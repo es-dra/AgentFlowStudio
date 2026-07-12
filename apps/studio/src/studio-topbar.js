@@ -18,6 +18,7 @@ export function renderTopbar(options) {
     authUser,
     runtimeSurfaceStatus,
     onSignOut,
+    onRetrySave,
   } = options;
   const topbar = document.getElementById("topbar");
   const signature = [
@@ -38,6 +39,7 @@ export function renderTopbar(options) {
   if (topbar.dataset.signature === signature) return;
   topbar.dataset.signature = signature;
   topbar.classList.toggle("drawer-open", state.ui.drawerOpen);
+  topbar.classList.toggle("save-attention", isSaveAttentionState(state.ui.saveState));
   topbar.replaceChildren();
 
   if (!state.ui.drawerOpen) {
@@ -52,9 +54,7 @@ export function renderTopbar(options) {
   const right = el("div", "topbar-right");
   if (runtimeSurfaceStatus) right.appendChild(runtimeStatusBadge(runtimeSurfaceStatus));
   if (authUser) right.appendChild(accountButton(authUser, onSignOut));
-  const save = el("span", `save-pill ${saveClass(state.ui.saveState)}`, state.ui.saveState || "本地暂存");
-  if (state.ui.saveMessage) save.title = state.ui.saveMessage;
-  right.appendChild(save);
+  right.appendChild(savePill(state, onRetrySave));
   topbar.appendChild(right);
 }
 
@@ -171,8 +171,36 @@ function projectLabel(item) {
   return item.studio_state_meta?.projectName || item.goal || item.project_id;
 }
 
+function savePill(state, onRetrySave) {
+  const saveState = state.ui.saveState || "本地暂存";
+  const retryable = isRetryableSaveState(saveState) && typeof onRetrySave === "function";
+  const save = retryable
+    ? el("button", `save-pill save-pill-button ${saveClass(saveState)}`, `${saveState} · 重试`)
+    : el("span", `save-pill ${saveClass(saveState)}`, saveState);
+  save.title = [
+    state.ui.saveMessage || "",
+    retryable ? "点击重试保存" : "",
+  ].filter(Boolean).join(" ");
+  if (retryable) {
+    save.type = "button";
+    save.setAttribute("aria-label", `重试保存：${state.ui.saveMessage || saveState}`);
+    save.addEventListener("click", () => onRetrySave?.());
+  }
+  return save;
+}
+
+function isRetryableSaveState(state) {
+  return state === "保存失败" || state === "需要登录";
+}
+
+function isSaveAttentionState(state) {
+  return isRetryableSaveState(state) || state === "保存冲突";
+}
+
 function saveClass(state) {
   if (state === "已保存") return "saved";
   if (state === "保存中" || state === "同步中") return "saving";
+  if (state === "保存失败" || state === "需要登录") return "failed";
+  if (state === "保存冲突") return "failed conflict";
   return "local";
 }

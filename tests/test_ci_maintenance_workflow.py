@@ -18,6 +18,21 @@ def test_github_maintenance_workflow_exists_with_required_gates() -> None:
     assert "git diff --check" in source
 
 
+def test_github_maintenance_workflow_installs_playwright_chromium_before_pytest() -> None:
+    source = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    dependency_install = 'python -m pip install -e ".[dev]"'
+    browser_install = "python -m playwright install chromium"
+    pytest_run = "python -m pytest"
+
+    assert dependency_install in source
+    assert browser_install in source
+    assert pytest_run in source
+    assert source.index(dependency_install) < source.index(browser_install) < source.index(
+        pytest_run
+    )
+
+
 def test_github_maintenance_workflow_does_not_enable_live_providers() -> None:
     source = WORKFLOW_PATH.read_text(encoding="utf-8")
 

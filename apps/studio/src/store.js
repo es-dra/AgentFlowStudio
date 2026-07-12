@@ -1,4 +1,5 @@
 import { loadPersisted, migrateLegacyCanvasStorage, persist } from "./store-persistence.js";
+import { runtimeSaveFailureState, shouldKeepLocalOverRemote, snapshotKey } from "./store-runtime-save.js";
 import {
   hasStudioContent,
   hasStudioMeta,
@@ -21,6 +22,9 @@ export function createStore(projectId = "studio-local-001") {
   let saveTimer = null;
   let runtimeClient = null;
   let runtimeStateVersion = "";
+  let lastRuntimeSavedSnapshot = "";
+  let saveInFlight = false;
+  let saveQueuedAfterSuccess = false;
 
   function get() {
     return state;
@@ -57,6 +61,9 @@ export function createStore(projectId = "studio-local-001") {
   function attachRuntime(runtime) {
     runtimeClient = runtime;
     runtimeStateVersion = "";
+    lastRuntimeSavedSnapshot = "";
+    saveInFlight = false;
+    saveQueuedAfterSuccess = false;
     if (runtime?.projectId) state.meta.projectId = runtime.projectId;
     state.ui.saveState = "本地暂存";
     notifySoon();
@@ -83,6 +90,7 @@ export function createStore(projectId = "studio-local-001") {
         remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
         persist(state);
+        lastRuntimeSavedSnapshot = snapshotKey(snapshotStudioState(state));
         state.ui.saveState = "已保存";
         state.ui.saveMessage = "";
         notifySoon();
@@ -122,6 +130,9 @@ export function createStore(projectId = "studio-local-001") {
   async function switchProject(projectId, runtime) {
     runtimeClient = runtime;
     runtimeStateVersion = "";
+    lastRuntimeSavedSnapshot = "";
+    saveInFlight = false;
+    saveQueuedAfterSuccess = false;
     clearTimeout(saveTimer);
     state = loadPersisted(projectId) || initialState(projectId);
     state.meta.projectId = projectId;
@@ -133,6 +144,12 @@ export function createStore(projectId = "studio-local-001") {
 
   function scheduleRuntimeSave() {
     if (!runtimeClient?.saveStudioState) return;
+    if (saveInFlight) {
+      saveQueuedAfterSuccess = true;
+      state.ui.saveState = "保存中";
+      notifySoon();
+      return;
+    }
     clearTimeout(saveTimer);
     state.ui.saveState = "保存中";
     saveTimer = setTimeout(async () => {
@@ -143,20 +160,49 @@ export function createStore(projectId = "studio-local-001") {
   async function flushRuntimeSave() {
     if (!runtimeClient?.saveStudioState) return;
     clearTimeout(saveTimer);
+    saveTimer = null;
+    if (saveInFlight) {
+      saveQueuedAfterSuccess = true;
+      return;
+    }
+    const snapshot = snapshotStudioState(state);
+    const savingSnapshotKey = snapshotKey(snapshot);
+    if (lastRuntimeSavedSnapshot && savingSnapshotKey === lastRuntimeSavedSnapshot) {
+      state.ui.saveState = "已保存";
+      state.ui.saveMessage = "";
+      notifySoon();
+      return;
+    }
+    saveInFlight = true;
+    saveQueuedAfterSuccess = false;
+    let flushQueued = false;
     try {
       state.ui.saveState = "保存中";
       notifySoon();
-      const payload = await runtimeClient.saveStudioState(snapshotStudioState(state), runtimeStateVersion);
+      const payload = await runtimeClient.saveStudioState(snapshot, runtimeStateVersion);
       runtimeStateVersion = String(payload?.state_version || runtimeStateVersion || "");
-      state.ui.saveState = "已保存";
-      state.ui.saveMessage = "";
+      lastRuntimeSavedSnapshot = savingSnapshotKey;
+      if (snapshotKey(snapshotStudioState(state)) === savingSnapshotKey) {
+        state.ui.saveState = "已保存";
+        state.ui.saveMessage = "";
+      } else {
+        state.ui.saveState = "保存中";
+        state.ui.saveMessage = "新修改尚未完成保存，正在继续同步。";
+        flushQueued = true;
+      }
     } catch (error) {
-      state.ui.saveState = "本地暂存";
-      state.ui.saveMessage = error?.status === 409
-        ? "项目已在其他窗口更新，当前修改已保留在本地暂存；刷新后再继续编辑"
-        : "运行服务保存失败，已保留本地暂存";
+      const failure = runtimeSaveFailureState(error);
+      state.ui.saveState = failure.saveState;
+      state.ui.saveMessage = failure.saveMessage;
+      saveQueuedAfterSuccess = false;
+    } finally {
+      saveInFlight = false;
+      if (flushQueued || saveQueuedAfterSuccess) {
+        saveQueuedAfterSuccess = false;
+        scheduleRuntimeSave();
+      }
+      notifySoon();
     }
-    notifySoon();
   }
 
   function notifySoon() {
@@ -169,19 +215,4 @@ export function createStore(projectId = "studio-local-001") {
   }
 
   return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, flushRuntimeSave, undo, redo };
-}
-
-function shouldKeepLocalOverRemote(localState, remoteState, payload) {
-  if (!hasStudioContent(localState) || payload?.source !== "runtime") return false;
-  const localUpdated = timestampMs(localState.meta?.updated_at);
-  const remoteUpdated = Math.max(
-    timestampMs(payload?.saved_at),
-    timestampMs(remoteState?.meta?.updated_at),
-  );
-  return localUpdated > remoteUpdated;
-}
-
-function timestampMs(value) {
-  const parsed = Date.parse(String(value || ""));
-  return Number.isFinite(parsed) ? parsed : 0;
 }

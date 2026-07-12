@@ -77,6 +77,7 @@ async function bootstrap() {
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
   bindStudioWorkflowEvents();
+  bindSaveAuthRecovery();
 
   store.subscribe(renderAll);
   renderAll(store.get());
@@ -137,6 +138,37 @@ function bindStudioWorkflowEvents() {
       s.selection = { nodeIds: [node.id], edgeId: null };
     }, { history: false, persist: false });
   });
+}
+
+function bindSaveAuthRecovery() {
+  let recoveryInFlight = false;
+  window.addEventListener("afs:studio-save-auth-required", (event) => {
+    if (recoveryInFlight) return;
+    recoveryInFlight = true;
+    void recoverSaveAuthBoundary(event.detail?.status).finally(() => {
+      recoveryInFlight = false;
+    });
+  });
+}
+
+async function recoverSaveAuthBoundary(status) {
+  projectController.setAuthUser(null);
+  renderAll(store.get());
+  if (Number(status) === 403) {
+    await signOut(runtime);
+  }
+  const authState = await ensureAuthSession(runtime, {
+    onAuthenticated: (user) => {
+      projectController.setAuthUser(user);
+      renderAll(store.get());
+    },
+  });
+  projectController.setAuthUser(authState?.user);
+  await refreshRuntimeSurfaceStatus({ authState });
+  if (!authState?.auth_required || authState?.authenticated) {
+    await store.flushRuntimeSave();
+  }
+  renderAll(store.get());
 }
 
 function openGenerationForNode(inputNode) {
@@ -263,6 +295,7 @@ function renderAll(state) {
     onOpenHome: () => openStudioHome(state),
     onBeforeSiteHome: () => store.flushRuntimeSave(),
     authUser: projectController.authUser,
+    onRetrySave: () => store.flushRuntimeSave(),
     runtimeSurfaceStatus,
     onSignOut: async () => {
       await signOut(runtime);

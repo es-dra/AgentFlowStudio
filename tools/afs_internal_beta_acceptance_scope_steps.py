@@ -103,6 +103,25 @@ def studio_state_step(
     )
 
 
+def auth_logout_boundary_step(
+    client,
+    steps: list[dict[str, Any]],
+    alpha_headers: dict[str, str],
+    config: AcceptanceConfig,
+) -> None:
+    logout = client.post("/auth/logout", headers=alpha_headers)
+    protected_after_logout = client.get(f"/projects/{config.project_id}/studio-state", headers=alpha_headers)
+    add_step(
+        steps,
+        "auth_logout_rejects_protected_studio_state",
+        "passed" if logout.status_code == 200 and protected_after_logout.status_code == 401 else "failed",
+        {
+            "logout_http_status": logout.status_code,
+            "protected_after_logout_http_status": protected_after_logout.status_code,
+        },
+    )
+
+
 def image_asset_step(
     client,
     steps: list[dict[str, Any]],

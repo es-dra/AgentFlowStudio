@@ -13,6 +13,7 @@ from tools.afs_internal_beta_acceptance_generation_steps import (
 )
 from tools.afs_internal_beta_acceptance_scope_steps import (
     artifact_scope_step,
+    auth_logout_boundary_step,
     auth_registration_step,
     health_step,
     image_asset_step,
@@ -46,6 +47,7 @@ def run_acceptance_contract(
         feedback_artifact_id,
     ])
     video_gate_step(client, steps, alpha_headers, health, image_asset_id, active_config)
+    auth_logout_boundary_step(client, steps, alpha_headers, active_config)
     return _report(steps, mode=mode)
 
 
