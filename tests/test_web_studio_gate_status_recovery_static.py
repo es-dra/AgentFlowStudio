@@ -460,7 +460,11 @@ def test_candidate_failure_reasons_are_redacted_before_state_restore_and_dom() -
           safe_manifest: {
             batch_status: "partially_complete",
             output_count: 1,
-            blocks: [{ candidate_id: "candidate_002", reason: unsafe, failure_class: "provider_timeout" }],
+            stage: unsafe,
+            failure_class: "provider_timeout",
+            blocks: [{ candidate_id: "candidate_002", reason: unsafe, message: unsafe, error: unsafe, failure_class: "provider_timeout" }],
+            provider_diagnostics: { reason: unsafe, error_type: unsafe, provider_stage: unsafe },
+            batch_summary: unsafe,
           },
           candidate_previews: [
             { candidate_id: "candidate_001", preview_url: firstUrl, width: 1024, height: 576, aspect_ratio: "16:9" },
@@ -476,6 +480,11 @@ def test_candidate_failure_reasons_are_redacted_before_state_restore_and_dom() -
 
         const node = { id: "node_1", type: "image", title: "Keyframe", prompt: "prompt", params: {} };
         applyKeyframeResponse(makeStore(node), "node_1", response, { aspect_ratio: "16:9" });
+        assertNoUnsafe("immediate lastGenerationManifest", node.params.lastGenerationManifest);
+        assertNoUnsafe("immediate provider diagnostics", node.params.lastGenerationManifest.provider_diagnostics);
+        assertNoUnsafe("immediate manifest blocks", node.params.lastGenerationManifest.blocks);
+        assertNoUnsafe("immediate params", node.params);
+        assertNoUnsafe("immediate result", node.result);
         const candidates = candidatePreviewsFromNode(node);
         assertNoUnsafe("candidate objects", candidates);
 
