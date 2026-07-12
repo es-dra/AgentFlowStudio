@@ -18,14 +18,23 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   let projectSummaries = [];
   let showAllProjects = false;
   let currentAuthUser = null;
+  let projectAccessRecovery = null;
 
-  async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true } = {}) {
+  async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true, recoverOnDenied = true } = {}) {
     const safe = safeProjectId(projectId) || "studio-local-001";
     persistActiveProject(safe);
     rememberProject(safe);
     syncProjectUrl(safe);
     setRuntime(runtimeClient);
-    await store.switchProject(safe, runtimeClient);
+    const switchResult = await store.switchProject(safe, runtimeClient);
+    if (isProjectAccessDeniedError(switchResult?.error)) {
+      if (recoverOnDenied) {
+        await recoverProjectAccessDenied(switchResult.error);
+      } else {
+        await showEmptyProjectState();
+      }
+      return;
+    }
     if (projectName) {
       store.set((s) => {
         s.meta.projectName = projectName;
@@ -62,6 +71,32 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       return;
     }
     await showEmptyProjectState();
+  }
+
+  async function recoverProjectAccessDenied(error = null) {
+    if (projectAccessRecovery) return projectAccessRecovery;
+    projectAccessRecovery = (async () => {
+      await refreshProjectSummaries();
+      const runtime = getRuntime();
+      const currentId = runtime.projectId || store.get().meta.projectId;
+      if (projectSummaries.some((item) => item.project_id === currentId)) {
+        return false;
+      }
+      const next = projectSummaries.find((item) => item.project_id);
+      if (next?.project_id) {
+        await applyProject(next.project_id, createRuntimeClient(next.project_id), {
+          projectName: projectDisplayName(next),
+          recoverOnDenied: false,
+        });
+      } else {
+        await showEmptyProjectState();
+      }
+      reportProjectAccessRecovery(runtime, error, currentId, next?.project_id || EMPTY_PROJECT_ID);
+      return true;
+    })().finally(() => {
+      projectAccessRecovery = null;
+    });
+    return projectAccessRecovery;
   }
 
   async function switchProject(projectId) {
@@ -127,7 +162,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       },
     };
     const known = projectSummaries.length ? [...projectSummaries] : [];
-    if (currentId && currentId !== EMPTY_PROJECT_ID && !known.some((item) => item.project_id === currentId)) {
+    if (!projectSummaries.length && currentId && currentId !== EMPTY_PROJECT_ID && !known.some((item) => item.project_id === currentId)) {
       known.unshift(current);
     }
     const recent = recentProjectIds();
@@ -167,6 +202,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     },
     refreshProjectSummaries,
     ensureAccessibleStartupProject,
+    recoverProjectAccessDenied,
     switchProject,
     createNewProject,
     deleteProject,
@@ -355,6 +391,22 @@ function reportProjectDeleteClientError(runtime, error, projectId) {
   });
 }
 
+function reportProjectAccessRecovery(runtime, error, staleProjectId, nextProjectId) {
+  reportClientError({
+    event_type: "project_access_recovered",
+    severity: "warning",
+    message: safeError(error || "project access denied"),
+    action: "recover_project_access",
+    project_id: staleProjectId,
+    runtime,
+    error,
+    details: {
+      stale_project_id: staleProjectId,
+      next_project_id: nextProjectId,
+    },
+  });
+}
+
 async function createProjectWithRetry(runtime, payload) {
   try {
     return await runtime.createProject(payload);
@@ -369,6 +421,15 @@ function isTransientRuntimeError(error) {
   const status = Number(error?.status || 0);
   const message = error instanceof Error ? error.message : String(error || "");
   return status === 0 || status === 502 || status === 503 || status === 504 || /network connection interrupted|Failed to fetch|Gateway timeout/i.test(message);
+}
+
+function isProjectAccessDeniedError(error) {
+  if (!error) return false;
+  const code = String(error.errorCode || error.payload?.error || error.payload?.detail?.error || "").trim();
+  if (code === "project_access_denied") return true;
+  const status = Number(error.status || 0);
+  const message = error instanceof Error ? error.message : String(error || "");
+  return status === 403 && /project[_ ]access[_ ]denied|没有访问该项目的权限/i.test(message);
 }
 
 function delay(ms) {

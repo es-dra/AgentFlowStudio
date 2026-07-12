@@ -46,6 +46,7 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
       sourceKeyframeNodeId: source.id,
       sourceKeyframeJobId: source.params?.lastKeyframeJobId || null,
       sourceKeyframeAssetId: frameAsset.asset_id,
+      assetReferenceMode: source.params?.assetReferenceMode || source.params?.referenceTransformMode || null,
       firstFrameImageAssetId: frameAsset.asset_id,
       firstFramePreviewUrl: frameAsset.preview_url || source.previewUrl || "",
       videoInputSource: {

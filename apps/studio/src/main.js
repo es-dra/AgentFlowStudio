@@ -77,6 +77,7 @@ async function bootstrap() {
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
   bindStudioWorkflowEvents();
+  bindProjectAccessRecovery();
 
   store.subscribe(renderAll);
   renderAll(store.get());
@@ -136,6 +137,12 @@ function bindStudioWorkflowEvents() {
     store.set((s) => {
       s.selection = { nodeIds: [node.id], edgeId: null };
     }, { history: false, persist: false });
+  });
+}
+
+function bindProjectAccessRecovery() {
+  window.addEventListener("afs:project-access-denied", () => {
+    void projectController.recoverProjectAccessDenied();
   });
 }
 

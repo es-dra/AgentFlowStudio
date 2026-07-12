@@ -418,6 +418,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     asset_card_drafts = (STUDIO_ROOT / "src" / "asset-card-drafts.js").read_text(encoding="utf-8")
     asset_card_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
     runtime_keyframes = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
+    runtime_reference_intent = Path("apps/api/runtime_reference_intent.py").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
     keyframe_response = (STUDIO_ROOT / "src" / "node-keyframe-response.js").read_text(encoding="utf-8")
@@ -431,6 +432,11 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
         assert marker in optimizer_contract
     for marker in ("assetCardRevision", "image_guided_partial_revision", "identity_layout_anchor", "changed_fields"):
         assert marker in asset_revision_refs + asset_card_panel + optimizer_contract
+    for marker in ("ASSET_REFERENCE_MODES", "originalize_ip_safe", "inspiration_reference", "原创重生"):
+        assert marker in asset_revision_refs + asset_card_panel
+    assert "reference_transform_mode" in optimizer_contract
+    assert "reference_transform_mode_for_request" in runtime_keyframes
+    assert "Originality-safe reference transformation" in runtime_reference_intent
     assert "assetCardRevisionImageRefs(node)" in optimizer_contract
     assert "assetCardRevisionPromptSupplement(node)" in asset_generation_prompt
     assert "image_operation" in runtime_keyframes
@@ -539,6 +545,68 @@ process.stdout.write(JSON.stringify({
     assert "只给左脸增加一道浅疤" in payload["promptText"]
     assert payload["refs"] == ["img_user_reference_001"]
     assert payload["revisionField"] == "user_instruction"
+
+
+def test_asset_card_originalize_reference_mode_reaches_runtime_contract() -> None:
+    script = r'''
+import {
+  ASSET_REFERENCE_MODES,
+  buildUserAssetCardRevisionState,
+} from "./apps/studio/src/asset-revision-references.js";
+import { assetCardPromptText } from "./apps/studio/src/asset-card-generation-prompt.js";
+import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const draft = {
+  asset_type: "character",
+  label: "灵感角色",
+  status: "draft",
+  signature: "来自参考图的高层灵感角色",
+  feature_card: {
+    identity: "高层灵感，不复制身份",
+    appearance: "重新设计头部、服装和轮廓",
+  },
+};
+const node = {
+  id: "asset_originalize",
+  type: "image",
+  prompt: "参考这张图的气质，重新设计成原创角色",
+  content: "",
+  params: {
+    nodeRole: "asset_card_draft",
+    assetReferenceMode: ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE,
+    assetCardDraft: { ...draft, user_edited_text: "参考这张图的气质，重新设计成原创角色" },
+    uploads: [{ asset_id: "img_reference_ip_risk", filename: "reference.png", role: "reference_image" }],
+    spec: { ratio: "16:9", count: 1 },
+  },
+};
+node.params.assetCardRevision = buildUserAssetCardRevisionState(
+  node,
+  draft,
+  node.prompt,
+  ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE,
+);
+const request = buildKeyframeGenerationRequest({ nodes: { [node.id]: node }, edges: {} }, node);
+process.stdout.write(JSON.stringify({
+  mode: node.params.assetCardRevision.mode,
+  role: node.params.assetCardRevision.reference_assets[0].role,
+  transformMode: request.node_parameters.reference_transform_mode,
+  promptText: assetCardPromptText(node),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["mode"] == "originalize_ip_safe"
+    assert payload["role"] == "inspiration_reference"
+    assert payload["transformMode"] == "originalize_ip_safe"
+    assert "originalize / IP-risk reduction" in payload["promptText"]
+    assert "primary visual source of truth" not in payload["promptText"]
 
 
 def test_scene_asset_card_keeps_story_characters_out_of_environment_prompt() -> None:
