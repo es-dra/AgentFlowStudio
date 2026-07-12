@@ -46,8 +46,16 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"status": preflight["status"], "report": str(report_path)}, ensure_ascii=False))
         return 2
 
-    client = TestClient(create_runtime_app(runtime_root=runtime_root))
-    payload = _run_comparison(client, args)
+    previous_auth = os.environ.get("AFS_AUTH_ENABLED")
+    os.environ["AFS_AUTH_ENABLED"] = "false"
+    try:
+        client = TestClient(create_runtime_app(runtime_root=runtime_root))
+        payload = _run_comparison(client, args)
+    finally:
+        if previous_auth is None:
+            os.environ.pop("AFS_AUTH_ENABLED", None)
+        else:
+            os.environ["AFS_AUTH_ENABLED"] = previous_auth
     report = _runner_report(
         payload,
         runtime_root=runtime_root,
@@ -68,7 +76,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--runtime-root", default="")
     parser.add_argument("--report", default="")
     parser.add_argument("--provider-config", default="")
-    parser.add_argument("--provider-service-id", default="codex_image")
+    parser.add_argument("--provider-service-id", default="image_relay")
     parser.add_argument("--reference-image", default="", help="Optional local image to upload as the fixed character asset.")
     parser.add_argument("--sample-reference-output", default="", help="Write and use a deterministic sample reference PNG when --reference-image is not supplied.")
     parser.add_argument("--allow-live-provider", action="store_true", help="Required in addition to AFS_ALLOW_REMOTE_IMAGE=true.")
