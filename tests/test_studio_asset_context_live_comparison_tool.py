@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from tools import studio_asset_context_live_comparison as live_runner
 from tools.studio_asset_context_sample_reference import write_sample_reference
@@ -112,3 +113,24 @@ def test_live_comparison_runner_can_use_sample_reference_in_readiness_mode(tmp_p
     assert report["runner_mode"] == "gate_closed_readiness"
     assert report["provider_calls_started"] is False
     assert report["arm_summary"][2]["reference_image_count"] == 1
+
+
+def test_live_comparison_runner_isolates_host_auth_setting(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
+    report_path = tmp_path / "live_report.json"
+
+    exit_code = live_runner.main(["--report", str(report_path)])
+
+    assert exit_code == 0
+    assert os.environ["AFS_AUTH_ENABLED"] == "true"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["comparison_status"] == "blocked"
+    assert report["provider_calls_started"] is False
+
+
+def test_live_comparison_runner_defaults_to_current_image_relay() -> None:
+    args = live_runner.parse_args([])
+
+    assert args.provider_service_id == "image_relay"
