@@ -202,12 +202,6 @@
   padding: 7px 8px;
   color: var(--text-primary);
 }
-.visual-asset-panel textarea {
-  min-height: 88px;
-  max-height: min(360px, 52vh);
-  resize: vertical;
-  overflow-y: auto;
-}
 .visual-asset-panel.is-drafting input,
 .visual-asset-panel.is-drafting textarea {
   background-image:
@@ -284,6 +278,35 @@
 .director-confirm-modal {
   width: min(440px, 92vw);
 }
+
+.project-delete-modal {
+  width: min(360px, 90vw);
+}
+
+.project-create-required-modal {
+  width: min(380px, 90vw);
+}
+
+.project-delete-body {
+  gap: 8px;
+}
+
+.project-create-required-body,
+.project-delete-body {
+  display: grid;
+  gap: 8px;
+}
+
+.project-create-required-body p,
+.project-delete-body p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.project-delete-body .modal-error {
+  font-size: 12px;
+}
+
 .project-create-body,
 .director-confirm-body {
   display: grid;

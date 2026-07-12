@@ -1,6 +1,10 @@
 import { showModal, el } from "../overlay.js";
 import { visualAssetDefaults } from "./visual-asset-defaults.js";
 import { lockChipsForAssetType, renderVisualAssetPanel } from "./visual-asset-panel-render.js";
+import { formatRuntimeError } from "../runtime-error-utils.js";
+import { buildVisualAssetPromotionPayload } from "./visual-asset-promotion-request.js";
+import { assetIdFromRef, primaryReuseCandidate, visualAssetPromotionReuseChoices } from "./visual-asset-reuse-intent.js";
+import { collectFieldValues, compactCard, mergeVisualAssets } from "./visual-asset-panel-submit-state.js";
 
 export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character", existingAsset = null }) {
   if (!runtime?.promoteVisualAsset) {
@@ -20,7 +24,9 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
   function render() {
     const previous = mergeFieldValues(seedFromExistingAsset(existingAsset), collectFieldValues(modal));
     const defaults = visualAssetDefaults(node, imageAsset, assetType);
-    renderVisualAssetPanel(modal, { assetType, node, imageAsset, previous, defaults });
+    const label = previous.label || defaults.label || node.title || "";
+    const reuseChoices = visualAssetPromotionReuseChoices(store.get(), node, { assetType, label });
+    renderVisualAssetPanel(modal, { assetType, node, imageAsset, previous, defaults, reuseChoices });
   }
 
   modal.addEventListener("click", async (event) => {
@@ -43,6 +49,10 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     if (action === "fix" || action === "reject") {
       await submit(action === "fix" ? "fixed" : "rejected");
     }
+  });
+
+  modal.addEventListener("change", (event) => {
+    if (event.target?.dataset?.field === "label") render();
   });
 
   function applyLockChip(index) {
@@ -107,6 +117,13 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     const card = compactCard(values.card);
     const signature = decision === "rejected" && !values.signature ? "未通过的候选图" : values.signature;
     const cardOrFallback = decision === "rejected" && !Object.keys(card).length ? { review: "rejected candidate" } : card;
+    const reuseChoices = visualAssetPromotionReuseChoices(store.get(), node, { assetType, label: values.label });
+    const reuseCandidate = primaryReuseCandidate(reuseChoices);
+    if (decision === "fixed" && reuseChoices.requires_intent && !reuseChoices.intents.includes(values.reuseIntent)) {
+      return showError("已存在同名或图谱绑定的固定资产，请选择复用、替换或新建。");
+    }
+    const intentTargetAssetId = values.existingAssetId || reuseCandidate?.asset_id || "";
+    const reuseIntent = decision === "fixed" && reuseChoices.requires_intent ? values.reuseIntent : "";
     if (decision === "fixed") {
       if (!values.label) return showError("请填写资产名称。");
       if (!signature) return showError("请填写一句话签名，它会出现在优化提示词里。");
@@ -121,7 +138,13 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
         signature,
         featureCard: cardOrFallback,
         negativeLocks: lines(values.locks),
-        supersedesAssetId: decision === "fixed" ? assetIdFromRef(existingAsset) : "",
+        reuseIntent,
+        linkExistingAssetId: reuseIntent === "link_existing" ? intentTargetAssetId : "",
+        supersedesAssetId: reuseIntent === "replace"
+          ? intentTargetAssetId
+          : decision === "fixed" && !reuseIntent
+            ? assetIdFromRef(existingAsset)
+            : "",
       });
       close();
     } catch (error) {
@@ -148,28 +171,6 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
   }
 }
 
-function collectFieldValues(root) {
-  const card = {};
-  for (const input of root.querySelectorAll("[data-card]")) {
-    const value = String(input.value || "").trim();
-    if (value) card[input.dataset.card] = value;
-  }
-  return {
-    label: field(root, "label"),
-    signature: field(root, "signature"),
-    locks: String(root.querySelector('[data-field="negative_locks"]')?.value || ""),
-    card,
-  };
-}
-
-function compactCard(card) {
-  const result = {};
-  for (const [key, value] of Object.entries(card || {})) {
-    if (String(value || "").trim()) result[key] = String(value).trim();
-  }
-  return result;
-}
-
 async function submitVisualAssetReview({
   store,
   runtime,
@@ -181,20 +182,23 @@ async function submitVisualAssetReview({
   signature,
   featureCard,
   negativeLocks,
+  reuseIntent = "",
+  linkExistingAssetId = "",
   supersedesAssetId = "",
 }) {
-  const payload = {
-    source_image_asset_refs: [imageAsset.asset_id],
-    asset_type: assetType,
+  const payload = buildVisualAssetPromotionPayload({
+    node,
+    imageAsset,
+    decision,
     label,
+    assetType,
     signature,
-    feature_card: featureCard,
-    negative_locks: negativeLocks,
-    source_node_id: node.id,
-    supersedes_asset_id: supersedesAssetId || null,
-    review_decision: decision,
-    reviewed_at: new Date().toISOString(),
-  };
+    featureCard,
+    negativeLocks,
+    reuseIntent,
+    linkExistingAssetId,
+    supersedesAssetId,
+  });
   const response = await runtime.promoteVisualAsset(payload);
   const asset = response?.asset;
   const localAsset = asset?.asset_id ? {
@@ -203,14 +207,17 @@ async function submitVisualAssetReview({
     label,
     signature,
     feature_card: featureCard,
-    negative_locks: negativeLocks,
-  } : null;
+      negative_locks: negativeLocks,
+      reuse_intent: reuseIntent || asset?.reuse_intent || "",
+      link_existing_asset_id: linkExistingAssetId || asset?.link_existing_asset_id || "",
+    } : null;
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n || !localAsset?.asset_id) return;
     n.params.visualAssets = mergeVisualAssets(n.params.visualAssets || [], localAsset, supersedesAssetId);
     n.params.lastVisualAssetWarnings = response?.warnings || [];
     n.result = `${n.result || ""}\n${decision === "fixed" ? "资产已固定；画布撤销(Ctrl+Z)不影响已固定资产" : "候选未采用"}：${localAsset.label}：${localAsset.asset_id}`.trim();
+    s.assets = s.assets.filter((item) => assetIdFromRef(item) !== localAsset.asset_id);
     s.assets.unshift({
       id: store.nextId("asset"),
       kind: "visual_asset",
@@ -228,6 +235,7 @@ async function submitVisualAssetReview({
       signature: localAsset.signature,
       feature_card: localAsset.feature_card,
       negative_locks: localAsset.negative_locks,
+      source_evidence: localAsset.source_evidence || null,
       created_at: new Date().toISOString(),
     });
   });
@@ -244,18 +252,6 @@ function field(root, name, attr = "data-field") {
 function setInputValue(root, name, value, attr = "data-field") {
   const input = root.querySelector(`[${attr}="${name}"]`);
   if (input) input.value = String(value || "");
-}
-
-function mergeVisualAssets(existing, asset, supersedesAssetId = "") {
-  const assetId = String(asset?.asset_id || "").trim();
-  if (!assetId) return existing;
-  return [
-    ...existing.filter((item) => {
-      const current = String(item?.asset_id || "").trim();
-      return current !== assetId && current !== supersedesAssetId;
-    }),
-    asset,
-  ].slice(-8);
 }
 
 function seedFromExistingAsset(asset) {
@@ -279,10 +275,6 @@ function mergeFieldValues(seed, current) {
 
 const normalizeAssetType = (value) => (["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character");
 
-function assetIdFromRef(ref) {
-  return String(ref?.asset_id || ref?.visual_asset_id || ref?.assetId || "").trim();
-}
-
 function markNodeError(store, nodeId, message) {
   store.set((s) => {
     const node = s.nodes[nodeId];
@@ -293,6 +285,5 @@ function markNodeError(store, nodeId, message) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "未知错误");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
+  return formatRuntimeError(error, "??????");
 }

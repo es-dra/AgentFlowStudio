@@ -20,6 +20,8 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_project_manifest",
         "agentflow_artifact_map",
         "agentflow_feedback_event",
+        "agentflow_control_event",
+        "agentflow_control_register",
         "agentflow_memory_candidate",
         "agentflow_memory_promotion_decision",
         "agentflow_memory_evidence_reuse_review",
@@ -75,6 +77,9 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
         "schema_version_0_1_0",
         "example_path_exists",
         "no_private_paths_or_secrets",
+        "control_event_archive_ordering",
+        "control_event_claim_non_claim_separation",
+        "control_event_worker_final_ingest_idempotency",
         "router_decision_only",
         "candidate_memory_only",
         "promotion_decision_required_for_context_reuse",
@@ -86,3 +91,17 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
     } <= rule_ids
     assert "execute_workflow" not in rule_ids
     assert "call_remote_provider" not in rule_ids
+
+
+def test_worker_final_ingest_example_is_discoverable_and_loads() -> None:
+    worker_final_path = Path("examples/agentflow/control_events_worker_final_ingest.example.jsonl")
+    jsonl_examples = {path.as_posix() for path in AGENTFLOW_EXAMPLE_PATHS if path.suffix == ".jsonl"}
+
+    assert worker_final_path.as_posix() in jsonl_examples
+    events = [
+        json.loads(line)
+        for line in worker_final_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert {event["artifact_type"] for event in events} == {"agentflow_control_event"}
+    assert any(event["event_type"] == "worker_final_ingested" for event in events)

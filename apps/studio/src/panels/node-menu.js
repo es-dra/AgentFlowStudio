@@ -2,23 +2,22 @@ import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
 import { qualityFeedbackView } from "../quality-feedback.js";
+import { humanGateTargets, openHumanGateMenu } from "../human-gate.js";
+import { feedbackOverlayReviewTargets, openFeedbackOverlayReviewMenu } from "../feedback-overlay-review.js";
 import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
   fixNodeVisualAsset,
+  createKeyframeLocalEditDraft,
   createStoryboardKeyframeLayer,
   pollNodeVideoGeneration,
   identifyScriptAssets,
   setNodeVideoFrame,
   startNodeGeneration,
+  canRunNodeGeneration,
   uploadNodeImage,
 } from "../node-actions.js";
 import { canContinueKeyframeToVideo, createVideoNodeFromKeyframe } from "../keyframe-video-continuation.js";
-import {
-  ASSET_REFERENCE_MODES,
-  assetReferenceMode,
-  canUseAssetReferenceMode,
-} from "../asset-revision-references.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -29,6 +28,8 @@ import { openAssetCardPanel } from "./asset-card-panel.js";
 import { openRetireAssetModal } from "./drawer-asset-actions.js";
 
 const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
+const KEYFRAME_LOCAL_EDIT_GATE = "局部编辑不可用：当前只支持按提示词重新生成整张关键帧；真正局部编辑需要 image-edit/mask 能力。";
+const VIDEO_LOCAL_EDIT_GATE = "局部视频编辑不可用：当前草稿只是整段重生成尝试；真正局部/逐帧编辑需要 video-edit/mask/temporal 能力。";
 
 export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
@@ -41,10 +42,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   addItem("copy", "复制节点", () => duplicateNode(store, nodeId));
   addItem(node.collapsed ? "chevronDown" : "chevronUp", node.collapsed ? "展开" : "折叠", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
-  addItem("retry", "重试生成", () => {
-    const fresh = store.get().nodes[nodeId];
-    if (fresh) startNodeGeneration(store, runtime, fresh);
-  });
+  if (canRetryGeneration(node)) {
+    addItem("retry", retryMenuLabel(node), () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) startNodeGeneration(store, runtime, fresh);
+    });
+  }
   if (node.type === "text") {
     addItem("upload", "导入/替换剧本", () => {
       const fresh = store.get().nodes[nodeId];
@@ -82,9 +85,6 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);
     });
-    if (canUseAssetReferenceMode(node)) {
-      addItem("wand", referenceModeMenuLabel(node), () => toggleReferenceMode(store, nodeId));
-    }
     addItem("bookmark", "标记为角色/场景/道具资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
@@ -94,6 +94,11 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       addItem("x", "取消固定资产", () => openRetireAssetModal(store, runtime, fixedAsset));
     }
     if (canContinueKeyframeToVideo(node)) {
+      addItem("pencil", "创建局部编辑需求草稿", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) void createKeyframeLocalEditDraft(store, runtime, fresh);
+      });
+      addDisabledItem("lock", "关键帧局部编辑不可用", KEYFRAME_LOCAL_EDIT_GATE);
       addItem("video", "接续视频节点", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) createVideoNodeFromKeyframe(store, fresh);
@@ -121,11 +126,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     });
     addItem("frames", "识别视频资产卡", () => requestVideoAssetCardDraft(store, nodeId));
     if (node.params?.lastVideoJobId) {
-      addItem("pencil", "创建视频修改草稿", () => {
+      addItem("pencil", "创建视频重生成草稿", () => {
         void VIDEO_REVISION_DRAFT_MARKER;
         const fresh = store.get().nodes[nodeId];
         if (fresh) enableVideoRevisionDraft(store, fresh);
       });
+      addDisabledItem("lock", "局部视频编辑不可用", VIDEO_LOCAL_EDIT_GATE);
       addItem("retry", "继续轮询视频任务", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) pollNodeVideoGeneration(store, runtime, fresh);
@@ -158,6 +164,18 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       if (fresh) createStoryboardKeyframeLayer(store, fresh);
     });
   }
+  if (humanGateTargets(node).length) {
+    addItem("check", "记录人工 Gate", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) openHumanGateMenu(fresh, anchor.point || anchor.el);
+    });
+  }
+  if (feedbackOverlayReviewTargets(node).length) {
+    addItem("layers", "选择反馈上下文", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) openFeedbackOverlayReviewMenu(store, fresh, anchor.point || anchor.el);
+    });
+  }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.params.isReference = !n.params.isReference; }));
   addItem("trash", "删除节点", () => deleteNodes(store, [nodeId]), true);
@@ -170,6 +188,17 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     item.addEventListener("click", () => { close(); onClick(); });
     pop.appendChild(item);
   }
+
+  function addDisabledItem(iconName, label, detail) {
+    const item = el("button", "menu-item");
+    item.disabled = true;
+    item.title = detail;
+    item.innerHTML = [
+      `<span class="mi-icon">${icon(iconName, 13)}</span>`,
+      `<span><span>${label}</span><span class="mi-sub">${detail}</span></span>`,
+    ].join("");
+    pop.appendChild(item);
+  }
 }
 
 function activeFixedVisualAsset(node) {
@@ -180,25 +209,16 @@ function activeFixedVisualAsset(node) {
   }) || null;
 }
 
-function referenceModeMenuLabel(node) {
-  return assetReferenceMode(node) === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
-    ? "参考图模式：原创重生"
-    : "参考图模式：局部修订";
+function canRetryGeneration(node) {
+  return canRunNodeGeneration(node);
 }
 
-function toggleReferenceMode(store, nodeId) {
-  store.set((s) => {
-    const node = s.nodes[nodeId];
-    if (!node) return;
-    const current = assetReferenceMode(node);
-    node.params.assetReferenceMode = current === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
-      ? ASSET_REFERENCE_MODES.LOCALIZED_EDIT
-      : ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
-    if (node.params.assetCardRevision) node.params.assetCardRevision.mode = node.params.assetReferenceMode;
-    delete node.params.lastOptimizedPromptPlain;
-    s.selection = { nodeIds: [node.id], edgeId: null };
-    s.ui.promptBarNodeId = node.id;
-  }, { history: false });
+function retryMenuLabel(node) {
+  if (["error", "partial"].includes(node.status)) return "Retry failed items";
+  if (node.type === "image") return "重新生成整张图";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) return "提交视频重生成尝试";
+  if (node.type === "video") return "重新生成整段视频";
+  return "重试生成";
 }
 
 function requestVideoAssetCardDraft(store, nodeId) {

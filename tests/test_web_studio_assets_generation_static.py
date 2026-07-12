@@ -112,6 +112,140 @@ process.stdout.write(JSON.stringify({
     assert "candidate_fixed_source.png" not in payload["current"]
 
 
+def test_asset_drawer_reference_action_sets_video_first_frame_and_keyframe_upload() -> None:
+    script = r'''
+import { markAssetReference, setVideoFrameFromAsset } from "./apps/studio/src/panels/drawer-asset-actions.js";
+
+const asset = {
+  id: "drawer_img_1",
+  asset_id: "img_asset_1",
+  kind: "image_reference",
+  title: "资产库参考图",
+  preview_url: "/projects/p/image-assets/img_asset_1/preview",
+};
+const fixedAsset = {
+  id: "visual_linwan",
+  asset_id: "vas_linwan",
+  visual_asset_id: "vas_linwan",
+  kind: "visual_asset",
+  asset_type: "character",
+  label: "林晚",
+  image_asset_refs: ["img_fixed_linwan"],
+  preview_url: "/projects/p/image-assets/img_fixed_linwan/preview",
+};
+const videoState = {
+  nodes: {
+    video_1: { id: "video_1", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_1"], edgeId: null },
+};
+const keyframeState = {
+  nodes: {
+    image_1: { id: "image_1", type: "image", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["image_1"], edgeId: null },
+};
+const fixedVideoState = {
+  nodes: {
+    video_2: { id: "video_2", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_2"], edgeId: null },
+};
+const fixedFrameState = {
+  nodes: {
+    video_3: { id: "video_3", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_3"], edgeId: null },
+};
+const storeFor = (state) => ({
+  get: () => state,
+  set: (mutator) => mutator(state),
+});
+
+markAssetReference(videoState, storeFor(videoState), asset);
+markAssetReference(keyframeState, storeFor(keyframeState), asset);
+markAssetReference(fixedVideoState, storeFor(fixedVideoState), fixedAsset);
+setVideoFrameFromAsset(fixedFrameState, storeFor(fixedFrameState), fixedAsset, "last");
+
+process.stdout.write(JSON.stringify({
+  video: videoState.nodes.video_1,
+  keyframe: keyframeState.nodes.image_1,
+  fixedVideo: fixedVideoState.nodes.video_2,
+  fixedFrame: fixedFrameState.nodes.video_3,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["video"]["params"]["firstFrameImageAssetId"] == "img_asset_1"
+    assert payload["video"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "首帧参考" in payload["video"]["result"]
+    assert payload["keyframe"]["params"]["uploads"][0]["role"] == "reference_image"
+    assert "视觉参考" in payload["keyframe"]["prompt"]
+    assert payload["fixedVideo"]["params"]["firstFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["fixedVideo"]["params"]["visualAssets"][0]["asset_id"] == "vas_linwan"
+    assert payload["fixedVideo"]["params"]["visualAssets"][0]["image_asset_refs"] == ["img_fixed_linwan"]
+    assert payload["fixedVideo"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "林晚 / img_fixed_linwan" in payload["fixedVideo"]["result"]
+    assert payload["fixedFrame"]["params"]["lastFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["fixedFrame"]["params"]["uploads"][0]["role"] == "last_frame"
+
+
+def test_video_generation_fallback_uses_fixed_visual_asset_as_first_frame() -> None:
+    script = r'''
+import { ensureVideoFirstFrameAsset } from "./apps/studio/src/video-node-flow.js";
+
+const state = {
+  nodes: {
+    video_1: {
+      id: "video_1",
+      type: "video",
+      params: {
+        visualAssets: [{
+          asset_id: "vas_linwan",
+          label: "林晚",
+          asset_type: "character",
+          image_asset_refs: ["img_fixed_linwan"],
+          preview_url: "/projects/p/image-assets/img_fixed_linwan/preview",
+        }],
+      },
+      result: "",
+    },
+  },
+  edges: {},
+  assets: [],
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const inferred = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+process.stdout.write(JSON.stringify({
+  inferred,
+  video: state.nodes.video_1,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["inferred"]["asset_id"] == "img_fixed_linwan"
+    assert payload["video"]["params"]["firstFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["video"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "参考资产作为首帧" in payload["video"]["result"]
+
+
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
@@ -171,6 +305,37 @@ process.stdout.write(JSON.stringify({
     assert payload["videoModelIds"] == ["seedance-i2v"]
 
 
+def test_image_model_default_uses_external_image_relay_provider() -> None:
+    script = r'''
+import {
+  IMAGE_MODELS,
+  defaultModel,
+  providerServiceForImageModel,
+} from "./apps/studio/src/presets/models.js";
+
+process.stdout.write(JSON.stringify({
+  defaultModel: defaultModel("image"),
+  fallbackProvider: providerServiceForImageModel(null),
+  imageProviders: IMAGE_MODELS.map((model) => model.providerServiceId),
+  imageModelIds: IMAGE_MODELS.map((model) => model.id),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["defaultModel"]["id"] == "image2-keyframe"
+    assert payload["defaultModel"]["providerServiceId"] == "image_relay"
+    assert payload["fallbackProvider"] == "image_relay"
+    assert payload["imageProviders"] == ["image_relay"]
+    assert payload["imageModelIds"] == ["image2-keyframe"]
+
+
 def test_active_video_paths_do_not_reference_retired_video_provider() -> None:
     active_paths = [
         Path("apps/studio/src/presets/models.js"),
@@ -178,7 +343,6 @@ def test_active_video_paths_do_not_reference_retired_video_provider() -> None:
         Path("agentflow_studio/model_gateway/provider_adapter.py"),
         Path("agentflow_studio/model_gateway/provider_adapter_impl.py"),
         Path("configs/providers.example.json"),
-        Path("apps/cli/support_command_registry.py"),
     ]
 
     for path in active_paths:
@@ -234,6 +398,11 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
     assert "pollKeyframeUntilTerminal" in keyframe_actions
     assert "lastKeyframeJobId" in keyframe_actions
     assert "recoverTimedOutKeyframeFromAssets" in keyframe_actions
+    assert "submittedJobId && isRecoverableSubmitError(error)" in keyframe_actions
+    assert "handleBackgroundKeyframePollingError" in keyframe_actions
+    assert "transientPollErrors" in keyframe_actions
+    assert "markKeyframeStillProcessing(store, nodeId, jobId)" in keyframe_actions
+    assert "await startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request)" not in keyframe_actions
     assert "source_node_id" in keyframe_recovery
     assert "Gateway timeout while waiting for image generation" in runtime_client
     assert "MiniMax keyframe request failed" not in node_actions
@@ -270,20 +439,6 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "Revision strength: conservative low-change pass" in asset_revision_refs
     assert "primary visual source of truth" in asset_revision_refs
     assert "only editable delta" in asset_revision_refs
-    assert "ORIGINALIZE_IP_SAFE" in asset_revision_refs
-    assert "originalize / IP-risk reduction" in asset_revision_refs
-    assert "reference_transform_mode" in optimizer_contract
-    assert "原创重生" in (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
-    assert "data-reference-mode" in asset_card_panel
-    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
-    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
-    keyframe_video = (STUDIO_ROOT / "src" / "keyframe-video-continuation.js").read_text(encoding="utf-8")
-    assert "canUseAssetReferenceMode" in asset_revision_refs
-    assert "参考图模式：局部修订" in node_menu
-    assert "参考图模式：原创重生" in node_menu
-    assert "toggleReferenceMode" in node_menu
-    assert "canUseAssetReferenceMode(node)" in prompt_bar
-    assert "assetReferenceMode: source.params?.assetReferenceMode" in keyframe_video
     assert "Wardrobe edit scope: add the requested clothing as an outer garment layer only" in asset_revision_refs
     assert "Plush/fabric material must read as a surface covering on the same existing robot frame" in asset_revision_refs
     assert "Do not turn the subject into a toy, chibi, mascot" in asset_revision_refs
@@ -364,8 +519,6 @@ process.stdout.write(JSON.stringify({
   userAdjustment: assetCardUserAdjustmentText(node),
   promptText: assetCardPromptText(node),
   refs: request.asset_refs,
-  mode: request.node_parameters.asset_card_revision.mode,
-  transformMode: request.node_parameters.reference_transform_mode || "",
   revisionField: request.node_parameters.asset_card_revision.changed_fields[0].field,
 }));
 '''
@@ -385,7 +538,6 @@ process.stdout.write(JSON.stringify({
     assert "用户调整要求" in payload["promptText"]
     assert "只给左脸增加一道浅疤" in payload["promptText"]
     assert payload["refs"] == ["img_user_reference_001"]
-    assert payload["mode"] == "localized_edit"
     assert payload["revisionField"] == "user_instruction"
 
 
@@ -666,7 +818,8 @@ def test_asset_card_node_generation_prompt_is_not_written_into_prompt_box() -> N
 
     assert "assetCardUserAdjustmentText" in prompt_bar
     assert "assetCardPromptPlaceholder" in prompt_bar
-    assert "textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node)" in prompt_bar
+    assert "textarea.value = promptTextValue(node)" in prompt_bar
+    assert "if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node)" in prompt_bar
     assert "n.params.assetCardDraft.user_edited_text = textarea.value" in prompt_bar
     assert "node.prompt = assetImagePrompt(draft)" not in asset_nodes + asset_panel
     assert "assetCardNodeUploadImageRefs(node)" in optimizer_contract
@@ -678,10 +831,14 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_actions = (STUDIO_ROOT / "src" / "node-generation-actions.js").read_text(encoding="utf-8")
     video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
+    video_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js").read_text(encoding="utf-8")
+    drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
+    drawer_actions = (STUDIO_ROOT / "src" / "panels" / "drawer-asset-actions.js").read_text(encoding="utf-8")
 
     assert "preflightVideoRevision" in runtime_client
     assert "generateVideoRevision" in runtime_client
@@ -695,11 +852,17 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     assert "user_excluded_unconnected_named_asset" in generation_guards
     assert "label_matched" in inspector
     assert "named_asset_not_connected_fail_closed" not in generation_guards
-    assert "startRemoteVideoRevision" in node_actions
+    assert "runNodeGeneration" in node_actions
+    assert "startRemoteVideoRevision" in generation_actions
     assert "videoRevision" in video_actions
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in video_actions
     assert "enableVideoRevisionDraft" in source
     assert "video-revision-draft" in node_menu
+    assert "imageAssetFromVisualAsset" in video_flow
+    assert "已自动使用参考资产作为首帧" in video_flow
+    assert "firstFrameAssetFromVisualAssets" in video_flow
+    assert "canProvideVideoFrame" in drawer_assets + drawer_actions
+    assert "videoFrameImageAssetRef" in drawer_actions
 
 
 def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> None:
@@ -739,6 +902,7 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     feedback = STUDIO_ROOT / "src" / "quality-feedback.js"
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
+    video_response = (STUDIO_ROOT / "src" / "node-video-response.js").read_text(encoding="utf-8")
     video_node_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
@@ -764,6 +928,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node?.previewUrl" in feedback_source
     assert "preview_url" not in feedback_source
     assert "recordFeedback(feedback)" in runtime_client
+    assert "recordHumanGateDecision(payload)" in runtime_client
+    assert "/human-gate-decisions" in runtime_client
     assert "promoteVideoAsset(payload)" in runtime_client
     assert "/video-assets/promote" in runtime_client
     assert 'return requestJson("/feedback"' in runtime_client
@@ -782,6 +948,7 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "downloadResolvedMedia(asset.preview_url" in drawer_assets
     assert "导出原图" in drawer_assets
     media_preview = (STUDIO_ROOT / "src" / "media-preview-modal.js").read_text(encoding="utf-8")
+    feedback_runtime_flow = (STUDIO_ROOT / "src" / "quality-feedback-runtime-flow.js").read_text(encoding="utf-8")
     assert "openMediaPreviewModal" in media_preview
     assert "downloadResolvedMedia" in media_preview
     assert "setRuntimeMediaSource(link, url)" in media_preview
@@ -792,8 +959,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "反馈视频质量" in node_menu
     assert "编辑关键帧资产约束" in node_menu
     assert "s.ui.promptBarNodeId = fresh.id" in node_menu
-    assert "handleQualityFeedback" in main
-    assert "runtime.recordFeedback" in main
+    assert "handleQualityFeedbackRuntime" in main
+    assert "runtime.recordFeedback" in feedback_runtime_flow
     assert 'action === "content-card" || action === "video-asset-card-draft"' in action_handler
     assert "resolveEventNode(event) || event.detail?.node" in main
     assert "正在识别视频资产卡" in main
@@ -802,7 +969,9 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "耗时：" in generation_results
     assert "cancelNodeVideoGeneration" in node_actions
     assert "cancelVideo(jobId)" in video_actions
-    assert "cancelled_local_only" in video_actions
+    assert "applyVideoResponse(store, node.id, response)" in video_actions
+    assert 'VIDEO_CANCELLED_LOCAL_ONLY_STATUS = "cancelled_local_only"' in video_response
+    assert "status === VIDEO_CANCELLED_LOCAL_ONLY_STATUS" in video_response
     assert "厂商侧任务" in video_actions
     assert "停止计费" in video_actions
     assert "ensureVideoFirstFrameAsset" in video_actions
@@ -839,7 +1008,6 @@ const state = {
       previewUrl: "/media/keyframe_01.png",
       params: {
         nodeRole: "keyframe_generation",
-        assetReferenceMode: "originalize_ip_safe",
         lastKeyframeJobId: "kf_job_001",
         spec: { ratio: "16:9", duration: "5s", resolution: "720P" },
         uploads: [{
@@ -876,7 +1044,6 @@ process.stdout.write(JSON.stringify({
   edge: edges[0],
   firstFrame: video?.params?.firstFrameImageAssetId,
   firstFramePreview: video?.params?.firstFramePreviewUrl,
-  referenceMode: video?.params?.assetReferenceMode,
   uploadRole: video?.params?.uploads?.[0]?.role,
   sourceKeyframe: video?.params?.sourceKeyframeNodeId,
   sourceAsset: video?.params?.sourceKeyframeAssetId,
@@ -896,7 +1063,6 @@ process.stdout.write(JSON.stringify({
     assert payload["videoType"] == "video"
     assert payload["firstFrame"] == "img_keyframe_001"
     assert payload["firstFramePreview"] == "/media/keyframe_01.png"
-    assert payload["referenceMode"] == "originalize_ip_safe"
     assert payload["uploadRole"] == "first_frame"
     assert payload["sourceKeyframe"] == "keyframe_01"
     assert payload["sourceAsset"] == "img_keyframe_001"
@@ -1045,8 +1211,8 @@ process.stdout.write(JSON.stringify({
     assert "4.0-5.0s" in payload["prompt"]
     assert "单张关键帧" not in payload["prompt"]
     assert "候选资产卡（资产）" not in payload["prompt"]
-    assert "可以直接生成" in payload["result"]
-    assert "先微调提示词" in payload["result"]
+    assert "重新生成整段视频" in payload["result"]
+    assert "不是局部视频编辑" in payload["result"]
 
 
 def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:

@@ -9,7 +9,7 @@ from typing import Any
 This module is deterministic and dependency-free. It powers the low-recall
 UI warning channel only; lock enforcement never depends on detection here.
 The same vocabulary doubles as the reference list for hand-filled
-feature cards (see docs/handoff feature card template).
+feature cards and asset-card contract tests.
 """
 
 

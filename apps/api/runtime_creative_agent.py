@@ -239,7 +239,7 @@ def _provider_translation(
     prompt = selected["canonical_prompt"]
     if request.generation_target in {"image", "keyframe"}:
         capability = "image_keyframe"
-        provider = "codex_image"
+        provider = "image_relay"
     elif request.generation_target == "video":
         capability = "video"
         provider = "not_enabled"

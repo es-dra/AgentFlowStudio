@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_studio_state import sanitize_studio_state
 
@@ -108,7 +109,16 @@ def test_studio_state_uses_expected_version_to_prevent_stale_overwrite(tmp_path)
         },
     )
     assert stale.status_code == 409
-    assert "version conflict" in stale.json()["detail"]
+    detail = stale.json()["detail"]
+    assert detail["error"] == "studio_state_conflict"
+    assert detail["detail_code"] == "invalid_request"
+    assert detail["status"] == "failed"
+    assert detail["retryable"] is True
+    assert detail["project_id"] == project_id
+    assert detail["action"] == "studio_state"
+    assert detail["stage"] == "state_conflict"
+    assert detail["details"]["raw_detail"] == "studio state version conflict"
+    assert response_contains_unsafe_marker(stale.json()) is False
 
 
 def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path) -> None:
@@ -161,6 +171,91 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
     assert params["candidatePreviewUrls"][0]["url"] == candidate_url
     assert params["candidatePreviewUrls"][0]["preview_url"] == candidate_url
     assert params["candidatePreviewUrls"][0]["artifact_id"] == "artifact_safe_001"
+
+
+def test_studio_state_preserves_public_generation_and_model_context_summaries(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-public-generation-summary"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio public summary state test"})
+    state = {
+        "nodes": {
+            "image_1": {
+                "id": "image_1",
+                "type": "image",
+                "title": "关键帧",
+                "status": "error",
+                "params": {
+                    "lastModelCallContextId": "mctx_public_001",
+                    "lastModelCallContextSummary": {
+                        "context_id": "mctx_public_001",
+                        "schema_version": "afs_model_call_context.v0.1",
+                        "operation_intent": "prompt_optimize",
+                        "generation_target": "prompt",
+                        "artifact": {"artifact_id": "artifact_mctx_001", "filename": "model_call_context.json"},
+                        "context_sources": {"context_bundle_present": True, "included_asset_count": 1},
+                        "asset_context": {"context_eligible_asset_count": 1, "draft_assets_enter_context": False},
+                        "reference_context": {"reference_image_count": 0},
+                        "provider_constraints": {"capability": "llm", "provider_gate": "AFS_ALLOW_REMOTE_LLM"},
+                        "trace_summary": {"warning_ids": ["w1"], "feedback_context_overlay_ids": ["ov1"]},
+                        "safety_boundary": {"no_provider_raw": True, "no_local_path": True, "no_media_bytes": True},
+                    },
+                    "lastGenerationManifest": {
+                        "status": "blocked",
+                        "batch_status": "failed",
+                        "stage": "provider_request_read",
+                        "failure_class": "provider_timeout",
+                        "output_count": 0,
+                        "reference_image_count": 0,
+                        "retry_count": 1,
+                        "provider_calls_started": True,
+                        "provider_diagnostics": {
+                            "provider_stage": "provider_request_read",
+                            "failure_class": "provider_timeout",
+                            "error_type": "ModelGatewayError",
+                            "reason": "API relay request timed out while reading provider result",
+                            "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                            "retry_count": 1,
+                            "attempt_count": 2,
+                            "provider_elapsed_ms": 244000.1,
+                        },
+                        "blocks": [
+                            {
+                                "block_id": "remote_image_provider_not_ready",
+                                "reason": "API relay request timed out while reading provider result",
+                                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                                "failure_class": "provider_timeout",
+                                "provider_stage": "provider_request_read",
+                                "retry_count": 1,
+                                "attempt_count": 2,
+                            }
+                        ],
+                    },
+                    "generationStatusDetail": "No complete output is available.",
+                    "generationBlockedReason": "API relay request timed out while reading provider result",
+                    "generationNextAction": "Retry failed items only.",
+                    "generationPolicyStatus": "failed",
+                    "generationSafeRefs": [{"label": "job", "value": "job_001"}],
+                },
+            }
+        },
+        "order": ["image_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+
+    assert saved.status_code == 200
+    params = saved.json()["state"]["nodes"]["image_1"]["params"]
+    assert params["lastModelCallContextId"] == "mctx_public_001"
+    assert params["lastModelCallContextSummary"]["safety_boundary"]["no_provider_raw"] is True
+    assert params["lastModelCallContextSummary"]["trace_summary"]["warning_ids"] == ["w1"]
+    manifest = params["lastGenerationManifest"]
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    serialized = str(params).lower()
+    assert "raw_provider_response_stored" not in serialized
+    assert "provider_raw_persisted" not in serialized
 
 
 def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> None:
@@ -269,6 +364,15 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
                         "/projects/studio-video-state/video-generations/"
                         "video_job_001/candidates/candidate_001/preview"
                     ),
+                    "videoInputSource": {
+                        "source_mode": "upstream_generated_image",
+                        "source_asset_id": "img_first_001",
+                        "source_node_id": "keyframe_1",
+                        "source_job_id": "keyframe_job_001",
+                        "visual_asset_id": "unsafe/path/ignored",
+                        "role": "ignored_role",
+                        "extra": "ignored",
+                    },
                     "quotaOverrideConfirmed": True,
                 },
                 "status": "generating",
@@ -285,6 +389,14 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
     assert params["lastFrameImageAssetId"] == "img_last_001"
     assert params["lastVideoJobId"] == "video_job_001"
     assert params["lastVideoPreviewUrl"].endswith("/video-generations/video_job_001/candidates/candidate_001/preview")
+    assert params["videoInputSource"] == {
+        "source_mode": "upstream_generated_image",
+        "source_asset_id": "img_first_001",
+        "source_node_id": "keyframe_1",
+        "source_job_id": "keyframe_job_001",
+        "visual_asset_id": "unsafe-path-ignored",
+        "role": "first_frame",
+    }
     assert params["quotaOverrideConfirmed"] is True
     assert "previewUrl" not in restored.json()["state"]["nodes"]["video_1"]
 

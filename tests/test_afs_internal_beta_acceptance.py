@@ -181,7 +181,14 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
     assert report["requires_invite_codes"] is True
     assert report["provider_calls_started"] is False
     assert report["human_acceptance_claim"] == "not_claimed"
+    assert report["product_readiness_claim"] == "not_claimed"
     assert report["business_validation_claim"] == "not_claimed"
+    assert report["readiness_claims"]["http_preflight_ready"] is True
+    assert report["readiness_claims"]["service_ready"] is True
+    assert report["readiness_claims"]["auth_required"] is True
+    assert report["readiness_claims"]["acceptance_ready"] is False
+    assert report["readiness_claims"]["product_readiness"] is False
+    assert "not human creative acceptance" in report["non_claims"]
     assert report["writes_company_kb"] is False
     assert report["writes_long_term_memory"] is False
     assert report["summary"]["failed_check_count"] == 0
@@ -198,6 +205,10 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
         "asr": False,
         "external_download": False,
     }
+    assert report["safe_health"]["readiness"]["service_ready"] is True
+    assert report["safe_health"]["readiness"]["runtime_three_end_alignment_evidence"] is False
+    assert report["safe_health"]["readiness"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
+    assert report["safe_health"]["readiness"]["acceptance_ready"] is False
     assert (tmp_path / "preflight-report.json").is_file()
 
     serialized = json.dumps(report, ensure_ascii=False)

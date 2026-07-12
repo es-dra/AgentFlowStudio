@@ -48,6 +48,12 @@ export function qualityFeedbackView(node) {
 
   const foot = document.createElement("div");
   foot.className = "quality-feedback-foot";
+  const nextContext = document.createElement("label");
+  nextContext.className = "quality-feedback-context";
+  const nextContextInput = document.createElement("input");
+  nextContextInput.type = "checkbox";
+  nextContextInput.dataset.feedbackNextContext = "true";
+  nextContext.append(nextContextInput, document.createTextNode("纳入下一次本地上下文"));
   const status = document.createElement("span");
   status.className = "quality-feedback-status";
   status.textContent = "原始证据，不写入长期记忆";
@@ -55,7 +61,7 @@ export function qualityFeedbackView(node) {
   submit.className = "quality-feedback-submit";
   submit.textContent = "记录反馈";
   submit.addEventListener("click", () => submitFeedback(node, wrap, status, submit));
-  foot.append(status, submit);
+  foot.append(nextContext, status, submit);
   wrap.appendChild(foot);
 
   return wrap;
@@ -88,7 +94,7 @@ export function buildQualityFeedbackPayload(node, values = {}) {
     writes_company_kb: false,
     safety_boundary: {
       no_provider_raw: true,
-      no_signed_url: true,
+      no_private_external_link: true,
       no_local_path: true,
       no_media_bytes: true,
     },
@@ -97,25 +103,40 @@ export function buildQualityFeedbackPayload(node, values = {}) {
 
 function shouldShowFeedback(node) {
   if (!node || !["image", "video"].includes(node.type)) return false;
-  if (node.status !== "complete") return false;
+  if (!["complete", "partial"].includes(node.status)) return false;
   return Boolean(node.result || node?.previewUrl);
 }
 
 function submitFeedback(node, wrap, status, submit) {
   const requestId = `quality-feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const feedback = buildQualityFeedbackPayload(node, collectValues(wrap));
+  const values = collectValues(wrap);
+  const feedback = buildQualityFeedbackPayload(node, values);
   submit.disabled = true;
   status.textContent = "记录中...";
   const onResult = (event) => {
     if (event.detail?.request_id !== requestId) return;
     window.removeEventListener(QUALITY_FEEDBACK_RESULT_EVENT, onResult);
     submit.disabled = false;
+    if (event.detail?.ok) {
+      status.textContent = feedbackResultText(event.detail);
+      return;
+    }
     status.textContent = event.detail?.ok
       ? `已记录：${event.detail.feedback_id || "runtime_feedback_event"}`
       : `记录失败：${sanitizeFeedbackText(event.detail?.error || "unknown")}`;
   };
   window.addEventListener(QUALITY_FEEDBACK_RESULT_EVENT, onResult);
-  window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_EVENT, { detail: { request_id: requestId, feedback } }));
+  window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_EVENT, {
+    detail: {
+      request_id: requestId,
+      feedback,
+      context_overlay: {
+        requested: Boolean(values.include_next_context),
+        rationale: "Studio operator selected this quality feedback for the next local context pass.",
+        overlay_intent: "Use this reviewed Studio quality feedback in the next local context pass.",
+      },
+    },
+  }));
 }
 
 function collectValues(wrap) {
@@ -125,7 +146,19 @@ function collectValues(wrap) {
   }
   const notes = wrap.querySelector("[data-feedback-notes]");
   values.drift_notes = notes?.value || "";
+  values.include_next_context = Boolean(wrap.querySelector("[data-feedback-next-context]")?.checked);
   return values;
+}
+
+function feedbackResultText(detail) {
+  const base = `已记录：${detail.feedback_id || "runtime_feedback_event"}`;
+  if (detail.context_overlay_status === "context_overlay_recorded") {
+    return `${base} / 已纳入下一次本地上下文`;
+  }
+  if (detail.context_overlay_status === "context_overlay_failed") {
+    return `${base} / 上下文纳入失败：${sanitizeFeedbackText(detail.context_overlay_error || "unknown")}`;
+  }
+  return base;
 }
 
 function numberOrNull(value) {

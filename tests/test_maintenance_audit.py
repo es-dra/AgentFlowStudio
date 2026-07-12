@@ -9,6 +9,7 @@ from tools.maintenance_audit import build_maintenance_audit
 
 
 def test_maintenance_audit_reports_expected_contract_shape(tmp_path) -> None:
+    _init_git_repo(tmp_path)
     (tmp_path / "AGENTS.md").write_text(
         "# 规则\n\nTreat `D:\\Learning materials\\Learning_notes\\Company` as legacy.\n",
         encoding="utf-8",
@@ -53,12 +54,48 @@ def test_maintenance_audit_ignores_generated_egg_info_metadata(tmp_path) -> None
 
 def test_maintenance_audit_does_not_count_named_fake_secret_fixture(tmp_path) -> None:
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "fixture.py").write_text('value = "sk-test-secret-value"\n', encoding="utf-8")
+    (tmp_path / "tests" / "fixture.py").write_text(
+        '\n'.join(
+            [
+                'value = "sk-test-secret-value"',
+                'provider_prompt = "api_key=sk-fixture-provider-redaction"',
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     report = build_maintenance_audit(tmp_path)
     checks = {check["check_id"]: check for check in report["checks"]}
 
     assert checks["secret_like_fragments"]["high_confidence_count"] == 0
+
+
+def test_maintenance_audit_flags_ambiguous_fake_secret_names(tmp_path) -> None:
+    (tmp_path / "tests").mkdir()
+    ambiguous_value = "sk-" + "client-event"
+    (tmp_path / "tests" / "fixture.py").write_text(f'value = "{ambiguous_value}"\n', encoding="utf-8")
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["secret_like_fragments"]["status"] == "failed"
+    assert checks["secret_like_fragments"]["high_confidence_count"] == 1
+
+
+def test_maintenance_audit_does_not_hide_real_secret_when_fixture_shares_line(tmp_path) -> None:
+    (tmp_path / "tests").mkdir()
+    fixture_value = "sk-fixture-redaction"
+    secret_value = "sk-" + "live-secret-value-123456"
+    (tmp_path / "tests" / "fixture.py").write_text(
+        f'value = "{fixture_value} {secret_value}"\n',
+        encoding="utf-8",
+    )
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["secret_like_fragments"]["status"] == "failed"
+    assert checks["secret_like_fragments"]["high_confidence_count"] == 1
 
 
 def test_maintenance_audit_ignores_schema_fields_and_safe_fixture_values(tmp_path) -> None:
@@ -99,7 +136,7 @@ def test_maintenance_audit_still_flags_real_high_confidence_secret(tmp_path) -> 
     report = build_maintenance_audit(tmp_path)
     checks = {check["check_id"]: check for check in report["checks"]}
 
-    assert checks["secret_like_fragments"]["status"] == "warning"
+    assert checks["secret_like_fragments"]["status"] == "failed"
     assert checks["secret_like_fragments"]["high_confidence_count"] == 1
 
 
@@ -117,7 +154,7 @@ def test_maintenance_audit_lists_legacy_frozen_surface_without_skipping_secret_s
     assert checks["legacy_frozen_surface"]["status"] == "warning"
     assert checks["legacy_frozen_surface"]["count"] == 1
     assert checks["oversized_files"]["status"] == "passed"
-    assert checks["secret_like_fragments"]["status"] == "warning"
+    assert checks["secret_like_fragments"]["status"] == "failed"
     assert checks["secret_like_fragments"]["high_confidence_count"] == 1
 
 
@@ -174,7 +211,8 @@ def test_chinese_doc_coverage_ignores_machine_contract_blocks(tmp_path) -> None:
     assert checks["human_doc_chinese_coverage"]["status"] == "passed"
 
 
-def test_historical_docs_are_exempt_only_when_summary_exists(tmp_path) -> None:
+def test_live_historical_docs_are_not_exempted_by_archive_summary(tmp_path) -> None:
+    _init_git_repo(tmp_path)
     docs = tmp_path / "docs"
     handoff = docs / "handoff"
     archive = docs / "archive"
@@ -183,17 +221,67 @@ def test_historical_docs_are_exempt_only_when_summary_exists(tmp_path) -> None:
     (handoff / "AFS-OLD.md").write_text("# Old Handoff\n\nEnglish historical evidence.\n", encoding="utf-8")
     (tmp_path / "README.md").write_text("# 当前说明\n\n这是当前中文入口。\n", encoding="utf-8")
 
-    report_without_summary = build_maintenance_audit(tmp_path)
-    checks_without_summary = {check["check_id"]: check for check in report_without_summary["checks"]}
-    assert checks_without_summary["human_doc_chinese_coverage"]["status"] == "warning"
-
     (archive / "HISTORICAL_DOCS_SUMMARY.zh-CN.md").write_text(
         "# 历史文档中文摘要索引\n\n旧 handoff 作为历史证据保留，当前入口改用中文维护账本。\n",
         encoding="utf-8",
     )
 
-    report_with_summary = build_maintenance_audit(tmp_path)
-    checks_with_summary = {check["check_id"]: check for check in report_with_summary["checks"]}
-    coverage = checks_with_summary["human_doc_chinese_coverage"]
-    assert coverage["status"] == "passed"
-    assert coverage["historical_docs_exempted_count"] == 1
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+    coverage = checks["human_doc_chinese_coverage"]
+    finding_paths = {finding["path"] for finding in coverage["findings"]}
+    assert coverage["status"] == "warning"
+    assert "docs/handoff/AFS-OLD.md" in finding_paths
+    assert "historical_docs_exempted_count" not in coverage
+
+
+def _init_git_repo(path: Path) -> None:
+    subprocess.run(
+        ["git", "init"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
+
+
+def test_maintenance_audit_classifies_git_state_and_excludes_ignored_oversized_files(tmp_path) -> None:
+    subprocess.run(
+        ["git", "init"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
+    (tmp_path / ".gitignore").write_text("runs/\n", encoding="utf-8")
+    (tmp_path / "tracked_big.py").write_text("\n".join("value = 1" for _ in range(301)), encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "demo.md").write_text("\n".join("English only." for _ in range(302)), encoding="utf-8")
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "generated.json").write_text("\n".join("{}" for _ in range(450)), encoding="utf-8")
+    subprocess.run(
+        ["git", "add", ".gitignore", "tracked_big.py"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+    oversized = checks["oversized_files"]
+    findings = {finding["path"]: finding for finding in oversized["findings"]}
+
+    assert "runs/generated.json" not in findings
+    assert findings["tracked_big.py"]["git_state"] == "tracked"
+    assert findings["docs/demo.md"]["git_state"] == "untracked"
+    assert oversized["source_summary"]["tracked"] == 1
+    assert oversized["source_summary"]["untracked"] == 1
+    assert oversized["source_summary"].get("ignored", 0) == 0
+    assert report["workspace_files"]["ignored_text_files"] == 1

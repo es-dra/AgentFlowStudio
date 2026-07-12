@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import tarfile
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -27,8 +29,10 @@ VISIBLE_PRODUCT_COMMANDS = (
     "memory-evidence-reuse-review",
     "runtime-service",
     "runtime-service-openapi-export",
+    "runtime-backup",
     "auth-invites",
 )
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def test_product_command_registry_has_no_direct_provider_or_demo_registrations() -> None:
@@ -40,9 +44,11 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source
     assert "memory_video_pipeline_command" not in source
-    assert "register_production_memory_commands" in source
+    assert "register_production_memory_commands" not in source
+    assert "production_memory_command_registry" not in source
     assert "runtime-service" in source
     assert "runtime-service-openapi-export" in source
+    assert "runtime_backup_app" in source
     assert "auth_invites_app" in source
     assert "production-memory-loop-next-operator-start-packet" not in source
     assert "production-memory-loop-record-next-operator-start" not in source
@@ -50,22 +56,8 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "production-memory-loop-record-action-result-acceptance-feedback" not in source
 
 
-def test_production_memory_registry_is_hidden_compatibility_only() -> None:
-    source = PRODUCTION_MEMORY_REGISTRY.read_text(encoding="utf-8")
-
-    assert "hidden compatibility only" in source
-    assert "production-memory-loop-asset-profile-readiness" in source
-    assert "production-memory-loop-run-asset-test-package" in source
-    assert "production-memory-loop-record-asset-feedback" in source
-    assert "production-memory-loop-run-real-asset-test-harness" in source
-    assert "production-memory-loop-two-round-context-runtime-validation" in source
-    assert "production-memory-loop-provider-validation-gate" in source
-    assert "production-memory-loop-next-operator-start-packet" in source
-    assert "production-memory-loop-record-next-operator-action-result" in source
-    assert "production-memory-loop-record-action-result-acceptance-feedback" in source
-    assert "_hidden(app" in source
-    assert "hidden=True" in source
-    assert "_visible(app" not in source
+def test_production_memory_registry_is_retired_not_hidden() -> None:
+    assert not PRODUCTION_MEMORY_REGISTRY.exists()
 
 
 def test_default_help_excludes_production_memory_legacy_surface() -> None:
@@ -185,18 +177,46 @@ def test_auth_invites_cli_issues_lists_and_revokes_without_storing_plaintext(tmp
     assert "revoked" in revoked.output
 
 
-def test_hidden_production_memory_support_commands_remain_callable() -> None:
+def test_runtime_backup_cli_excludes_codex_home_by_default(tmp_path) -> None:
+    runtime_root = tmp_path / "runtime"
+    (runtime_root / "auth").mkdir(parents=True)
+    (runtime_root / "auth" / "users.json").write_text('{"users": {}}', encoding="utf-8")
+    (runtime_root / "codex-home").mkdir()
+    (runtime_root / "codex-home" / "auth.json").write_text('{"token": "secret"}', encoding="utf-8")
+    output_dir = tmp_path / "backups"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "runtime-backup",
+            "create",
+            "--runtime-root",
+            str(runtime_root),
+            "--output-dir",
+            str(output_dir),
+            "--label",
+            "wave1",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [archive_path] = list(output_dir.glob("afs-runtime-backup-*.tar.gz"))
+    with tarfile.open(archive_path, "r:gz") as archive:
+        names = archive.getnames()
+    assert "runtime_root/auth/users.json" in names
+    assert "runtime_root/codex-home/auth.json" not in names
+
+
+def test_hidden_production_memory_support_commands_are_retired() -> None:
     result = CliRunner().invoke(app, ["production-memory-loop-record-next-operator-action-result", "--help"])
 
-    assert result.exit_code == 0
-    assert "recorded-at" in result.output
+    assert result.exit_code != 0
+    assert "No such command" in ANSI_ESCAPE_RE.sub("", result.output)
 
 
-def test_support_command_registry_has_no_retired_provider_smoke_surface() -> None:
-    source = SUPPORT_REGISTRY.read_text(encoding="utf-8")
+def test_support_command_registry_noop_wrapper_is_removed() -> None:
+    source = PRODUCT_REGISTRY.read_text(encoding="utf-8")
 
-    assert "hidden=True" not in source
-    assert "smoke" not in source
-    assert "minimax-image-smoke" not in source
-    assert "memory-advantage-demo-012" not in source
-    assert "memory-advantage-demo-015" not in source
+    assert not SUPPORT_REGISTRY.exists()
+    assert "support_command_registry" not in source
+    assert "register_support_commands" not in source

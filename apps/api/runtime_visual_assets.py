@@ -70,9 +70,16 @@ def create_visual_asset(
     store: RuntimeStore,
     project_id: str,
     request: VisualAssetPromoteRequest,
-) -> tuple[dict[str, Any], list[dict[str, str]]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     _validate_promote_request(store, project_id, request)
-    warnings = _duplicate_label_warnings(store, project_id, request.asset_type, request.label)
+    duplicates = _matching_fixed_visual_assets(store, project_id, request.asset_type, request.label)
+    warnings = _duplicate_label_warnings(duplicates, request.asset_type, request.label, request.reuse_intent)
+    if request.review_decision == "fixed" and request.reuse_intent == "link_existing":
+        linked_id = str(request.link_existing_asset_id or "").strip()
+        linked = next((item for item in duplicates if str(item.get("asset_id") or "") == linked_id), None)
+        if not linked:
+            raise ValueError("link_existing_asset_id must match an existing fixed asset")
+        return linked, warnings
     asset_id = f"vas_{uuid4().hex[:12]}"
     record = build_visual_asset_record(
         project_id=project_id,
@@ -160,27 +167,61 @@ def _validate_promote_request(store: RuntimeStore, project_id: str, request: Vis
         image_asset_metadata(store, project_id, asset_id)
     if request.supersedes_asset_id:
         visual_asset_record(store, project_id, request.supersedes_asset_id.strip())
+    if request.link_existing_asset_id:
+        visual_asset_record(store, project_id, request.link_existing_asset_id.strip())
+    if request.review_decision != "fixed":
+        return
+    duplicates = _matching_fixed_visual_assets(store, project_id, request.asset_type, request.label)
+    if not duplicates:
+        return
+    if request.reuse_intent not in {"link_existing", "replace", "create_new"}:
+        raise ValueError("reuse_intent is required when a fixed visual asset duplicate exists")
+    duplicate_ids = {str(item.get("asset_id") or "") for item in duplicates}
+    if request.reuse_intent == "link_existing" and str(request.link_existing_asset_id or "").strip() not in duplicate_ids:
+        raise ValueError("link_existing_asset_id must match an existing fixed asset duplicate")
+    if request.reuse_intent == "replace" and str(request.supersedes_asset_id or "").strip() not in duplicate_ids:
+        raise ValueError("supersedes_asset_id must match an existing fixed asset duplicate")
 
 
-def _duplicate_label_warnings(
+def _matching_fixed_visual_assets(
     store: RuntimeStore,
     project_id: str,
     asset_type: str,
     label: str,
-) -> list[dict[str, str]]:
-    duplicates = [
+) -> list[dict[str, Any]]:
+    return [
         item
         for item in list_visual_assets(store, project_id, status="fixed")
         if item.get("asset_type") == asset_type and str(item.get("label") or "").casefold() == label.strip().casefold()
     ]
+
+
+def _duplicate_label_warnings(
+    duplicates: list[dict[str, Any]],
+    asset_type: str,
+    label: str,
+    reuse_intent: str | None = None,
+) -> list[dict[str, Any]]:
     if not duplicates:
         return []
     return [
         {
             "warning_id": "duplicate_visual_asset_label",
+            "warning_code": "fixed_asset_reuse_intent_recorded" if reuse_intent else "fixed_asset_reuse_intent_required",
             "asset_type": asset_type,
             "label": label.strip(),
             "existing_asset_ids": ",".join(str(item.get("asset_id")) for item in duplicates),
+            "existing_assets": [
+                {
+                    "asset_id": str(item.get("asset_id") or ""),
+                    "asset_type": str(item.get("asset_type") or ""),
+                    "label": str(item.get("label") or ""),
+                    "status": str(item.get("status") or ""),
+                }
+                for item in duplicates[:8]
+            ],
+            "required_intents": ["link_existing", "replace", "create_new"],
+            "reuse_intent": reuse_intent or "",
         }
     ]
 

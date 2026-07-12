@@ -1,25 +1,25 @@
 import { promptPlaceholder } from "./nodes.js";
-import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel } from "./presets/models.js";
+import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel, videoCapabilitiesForVideoModel } from "./presets/models.js";
 import {
-  VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS,
+  VIDEO_RATIOS, VIDEO_RESOLUTIONS,
   videoSpecLabel,
 } from "./presets/specs.js";
+import {
+  clampVideoDurationLabel,
+  videoCapabilitiesFromNode,
+  videoDurationOptions,
+} from "./presets/video-capabilities.js";
 import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
-import { pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
+import { canRunNodeGeneration, pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
-import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
+import { barSignature, bindBarResizePositioning, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
-import {
-  ASSET_REFERENCE_MODES,
-  assetReferenceMode,
-  canUseAssetReferenceMode,
-  buildUserAssetCardRevisionState,
-} from "./asset-revision-references.js";
+import { buildUserAssetCardRevisionState } from "./asset-revision-references.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -32,7 +32,7 @@ export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && (!node.content || state.ui?.promptBarNodeId === node.id);
+  const show = node && PROMPT_NODE_TYPES.has(node.type) && (node.type === "script" || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {
@@ -66,7 +66,7 @@ function isPromptTextEditing(bar) {
 function buildBar(store, runtime, node) {
   const bar = el("div", "prompt-bar");
   bar.dataset.nodeId = node.id;
-  const p = node.params;
+  const p = node.params || {};
 
   if ((p.attachments || []).length) {
     const chips = el("div", "attach-chips");
@@ -80,15 +80,9 @@ function buildBar(store, runtime, node) {
     bar.appendChild(chips);
   }
 
-  if (canUseAssetReferenceMode(node)) {
-    bar.appendChild(buildAssetReferenceModeTabs(store, node));
-  }
-
   const textarea = document.createElement("textarea");
-  textarea.placeholder = p.assetCardDraft
-    ? assetCardPromptPlaceholder(p.assetCardDraft.asset_type)
-    : promptPlaceholder(node.type, p.spec?.mode);
-  textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node) : node.prompt || node.content || "";
+  textarea.placeholder = promptTextPlaceholder(node);
+  textarea.value = promptTextValue(node);
   textarea.addEventListener("input", () => {
     store.set((s) => {
       s.ui.promptBarNodeId = node.id;
@@ -99,19 +93,12 @@ function buildBar(store, runtime, node) {
         n.params.assetCardDraft.user_edited_text = textarea.value;
         n.params.assetCardDraft.updated_by_user = Boolean(textarea.value.trim());
         if (textarea.value.trim()) {
-          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value, n.params.assetReferenceMode);
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value);
         } else if (usesPromptBarAssetCardRevision(n.params.assetCardRevision)) {
           delete n.params.assetCardRevision;
         }
       } else if (n.type === "text" || n.type === "script") {
         n.content = textarea.value;
-        if (String(n.params?.scriptExpansionSourceIdea || "").trim() !== textarea.value.trim()) {
-          delete n.params.scriptExpansionSourceIdea;
-          delete n.params.scriptExpansionState;
-          if (n.params.scriptInputMode === "idea_expanded_script" || n.params.scriptInputMode === "idea_expanded_script_fallback") {
-            delete n.params.scriptInputMode;
-          }
-        }
       }
       delete n.params.lastOptimizedPromptPlain;
     }, { history: false });
@@ -119,8 +106,8 @@ function buildBar(store, runtime, node) {
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      if (node.type !== "image" && !(node.type === "video" && isRemoteVideoModel(node.params?.model))) {
-        flashTooltip(textarea, "当前版本仅图片节点支持真实生成");
+      if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
+        flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
         return;
       }
       runPromptBarGeneration(store, runtime, node);
@@ -129,52 +116,16 @@ function buildBar(store, runtime, node) {
   bindAssetMentionSuggestions(textarea, store, node.id);
   bar.appendChild(textarea);
 
-  if (node.type === "video" || node.type === "script") {
-    const expand = el("button", "expand-btn");
-    expand.innerHTML = icon("expand", 14);
-    expand.title = "放大编辑";
-    expand.addEventListener("click", () => openExpandEditor(store, runtime, node));
-    bar.appendChild(expand);
-  }
+  const expand = el("button", "expand-btn");
+  expand.innerHTML = icon("expand", 14);
+  expand.title = "放大编辑";
+  expand.addEventListener("click", () => openExpandEditor(store, runtime, node));
+  bar.appendChild(expand);
 
   bar.appendChild(buildBottomRow(store, runtime, node, textarea));
+  bindBarResizePositioning(bar, store, node.id);
   syncPromptBarState(bar, node);
   return bar;
-}
-
-function buildAssetReferenceModeTabs(store, node) {
-  const wrap = el("div", "mode-tabs asset-reference-mode-tabs");
-  const current = assetReferenceMode(node);
-  const modes = [
-    [ASSET_REFERENCE_MODES.LOCALIZED_EDIT, "局部修订", "按参考图稳定身份，只修改你写明的细节"],
-    [ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE, "原创重生", "只提取灵感方向，重新设计以降低 IP 风险"],
-  ];
-  for (const [mode, label, title] of modes) {
-    const tab = el("button", `mode-tab${current === mode ? " active" : ""}`, label);
-    tab.type = "button";
-    tab.title = title;
-    tab.dataset.mode = mode;
-    tab.addEventListener("click", () => {
-      store.set((s) => {
-        const n = s.nodes[node.id];
-        if (!n) return;
-        n.params.assetReferenceMode = mode;
-        if (n.params.assetCardDraft && String(n.prompt || n.params.assetCardDraft.user_edited_text || "").trim()) {
-          n.params.assetCardRevision = buildUserAssetCardRevisionState(
-            n,
-            n.params.assetCardDraft,
-            n.prompt || n.params.assetCardDraft.user_edited_text,
-            mode,
-          );
-        } else if (n.params.assetCardRevision) {
-          n.params.assetCardRevision.mode = mode;
-        }
-        delete n.params.lastOptimizedPromptPlain;
-      }, { history: false });
-    });
-    wrap.appendChild(tab);
-  }
-  return wrap;
 }
 
 function buildToolChips(store, node, defs) {
@@ -241,8 +192,10 @@ function buildBottomRow(store, runtime, node, textarea) {
   const shouldPollVideo = canVideo && node.status === "generating" && Boolean(node.params?.lastVideoJobId);
   send.innerHTML = shouldPollVideo ? icon("retry", 15) : icon("arrowUp", 15);
   const canSend = node.type === "image" || canVideo;
-  send.title = node.type === "image" ? "生成" : "视频/音频通道开发中，当前版本仅图片节点支持真实生成";
-  if (canSend) send.title = "生成";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) send.title = "提交视频重生成尝试；不是局部编辑";
+  else if (canSend) send.title = "生成";
+  else if (node.type === "video") send.title = "当前视频模型不支持直接生成";
+  else send.title = "当前节点不支持直接生成，请使用该节点的专用操作";
   if (shouldPollVideo) send.title = "继续轮询";
   send.disabled = !canSend;
   send.addEventListener("click", () => runPromptBarGeneration(store, runtime, node));
@@ -261,23 +214,64 @@ function textAction(iconName, label, onClick) {
 
 function optimizableNodeText(node) {
   if (!node) return "";
-  return String(node.content || node.prompt || "");
+  if (isTextContentNode(node)) return String(node.content || node.prompt || "");
+  return String(node.prompt || node.content || "");
 }
 
-function syncPromptBarState(bar, node) {
-  const running =
-    node.params?.promptOptimizationState?.status === "running" ||
-    node.params?.scriptExpansionState?.status === "running";
+function isTextContentNode(node) {
+  return node.type === "text" || node.type === "script";
+}
+
+export function syncPromptBarState(bar, node) {
+  const task = activePromptTaskProgress(node);
+  const running = Boolean(task);
   bar.classList.toggle("optimizing", running);
   const textarea = bar.querySelector("textarea");
-  textarea?.classList.toggle("prompt-shimmer", running);
+  if (textarea) {
+    textarea.classList.toggle("prompt-shimmer", running);
+    const expectedPrompt = promptTextValue(node);
+    if (!isPromptTextEditing(bar) && textarea.value !== expectedPrompt) {
+      textarea.value = expectedPrompt;
+    }
+    const expectedPlaceholder = promptTextPlaceholder(node);
+    if (textarea.placeholder !== expectedPlaceholder) {
+      textarea.placeholder = expectedPlaceholder;
+    }
+  }
   const optimizeBtn = bar.querySelector('[data-action="optimize-prompt"]');
   if (optimizeBtn) {
     optimizeBtn.classList.toggle("busy", running);
     optimizeBtn.disabled = running;
     const label = optimizeBtn.querySelector("span");
-    if (label) label.textContent = running ? "优化中" : "优化";
+    if (label) label.textContent = running ? promptTaskLabel(task) : "优化";
   }
+}
+
+function activePromptTaskProgress(node) {
+  const tasks = [
+    { label: "优化", state: node.params?.promptOptimizationState },
+    { label: "扩写", state: node.params?.scriptExpansionState },
+    { label: "拆分", state: node.params?.storyboardBreakdownState },
+  ];
+  return tasks.find((item) => item.state?.status === "running") || null;
+}
+
+function promptTaskLabel(task) {
+  const percent = Number(task?.state?.percent);
+  if (Number.isFinite(percent)) return `${task.label} ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+  return `${task?.label || "处理"}中`;
+}
+
+function promptTextValue(node) {
+  if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node);
+  if (isTextContentNode(node)) return node?.content || node?.prompt || "";
+  return node?.prompt || node?.content || "";
+}
+
+function promptTextPlaceholder(node) {
+  const p = node?.params || {};
+  if (p.assetCardDraft) return assetCardPromptPlaceholder(p.assetCardDraft.asset_type);
+  return promptPlaceholder(node?.type, p.spec?.mode);
 }
 
 function usesPromptBarAssetCardRevision(revision) {
@@ -291,6 +285,7 @@ function runPromptBarGeneration(store, runtime, node) {
     pollNodeVideoGeneration(store, runtime, fresh);
     return;
   }
+  if (!canRunNodeGeneration(fresh)) return;
   startNodeGeneration(store, runtime, fresh);
 }
 
@@ -302,7 +297,16 @@ function openModelPopover(store, node, anchor) {
     const item = el("button", `menu-item${node.params.model === m.id ? " selected" : ""}`);
     item.innerHTML = `<span class="mi-icon">${icon("sparkle1", 13)}</span><span>${m.name}${m.desc ? `<span class="mi-sub">${m.desc}</span>` : ""}</span><span class="mi-meta">${m.eta}</span>`;
     item.addEventListener("click", () => {
-      updateNode(store, node.id, (n) => { n.params.model = m.id; });
+      updateNode(store, node.id, (n) => {
+        n.params.model = m.id;
+        if (n.type === "video") {
+          const capabilities = videoCapabilitiesForVideoModel(m.id);
+          n.params.spec = {
+            ...(n.params.spec || {}),
+            duration: clampVideoDurationLabel(n.params.spec?.duration || "5s", capabilities),
+          };
+        }
+      });
       close();
     });
     pop.appendChild(item);
@@ -312,11 +316,12 @@ function openModelPopover(store, node, anchor) {
 
 function openVideoSpecPopover(store, node, anchor) {
   const pop = el("div", "spec-pop");
+  const videoCapabilities = videoCapabilitiesFromNode(node, videoCapabilitiesForVideoModel(node.params?.model));
   pop.appendChild(specSection("比例", VIDEO_RATIOS, node.params.spec.ratio, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.ratio = v; })));
   pop.appendChild(specSection("分辨率", VIDEO_RESOLUTIONS, node.params.spec.resolution, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.resolution = v; })));
-  pop.appendChild(specSection("时长", VIDEO_DURATIONS, node.params.spec.duration, (v) =>
+  pop.appendChild(specSection("时长", videoDurationOptions(videoCapabilities), node.params.spec.duration, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.duration = v; })));
   showPopover(anchor, pop, { place: "top" });
 }
@@ -326,9 +331,15 @@ function specSection(label, options, current, onPick, ratio = false) {
   section.appendChild(el("div", "spec-label", label));
   const wrap = el("div", "spec-options");
   for (const opt of options) {
-    const btn = el("button", `spec-opt${ratio ? " ratio" : ""}${current === opt ? " active" : ""}`, opt);
+    const value = typeof opt === "object" ? opt.value : opt;
+    const text = typeof opt === "object" ? opt.label : opt;
+    const disabled = Boolean(typeof opt === "object" && opt.disabled);
+    const btn = el("button", `spec-opt${ratio ? " ratio" : ""}${current === value ? " active" : ""}`, text);
+    btn.disabled = disabled;
+    if (disabled) btn.title = opt.reason || "unsupported";
     btn.addEventListener("click", () => {
-      onPick(opt);
+      if (disabled) return;
+      onPick(value);
       for (const sib of wrap.children) sib.classList.toggle("active", sib === btn);
     });
     wrap.appendChild(btn);

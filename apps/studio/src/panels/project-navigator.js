@@ -1,7 +1,8 @@
 import { NODE_TYPES, deleteNodes } from "../nodes.js";
-import { fitVisibleCanvasViewport } from "../canvas-safe-area.js";
+import { visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
+import { canonicalStudioStatusId, studioStatusLabel } from "../studio-entity-status-vocabulary.js";
 
 export function renderProjectNavigator(state, store, body) {
   body.appendChild(summaryRow(state));
@@ -73,21 +74,34 @@ function navigatorItem(state, store, node) {
 function focusNode(store, node) {
   store.set((s) => {
     s.selection = { nodeIds: [node.id], edgeId: null };
-    s.viewport = fitVisibleCanvasViewport({ [node.id]: node }, 220);
+    s.viewport = panViewportToNode(s.viewport, node);
   }, { history: false, persist: false });
 }
 
-function statusText(status) {
+function panViewportToNode(viewport, node) {
+  const scale = Number(viewport?.scale || 1);
+  const center = visibleCanvasCenter();
+  const nodeCenterX = Number(node.x || 0) + Number(node.w || 0) / 2;
+  const nodeCenterY = Number(node.y || 0) + Number(node.h || 0) / 2;
   return {
-    complete: "已完成",
-    generating: "生成中",
-    error: "失败",
-    cancelled: "已取消",
-  }[status] || "草稿";
+    ...viewport,
+    scale,
+    x: center.x - nodeCenterX * scale,
+    y: center.y - nodeCenterY * scale,
+  };
+}
+
+function statusText(status) {
+  return studioStatusLabel(status, "草稿");
 }
 
 function statusClass(status) {
-  return status === "generating" ? "running" : status === "complete" ? "done" : status === "error" ? "failed" : "";
+  const canonical = canonicalStudioStatusId(status, "draft");
+  if (canonical === "running" || canonical === "queued" || canonical === "submitted" || canonical === "retrying") return "running";
+  if (canonical === "succeeded" || canonical === "accepted" || canonical === "fixed") return "done";
+  if (canonical === "failed") return "failed";
+  if (canonical === "partial" || canonical === "cancelled" || canonical === "blocked" || canonical === "needs_attention") return "attention";
+  return "";
 }
 
 function escapeHtml(value) {

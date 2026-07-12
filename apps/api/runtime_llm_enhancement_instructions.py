@@ -8,16 +8,18 @@ from apps.api.runtime_llm_enhancement_constants import SECTION_ORDER
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import visual_reference_hint
 from apps.api.runtime_models import PromptOptimizationRequest
-from apps.api.runtime_reference_intent import (
-    ORIGINALIZE_REFERENCE_MODE,
-    originalize_reference_policy,
-    reference_transform_mode_for_request,
+from apps.api.runtime_script_generation_body import (
+    is_script_generation_request,
+    is_script_surface_request,
+    source_idea_from_request,
 )
 
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
-    if is_script_expansion_request(request):
-        return script_expansion_instruction(request)
+    if is_script_generation_request(request):
+        return script_generation_enhancement_instruction(request, assembly)
+    if is_script_surface_request(request):
+        return script_surface_enhancement_instruction(request, assembly)
     if request.node_type in {"text", "script"}:
         return text_enhancement_instruction(request)
     mode = prompt_optimization_mode(request)
@@ -28,29 +30,64 @@ def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[s
     return visual_enhancement_instruction(request)
 
 
-def is_script_expansion_request(request: PromptOptimizationRequest) -> bool:
-    params = request.node_parameters or {}
-    return (
-        request.generation_target == "script"
-        and params.get("script_expansion_contract") == "formal_script_before_storyboard_breakdown"
-    )
-
-
-def script_expansion_instruction(request: PromptOptimizationRequest) -> str:
-    params = request.node_parameters or {}
-    source = str(params.get("source_idea") or request.prompt_text).strip()
+def script_generation_enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object] | None = None) -> str:
+    source_idea = source_idea_from_request(request)
+    knowledge_lines = _knowledge_guidance_lines(assembly or {}, limit=8)
     return "\n".join(
         [
-            "你正在为 AFS Studio 扩写短视频剧本正文。",
-            f"原始想法：{source}",
-            "硬性要求：只输出剧本正文，不解释、不输出思考过程、不输出九段画面提示词。",
-            "格式要求：先输出一行片名，格式为“片名：《标题》”；然后输出 2 到 4 段连续叙事正文。",
-            "内容要求：明确角色、场景、情绪、动作变化和结尾；所有细节必须服务原始想法。",
-            "禁止输出：意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
-            "禁止输出：分镜 01/02/03/04、推进主体、展示变化、收束结果、占位句、模板说明、request.json、prompt.md、沙盒或文件读取错误。",
-            "如果原始想法很短，可以合理补足剧情，但不要把系统指令或输出要求写进正文。",
+            "你正在为 AFS Studio 把一句创作想法扩写成正式短视频剧本正文。",
+            f"原始想法：{source_idea}",
+            "专业知识库约束：",
+            *knowledge_lines,
+            "只输出剧本正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
+            "必须先给片名，然后写连续叙事正文。",
+            "正文必须包含：有名字或称呼的主角、明确场景、情绪基调、动作推进、冲突升级、转折或发现、结尾钩子。",
+            "按专业短视频剧本标准补强节奏：开场钩子、关系或目标、阻碍、选择、反应、余味；不要只写一句画面提示。",
+            "不要输出分镜列表、镜头编号、提示词包装、输出要求、原始想法回显、推进主体、展示变化、收束结果或模板占位句。",
         ]
     )
+
+
+def script_surface_enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object] | None = None) -> str:
+    knowledge_lines = _knowledge_guidance_lines(assembly or {}, limit=8)
+    return "\n".join(
+        [
+            "你正在为 AFS Studio 优化已有短视频剧本或分镜脚本正文。",
+            "这不是生图提示词优化，也不是把剧本改写成意图/主体/镜头标签。",
+            "专业知识库约束：",
+            *knowledge_lines,
+            f"原始剧本/分镜：\n{request.prompt_text}",
+            "硬性要求：只输出优化后的剧本/分镜正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
+            "如果输入是连续剧本：保持片名和叙事段落，补强戏剧目标、人物动机、空间调度、情绪转折、动作因果和结尾钩子；输出仍必须像剧本正文。",
+            "如果输入是分镜脚本：保留镜号、时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效、资产等字段；补强每个镜头的主次关系、节奏、视线方向、动作连续性和可拍性。",
+            "不得输出“意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束”等提示词标签。",
+            "不得把连续剧本压缩成单段提示词；不得把分镜字段合并成生图提示词。",
+            "不要新增与原剧本无关的人物、场景、道具或设定；不确定时保持原文。",
+        ]
+    )
+
+
+def _knowledge_guidance_lines(assembly: dict[str, object], *, limit: int) -> list[str]:
+    rules = assembly.get("knowledge_rules")
+    if not isinstance(rules, list):
+        return ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
+    lines: list[str] = []
+    preferred_domains = {"short_video_script", "storyboard", "directing", "cinematography", "negative_constraints"}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        domain = str(rule.get("domain") or "")
+        if domain not in preferred_domains:
+            continue
+        transform = rule.get("prompt_transform")
+        guidance = str(transform.get("guidance") or "").strip() if isinstance(transform, dict) else ""
+        rule_id = str(rule.get("rule_id") or "").strip()
+        if not guidance or not rule_id:
+            continue
+        lines.append(f"- {rule_id}: {guidance}")
+        if len(lines) >= limit:
+            break
+    return lines or ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
 
 
 def video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:
@@ -85,8 +122,6 @@ def t2i_visual_enhancement_instruction(request: PromptOptimizationRequest) -> st
 
 
 def visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
-    if reference_transform_mode_for_request(request) == ORIGINALIZE_REFERENCE_MODE:
-        return originalize_visual_enhancement_instruction(request)
     reference_hint = visual_reference_hint(request)
     reference_line = f"参考图线索：{reference_hint}" if reference_hint else "参考图线索：当前请求携带参考图，但没有可公开的文件名或资产签名；必须先判断它是主体参考还是风格参考。"
     reference_role_line = (
@@ -121,35 +156,18 @@ def visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
     )
 
 
-def originalize_visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
-    reference_hint = visual_reference_hint(request)
-    reference_line = f"参考图线索：{reference_hint}" if reference_hint else "参考图线索：当前请求携带参考图，但参考图只作为灵感来源。"
-    parts = [
-        f"意图：围绕“{request.prompt_text}”把参考图转化为新的原创资产或关键帧方向，目标是降低可识别 IP 相似度，而不是复刻参考图。",
-        "角色/主体：只抽取参考图的高层类别、功能、气质和宽泛造型语言；重新设计身份、脸部/头部细节、轮廓、服饰/材质系统和标志性辨识点。",
-        "场景/美术：可借鉴宽泛时代感、材质情绪和色彩关系，但不要复制原图独特场景构图、标志物、文字、logo、服装图案或 franchise 视觉符号。",
-        f"动作/情节：执行用户当前目标“{request.prompt_text}”，动作和情境服务新设计，不延续参考图的经典姿势、名场面或固定剧情关系。",
-        "镜头/构图：构图必须重新组织，避免贴近参考图的角度、姿势、画面布局、四视图排列或标志性剪影。",
-        "灯光：保留可用的氛围方向和可读性，但重新设计光源位置、明暗层次和材质表现，避免形成原图复刻感。",
-        "运动/时间推进：若是单帧，只表达当前新资产的可读状态；若后续用于视频，保留可动画的原创结构和动作余量。",
-        "连续性：新资产内部要稳定一致；参考图只作为灵感证据，不作为身份、服装、比例、构图或未修改细节的锁定项。",
-        "负面约束：不要复制已知角色、商标、logo、标志性服装/武器/构图/姿势，不要保留可识别 IP 组合，不要水印、文字乱码、畸形肢体或身份漂移。",
-    ]
-    return "\n".join(
-        [
-            f"原始提示词：{request.prompt_text}",
-            reference_line,
-            originalize_reference_policy(),
-            "当前场景：图生图参考用于原创重生 / 降 IP 风险。模板仍用于稳定质量，但每段必须服务“重新设计”，不能写成保守局部修图。",
-            "硬性要求：只优化提示词，不解释、不输出思考过程、不添加标题；参考图只能提供抽象灵感、材质情绪、功能方向和宽泛风格，不能作为复刻依据。",
-            "输出必须只有以下九行，标签不可改名：意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
-            " ".join(parts),
-        ]
-    )
-
-
 def strict_format_retry_instruction(request: PromptOptimizationRequest) -> str:
     mode = prompt_optimization_mode(request)
+    if is_script_surface_request(request):
+        return "\n".join(
+            [
+                "你正在重新整理已有短视频剧本或分镜优化结果。",
+                f"原始剧本/分镜：\n{request.prompt_text}",
+                "上一次输出破坏了剧本格式。只输出优化后的剧本/分镜正文。",
+                "保留原有片名/段落，或保留镜号、时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效、资产等字段。",
+                "禁止输出意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束等提示词标签。",
+            ]
+        )
     if mode in {"i2v", "t2v"}:
         return algorithm_video_strict_format_retry_instruction(
             prompt_text=request.prompt_text,
@@ -200,4 +218,4 @@ def text_enhancement_instruction(request: PromptOptimizationRequest) -> str:
     )
 
 
-__all__ = ("enhancement_instruction", "is_script_expansion_request", "strict_format_retry_instruction")
+__all__ = ("enhancement_instruction", "strict_format_retry_instruction")

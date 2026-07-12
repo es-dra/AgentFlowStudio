@@ -35,20 +35,22 @@ def _upload(client: TestClient, project_id: str, node_id: str) -> str:
     return response.json()["asset"]["asset_id"]
 
 
-def _promote(client: TestClient, project_id: str, image_id: str, label: str, asset_type: str = "character") -> dict:
+def _promote(client: TestClient, project_id: str, image_id: str, label: str, asset_type: str = "character", **overrides) -> dict:
+    payload = {
+        "source_image_asset_refs": [image_id],
+        "asset_type": asset_type,
+        "label": label,
+        "signature": f"{label} signature",
+        "feature_card": {"identity": f"{label} identity", "palette": "black and red"},
+        "negative_locks": [f"keep {label} identity", "keep black short hair"],
+        "source_node_id": f"{label}-node",
+        "review_decision": "fixed",
+        "reviewed_at": "2026-06-12T10:05:00+08:00",
+    }
+    payload.update(overrides)
     response = client.post(
         f"/projects/{project_id}/visual-assets/promote",
-        json={
-            "source_image_asset_refs": [image_id],
-            "asset_type": asset_type,
-            "label": label,
-            "signature": f"{label} signature",
-            "feature_card": {"identity": f"{label} identity", "palette": "black and red"},
-            "negative_locks": [f"keep {label} identity", "keep black short hair"],
-            "source_node_id": f"{label}-node",
-            "review_decision": "fixed",
-            "reviewed_at": "2026-06-12T10:05:00+08:00",
-        },
+        json=payload,
     )
     assert response.status_code == 200
     return response.json()["asset"]
@@ -204,7 +206,8 @@ def test_generate_context_uses_label_matched_fixed_assets_without_edges(tmp_path
     assert asset["asset_id"] not in {item["asset_id"] for item in bundle["excluded_assets"]}
 
 
-def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is_rejected(tmp_path) -> None:
+def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is_rejected(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_scene_subject_ref"
     scene_image = _upload(client, project_id, "scene-node")
@@ -308,7 +311,8 @@ def test_director_setup_asset_binding_reads_signature_from_backend_store(tmp_pat
     assert bundle["director_compile_result"]["asset_refs_used"] == [asset["asset_id"]]
 
 
-def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path) -> None:
+def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     store = RuntimeStore(tmp_path)
     legacy_dir = tmp_path / "creative_memory" / "proj_legacy_context"
     legacy_dir.mkdir(parents=True, exist_ok=True)
@@ -643,21 +647,30 @@ def test_same_label_visual_assets_resolve_to_chain_terminal_or_newest(tmp_path, 
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_label_arbitration"
     old = _promote(client, project_id, _upload(client, project_id, "old"), "Lin Wan")
-    new = client.post(
+    new_payload = {
+        "source_image_asset_refs": [_upload(client, project_id, "new")],
+        "asset_type": "character",
+        "label": "Lin Wan",
+        "signature": "Lin Wan v2 signature",
+        "feature_card": {"identity": "Lin Wan v2 identity"},
+        "negative_locks": ["keep Lin Wan v2 identity"],
+        "source_node_id": "new-node",
+        "review_decision": "fixed",
+        "reviewed_at": "2026-06-12T11:45:00+08:00",
+        "supersedes_asset_id": old["asset_id"],
+    }
+    missing_intent = client.post(
         f"/projects/{project_id}/visual-assets/promote",
-        json={
-            "source_image_asset_refs": [_upload(client, project_id, "new")],
-            "asset_type": "character",
-            "label": "Lin Wan",
-            "signature": "Lin Wan v2 signature",
-            "feature_card": {"identity": "Lin Wan v2 identity"},
-            "negative_locks": ["keep Lin Wan v2 identity"],
-            "source_node_id": "new-node",
-            "review_decision": "fixed",
-            "reviewed_at": "2026-06-12T11:45:00+08:00",
-            "supersedes_asset_id": old["asset_id"],
-        },
-    ).json()["asset"]
+        json=new_payload,
+    )
+    new_response = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json={**new_payload, "reuse_intent": "replace"},
+    )
+    assert missing_intent.status_code == 422
+    assert missing_intent.json()["detail"]["error"] == "invalid_visual_asset"
+    assert new_response.status_code == 200
+    new = new_response.json()["asset"]
     graph = {
         "target_node_id": "target-node",
         "runtime_work_mode": "context_generate",
@@ -695,7 +708,7 @@ def test_same_label_without_supersedes_uses_newest_server_recorded_asset(tmp_pat
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_label_newest"
     first = _promote(client, project_id, _upload(client, project_id, "first"), "Lin Wan")
-    second = _promote(client, project_id, _upload(client, project_id, "second"), "Lin Wan")
+    second = _promote(client, project_id, _upload(client, project_id, "second"), "Lin Wan", reuse_intent="create_new")
     graph = {
         "target_node_id": "target-node",
         "runtime_work_mode": "context_generate",

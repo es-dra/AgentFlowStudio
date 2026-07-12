@@ -43,6 +43,8 @@ def test_storyboard_breakdown_gate_closed_uses_safe_local_fallback(tmp_path, mon
     assert payload["safe_manifest"]["status"] == "local_fallback"
     assert payload["safe_manifest"]["raw_provider_response_stored"] is False
     assert payload["safe_manifest"]["asset_nodes_created"] is False
+    assert payload["safe_manifest"]["knowledgebase_version"] == "creative_prompt_knowledgebase_v1"
+    assert "storyboard_shot_numbering_handoff_v1" in payload["safe_manifest"]["knowledge_rule_ids"]
     assert len(payload["shots"]) >= 1
     first = payload["shots"][0]
     for field in ("shot_id", "index", "duration", "description", "shot_size", "light_atmosphere", "camera_motion", "asset_refs"):
@@ -94,7 +96,58 @@ def test_storyboard_local_fallback_uses_adaptive_shot_count_not_three_sentence_c
     assert shots[-1]["shot_id"] == "shot_05"
 
 
-def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_count() -> None:
+def test_storyboard_local_fallback_adds_source_grounding_and_asset_evidence() -> None:
+    script = "未来机器人站在农村屋顶仰望星空。毛绒头部外壳被月光照亮。远处村庄灯火慢慢熄灭。"
+
+    shots = local_storyboard_shots(script)
+
+    assert shots
+    assert all(shot["source_span"]["text"] for shot in shots)
+    assert all(shot["source_span"]["grounding_status"] == "source_grounded" for shot in shots)
+    assert all(shot["unsupported_additions"] == [] for shot in shots)
+    assert all(shot["planning_agent"]["dynamic_shot_count"] is True for shot in shots)
+    first_refs = shots[0]["asset_refs"]
+    assert all(ref["evidence_text"] for ref in first_refs)
+    assert all(isinstance(ref["confidence"], float) for ref in first_refs)
+
+
+def test_storyboard_breakdown_returns_asset_graph_with_cross_shot_evidence(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_storyboard_asset_graph"
+    client.post("/projects", json={"project_id": project_id, "goal": "Build asset graph"})
+
+    response = client.post(
+        f"/projects/{project_id}/storyboard-breakdowns",
+        json={
+            "node_id": "text_001",
+            "script_text": "未来机器人站在农村屋顶仰望星空。未来机器人抬起毛绒头部外壳。屋顶平台边缘映着远处村庄灯火。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-06-28T11:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    graph = payload["asset_graph"]
+    assets = {(item["label"], item["asset_type"]): item for item in graph["assets"]}
+
+    assert graph["artifact_type"] == "agentflow_asset_graph"
+    assert payload["safe_manifest"]["asset_graph_asset_count"] == len(graph["assets"])
+    assert ("未来机器人", "character") in assets
+    assert any(asset_type == "scene" for _label, asset_type in assets)
+    robot = assets[("未来机器人", "character")]
+    assert robot["graph_asset_id"].startswith("graph:character:")
+    assert len(robot["shot_refs"]) >= 1
+    assert all(item["text"] for item in robot["evidence_spans"])
+    assert robot["review_state"] == "candidate_review_required"
+    assert any(rel["relationship_type"] == "shot_contains_asset" for rel in graph["relationships"])
+    assert graph["writes_long_term_memory"] is False
+    assert graph["writes_company_kb"] is False
+
+
+def test_storyboard_local_fallback_extracts_named_characters_scenes_and_dynamic_count() -> None:
     script = (
         "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。"
         "孙悟空手持金箍棒向前压低身形。"
@@ -119,12 +172,12 @@ def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_c
     assert ("孙悟空", "character") in labels_by_type
     assert ("金刚狼", "character") in labels_by_type
     assert ("山巅石台战场", "scene") in labels_by_type
-    assert ("金箍棒", "prop") in labels_by_type
+    assert not any(ref["asset_type"] == "prop" for ref in refs)
     assert "@主角" not in descriptions
     assert "@主要场景" not in descriptions
 
 
-def test_shot_asset_plan_endpoint_returns_character_scene_and_prop_assets(tmp_path, monkeypatch) -> None:
+def test_shot_asset_plan_endpoint_returns_principal_character_scene_assets_and_holds_props(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_shot_asset_plan"
@@ -172,7 +225,11 @@ def test_shot_asset_plan_endpoint_returns_character_scene_and_prop_assets(tmp_pa
     assert ("孙悟空", "character") in labels_by_type
     assert ("金刚狼", "character") in labels_by_type
     assert ("山巅石台战场", "scene") in labels_by_type
-    assert ("金箍棒", "prop") in labels_by_type
+    assert ("金箍棒", "prop") not in labels_by_type
+    assert any(
+        item.get("display_name") == "金箍棒" and item.get("reason") == "prop_requires_manual_asset_entry"
+        for item in payload["asset_graph"]["held_asset_refs"]
+    )
     assert all(item["evidence_text"] for item in payload["asset_refs"])
     assert response_contains_unsafe_marker(payload) is False
 
@@ -275,11 +332,21 @@ def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, 
     assert response.status_code == 200
     payload = response.json()
     assert len(calls) == 1
+    provider_prompt = calls[0].prompt
+    assert "专业知识库约束" in provider_prompt
+    assert "storyboard_shot_numbering_handoff_v1" in provider_prompt
     assert payload["provider_calls_started"] is True
     assert payload["safe_manifest"]["status"] == "provider_structured"
     assert payload["safe_manifest"]["raw_provider_response_stored"] is False
+    assert payload["safe_manifest"]["knowledgebase_version"] == "creative_prompt_knowledgebase_v1"
+    assert "storyboard_shot_numbering_handoff_v1" in payload["safe_manifest"]["knowledge_rule_ids"]
     assert payload["shots"][0]["description"].startswith("@主角")
-    assert payload["shots"][1]["asset_refs"][1]["asset_type"] == "prop"
+    assert not any(ref["asset_type"] == "prop" for ref in payload["shots"][1]["asset_refs"])
+    assert any(
+        item.get("display_name") == "发光地图" and item.get("reason") == "prop_requires_manual_asset_entry"
+        for item in payload["shots"][1]["dropped_asset_ref_diagnostics"]
+    )
+    assert payload["asset_graph"]["held_asset_ref_count"] >= 1
 
 
 def test_storyboard_breakdown_accepts_llm_json_with_markdown_and_trailing_text(tmp_path, monkeypatch) -> None:
@@ -343,6 +410,76 @@ def test_storyboard_breakdown_accepts_llm_json_with_markdown_and_trailing_text(t
     assert payload["shots"][0]["asset_refs"][1]["asset_type"] == "scene"
 
 
+def test_storyboard_provider_parser_marks_unrequested_set_pieces_for_review(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+
+    class Descriptor:
+        modality = "llm"
+
+    class FakeRegistry:
+        _descriptors = {"prompt_optimizer": Descriptor()}
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {
+                "text": json.dumps(
+                    {
+                        "shots": [
+                            {
+                                "shot_id": "shot_01",
+                                "index": 1,
+                                "duration": "5s",
+                                "description": "@未来机器人 坐在木椅上仰望星空，屋檐从画面右侧压下来。",
+                                "shot_size": "中景",
+                                "light_atmosphere": "冷月光",
+                                "camera_motion": "固定机位",
+                                "dialogue": "无明确对白",
+                                "sound": "夜晚环境声",
+                                "source_span": {
+                                    "span_id": "script_span_01",
+                                    "text": "未来机器人站在农村屋顶仰望星空。",
+                                },
+                                "asset_refs": [
+                                    {"label": "未来机器人", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                                    {"label": "农村屋顶", "asset_type": "scene", "status": "mentioned", "source": "explicit"},
+                                ],
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                "provider_calls_started": True,
+            }
+
+    monkeypatch.setattr("apps.api.runtime_storyboard_breakdown.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_storyboard_grounding", "goal": "Ground storyboard output"})
+
+    response = client.post(
+        "/projects/proj_storyboard_grounding/storyboard-breakdowns",
+        json={
+            "node_id": "text_001",
+            "script_text": "未来机器人站在农村屋顶仰望星空。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {"llm_provider": "prompt_optimizer"},
+            "generated_at": "2026-06-28T10:06:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    shot = response.json()["shots"][0]
+    assert shot["grounding_status"] == "needs_review_unsupported_addition"
+    assert "木椅" in shot["unsupported_additions"]
+    assert "屋檐" in shot["unsupported_additions"]
+    assert shot["source_span"]["text"] == "未来机器人站在农村屋顶仰望星空。"
+    graph = response.json()["asset_graph"]
+    assert {"shot_id": "shot_01", "addition": "木椅"} in [
+        {"shot_id": item["shot_id"], "addition": item["addition"]} for item in graph["unsupported_additions"]
+    ]
+
+
 def test_storyboard_breakdown_keeps_provider_started_when_llm_json_is_discarded(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
 
@@ -399,3 +536,75 @@ def test_storyboard_breakdown_is_exported_without_secret_surface(tmp_path) -> No
     assert "storyboardbreakdownrequest" in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+def test_storyboard_shots_include_keyframe_and_video_plan_fields() -> None:
+    shots = local_storyboard_shots("A future robot stands on a rural rooftop and watches stars before turning its glowing face toward the sky.")
+
+    first = shots[0]
+    assert first["shot_function"] == "establish"
+    assert first["keyframe_requirement"]["frame_role"] == "establish_keyframe"
+    assert first["video_motion_requirement"]["time_beats"][0]["time"] == "0.0s-1.0s"
+    assert "robot head shell and mechanical body proportions" in first["continuity_locks"]
+    assert "no unrequested chair" in first["negative_scene_locks"]
+
+
+def test_shot_asset_plan_returns_editable_asset_profiles(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_asset_profile_plan"
+    client.post("/projects", json={"project_id": project_id, "goal": "Asset profile plan"})
+
+    response = client.post(
+        f"/projects/{project_id}/shot-asset-plans",
+        json={
+            "node_id": "shot_robot_rooftop",
+            "shot": {
+                "shot_id": "shot_01",
+                "index": 1,
+                "description": "A future robot watches stars on a rural rooftop platform.",
+                "asset_refs": [
+                    {"label": "Future Robot", "asset_type": "character", "status": "candidate", "source": "explicit"},
+                    {"label": "Rooftop Platform", "asset_type": "scene", "status": "candidate", "source": "explicit"},
+                ],
+            },
+            "script_text": "A future robot watches stars on a rural rooftop platform.",
+            "generated_at": "2026-06-27T10:05:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["safe_manifest"]["asset_profile_count"] >= 2
+    assert payload["safe_manifest"]["asset_graph_asset_count"] >= 2
+    assert len(payload["asset_profile_plan"]) >= 2
+    assert payload["asset_graph"]["artifact_type"] == "agentflow_asset_graph"
+    robot = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "character")
+    scene = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "scene")
+    assert robot["profile_stage"] == "candidate_profile_seed"
+    assert "robot head shell" in robot["identity_locks"]
+    assert "forbidden geometry" in scene["editable_fields"]
+    assert "do not add chairs or stools unless approved" in scene["negative_locks"]
+    assert all("profile_plan" in ref for ref in payload["asset_refs"])
+    assert all("graph_asset_id" in ref for ref in payload["asset_refs"])
+
+
+def test_storyboard_plan_includes_professional_reference_for_rooftop_video() -> None:
+    shots = local_storyboard_shots("A future robot stands on a rural rooftop and watches stars before turning its glowing face toward the sky.")
+
+    reference = shots[0]["professional_reference"]
+
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert reference["pacing"]["must_include"][0].startswith("0-1s")
+    assert reference["writes_company_kb"] is False
+
+
+def test_storyboard_plan_includes_director_scenario_for_saas_demo() -> None:
+    shots = local_storyboard_shots("A SaaS product launch demo shows a dashboard workflow and the final saved-time result.")
+
+    scenario = shots[0]["director_scenario"]
+
+    assert scenario["primary_scenario"] == "saas_launch"
+    assert "screen geometry remains readable" in scenario["quality_checks"]
+    assert scenario["writes_company_kb"] is False

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
@@ -83,7 +82,8 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     canvas_body_source = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     assert '!["image", "video"].includes(node.type)' in canvas_body_source
     prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
-    assert 'node.type === "video" || node.type === "script"' in prompt_bar_source
+    assert "openExpandEditor(store, runtime, node)" in prompt_bar_source
+    assert 'node.type === "video" || node.type === "script") {' not in prompt_bar_source
     assert "AFS_ALLOW_REMOTE_IMAGE" in env_example
 
 
@@ -111,6 +111,32 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "onBeforeSiteHome" in topbar
     assert "store.flushRuntimeSave()" in main
     assert "首页" in topbar
+
+
+def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    runtime_status = (STUDIO_ROOT / "src" / "runtime-surface-status.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    styles = _styles()
+
+    assert 'health()' in runtime_client
+    assert 'requestJson("/health")' in runtime_client
+    assert 'authStatus()' in runtime_client
+    assert "runtimeSurfaceStatus" in main
+    assert "refreshRuntimeSurfaceStatus" in main
+    assert "loadRuntimeSurfaceStatus(runtimeClient" in main
+    assert "runtime.health()" in runtime_status
+    assert "runtime.authStatus()" in runtime_status
+    assert "providerGateSummary" in runtime_status
+    assert "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed." in runtime_status
+    assert "runtimeSurfaceStatus" in topbar
+    assert "runtimeStatusBadge" in topbar
+    assert "safeRuntimeStatusState" in topbar
+    assert "runtime-status-badge" in topbar
+    assert "data-state" in topbar or "dataset.state" in topbar
+    assert ".runtime-status-badge.ready" in styles
+    assert ".runtime-status-badge.unavailable" in styles
 
 
 def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
@@ -169,104 +195,22 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
         assert marker in source
 
 
-def test_studio_prompt_textareas_are_resizable_for_long_prompts() -> None:
-    base = (STUDIO_ROOT / "styles" / "base.css").read_text(encoding="utf-8")
-    prompt_bar = (STUDIO_ROOT / "styles" / "prompt-bar.css").read_text(encoding="utf-8")
-    maturity = (STUDIO_ROOT / "styles" / "studio-canvas-maturity.css").read_text(encoding="utf-8")
-    modals = (STUDIO_ROOT / "styles" / "modals.css").read_text(encoding="utf-8")
+def test_prompt_optimizer_provider_errors_use_user_facing_message() -> None:
+    runtime_errors = (STUDIO_ROOT / "src" / "runtime-error-utils.js").read_text(encoding="utf-8")
+    optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
 
-    assert "textarea { resize: none; }" not in base
-    assert "textarea {\n  resize: vertical;\n  overflow: auto;\n}" in base
-    assert ".prompt-bar textarea" in prompt_bar
-    assert "max-height: min(320px, calc(100vh - 220px));" in prompt_bar
-    assert "resize: vertical;" in prompt_bar
-    assert ".prompt-expand {" in prompt_bar
-    assert "resize: both;" in prompt_bar
-    assert ".prompt-expand textarea" in prompt_bar
-    assert ".node .node-content-editor" in maturity
-    assert "max-height: min(460px, calc(100vh - 220px));" in maturity
-    assert ".generation-field textarea" in maturity
-    assert "max-height: min(420px, 60vh);" in maturity
-    assert ".visual-asset-panel textarea" in modals
-    assert "max-height: min(360px, 52vh);" in modals
+    assert "提示词优化失败，请检查 LLM provider 配置或稍后重试。" in runtime_errors
+    assert "provider returned infrastructure error" in runtime_errors
+    assert "unable to read `request.json`" in runtime_errors
+    assert "bwrap:" in runtime_errors
+    assert "提示词优化失败，请稍后重试。" in optimizer
+    assert 'formatRuntimeError(error, "???????")' not in optimizer
 
 
-def test_runtime_error_detail_objects_are_rendered_without_object_object() -> None:
-    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
-    upload_actions = (STUDIO_ROOT / "src" / "node-upload-actions.js").read_text(encoding="utf-8")
+def test_script_nodes_keep_prompt_bar_visible_with_content() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
 
-    assert "runtimeErrorDetail(payload)" in runtime_client
-    assert "Array.isArray(detail)" in runtime_client
-    assert "runtimeValidationIssueText" in runtime_client
-    assert 'typeof detail === "object"' in runtime_client
-    assert "detail.reason" in runtime_client
-    assert "detail.error" in runtime_client
-    assert "detail.detail_code" in runtime_client
-    assert 'field=${detail.field}' in runtime_client
-    assert 'item !== "body"' in runtime_client
-    assert "String(payload?.detail" not in runtime_client
-    assert "[object Object]" not in runtime_client
-    assert "图片上传失败" in upload_actions
-
-
-def test_runtime_error_detail_object_and_validation_array_are_readable() -> None:
-    code = r"""
-import { createRuntimeClient } from './apps/studio/src/runtime-client.js';
-
-const responses = [
-  {
-    ok: false,
-    status: 422,
-    text: async () => JSON.stringify({
-      detail: {
-        error: 'reference_image_upload_invalid_base64',
-        detail_code: 'reference_image_upload_invalid_base64',
-        field: 'data_base64',
-        reason: '上传图片数据不是有效的 base64，请重新选择图片后再试。',
-      },
-    }),
-  },
-  {
-    ok: false,
-    status: 422,
-    text: async () => JSON.stringify({
-      detail: [{ loc: ['body', 'data_base64'], msg: 'Field required', type: 'missing' }],
-    }),
-  },
-];
-globalThis.window = {
-  location: { protocol: 'http:', href: 'http://127.0.0.1:8796/studio/', hostname: '127.0.0.1', port: '8796' },
-  localStorage: { getItem() { return ''; } },
-};
-globalThis.fetch = async () => responses.shift();
-const runtime = createRuntimeClient('proj_error_detail');
-
-for (const expected of ['reference_image_upload_invalid_base64', 'field=data_base64: Field required']) {
-  try {
-    await runtime.uploadImageAsset({
-      node_id: 'image_1',
-      filename: 'reference.png',
-      mime_type: 'image/png',
-      data_base64: '',
-      role: 'reference_image',
-      generated_at: '2026-07-05T10:00:00+08:00',
-    });
-  } catch (error) {
-    if (String(error.message).includes('[object Object]')) throw new Error(error.message);
-    if (!String(error.message).includes(expected)) throw new Error(`missing ${expected}: ${error.message}`);
-    continue;
-  }
-  throw new Error('expected Runtime request to fail');
-}
-"""
-    completed = subprocess.run(
-        ["node", "--input-type=module", "-e", code],
-        cwd=Path.cwd(),
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert completed.returncode == 0, completed.stderr
+    assert 'node.type === "script" || !node.content' in prompt_bar
 
 
 def test_studio_asset_context_workflow_is_single_canvas() -> None:
@@ -327,7 +271,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     assert '!["image", "video"].includes(node.type)' in canvas_body
     assert "bar-cost" not in prompt_bar
-    assert "当前版本仅图片节点支持真实生成" in prompt_bar
+    assert "当前视频模型不支持直接生成" in prompt_bar
+    assert "当前版本仅图片节点支持真实生成" not in prompt_bar
     assert "uploadNodeImage" in node_menu
     assert "setNodeVideoFrame" in node_menu
     assert "pollNodeVideoGeneration" in node_menu

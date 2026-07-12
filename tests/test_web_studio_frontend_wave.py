@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 
@@ -187,6 +189,84 @@ def test_frontend_maturity_wave_has_canvas_generation_and_work_actions() -> None
     assert "provider raw" not in combined.lower()
 
 
+def test_generation_panel_uses_node_specific_settings_profiles() -> None:
+    panel = _read("src/panels/generation-panel.js")
+    profile = _read("src/panels/generation-panel-profile.js")
+    specs = _read("src/presets/specs.js")
+
+    assert "generationProfile(current)" in panel
+    assert "applyGenerationProfileSettings(target, profile, controls)" in panel
+    assert "profile.runsGeneration !== false" in panel
+    assert "generation-setting-${profile.kind}" in panel
+    assert "generation-setting-count-${profile.fields.length}" in panel
+    assert "保存设置" in panel
+    assert "target.params.spec = { ...(target.params.spec || {}), ratio: controls.ratio?.value || \"9:16\", count }" in profile
+    assert "target.params.candidateCount = count" in profile
+    assert "const VIDEO_MOTIONS = [" in profile
+    assert "{ key: \"motion\", label: \"镜头运动 / 运镜\", kind: \"select\", options: VIDEO_MOTIONS" in profile
+    assert "target.params.motion = controls.motion?.value || \"固定机位\"" in profile
+    assert "缓慢推进" in profile
+    assert "轻微环绕主体" in profile
+    assert "target.params.candidateCount = 1" not in profile
+    assert "videoCandidateCount" not in profile
+    assert "当前视频模型仅支持生成 1 个候选视频" not in profile
+    assert "镜头 / 构图" not in profile
+    assert "视图 / 构图要求" not in profile
+    assert "文本规划节点当前不直接使用生成设置" in profile
+    assert "导演台请使用专门的导演台面板编辑" in profile
+    assert "当前视频片段复用还没有接入真实生成设置" in profile
+    for unused_setting in (
+        "scriptPlanning",
+        "directorGenerationSettings",
+        "videoReuseSettings",
+        "scriptStyle",
+        "cameraLanguage",
+        "reuseSource",
+    ):
+        assert unused_setting not in profile
+    assert "VIDEO_DURATIONS" in specs
+    assert "\"2s\"" in specs or "length: 15" in specs
+    assert "\"7s\"" in specs or "length: 15" in specs
+    assert "\"14s\"" in specs or "length: 15" in specs
+    assert "VIDEO_RESOLUTIONS = [\"480P\", \"720P\"]" in specs
+    assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"3:4\"]" in specs
+    assert "20s" not in specs
+    assert "1080P" not in specs
+    assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"21:9\"]" not in specs
+    styles = _read("styles/studio-media-experience.css")
+    assert ".generation-panel .generation-setting-image" in styles
+    assert "grid-template-columns: minmax(0, 1fr) 112px" in styles
+    assert ".generation-setting-grid .generation-field:last-child" not in styles
+
+
+def test_video_duration_options_cover_one_to_fifteen_seconds() -> None:
+    script = r'''
+import { VIDEO_DURATIONS } from "./apps/studio/src/presets/specs.js";
+import { generationProfile } from "./apps/studio/src/panels/generation-panel-profile.js";
+
+const profile = generationProfile({ type: "video", params: {} });
+const durationField = profile.fields.find((field) => field.key === "duration");
+process.stdout.write(JSON.stringify({
+  durations: VIDEO_DURATIONS,
+  profileOptions: durationField?.options || [],
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+    )
+    payload = json.loads(completed.stdout)
+
+    expected = [f"{second}s" for second in range(1, 16)]
+    assert payload["durations"] == expected
+    assert payload["profileOptions"] == expected
+    for representative in ("2s", "7s", "14s"):
+        assert representative in payload["durations"]
+
+
 def test_generation_projection_is_split_from_node_actions() -> None:
     for path in (
         "src/node-generation-progress.js",
@@ -230,14 +310,16 @@ def test_generation_projection_is_split_from_node_actions() -> None:
     assert "function showCarryConfirmModal" not in node_actions
 
 
-def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failure() -> None:
+def test_keyframe_progress_uses_percentage_long_polling_without_timeout_failure() -> None:
     main = _read("src/main.js")
     progress = _read("src/node-generation-progress.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")
     project_controller = _read("src/studio-project-controller.js")
     body = _read("src/canvas-node-body.js")
 
-    assert "INDETERMINATE_ACTIVE_STATUSES" in progress
+    assert "ACTIVE_STATUS_PROGRESS" in progress
+    assert "submitted: 8" in progress
+    assert "running: 58" in progress
     assert "mode: progressMode(response, status)" in progress
     assert "MAX_KEYFRAME_POLL_ATTEMPTS" in keyframe_actions
     assert "markKeyframeStillProcessing" in keyframe_actions
@@ -249,7 +331,8 @@ def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failu
     assert "refreshPendingKeyframeGenerations(store, runtime)" in main
     assert "onProjectReady?.(runtimeClient)" in project_controller
     assert "throw new Error(`图片生成仍在处理中" not in keyframe_actions
-    assert "progress?.mode === \"indeterminate\"" in body
+    assert "const isIndeterminate = !progress || progress?.percent == null" in body
+    assert "`${progress.percent}%`" in body
     assert "生成中" in body
 
 
@@ -354,7 +437,8 @@ def test_canvas_fit_uses_visible_safe_area_not_full_root_bounds() -> None:
     assert "fitVisibleCanvasViewport(s.nodes)" in context_menu
     assert "fitVisibleCanvasViewport(s.nodes)" in dock
     assert "visibleCanvasCenter()" in dock
-    assert "fitVisibleCanvasViewport({ [node.id]: node }, 220)" in navigator
+    assert "visibleCanvasCenter()" in navigator
+    assert "panViewportToNode(s.viewport, node)" in navigator
     assert "fitVisibleCanvasViewport({ [node.id]: node }, 220)" in drawer_actions
 
 

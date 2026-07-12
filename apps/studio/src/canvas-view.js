@@ -3,7 +3,7 @@ import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { renderEdges } from "./canvas-edges.js";
 import { icon } from "./icons.js";
-import { boundedNodeFrame } from "./interaction/node-resize.js";
+import { canRunNodeGeneration } from "./node-actions.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
 export function renderCanvas(state, store) {
@@ -55,7 +55,6 @@ function buildNodeElement(node) {
   elNode.appendChild(nodeBody());
   elNode.appendChild(portButton("in"));
   elNode.appendChild(portButton("out"));
-  elNode.appendChild(nodeResizeHandle());
   return elNode;
 }
 
@@ -110,16 +109,6 @@ function portButton(port) {
   return button;
 }
 
-function nodeResizeHandle() {
-  const handle = document.createElement("button");
-  handle.className = "node-resize-handle";
-  handle.dataset.resizeHandle = "node";
-  handle.type = "button";
-  handle.title = "调整节点大小";
-  handle.setAttribute("aria-label", "调整节点大小");
-  return handle;
-}
-
 function syncNodeElement(elNode, node, state, relations, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   syncNodeFrame(elNode, node, state);
@@ -131,12 +120,10 @@ function syncNodeElement(elNode, node, state, relations, store) {
 }
 
 function syncNodeFrame(elNode, node, state) {
-  const frame = boundedNodeFrame(node);
-  const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   elNode.style.transform = `translate(${node.x}px, ${node.y}px)`;
-  elNode.style.width = `${frame.w}px`;
-  elNode.style.minHeight = `${node.collapsed ? effectiveHeight(node) : frame.h}px`;
-  elNode.style.height = `${node.collapsed ? effectiveHeight(node) : frame.h}px`;
+  elNode.style.width = `${node.w}px`;
+  elNode.style.minHeight = `${effectiveHeight(node)}px`;
+  elNode.style.height = node.collapsed ? `${effectiveHeight(node)}px` : "";
   elNode.classList.toggle("selected", state.selection.nodeIds.includes(node.id));
   elNode.classList.toggle("collapsed", Boolean(node.collapsed));
   elNode.classList.toggle("director", node.type === "director");
@@ -147,23 +134,6 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("is-generating", node.status === "generating");
   elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
   elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
-  elNode.classList.toggle("empty-tool-node", isEmptyToolNode(node, def));
-  elNode.classList.toggle("compact-node", !node.collapsed && frame.h < 330);
-  elNode.classList.toggle("roomy-node", !node.collapsed && frame.w >= 420);
-  elNode.classList.toggle("tall-node", !node.collapsed && frame.h >= 380);
-}
-
-function isEmptyToolNode(node, def) {
-  const status = node.status || "empty";
-  return Boolean(
-    !node.collapsed
-      && !node.content
-      && !node.result
-      && !node.previewUrl
-      && (status === "empty" || status === "idle")
-      && def.intents?.length
-      && !["image", "video"].includes(node.type),
-  );
 }
 
 function syncNodeRelations(elNode, node, relations) {
@@ -196,7 +166,7 @@ function syncNodeStateStrip(elNode, node, def) {
 function syncNodeBody(elNode, node, def, store) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
-  body.classList.toggle("full-bleed-media", node.type === "image" && node.status === "complete" && Boolean(node.previewUrl));
+  body.classList.toggle("full-bleed-media", node.type === "image" && ["complete", "partial"].includes(node.status) && Boolean(node.previewUrl));
   const signature = nodeBodySignature(node);
   if (body.dataset.signature !== signature) {
     if (body.contains(document.activeElement) && document.activeElement?.classList?.contains("node-content-editor")) {
@@ -225,7 +195,19 @@ function syncRunAction(elNode, node) {
     }
     return;
   }
+  if (!canRunNodeGeneration(node)) {
+    runBtn.hidden = true;
+    runBtn.disabled = true;
+    runBtn.dataset.action = "run-disabled";
+    return;
+  }
+  runBtn.hidden = false;
   runBtn.dataset.action = "run";
+  if (["error", "partial"].includes(node.status)) {
+    runBtn.title = "Retry failed items";
+    runBtn.innerHTML = icon("retry", 13);
+    return;
+  }
   runBtn.title = "生成";
   runBtn.innerHTML = icon("play", 13);
 }

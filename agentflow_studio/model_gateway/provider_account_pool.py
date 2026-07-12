@@ -98,11 +98,11 @@ def _select_from_pool(
         raise ModelConfigError(f"No enabled provider account for service {service_id} in pool {account_pool_id}")
     entry = sorted(entries, key=lambda item: (item.priority, item.account_id))[0]
     account = store.account(entry.account_id)
-    _ensure_credential_env(entry.credential_env, account=account)
+    _ensure_credential_env(entry.credential_env)
     return ProviderAccountSelection(
         account_id=entry.account_id,
         account=account,
-        credential_env=_effective_credential_env(entry.credential_env, account),
+        credential_env=entry.credential_env,
         account_pool_id=account_pool_id,
         priority=entry.priority,
         weight=entry.weight,
@@ -116,11 +116,11 @@ def _select_service_account_ref(store: CompanyProviderSecrets, *, service_id: st
     account_id = str(service.get("account_ref") or "")
     account = store.account(account_id)
     credential_env = str(account.get("api_key_env") or "").strip() or None
-    _ensure_credential_env(credential_env, account=account)
+    _ensure_credential_env(credential_env)
     return ProviderAccountSelection(
         account_id=account_id,
         account=account,
-        credential_env=_effective_credential_env(credential_env, account),
+        credential_env=credential_env,
         account_pool_id=None,
         priority=100,
         weight=1,
@@ -137,15 +137,7 @@ def _entry_matches(entry: ProviderAccountPoolEntry, *, service_id: str, capabili
     return not entry.enabled_capabilities or capability in entry.enabled_capabilities
 
 
-def _effective_credential_env(credential_env: str | None, account: dict[str, Any]) -> str | None:
-    if str(account.get("auth_type") or "").strip().lower() == "none":
-        return None
-    return credential_env
-
-
-def _ensure_credential_env(credential_env: str | None, *, account: dict[str, Any]) -> None:
-    if _effective_credential_env(credential_env, account) is None:
-        return
+def _ensure_credential_env(credential_env: str | None) -> None:
     if credential_env and not os.environ.get(credential_env):
         raise ModelGatewayError(f"Provider credential env is not configured: {credential_env}")
 

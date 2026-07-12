@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from agentflow.contracts.project_manifest import validate_project_manifest
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
-from agentflow.harness.json_io import write_json
+from agentflow.harness.json_io import system_path, write_json
 
 
 SAFE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
@@ -33,6 +35,13 @@ class RuntimeStore:
     def project_manifest_path(self, project_id: str) -> Path:
         safe = safe_id(project_id)
         return self.projects_dir / safe / "project_manifest.json"
+
+    def project_deleted_marker_path(self, project_id: str) -> Path:
+        safe = safe_id(project_id)
+        return self.projects_dir / safe / "project_deleted.json"
+
+    def is_project_deleted(self, project_id: str) -> bool:
+        return self.project_deleted_marker_path(project_id).is_file()
 
     def create_project_manifest(
         self,
@@ -62,6 +71,9 @@ class RuntimeStore:
         validate_project_manifest(payload)
         path = self.project_manifest_path(project_id)
         path.parent.mkdir(parents=True, exist_ok=True)
+        marker = self.project_deleted_marker_path(project_id)
+        if marker.exists():
+            marker.unlink()
         write_json(path, payload)
         return payload
 
@@ -91,11 +103,34 @@ class RuntimeStore:
     def list_project_summaries(self) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
         for path in sorted(self.projects_dir.glob("*/project_manifest.json")):
+            if (path.parent / "project_deleted.json").is_file():
+                continue
             manifest = read_json(path)
             validate_project_manifest(manifest)
             artifact = self.register_artifact(path, role="project_manifest")
             summaries.append(project_summary(manifest, artifact))
         return summaries
+
+    def soft_delete_project(self, project_id: str, *, deleted_by: str = "", reason: str = "user_requested") -> dict[str, Any]:
+        path = self.project_manifest_path(project_id)
+        if not path.exists():
+            raise KeyError(project_id)
+        manifest = read_json(path)
+        validate_project_manifest(manifest)
+        marker = {
+            "schema_version": "0.1.0",
+            "project_id": str(manifest.get("project_id") or project_id),
+            "deleted": True,
+            "delete_mode": "soft_delete",
+            "deleted_at": datetime.now(timezone.utc).isoformat(),
+            "deleted_by": str(deleted_by or ""),
+            "reason": str(reason or "user_requested"),
+            "does_not_delete_project_bytes": True,
+        }
+        marker_path = self.project_deleted_marker_path(project_id)
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(marker_path, marker)
+        return marker
 
     def update_project_manifest(self, project_id: str, updates: dict[str, list[dict[str, Any]]], status: str) -> dict[str, Any]:
         manifest = self.ensure_project_manifest(project_id)
@@ -159,23 +194,34 @@ class RuntimeStore:
 
     def register_artifact(self, path: Path, *, role: str) -> dict[str, Any]:
         resolved = Path(path).resolve()
-        if not resolved.exists():
+        if not _path_exists(resolved):
             raise FileNotFoundError(str(path))
+        relative_path = resolved.relative_to(self.root.resolve()).as_posix()
         artifact_id = safe_id(str(resolved.relative_to(self.root.resolve()).with_suffix("")))
         payload = read_json(resolved) if resolved.suffix.lower() == ".json" else None
         artifact_type = str((payload or {}).get("artifact_type") or (payload or {}).get("kind") or "text_artifact")
         entry = {
             "artifact_id": artifact_id,
-            "relative_path": resolved.relative_to(self.root.resolve()).as_posix(),
+            "relative_path": relative_path,
             "filename": resolved.name,
             "artifact_type": artifact_type,
             "role": role,
             "media_type": "application/json" if resolved.suffix.lower() == ".json" else "text/markdown",
         }
+        project_id = _project_id_from_artifact_relative_path(relative_path)
+        if project_id:
+            entry["project_id"] = project_id
         index = self._artifact_index()
         index.setdefault("artifacts", {})[artifact_id] = entry
         write_json(self.index_path, index)
         return public_artifact_ref(entry)
+
+    def artifact_project_id(self, artifact_id: str) -> str:
+        index = self._artifact_index()
+        entry = dict(index.get("artifacts", {}).get(artifact_id) or {})
+        if not entry:
+            raise KeyError(artifact_id)
+        return str(entry.get("project_id") or _project_id_from_artifact_relative_path(str(entry.get("relative_path") or "")))
 
     def read_artifact(self, artifact_id: str) -> dict[str, Any]:
         index = self._artifact_index()
@@ -190,7 +236,7 @@ class RuntimeStore:
             payload = read_json(path)
             reject_unsafe_payload(payload)
             return {**ref, "payload": payload}
-        text = path.read_text(encoding="utf-8")
+        text = _read_text(path, encoding="utf-8")
         reject_unsafe_text(text)
         return {**ref, "text": text}
 
@@ -206,9 +252,10 @@ class RuntimeStore:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    json_path = Path(path)
+    payload = json.loads(_read_text(json_path, encoding="utf-8-sig"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{Path(path).name} must be a JSON object")
+        raise ValueError(f"{json_path.name} must be a JSON object")
     return payload
 
 
@@ -263,6 +310,22 @@ def _is_within(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _path_exists(path: Path) -> bool:
+    return os.path.exists(system_path(path))
+
+
+def _read_text(path: Path, *, encoding: str) -> str:
+    with open(system_path(path), encoding=encoding) as handle:
+        return handle.read()
+
+
+def _project_id_from_artifact_relative_path(relative_path: str) -> str:
+    parts = [part for part in str(relative_path or "").replace("\\", "/").split("/") if part]
+    if len(parts) >= 2 and parts[0] in {"projects", "runs", "feedback"}:
+        return safe_id(parts[1])
+    return ""
 
 
 __all__ = (

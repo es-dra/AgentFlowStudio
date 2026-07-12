@@ -12,6 +12,8 @@
   min-width: 0;
   overflow: hidden;
   background: #0b0d10;
+  border: 0;
+  color: var(--text-secondary);
 }
 
 .candidate-card img {
@@ -23,6 +25,35 @@
 
 .candidate-card:hover img {
   transform: scale(1.03);
+}
+
+.candidate-card.failed,
+.candidate-card.blocked,
+.candidate-card.needs_attention,
+.candidate-card.retryable,
+.candidate-card.partial,
+.candidate-card.cancelled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 170, 90, 0.42);
+  background: rgba(255, 170, 90, 0.08);
+}
+
+.candidate-card:disabled {
+  cursor: default;
+}
+
+.candidate-empty {
+  display: block;
+  max-width: calc(100% - 14px);
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #ffc285;
 }
 
 .candidate-badge {
@@ -71,10 +102,114 @@ button.creation-action:hover {
   max-height: calc(100vh - 140px);
 }
 
-.generation-panel .generation-setting-grid {
-  grid-template-columns: 1fr 82px;
+.generation-panel .generation-setting-image {
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: end;
 }
 
-.generation-panel .generation-setting-grid .generation-field:last-child {
+.generation-panel .generation-setting-video {
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: end;
+}
+
+.generation-panel .generation-setting-video .generation-field:first-child {
   grid-column: 1 / -1;
+}
+
+.generation-panel.keyframe-generation-panel .generation-panel-body {
+  gap: 10px;
+}
+
+.keyframe-constraints-editor {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.keyframe-constraints-head,
+.keyframe-constraints-toolbar,
+.keyframe-constraint-row-top,
+.keyframe-constraint-meta,
+.keyframe-fixed-asset-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keyframe-constraints-head {
+  justify-content: space-between;
+}
+
+.keyframe-constraints-head small,
+.keyframe-fixed-asset-row small,
+.keyframe-constraints-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.keyframe-constraints-toolbar {
+  flex-wrap: wrap;
+}
+
+.keyframe-fixed-assets,
+.keyframe-constraints-list {
+  display: grid;
+  gap: 6px;
+}
+
+.keyframe-fixed-asset-row {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+.keyframe-fixed-asset-row span,
+.keyframe-fixed-asset-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyframe-constraint-row {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.keyframe-constraint-row.disabled {
+  opacity: 0.68;
+}
+
+.keyframe-constraint-row select,
+.keyframe-constraint-row input,
+.keyframe-constraint-row textarea {
+  min-width: 0;
+}
+
+.keyframe-constraint-row textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.keyframe-constraint-row button {
+  flex: 0 0 28px;
+}
+
+.keyframe-constraint-row-top select:first-of-type {
+  flex: 1 1 130px;
+}
+
+.keyframe-constraint-row-top select:last-of-type {
+  flex: 0 0 92px;
+}
+
+.keyframe-constraint-meta input {
+  flex: 1 1 0;
 }

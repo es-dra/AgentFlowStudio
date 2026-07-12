@@ -82,14 +82,6 @@
   border-color: rgba(90, 200, 250, 0.74);
 }
 
-.node.resizing {
-  z-index: 12;
-  border-color: rgba(90, 200, 250, 0.68);
-  box-shadow:
-    0 0 0 1px rgba(90, 200, 250, 0.24),
-    0 24px 64px rgba(0, 0, 0, 0.42);
-}
-
 .node.connection-source {
   border-color: rgba(245, 196, 81, 0.62);
   box-shadow:

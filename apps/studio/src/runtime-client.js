@@ -79,11 +79,18 @@ function isLocalHost(hostname) {
   return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function requestJson(route, { method = "GET", payload = null } = {}) {
+async function requestJson(route, { method = "GET", payload = null, meta = null } = {}) {
+  const requestMeta = buildRequestMeta(route, method, payload, meta);
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  headers["X-Client-Request-ID"] = requestMeta.client_request_id;
+  if (requestMeta.user_action) headers["X-User-Action"] = requestMeta.user_action;
+  if (requestMeta.node_id) headers["X-Studio-Node-ID"] = requestMeta.node_id;
+  if (requestMeta.node_type) headers["X-Studio-Node-Type"] = requestMeta.node_type;
   const token = authToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
+  logStudioRequestStarted(requestMeta);
+  const started = Date.now();
   try {
     response = await fetch(`${runtimeBaseUrl()}${route}`, {
       method,
@@ -94,75 +101,174 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
     const error = new Error("Runtime request failed: network connection interrupted");
     error.status = 0;
     error.route = route;
+    error.clientRequestId = requestMeta.client_request_id;
     error.cause = fetchError;
+    logStudioRequestFinished(requestMeta, { status: "network_error", status_code: 0, elapsed_ms: Date.now() - started });
     throw error;
   }
   const body = await response.text();
   if (!response.ok) {
-    const error = new Error(staleRuntimeRouteMessage(response, route, body) || runtimeErrorMessage(response, body));
+    const parsed = parseRuntimeErrorPayload(response, body);
+    const error = new Error(staleRuntimeRouteMessage(response, route, body, parsed) || runtimeErrorMessage(response, body, parsed));
     error.status = response.status;
     error.route = route;
+    error.payload = parsed?.payload || null;
+    error.errorCode = parsed?.error || "";
+    error.requestId = parsed?.request_id || response.headers.get("X-Request-ID") || "";
+    error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
+    logStudioRequestFinished(requestMeta, {
+      status: "failed",
+      status_code: response.status,
+      request_id: error.requestId,
+      error: error.errorCode,
+      stage: parsed?.stage || "",
+      elapsed_ms: Date.now() - started,
+    });
     throw error;
   }
-  return body ? JSON.parse(body) : {};
+  const result = body ? JSON.parse(body) : {};
+  logStudioRequestFinished(requestMeta, {
+    status: "succeeded",
+    status_code: response.status,
+    request_id: response.headers.get("X-Request-ID") || result?.request_id || "",
+    elapsed_ms: Date.now() - started,
+  });
+  return result;
 }
 
-function staleRuntimeRouteMessage(response, route, body) {
+function staleRuntimeRouteMessage(response, route, body, parsed = null) {
   if (response.status !== 404) return "";
-  const missingPreflight = /\/(keyframe-generations|video-generations|video-revisions)\/preflight$/.test(route);
+  const missingPreflight = /\/(keyframe-generations|keyframe-local-edits|video-generations|video-revisions)\/preflight$/.test(route);
   const missingRevisionRoute = /\/video-revisions$/.test(route);
   if (!missingPreflight && !missingRevisionRoute) return "";
-  const detail = runtimeErrorMessage(response, body);
+  const detail = runtimeErrorMessage(response, body, parsed);
   return `${detail}. Runtime Service route is missing for ${route}. Restart the 8790 Runtime Service from the current branch and retry.`;
 }
 
-function runtimeErrorMessage(response, body) {
+function runtimeErrorMessage(response, body, parsed = null) {
   let detail = "";
-  try {
-    const payload = body ? JSON.parse(body) : {};
-    detail = runtimeErrorDetail(payload);
-  } catch {
+  if (parsed?.message || parsed?.error) {
+    detail = [
+      parsed.message,
+      parsed.field ? `字段：${parsed.field}` : "",
+      parsed.error ? `代码：${parsed.error}` : "",
+      parsed.user_action ? `建议：${parsed.user_action}` : "",
+      parsed.request_id ? `请求编号：${parsed.request_id}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  } else {
     detail = cleanTextResponseError(body, response);
   }
-  const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
+  const safeDetail = cleanRuntimeErrorText(detail, 220);
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
 }
 
-function runtimeErrorDetail(payload) {
-  const detail = payload?.detail ?? payload?.message ?? "";
-  if (Array.isArray(detail)) {
-    const text = detail.map(runtimeValidationIssueText).filter(Boolean).join(" / ");
-    if (text) return text;
-    try {
-      return JSON.stringify(detail);
-    } catch {
-      return "Runtime returned validation error details";
+function parseRuntimeErrorPayload(response, body) {
+  try {
+    const payload = body ? JSON.parse(body) : {};
+    const detail = payload?.detail && typeof payload.detail === "object" ? payload.detail : payload;
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      return {
+        payload,
+        message: Array.isArray(detail) ? validationErrorMessage(detail) : String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        error: "",
+      };
     }
+    const details = detail.details && typeof detail.details === "object" ? detail.details : {};
+    return {
+      payload,
+      error: String(detail.error || detail.detail_code || payload.error || "").trim(),
+      message: cleanRuntimeErrorText(
+        detail.message || payload.message || (typeof payload.detail === "string" ? payload.detail : ""),
+        220,
+      ),
+      field: validationFieldMessage(details.fields || detail.fields),
+      user_action: cleanRuntimeErrorText(detail.user_action, 220),
+      request_id: cleanRuntimeErrorText(detail.request_id || payload.request_id, 120),
+      client_request_id: cleanRuntimeErrorText(detail.client_request_id || payload.client_request_id, 120),
+      project_id: cleanRuntimeErrorText(detail.project_id || payload.project_id, 120),
+      node_id: cleanRuntimeErrorText(detail.node_id || payload.node_id, 120),
+      action: cleanRuntimeErrorText(detail.action, 80),
+      stage: cleanRuntimeErrorText(detail.stage, 80),
+      details,
+    };
+  } catch {
+    return { payload: null, message: cleanTextResponseError(body, response), error: "" };
   }
-  if (detail && typeof detail === "object") {
-    const parts = [
-      detail.message,
-      detail.reason,
-      detail.error,
-      detail.detail_code,
-      detail.field ? `field=${detail.field}` : "",
-    ];
-    const text = parts.map((part) => String(part || "").trim()).filter(Boolean).join(" / ");
-    if (text) return text;
-    try {
-      return JSON.stringify(detail);
-    } catch {
-      return "Runtime returned an object error detail";
-    }
-  }
-  return String(detail || "").trim();
 }
 
-function runtimeValidationIssueText(issue) {
-  if (!issue || typeof issue !== "object") return String(issue || "").trim();
-  const loc = Array.isArray(issue.loc) ? issue.loc.filter((item) => item !== "body").join(".") : "";
-  const msg = String(issue.msg || issue.message || issue.type || "").trim();
-  return [loc ? `field=${loc}` : "", msg].filter(Boolean).join(": ");
+function validationErrorMessage(items) {
+  if (!Array.isArray(items) || !items.length) return "";
+  const first = items[0] || {};
+  const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : first.field);
+  return [first.msg || "请求参数校验失败", field ? `字段：${field}` : ""].filter(Boolean).join(" ");
+}
+
+function validationFieldMessage(value) {
+  const fields = Array.isArray(value) ? value : [];
+  if (!fields.length) return "";
+  const first = fields[0] || {};
+  const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : (first.field || first.loc));
+  const message = cleanRuntimeErrorText(first.message || first.msg, 160);
+  const type = cleanRuntimeErrorText(first.type, 120);
+  const suffix = fields.length > 1 ? `；共 ${fields.length} 项` : "";
+  if (field && message) return `${field}（${message}${type ? ` / ${type}` : ""}${suffix}）`;
+  return [field, message || type].filter(Boolean).join("：") + suffix;
+}
+
+function cleanRuntimeErrorText(value, limit = 220) {
+  if (value == null) return "";
+  if (Array.isArray(value)) return validationFieldMessage(value) || value.map((item) => cleanRuntimeErrorText(item, 80)).filter(Boolean).join(" ");
+  if (typeof value === "object") {
+    const field = validationFieldMessage(value.fields);
+    if (field) return field.slice(0, limit);
+    for (const key of ["reason", "raw_detail", "message", "detail", "error_description"]) {
+      const text = cleanRuntimeErrorText(value[key], limit);
+      if (text) return text;
+    }
+    const pairs = [];
+    for (const [key, item] of Object.entries(value)) {
+      if (pairs.length >= 3) break;
+      if (/token|secret|authorization|cookie|base64|bytes|raw|provider/i.test(key)) continue;
+      if (item && typeof item === "object") continue;
+      const text = cleanRuntimeErrorText(item, 80);
+      if (text) pairs.push(`${key}=${text}`);
+    }
+    return pairs.join(" ").slice(0, limit);
+  }
+  return String(value || "")
+    .replace(/\[object Object\]/g, " ")
+    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
+    .replace(/Authorization\s*[:=]\s*\S+/gi, "Authorization=<redacted>")
+    .replace(/\b(?:token|secret|credential)\s*[:=]\s*\S+/gi, "<redacted>")
+    .replace(/\bdata:[^\s"'<>]+/gi, "<media-bytes-redacted>")
+    .replace(/\bdata[_ -]?base64\b/gi, "<redacted>")
+    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
+    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
+    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
+
+function safeFieldName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const parts = raw.split(".").filter((part) => part && part !== "body");
+  const labels = parts.map((part) => {
+    const normalized = part.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
+    const known = {
+      data_base64: "上传图片内容",
+      mime_type: "图片类型",
+      filename: "文件名",
+      reference_target: "参考目标",
+      role: "绑定角色",
+      node_id: "节点",
+    };
+    return known[normalized] || normalized.slice(0, 80);
+  }).filter(Boolean);
+  return labels.join(".").slice(0, 120);
 }
 
 function cleanTextResponseError(body, response) {
@@ -174,6 +280,104 @@ function cleanTextResponseError(body, response) {
       : (response.statusText || "HTTP response was not JSON");
   }
   return raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function buildRequestMeta(route, method, payload, meta) {
+  const inferred = inferRequestMeta(route, method, payload);
+  return {
+    ...inferred,
+    ...(meta || {}),
+    route,
+    method,
+    client_request_id: String(meta?.client_request_id || inferred.client_request_id || newClientRequestId()),
+    started_at: new Date().toISOString(),
+  };
+}
+
+function inferRequestMeta(route, method, payload) {
+  const nodeParameters = payload?.node_parameters && typeof payload.node_parameters === "object" ? payload.node_parameters : {};
+  const contextTarget = payload?.context_subgraph?.target_node_id || "";
+  return {
+    client_request_id: "",
+    user_action: inferUserAction(route, method),
+    project_id: projectIdFromRoute(route),
+    node_id: String(payload?.node_id || contextTarget || nodeParameters.node_id || "").slice(0, 120),
+    node_type: String(payload?.node_type || nodeParameters.node_type || "").slice(0, 80),
+    generation_kind: inferGenerationKind(route),
+    provider_service_id: String(payload?.provider_service_id || "").slice(0, 120),
+    has_first_frame: Boolean(payload?.first_frame_image_asset_id),
+    first_frame_image_asset_id: String(payload?.first_frame_image_asset_id || "").slice(0, 120),
+    video_input_source_mode: String(payload?.input_source?.source_mode || "").slice(0, 80),
+    duration_sec: payload?.duration_sec,
+    resolution: payload?.resolution,
+    aspect_ratio: payload?.aspect_ratio,
+    candidate_count: payload?.candidate_count,
+  };
+}
+
+function inferUserAction(route, method) {
+  if (/\/video-generations\/preflight$/.test(route)) return "preflight_video_generation";
+  if (/\/video-generations\/[^/]+\/poll$/.test(route)) return "poll_video_generation";
+  if (/\/video-generations$/.test(route) && method === "POST") return "click_generate_video";
+  if (/^\/projects\/[^/]+$/.test(route) && method === "DELETE") return "delete_project";
+  if (/\/keyframe-local-edits\/preflight$/.test(route)) return "preflight_keyframe_local_edit";
+  if (/\/keyframe-generations\/preflight$/.test(route)) return "preflight_keyframe_generation";
+  if (/\/keyframe-generations$/.test(route) && method === "POST") return "click_generate_keyframe";
+  if (/\/prompt-optimizations$/.test(route)) return "click_optimize_prompt";
+  if (/\/image-assets$/.test(route) && method === "POST") return "upload_image_asset";
+  if (/\/feedback-candidate-promotions$/.test(route) && method === "POST") return "record_feedback_candidate_promotion";
+  if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
+  if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
+  if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
+  if (/\/studio-state$/.test(route) && method === "PUT") return "save_studio_state";
+  return "";
+}
+
+function inferGenerationKind(route) {
+  if (route.includes("/keyframe-local-edits")) return "keyframe_local_edit";
+  if (route.includes("/video-generations")) return "video";
+  if (route.includes("/video-revisions")) return "video_revision";
+  if (route.includes("/keyframe-generations")) return "keyframe";
+  if (route.includes("/prompt-optimizations")) return "prompt_optimization";
+  return "";
+}
+
+function projectIdFromRoute(route) {
+  const match = String(route || "").match(/^\/projects\/([^/]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function newClientRequestId() {
+  const random = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+    : Math.random().toString(16).slice(2, 14);
+  return `cli_${random}`;
+}
+
+function logStudioRequestStarted(meta) {
+  safeConsoleInfo("studio_request_started", safeRequestLogPayload(meta));
+}
+
+function logStudioRequestFinished(meta, patch) {
+  safeConsoleInfo("studio_request_finished", safeRequestLogPayload({ ...meta, ...patch }));
+}
+
+function safeRequestLogPayload(value) {
+  const payload = {};
+  for (const [key, item] of Object.entries(value || {})) {
+    if (item == null || item === "") continue;
+    if (/token|authorization|prompt|secret|base64|data/i.test(key)) continue;
+    payload[key] = typeof item === "string" ? item.slice(0, 180) : item;
+  }
+  return payload;
+}
+
+function safeConsoleInfo(label, payload) {
+  try {
+    console.info(label, payload);
+  } catch {
+    // Console may be unavailable in embedded test contexts.
+  }
 }
 
 export function authToken() {
@@ -226,6 +430,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });
     },
+    deleteProject(projectId) {
+      return requestJson(`/projects/${encodeURIComponent(projectId || this.projectId)}`, { method: "DELETE" });
+    },
+    recordClientEvent(payload) {
+      return requestJson("/studio/client-events", { method: "POST", payload });
+    },
     optimizePrompt(payload) {
       return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
     },
@@ -268,6 +478,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     preflightKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations/preflight`, { method: "POST", payload });
     },
+    preflightKeyframeLocalEdit(payload) {
+      return requestJson(`/projects/${encoded}/keyframe-local-edits/preflight`, { method: "POST", payload });
+    },
     generateKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });
     },
@@ -296,6 +509,21 @@ export function createRuntimeClient(projectId = "studio-local-001") {
       return requestJson("/feedback", {
         method: "POST",
         payload: { project_id: projectId, feedback, generated_at: new Date().toISOString() },
+      });
+    },
+    recordFeedbackCandidatePromotion(payload) {
+      return requestJson(`/projects/${encoded}/feedback-candidate-promotions`, { method: "POST", payload });
+    },
+    recordFeedbackCandidateContextOverlay(payload) {
+      return requestJson(`/projects/${encoded}/feedback-candidate-context-overlays`, { method: "POST", payload });
+    },
+    recordHumanGateDecision(payload) {
+      return requestJson(`/projects/${encoded}/human-gate-decisions`, { method: "POST", payload });
+    },
+    previewAcceptedGenerationPlanPacket(payload = {}) {
+      return requestJson(`/projects/${encoded}/accepted-generation-plan-packets/preview`, {
+        method: "POST",
+        payload: { fixture_mode: "default_unconfirmed", ...payload },
       });
     },
     loadStudioState() {

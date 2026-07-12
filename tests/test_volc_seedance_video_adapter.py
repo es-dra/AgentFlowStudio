@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 from types import SimpleNamespace
+import urllib.error
 
 import pytest
 from fastapi.testclient import TestClient
@@ -100,6 +102,42 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert (tmp_path / "run" / "video_candidates" / "candidate_001.mp4").read_bytes() == b"fake-seedance-video"
     assert "secret-video-key" not in json.dumps(result, ensure_ascii=False)
     assert "media.seedance.test" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/volc/v1/contents/generations/tasks":
+            return _JsonResponse({"id": "cgt-seedance-not-start", "status": "queued"})
+        if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-not-start":
+            return _JsonResponse({"id": "cgt-seedance-not-start", "status": "not_start"})
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    task = registry.submit(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="A controlled cinematic move from the first frame.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=(first,),
+            subject_reference_image_path=first,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    result = registry.poll("video", "seedance_i2v", task)
+
+    assert result == {"status": "running", "task": {"task_id": "cgt-seedance-not-start"}}
 
 
 def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_path, monkeypatch) -> None:
@@ -214,6 +252,61 @@ def test_seedance_poll_reports_policy_failure_safely(tmp_path, monkeypatch) -> N
     assert "secret-video-key" not in message
 
 
+def test_seedance_submit_http_error_attaches_safe_provider_summary(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        body = json.dumps(
+            {
+                "error": {
+                    "code": "InvalidParameter",
+                    "message": "reference image format is unsupported. Request id: raw-provider-id",
+                },
+                "request_id": "raw-provider-id",
+            }
+        ).encode("utf-8")
+        raise urllib.error.HTTPError(
+            request.full_url,
+            400,
+            "Bad Request",
+            hdrs=None,
+            fp=io.BytesIO(body),
+        )
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    with pytest.raises(ModelGatewayError) as exc_info:
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move from the first frame.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                subject_reference_image_path=first,
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+
+    message = str(exc_info.value)
+    summary = exc_info.value.provider_error_summary
+    assert "Seedance video HTTP error 400" in message
+    assert "reference image format is unsupported" in message
+    assert summary["provider_http_status"] == 400
+    assert summary["provider_error_code"] == "InvalidParameter"
+    assert summary["provider_error_message"] == "reference image format is unsupported."
+    assert summary["provider_raw_response_stored"] is False
+    serialized = json.dumps({"message": message, "summary": summary}, ensure_ascii=False)
+    assert "raw-provider-id" not in serialized
+    assert "secret-video-key" not in serialized
+
+
 def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> None:
     called = {"count": 0}
 
@@ -257,23 +350,30 @@ def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_p
     client.post("/projects", json={"project_id": project_id, "goal": "Seedance first last frame"})
     first_id = _upload_image(client, project_id, "first_frame")
     last_id = _upload_image(client, project_id, "last_frame")
+    request = {
+        "prompt_text": "Move from first frame to last frame.",
+        "provider_service_id": "seedance_i2v",
+        "first_frame_image_asset_id": first_id,
+        "last_frame_image_asset_id": last_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-06-24T20:00:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "Move from first frame to last frame.",
-            "provider_service_id": "seedance_i2v",
-            "first_frame_image_asset_id": first_id,
-            "last_frame_image_asset_id": last_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "16:9",
-            "generated_at": "2026-06-24T20:00:00+08:00",
-        },
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
     )
 
     assert response.status_code == 200
-    assert response.json()["job"]["status"] == "succeeded"
+    payload = response.json()
+    assert payload["job"]["status"] == "needs_attention"
+    assert payload["candidate_previews"] == []
+    assert payload["runtime_recovery"]["status"] == "needs_attention"
+    assert payload["runtime_recovery"]["retry"]["default_scope"] == "failed_items_only"
     assert captured["capability"] == "video"
     assert captured["service_id"] == "seedance_i2v"
     assert len(captured["reference_image_paths"]) == 2

@@ -55,12 +55,21 @@ def test_public_edge_preflight_safe_helpers() -> None:
 
     safe = safe_public_edge_status({
         "status": "ready_for_public_auth",
-        "summary": {"public_edge_http_status": 200, "edge_basic_auth": False, "runtime_status": "ready"},
+        "summary": {"public_edge_http_status": 200, "edge_basic_auth": False, "runtime_status": "ready", "auth_required": True},
+        "readiness_boundary": {"public_edge_auth_ready": True, "acceptance_ready": False},
         "provider_calls_started": False,
     })
 
     assert safe["status"] == "ready_for_public_auth"
-    assert safe["summary"] == {"public_edge_http_status": 200, "edge_basic_auth": False, "runtime_status": "ready"}
+    assert safe["summary"] == {
+        "public_edge_http_status": 200,
+        "edge_basic_auth": False,
+        "runtime_status": "ready",
+        "auth_required": True,
+        "acceptance_ready": False,
+    }
+    assert safe["readiness_boundary"]["public_edge_auth_ready"] is True
+    assert safe["readiness_boundary"]["acceptance_ready"] is False
 
 
 def test_acceptance_runner_reuses_three_end_server_for_public_edge_by_default() -> None:

@@ -2,6 +2,9 @@ import { NODE_TYPES } from "../nodes.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 import { assetsFromNode } from "../asset-reference-summary.js";
+import { blockedReasonForNode, nextActionForNode, statusLineForNode } from "../generation-status-view.js";
+import { keyframeSourceEvidenceTraceSummaryText } from "../keyframe-source-evidence-trace.js";
+import { studioStatusLabel } from "../studio-entity-status-vocabulary.js";
 import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
 import {
   nodeAssetDecisionText,
@@ -87,10 +90,13 @@ function emptyGuide(state) {
 function nodeActionBrief(node) {
   const model = node.params?.model || "未选择模型";
   const assetCount = assetsFromNode(node).length;
+  const blockedReason = blockedReasonForNode(node);
   return [
-    `${statusText(node.status)} · ${model} · ${assetCount} 个素材`,
+    `${statusLineForNode(node)} · ${model} · ${assetCount} 个素材`,
+    blockedReason ? `Blocked reason: ${blockedReason}` : "",
+    nextActionForNode(node),
     nextStepText(node),
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function metaPill(label, value) {
@@ -112,8 +118,12 @@ function inspectorActions(actions) {
 }
 
 function nodeActions(node, store) {
+  const retry = ["error", "partial"].includes(node.status)
+    ? [["Retry failed items", "retry", () => dispatchNodeEvent("afs:studio-open-generation-panel", node), "primary"]]
+    : [];
   const base = [
-    ["继续创作", "play", () => dispatchNodeEvent("afs:studio-open-generation-panel", node), "primary"],
+    ...retry,
+    ["继续创作", "play", () => dispatchNodeEvent("afs:studio-open-generation-panel", node), retry.length ? "" : "primary"],
     ["保存素材", "bookmark", () => dispatchNodeEvent("afs:studio-fix-visual-asset", node)],
     ["看过程", "layers", () => dispatchNodeEvent("afs:studio-open-creation-process", node)],
   ];
@@ -170,7 +180,8 @@ function projectReferenceSummary(state) {
 
 function nextStepText(node) {
   if (node.status === "generating") return "等待生成完成；如果是视频节点，可以继续刷新进度。";
-  if (node.status === "error") return "检查失败原因后重试，或先打开生成面板调整描述。";
+  if (node.status === "partial") return "partial result 已保留；默认只重试失败项，成功输出继续保留。";
+  if (node.status === "error") return "检查 blocked reason 后重试失败项，或先打开生成面板调整描述。";
   if (node.previewUrl || node.result) return "结果已经出现，可以继续生成、保存为素材，或打开过程查看引用与输出。";
   if (node.type === "script") return "补充故事设定后继续生成分镜和关键帧。";
   if (node.type === "director") return "打开导演台，先把角色、机位、灯光、道具和镜头生产包摆清楚。";
@@ -180,8 +191,18 @@ function nextStepText(node) {
 }
 
 function recordSummary(node) {
-  const parts = [manifestSummary(node), jobSummary(node), assetSummary(node)].filter(Boolean);
+  const parts = [manifestSummary(node), jobSummary(node), statusRefSummary(node), keyframeEvidenceTraceSummary(node), assetSummary(node)].filter(Boolean);
   return parts.length ? parts.join("\n\n") : "还没有生成记录。";
+}
+
+function statusRefSummary(node) {
+  const refs = node.params?.generationSafeRefs;
+  if (!Array.isArray(refs) || !refs.length) return "";
+  return `安全引用：${refs.map((ref) => `${ref.label}:${ref.value}`).join(" / ")}`;
+}
+
+function keyframeEvidenceTraceSummary(node) {
+  return keyframeSourceEvidenceTraceSummaryText(node.params?.lastKeyframeSourceEvidenceTrace);
 }
 
 function manifestSummary(node) {
@@ -210,21 +231,7 @@ function assetSummary(node) {
 }
 
 function statusText(status) {
-  return {
-    complete: "已完成",
-    generated: "已完成",
-    succeeded: "已完成",
-    success: "已完成",
-    ready: "待生成",
-    generating: "生成中",
-    running: "生成中",
-    pending: "排队中",
-    blocked: "已阻塞",
-    error: "失败",
-    failed: "失败",
-    cancelled: "已取消",
-    empty: "草稿",
-  }[status] || "草稿";
+  return studioStatusLabel(status, "草稿");
 }
 
 function providerLabel(value) {
@@ -249,6 +256,7 @@ function inspectorSignature(state, node) {
     node?.prompt || "",
     node?.result || "",
     JSON.stringify(node?.params?.lastContextBundle || {}),
+    JSON.stringify(node?.params?.keyframeLayer || {}),
     JSON.stringify(node?.params?.lastSafeManifest || node?.params?.lastGenerationManifest || {}),
     JSON.stringify(node?.params?.jobProgress || {}),
     node?.params?.lastOptimizedPromptPlain || "",

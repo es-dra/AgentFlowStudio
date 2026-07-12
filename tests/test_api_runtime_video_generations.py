@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api import runtime_video_routes
 from apps.api.runtime_models import VideoGenerationRequest, VideoRevisionRequest
 from apps.api.runtime_service import create_runtime_app
@@ -48,6 +49,12 @@ def _upload_image(client: TestClient, project_id: str) -> str:
     )
     assert upload.status_code == 200
     return upload.json()["asset"]["asset_id"]
+
+
+def _with_video_preflight_token(client: TestClient, project_id: str, request: dict) -> dict:
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return {**request, "preflight_token": preflight.json()["preflight_token"]}
 
 
 def test_video_generation_requires_explicit_first_frame(tmp_path, monkeypatch) -> None:
@@ -146,17 +153,18 @@ def test_tiny_video_first_frame_blocks_before_provider_submit(tmp_path, monkeypa
     project_id = "video-tiny-first-frame-guard"
     client.post("/projects", json={"project_id": project_id, "goal": "Video tiny first frame guard"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 200
@@ -199,6 +207,50 @@ def test_video_generation_preflight_needs_no_video_gate_and_is_stable(tmp_path, 
     assert first.json()["preflight_token"] != changed.json()["preflight_token"]
 
 
+def test_video_generation_preflight_reports_provider_duration_block_without_submit(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-preflight-duration-block"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video preflight duration block"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 10,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-07-06T10:00:00+08:00",
+    }
+
+    response = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider_calls_started"] is False
+    assert payload["duration_contract"] == {
+        "duration_seconds": 10,
+        "min_seconds": 1,
+        "max_seconds": 15,
+        "unit": "seconds",
+        "validation_scope": "afs_request_contract",
+    }
+    limits = payload["provider_capability_limits"]
+    assert limits["provider_calls_started"] is False
+    assert limits["provider_service_id"] == "fake_video"
+    assert limits["duration_seconds"]["allowed"] == [5]
+    assert limits["duration_seconds"]["requested"] == 10
+    assert limits["duration_seconds"]["supported"] is False
+    assert payload["preflight_blocked"] is True
+    block = payload["blocked_unsupported_combinations"][0]
+    assert block["error"] == "unsupported_duration"
+    assert block["stage"] == "provider_capability_check"
+    assert block["provider_calls_started"] is False
+    assert block["details"]["allowed"] == [5]
+
+
 def test_video_generation_rejects_stale_preflight_token(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
@@ -235,19 +287,20 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     project_id = "video-fake-async"
     client.post("/projects", json={"project_id": project_id, "goal": "Video async flow"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "node_id": "video_1",
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "9:16",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
     assert submitted.status_code == 200
     job = submitted.json()["job"]
@@ -273,6 +326,68 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert "data/processed/runs" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_video_generation_does_not_create_fake_placeholder_for_non_fixture_provider(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class NoOutputRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "real_video"
+            return SimpleNamespace(
+                required_gate="AFS_ALLOW_REMOTE_VIDEO",
+                prompt_char_limit=2000,
+                supported_durations_sec=[5],
+                supported_resolutions=["720p"],
+                supported_aspect_ratios=["9:16"],
+                frame_modes=["first_frame"],
+                min_reference_image_edge_px=0,
+            )
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "real_video"
+            return {"service_id": service_id, "capability": capability, "task": {"status": "submitted", "task_id": "real-no-output"}}
+
+        def poll(self, capability: str, service_id: str, task):
+            assert capability == "video"
+            assert service_id == "real_video"
+            return {"status": "succeeded", "outputs": [], "provider": "real"}
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: NoOutputRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-real-no-output"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video no-output guard"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_no_output_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "real_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-24T13:00:00+08:00",
+    }
+
+    submitted = client.post(
+        f"/projects/{project_id}/video-generations",
+        json=_with_video_preflight_token(client, project_id, request),
+    )
+    assert submitted.status_code == 200
+    job_id = submitted.json()["job"]["job_id"]
+
+    polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
+
+    assert polled.status_code == 200
+    payload = polled.json()
+    assert payload["job"]["status"] == "needs_attention"
+    assert payload["safe_manifest"]["status"] == "needs_attention"
+    assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_video_output_missing"
+    assert payload["candidate_previews"] == []
+    assert payload["runtime_recovery"]["status"] == "needs_attention"
+    assert payload["runtime_recovery"]["retry"]["retryable_item_ids"] == ["candidate_001"]
+    assert not (tmp_path / "runtime" / "runs" / project_id / job_id / "video_candidates" / "candidate_001.mp4").exists()
 
 
 def test_video_provider_prompt_removes_image_edit_language() -> None:
@@ -347,19 +462,20 @@ def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tm
     project_id = "video-path-safe-task-state"
     client.post("/projects", json={"project_id": project_id, "goal": "Video task state path hygiene"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "node_id": "video_1",
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "9:16",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert submitted.status_code == 200
@@ -407,17 +523,18 @@ def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path,
     project_id = "video-provider-internal-error"
     client.post("/projects", json={"project_id": project_id, "goal": "Video safe error guard"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 200
@@ -426,6 +543,61 @@ def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path,
     assert payload["safe_manifest"]["status"] == "poll_failed"
     assert payload["provider_calls_started"] is True
     serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "secret" not in serialized
+    assert "token" not in serialized
+
+
+def test_video_generation_seedance_400_summary_writes_safe_manifest(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class Seedance400Registry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO")
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            error = ModelGatewayError("Seedance video HTTP error 400: reference image format is unsupported.")
+            error.provider_error_summary = {
+                "provider_error_stage": "submit_http_error",
+                "provider_http_status": 400,
+                "provider_error_code": "InvalidParameter",
+                "provider_error_message": "reference image format is unsupported.",
+                "provider_raw_response_stored": False,
+            }
+            raise error
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: Seedance400Registry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-seedance-400-summary"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video Seedance 400 summary"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json=_with_video_preflight_token(client, project_id, request),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    block = payload["safe_manifest"]["blocks"][0]
+    assert payload["job"]["status"] == "poll_failed"
+    assert block["provider_http_status"] == 400
+    assert block["provider_error_code"] == "InvalidParameter"
+    assert block["provider_error_message"] == "reference image format is unsupported."
+    assert block["provider_error_stage"] == "submit_http_error"
+    assert block["provider_raw_response_stored"] is False
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "raw-provider-id" not in serialized
     assert "secret" not in serialized
     assert "token" not in serialized
 
@@ -454,17 +626,18 @@ def test_video_generation_policy_failure_writes_policy_block(tmp_path, monkeypat
     project_id = "video-policy-block"
     client.post("/projects", json={"project_id": project_id, "goal": "Video policy block"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
     job_id = submitted.json()["job"]["job_id"]
     polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
@@ -538,3 +711,371 @@ def _fake_video_provider_config(tmp_path) -> str:
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return str(path)
+
+
+def test_video_generation_response_exposes_structured_generation_plan_when_gate_closed(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-plan-gate-closed"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video plan without provider"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_plan_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "generated_at": "2026-06-27T10:15:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "blocked"
+    plan = payload["video_generation_plan"]
+    assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
+    assert "unrequested eaves" in plan["editing_plan"]["forbidden_changes"]
+
+    request_plan = client.get(f"/artifacts/{payload['artifacts']['model_request_plan']['artifact_id']}").json()["payload"]
+    assert request_plan["generation_plan"] == plan
+
+
+def test_video_generation_plan_uses_context_subgraph_asset_graph_feedback(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-asset-graph-feedback"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video asset graph feedback"})
+    asset_id = _upload_image(client, project_id)
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "continuity_locks": ["robot head shell"],
+                "negative_locks": ["do not change identity"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "asset_id": "asset_eaves",
+                "asset_type": "scene",
+                "label": "wrong eaves",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "continuity_locks": ["eaves geometry"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+    }
+    overlay = {
+        "artifact_type": "agentflow_asset_graph_feedback_overlay",
+        "decisions": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "decision": "lock",
+                "continuity_locks": ["plush robot head shell must remain"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "decision": "reject",
+                "note": "Wrong roof structure.",
+            },
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_asset_graph_feedback_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "context_subgraph": {
+                "target_node_id": "video_asset_graph_feedback_1",
+                "nodes": [
+                    {
+                        "id": "storyboard_01",
+                        "type": "storyboard",
+                        "node_parameters": {
+                            "asset_graph": asset_graph,
+                            "asset_graph_feedback_overlay": overlay,
+                        },
+                    }
+                ],
+                "edges": [],
+            },
+            "generated_at": "2026-06-28T10:35:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "blocked"
+    plan = payload["video_generation_plan"]
+    assert plan["temporal_director_plan"]["beat_count"] == 5
+    assert "plush robot head shell must remain" in plan["editing_plan"]["continuity_locks"]
+    assert "graph:scene:wrong_eaves" in plan["asset_graph_context"]["blocked_graph_asset_ids"]
+    assert "graph:scene:wrong_eaves" not in plan["asset_graph_context"]["graph_asset_ids"]
+    assert plan["prompt_contract"]["asset_graph_feedback_used"] is True
+
+
+def test_video_generation_response_exposes_professional_reference(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-prof-ref"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video professional reference"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_prof_ref_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "generated_at": "2026-06-27T10:30:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    plan = response.json()["video_generation_plan"]
+    reference = plan["professional_reference"]
+    scenario = plan["director_scenario"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert reference["writes_company_kb"] is False
+    assert scenario["primary_scenario"] == "general_short_video"
+    assert scenario["writes_company_kb"] is False
+
+
+def test_video_generation_gate_closed_plans_supported_duration_contract_boundaries(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-duration-boundaries"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video duration contract"})
+    asset_id = _upload_image(client, project_id)
+
+    for duration in (1, 5, 10, 15):
+        response = client.post(
+            f"/projects/{project_id}/video-generations",
+            json={
+                "node_id": f"video_duration_{duration}",
+                "prompt_text": "A controlled image-to-video move.",
+                "provider_service_id": "fake_video",
+                "first_frame_image_asset_id": asset_id,
+                "input_source": {
+                    "source_mode": "uploaded_image",
+                    "source_asset_id": asset_id,
+                    "source_node_id": "image_1",
+                    "role": "first_frame",
+                },
+                "duration_sec": duration,
+                "resolution": "720p",
+                "generated_at": "2026-07-02T10:00:00+08:00",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["job"]["status"] == "blocked"
+        assert payload["provider_calls_started"] is False
+        request_plan = client.get(f"/artifacts/{payload['artifacts']['model_request_plan']['artifact_id']}").json()["payload"]
+        assert request_plan["duration_contract"] == {
+            "duration_seconds": duration,
+            "min_seconds": 1,
+            "max_seconds": 15,
+            "unit": "seconds",
+            "validation_scope": "afs_request_contract",
+        }
+        assert request_plan["provider_request"]["duration_seconds"] == duration
+
+
+def test_video_generation_rejects_duration_outside_contract(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-invalid-duration"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video invalid duration"})
+    asset_id = _upload_image(client, project_id)
+
+    for duration in (0, 16):
+        response = client.post(
+            f"/projects/{project_id}/video-generations",
+            json={
+                "prompt_text": "A controlled image-to-video move.",
+                "provider_service_id": "fake_video",
+                "first_frame_image_asset_id": asset_id,
+                "duration_sec": duration,
+                "resolution": "720p",
+                "generated_at": "2026-07-02T10:00:00+08:00",
+            },
+        )
+
+        assert response.status_code == 422
+        assert "duration_sec" in response.text
+
+
+def test_video_generation_gate_open_returns_structured_unsupported_duration(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class NoSubmitRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(
+                required_gate="AFS_ALLOW_REMOTE_VIDEO",
+                supported_durations_sec=[5],
+                supported_resolutions=["720p"],
+                supported_aspect_ratios=["16:9", "9:16"],
+                min_reference_image_edge_px=0,
+            )
+
+        def submit(self, capability: str, service_id: str, request):
+            raise AssertionError("unsupported provider duration should be rejected before submit")
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: NoSubmitRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-provider-duration-guard"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video provider duration guard"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A controlled image-to-video move.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 10,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-07-02T10:00:00+08:00",
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json=_with_video_preflight_token(client, project_id, request),
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error"] == "unsupported_duration"
+    assert detail["stage"] == "provider_capability_check"
+    assert detail["details"]["duration_sec"] == 10
+    assert detail["details"]["allowed"] == [5]
+
+
+def test_video_generation_gate_open_returns_structured_unsupported_input_mode(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class FirstFrameOnlyRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(
+                required_gate="AFS_ALLOW_REMOTE_VIDEO",
+                supported_durations_sec=[5],
+                supported_resolutions=["720p"],
+                supported_aspect_ratios=["16:9", "9:16"],
+                frame_modes=["first_frame"],
+                min_reference_image_edge_px=0,
+            )
+
+        def submit(self, capability: str, service_id: str, request):
+            raise AssertionError("unsupported provider input mode should be rejected before submit")
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: FirstFrameOnlyRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-provider-input-mode-guard"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video provider input mode guard"})
+    first_id = _upload_image(client, project_id)
+    last_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "Move from first frame to last frame.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": first_id,
+        "last_frame_image_asset_id": last_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-07-02T10:00:00+08:00",
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json=_with_video_preflight_token(client, project_id, request),
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error"] == "unsupported_input_mode"
+    assert detail["stage"] == "provider_capability_check"
+    assert detail["details"]["input_mode"] == "first_last_frame"
+    assert detail["details"]["allowed"] == ["first_frame"]
+
+
+def test_video_generation_request_plan_carries_input_source(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-input-source-plan"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video input source plan"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_input_source_1",
+            "prompt_text": "A controlled image-to-video move.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "input_source": {
+                "source_mode": "upstream_generated_image",
+                "source_asset_id": asset_id,
+                "source_node_id": "image_keyframe_1",
+                "source_job_id": "keyframe_job_1",
+                "role": "first_frame",
+            },
+            "duration_sec": 5,
+            "resolution": "720p",
+            "generated_at": "2026-07-02T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    context = client.get(f"/artifacts/{payload['artifacts']['model_call_context']['artifact_id']}").json()["payload"]
+    request_plan = client.get(f"/artifacts/{payload['artifacts']['model_request_plan']['artifact_id']}").json()["payload"]
+
+    assert payload["job"]["status"] == "blocked"
+    assert context["reference_context"]["input_source"]["source_mode"] == "upstream_generated_image"
+    assert context["reference_context"]["input_source"]["source_asset_id"] == asset_id
+    assert request_plan["input_source"]["source_mode"] == "upstream_generated_image"
+    assert request_plan["provider_request"]["input_source"]["source_node_id"] == "image_keyframe_1"

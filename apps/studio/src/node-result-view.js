@@ -1,6 +1,7 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
 import { icon } from "./icons.js";
 import { downloadResolvedMedia, openMediaPreviewModal } from "./media-preview-modal.js";
+import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
 
 export function resultView(node) {
@@ -64,7 +65,10 @@ function resultActions(node, result) {
   continueButton.className = "mini-btn";
   continueButton.type = "button";
   continueButton.dataset.action = "continue-generate";
-  continueButton.innerHTML = `${icon("play", 12)}<span>继续生成</span>`;
+  continueButton.title = regenerateActionTitle(node);
+  continueButton.innerHTML = node.status === "partial"
+    ? `${icon("retry", 12)}<span>Retry failed items</span>`
+    : `${icon("play", 12)}<span>${regenerateActionLabel(node)}</span>`;
   actions.appendChild(continueButton);
 
   const assetButton = document.createElement("button");
@@ -97,29 +101,83 @@ function resultActions(node, result) {
   return actions;
 }
 
+function regenerateActionLabel(node) {
+  if (node.type === "video" && node.params?.videoRevision?.enabled) return "重生成尝试";
+  if (node.type === "video") return "重新生成整段";
+  return "重新生成整张";
+}
+
+function regenerateActionTitle(node) {
+  if (node.status === "partial") return "只重试失败项，保留已完成输出。";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) {
+    return "提交视频重生成尝试；这不是局部编辑，未点名内容也可能变化。";
+  }
+  if (node.type === "video") return "按当前提示词重新生成整段视频；这不是局部编辑。";
+  return "按当前提示词重新生成整张图片；这不是局部编辑。";
+}
+
 function candidateGrid(candidates) {
   const grid = document.createElement("div");
   grid.className = "candidate-grid";
   candidates.slice(0, 9).forEach((candidate, index) => {
+    const url = candidate.url || candidate.preview_url;
+    const status = candidateStatus(candidate, url);
     const item = document.createElement("button");
-    item.className = "candidate-card";
+    item.className = `candidate-card ${status}`;
     item.type = "button";
-    item.title = `候选 ${index + 1}`;
-    item.addEventListener("click", () => openMediaPreviewModal({
-      url: candidate.url || candidate.preview_url,
-      type: "image",
-      title: `候选 ${index + 1}`,
-      downloadName: `候选-${String(index + 1).padStart(2, "0")}.png`,
-    }));
-    const img = document.createElement("img");
-    setRuntimeMediaSource(img, candidate.url || candidate.preview_url);
-    img.alt = `候选 ${index + 1}`;
-    img.loading = "lazy";
-    item.appendChild(img);
+    item.title = candidateTitle(candidate, index + 1, status);
+    if (url) {
+      item.addEventListener("click", () => openMediaPreviewModal({
+        url,
+        type: "image",
+        title: `候选 ${index + 1}`,
+        downloadName: `候选-${String(index + 1).padStart(2, "0")}.png`,
+      }));
+      const img = document.createElement("img");
+      setRuntimeMediaSource(img, url);
+      img.alt = `候选 ${index + 1}`;
+      img.loading = "lazy";
+      item.appendChild(img);
+    } else {
+      item.disabled = true;
+      item.appendChild(candidatePlaceholder(status));
+    }
     item.appendChild(candidateBadge(index + 1));
     grid.appendChild(item);
   });
   return grid;
+}
+
+function candidatePlaceholder(status) {
+  const placeholder = document.createElement("span");
+  placeholder.className = "candidate-empty";
+  placeholder.textContent = candidateStatusLabel(status);
+  return placeholder;
+}
+
+function candidateTitle(candidate, index, status) {
+  const id = candidate.candidate_id ? ` · ${candidate.candidate_id}` : "";
+  const reason = candidate.reason ? ` · ${candidate.reason}` : "";
+  return `候选 ${index} · ${candidateStatusLabel(status)}${id}${reason}`;
+}
+
+function candidateStatus(candidate, url) {
+  const status = String(candidate?.status || candidate?.state || "").trim().toLowerCase();
+  if (url && (!status || status === "complete" || status === "succeeded")) return "succeeded";
+  if (["complete", "completed", "success", "succeeded"].includes(status)) return "succeeded";
+  if (["failed", "failure", "error", "timeout", "timed_out"].includes(status)) return "failed";
+  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(status)) return status;
+  return url ? "succeeded" : "needs_attention";
+}
+
+function candidateStatusLabel(status) {
+  if (status === "succeeded") return "succeeded";
+  if (status === "failed") return "failed";
+  if (status === "blocked") return "blocked";
+  if (status === "retryable") return "retryable";
+  if (status === "partial") return "partial";
+  if (status === "cancelled") return "cancelled";
+  return "needs_attention";
 }
 
 function candidateBadge(index) {
@@ -130,11 +188,7 @@ function candidateBadge(index) {
 }
 
 function candidatePreviews(node) {
-  const raw = node.params?.candidatePreviewUrls || node.params?.candidate_previews || node.params?.candidates || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => (typeof item === "string" ? { url: item } : item))
-    .filter((item) => item?.url || item?.preview_url);
+  return candidatePreviewsFromNode(node);
 }
 
 export function bundleSummary(node) {

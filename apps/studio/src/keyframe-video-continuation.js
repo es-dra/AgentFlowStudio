@@ -37,17 +37,24 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
     node.result = [
       "已从上游关键帧创建图生视频节点。",
       "关键帧图片已设为首帧；视频提示词和视频资产计划已自动生成。",
-      "可以直接生成，也可以先微调提示词/视频资产计划后再生成。",
-    ].join("");
+      "可以直接生成，也可以先微调提示词/视频资产计划后重新生成整段视频。",
+      "提示词微调不是局部视频编辑；未点名内容仍可能变化。",
+    ].join("\n");
     node.params = {
       ...node.params,
       nodeRole: "video_generation",
       sourceKeyframeNodeId: source.id,
       sourceKeyframeJobId: source.params?.lastKeyframeJobId || null,
       sourceKeyframeAssetId: frameAsset.asset_id,
-      assetReferenceMode: source.params?.assetReferenceMode || source.params?.referenceTransformMode || null,
       firstFrameImageAssetId: frameAsset.asset_id,
       firstFramePreviewUrl: frameAsset.preview_url || source.previewUrl || "",
+      videoInputSource: {
+        source_mode: "upstream_generated_image",
+        source_asset_id: frameAsset.asset_id,
+        source_node_id: source.id,
+        source_job_id: source.params?.lastKeyframeJobId || frameAsset.source_job_id || null,
+        role: "first_frame",
+      },
       motion: node.params?.motion || DEFAULT_KEYFRAME_VIDEO_MOTION,
       spec: {
         ...(node.params?.spec || {}),
@@ -60,7 +67,7 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
       uploads: mergeImageAssets(node.params?.uploads || [], {
         ...frameAsset,
         role: "first_frame",
-        source_role: frameAsset.role || frameAsset.source_role || null,
+        source_role: frameAsset.source_role || frameAsset.role || "generated_keyframe_reference",
       }).slice(-4),
       videoAssetPlan,
       videoAssetRecognition: {

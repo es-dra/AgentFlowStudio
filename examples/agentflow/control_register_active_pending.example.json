@@ -1,0 +1,232 @@
+{
+  "active_pending_lane_ids": [
+    "EVAL-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER",
+    "IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER"
+  ],
+  "artifact_type": "agentflow_control_register",
+  "lanes": [
+    {
+      "ack": {
+        "ack_delivery_confirmed": false,
+        "ack_required": true,
+        "ack_state": "no_ack",
+        "no_ack": true
+      },
+      "archive_execution": {},
+      "archive_policy": {
+        "archive_after_ack_delivery_confirmed": true,
+        "archive_execution_allowed": false,
+        "blocked_reason": "ack_delivery_not_confirmed",
+        "evaluated_before_archive_execution": true,
+        "evaluation_state": "blocked_pending_ack",
+        "owner_manual_archive_excluded": "no",
+        "policy": "agent_created_archive_when_useless"
+      },
+      "artifact_handles": [],
+      "bottom_up_feedback_id": "BU-AFS-V02-IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703-001",
+      "claim_states": {},
+      "event_ids": [
+        "evt-control-register-010",
+        "evt-control-register-011",
+        "evt-control-register-012",
+        "evt-control-register-013"
+      ],
+      "evidence_sources": [
+        {
+          "safe_summary": "Pending-control evaluator lane registered without implementation artifact claim.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "pending_control:evaluator-lane"
+        },
+        {
+          "safe_summary": "Evaluator fixed role surface for pending-control review.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "role_surface:evaluator-pending-control"
+        },
+        {
+          "safe_summary": "Pending-control evaluator lane remains no-ACK until evaluation starts.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "ack:evaluator-pending-control-no-ack"
+        },
+        {
+          "safe_summary": "Evaluator pending-control lane archive policy is blocked before ACK confirmation.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "archive_policy:evaluator-pending-control"
+        }
+      ],
+      "fixed_role_surfaces": {
+        "evaluator": {
+          "fixed_role_surface": true,
+          "role": "evaluator",
+          "surface_id": "pending-control-evaluator",
+          "thread_ref": "lane:EVAL-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER"
+        }
+      },
+      "implementation_artifact_handles": [],
+      "lane_id": "EVAL-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER",
+      "lane_kind": "evaluation",
+      "last_event_id": "evt-control-register-013",
+      "non_claims": {},
+      "route_basis": "post-implementation-control-adapter-evaluation",
+      "state": "pending_control",
+      "top_down_dispatch_id": "TD-AFS-V02-IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703-001"
+    },
+    {
+      "ack": {
+        "ack_delivery_confirmed": false,
+        "ack_required": true,
+        "ack_state": "no_ack",
+        "no_ack": true
+      },
+      "archive_execution": {},
+      "archive_policy": {
+        "archive_after_ack_delivery_confirmed": true,
+        "archive_execution_allowed": false,
+        "blocked_reason": "ack_delivery_not_confirmed",
+        "evaluated_before_archive_execution": true,
+        "evaluation_state": "blocked_pending_ack",
+        "owner_manual_archive_excluded": "no",
+        "policy": "agent_created_archive_when_useless"
+      },
+      "artifact_handles": [
+        {
+          "artifact_id": "impl-control-event-register-adapter-20260703",
+          "artifact_kind": "git_branch_with_repo_files",
+          "artifact_role": "implementation",
+          "does_not_store_private_asset_bytes": true,
+          "does_not_store_secrets": true,
+          "durability": {
+            "durability_state": "branch_created_pending_local_commit",
+            "is_durable": true,
+            "ref": "codex/control-event-log-register-adapter-20260703",
+            "storage_medium": "git_local_branch"
+          },
+          "uri": "git:codex/control-event-log-register-adapter-20260703"
+        }
+      ],
+      "bottom_up_feedback_id": "BU-AFS-V02-IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703-001",
+      "claim_states": {
+        "artifact_handle_durability": {
+          "claim_id": "artifact_handle_durability",
+          "evidence_ref": "impl-control-event-register-adapter-20260703",
+          "first_class_claim_state_event": true,
+          "non_claim_separated": true,
+          "state": "claimed"
+        }
+      },
+      "event_ids": [
+        "evt-control-register-001",
+        "evt-control-register-002",
+        "evt-control-register-003",
+        "evt-control-register-004",
+        "evt-control-register-005",
+        "evt-control-register-006",
+        "evt-control-register-007",
+        "evt-control-register-008",
+        "evt-control-register-009"
+      ],
+      "evidence_sources": [
+        {
+          "safe_summary": "Deep bounded control event register adapter implementation dispatch.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "codex_delegation:019f25c8-37c9-7e30-8c57-279e40a3a1fc"
+        },
+        {
+          "safe_summary": "Source dispatcher role surface for the bounded implementation lane.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "role_surface:ceo-v5-source-thread"
+        },
+        {
+          "safe_summary": "CTO disposition fixed surface authorizing phase1 adapter implementation.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "role_surface:cto-v5-disposition"
+        },
+        {
+          "safe_summary": "Bounded implementation worker role surface on local codex branch.",
+          "source_class": "local_artifact",
+          "source_ref": "branch:codex/control-event-log-register-adapter-20260703"
+        },
+        {
+          "safe_summary": "Repo-local implementation artifact handle for branch, module, tests, examples, and handoff.",
+          "source_class": "local_artifact",
+          "source_ref": "implementation_handle:control-event-register-adapter"
+        },
+        {
+          "safe_summary": "First-class claim-state event for implementation artifact handle durability.",
+          "source_class": "local_artifact",
+          "source_ref": "claim_state:artifact_handle_durability"
+        },
+        {
+          "safe_summary": "Non-claim boundaries for bounded local implementation.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "non_claims:control-adapter-boundary"
+        },
+        {
+          "safe_summary": "No-ACK state before bottom-up feedback delivery is confirmed.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "ack:pending-ceo-delivery-confirmation"
+        },
+        {
+          "safe_summary": "Archive policy evaluated before any archive execution and blocked while ACK is absent.",
+          "source_class": "dispatcher_instruction",
+          "source_ref": "archive_policy:agent_created_archive_when_useless"
+        }
+      ],
+      "fixed_role_surfaces": {
+        "cto_disposition": {
+          "fixed_role_surface": true,
+          "role": "cto_disposition",
+          "surface_id": "cto-v5-disposition",
+          "thread_ref": "disposition:accept_control_plane_kernel_v1_phase0_spec_authorize_phase1_adapter"
+        },
+        "dispatcher": {
+          "fixed_role_surface": true,
+          "role": "dispatcher",
+          "surface_id": "ceo-v5-source-thread",
+          "thread_ref": "codex_thread:019f25c8-37c9-7e30-8c57-279e40a3a1fc"
+        },
+        "implementation_worker": {
+          "fixed_role_surface": true,
+          "role": "implementation_worker",
+          "surface_id": "worker-local-codex-branch",
+          "thread_ref": "branch:codex/control-event-log-register-adapter-20260703"
+        }
+      },
+      "implementation_artifact_handles": [
+        {
+          "artifact_id": "impl-control-event-register-adapter-20260703",
+          "artifact_kind": "git_branch_with_repo_files",
+          "artifact_role": "implementation",
+          "does_not_store_private_asset_bytes": true,
+          "does_not_store_secrets": true,
+          "durability": {
+            "durability_state": "branch_created_pending_local_commit",
+            "is_durable": true,
+            "ref": "codex/control-event-log-register-adapter-20260703",
+            "storage_medium": "git_local_branch"
+          },
+          "uri": "git:codex/control-event-log-register-adapter-20260703"
+        }
+      ],
+      "lane_id": "IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER",
+      "lane_kind": "implementation",
+      "last_event_id": "evt-control-register-009",
+      "non_claims": {
+        "business_validation": false,
+        "companyos_projection": false,
+        "durable_memory_promotion": false,
+        "full_historical_replay": false,
+        "generated_media_qa": false,
+        "human_acceptance": false,
+        "provider_smoke": false,
+        "runtime_service_mutation": false,
+        "thread_archive_automation": false
+      },
+      "route_basis": "accept_control_plane_kernel_v1_phase0_spec_authorize_phase1_adapter",
+      "state": "active",
+      "top_down_dispatch_id": "TD-AFS-V02-IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703-001"
+    }
+  ],
+  "materialized_from_event_count": 13,
+  "register_scope": "active_pending_control_lanes",
+  "schema_version": "0.1.0"
+}

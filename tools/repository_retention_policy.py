@@ -79,7 +79,7 @@ def review_directory(path: str) -> ReviewedPath:
     if path.startswith("docs/handoff"):
         return _dir(path, "historical_reference", "archive_or_delete_when_indexed", "多切片交接证据；应继续摘要归档和删减。")
     if path.startswith("docs/maintenance"):
-        return _dir(path, "production_spine", "current", "维护账本、清理记录和候选规则投影。")
+        return _dir(path, "historical_reference", "archive_or_delete_when_indexed", "Maintenance ledgers are historical loop evidence, not active startup state.")
     if path.startswith("docs/task_briefs"):
         return _dir(path, "historical_reference", "archive_or_delete_when_indexed", "历史任务 brief；当前不作为产品入口。")
     if path.startswith("docs"):
@@ -125,7 +125,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
                 "提交删除后完成退休；如需恢复，必须证明 README.md 不能覆盖中文入口职责。",
             )
         return _file(path, git_state, "delete_candidate", "delete_candidate", "README.md 已作为中文主入口，旧中文副本会制造双入口漂移。", "删除或转为短跳转后再次运行审查。")
-    if path in {"README.md", "AGENTS.md", "TASK_TRACKER.md", "BACKLOG.md", "DEVLOG.md", "pyproject.toml", "package.json", "uv.lock", ".gitattributes", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
+    if path in {"README.md", "AGENTS.md", "BACKLOG.md", "pyproject.toml", "package.json", "uv.lock", ".gitattributes", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
         return _file(path, git_state, "production_spine", "current", "项目入口、规则、跟踪、配置或许可证。")
     if path == ".github/workflows/maintenance.yml":
         return _file(path, git_state, "operations_spine", "current", "CI 维护门禁，运行 CLI、维护审计、测试和空白检查。")
@@ -184,7 +184,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
     if path.startswith("docs/handoff/"):
         return _file(path, git_state, "historical_reference", "archive_or_delete_when_indexed", "历史/当前切片交接证据，应继续摘要归档和删减。")
     if path.startswith("docs/maintenance/"):
-        return _file(path, git_state, "production_spine", "current", "维护账本、清理记录或候选规范。")
+        return _file(path, git_state, "historical_reference", "archive_or_delete_when_indexed", "Maintenance ledgers are historical loop evidence, not active startup state.")
     if path.startswith("docs/task_briefs/"):
         return _file(path, git_state, "historical_reference", "archive_or_delete_when_indexed", "任务 brief 历史记录。")
     if path.startswith("docs/"):

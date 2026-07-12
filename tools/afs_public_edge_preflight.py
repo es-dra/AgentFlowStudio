@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.afs_three_end_status import DEFAULT_RUNTIME_HEALTH_URL, collect_remote_runtime_health, sh_quote
+from tools.afs_readiness_claims import safe_readiness_projection
 
 
 DEFAULT_PUBLIC_URL = "https://afstudio.art/studio/"
@@ -83,6 +84,7 @@ def run_public_edge_preflight(
     safe_health = _safe_runtime_health(runtime_health)
     runtime_checked = bool(server.strip() or check_runtime_health)
     runtime_ready = not runtime_checked or safe_health.get("status") == "ready"
+    runtime_auth_ready = runtime_checked and safe_health.get("auth_required") is True
     _add_check(
         checks,
         "runtime_health",
@@ -92,12 +94,28 @@ def run_public_edge_preflight(
             "runtime_status": safe_health.get("status", ""),
             "studio_static_status": safe_health.get("studio_static", {}).get("status", ""),
             "auth_required": safe_health.get("auth_required", False),
+            "runtime_three_end_alignment_evidence": bool(safe_health.get("readiness", {}).get("runtime_three_end_alignment_evidence")),
+            "runtime_loaded_code_freshness_claim": str(safe_health.get("readiness", {}).get("runtime_loaded_code_freshness_claim") or "not_claimed"),
+            "acceptance_ready": bool(safe_health.get("readiness", {}).get("acceptance_ready")),
+        },
+    )
+    _add_check(
+        checks,
+        "runtime_auth_boundary",
+        "passed" if runtime_auth_ready else "failed",
+        {
+            "runtime_checked": runtime_checked,
+            "auth_required": safe_health.get("auth_required", False),
+            "public_edge_verified_by_health": bool(safe_health.get("readiness", {}).get("public_edge_verified")),
+            "acceptance_ready": bool(safe_health.get("readiness", {}).get("acceptance_ready")),
         },
     )
     if edge_blocked:
         status = "blocked_by_edge_basic_auth"
-    elif edge_ready and runtime_ready:
+    elif edge_ready and runtime_ready and runtime_auth_ready:
         status = "ready_for_public_auth"
+    elif edge_ready and runtime_ready:
+        status = "public_edge_auth_not_ready"
     else:
         status = "needs_attention"
     return {
@@ -111,9 +129,28 @@ def run_public_edge_preflight(
             "public_edge_http_status": edge.status_code,
             "edge_basic_auth": edge_blocked,
             "runtime_status": safe_health.get("status", ""),
+            "auth_required": safe_health.get("auth_required", False),
+            "acceptance_ready": False,
         },
         "checks": checks,
         "runtime_health": safe_health,
+        "readiness_boundary": {
+            "public_edge_auth_ready": status == "ready_for_public_auth",
+            "runtime_three_end_alignment_evidence": False,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
+            "acceptance_ready": False,
+            "human_acceptance_claim": "not_claimed",
+            "product_readiness_claim": "not_claimed",
+        },
+        "non_claims": [
+            "public edge auth preflight only",
+            "not runtime loaded-code freshness",
+            "not provider smoke",
+            "not generated-media QA",
+            "not human creative acceptance",
+            "not product or business readiness",
+            "not public or legal readiness",
+        ],
         "recommended_action": _recommended_action(status),
     }
 
@@ -183,6 +220,7 @@ def _safe_runtime_health(payload: dict[str, Any]) -> dict[str, Any]:
         "auth_required": bool(payload.get("auth_required")),
         "studio_static": _safe_studio_static(payload.get("studio_static")),
         "provider_gates": _safe_provider_gates(payload.get("provider_gates")),
+        "readiness": safe_readiness_projection(payload.get("readiness")),
     }
 
 
@@ -203,8 +241,6 @@ def _safe_provider_gates(value: Any) -> dict[str, bool]:
         return {}
     allowed = {"llm", "image", "video", "vision", "asr", "external_download"}
     return {str(key): bool(val) for key, val in value.items() if str(key) in allowed}
-
-
 def _recommended_action(status: str) -> dict[str, Any]:
     if status != "blocked_by_edge_basic_auth":
         return {"action": "none" if status == "ready_for_public_auth" else "inspect_public_edge", "commands": []}

@@ -1,4 +1,9 @@
 import { assetsFromNode, assetCarryState } from "../asset-reference-summary.js";
+import {
+  feedbackOverlayCount,
+  feedbackOverlayPromptPolicyFromBundle,
+  feedbackOverlayPromptPolicySummaryText,
+} from "../feedback-context-overlays.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 
@@ -39,7 +44,8 @@ export function algorithmConsoleSection(node) {
       ["目标", generationTargetLabel(node), "target"],
       ["纳入", includedLabel(node, bundle), "context"],
       ["排除", excludedLabel(bundle), "warning"],
-    ],
+      promptPolicyStat(bundle),
+    ].filter(Boolean),
     warnings: traceWarnings(node, bundle, manifest),
   });
 }
@@ -149,7 +155,9 @@ function projectSummary(state) {
 function nodeSummary(node, bundle) {
   const assets = Array.isArray(bundle?.included_assets) ? bundle.included_assets.length : 0;
   const nodes = Array.isArray(bundle?.included_nodes) ? bundle.included_nodes.length : 0;
+  const feedback = feedbackOverlayCount(bundle);
   if (assets || nodes) return `已参考 ${nodes} 个节点 / ${assets} 个素材`;
+  if (feedback) return `已消费 ${feedback} 条反馈上下文`;
   if (hasRequestEvidence(node)) return "已有请求与安全摘要";
   return "触发生成时再展开";
 }
@@ -177,7 +185,7 @@ function projectFeedbackLabel(state) {
 }
 
 function operationLabel(node) {
-  if (node.params?.videoRevision || node.params?.lastRevisionJobId) return "视频修订";
+  if (node.params?.videoRevision || node.params?.lastRevisionJobId) return "视频重生成尝试";
   if (node.type === "video") return "视频生成";
   if (node.type === "image") return "图片生成";
   if (node.type === "director") return "导演上下文";
@@ -186,7 +194,7 @@ function operationLabel(node) {
 }
 
 function generationTargetLabel(node) {
-  if (node.params?.videoRevision) return "修订片段";
+  if (node.params?.videoRevision) return "重生成片段";
   if (node.type === "video") return "视频片段";
   if (node.type === "image") return "关键帧";
   if (node.type === "director") return "导演参数";
@@ -206,6 +214,12 @@ function excludedLabel(bundle) {
   const excluded = Array.isArray(bundle?.excluded_assets) ? bundle.excluded_assets.length : 0;
   const conflicts = Array.isArray(bundle?.asset_conflicts) ? bundle.asset_conflicts.length : 0;
   return excluded || conflicts ? `${excluded + conflicts} 项` : "无";
+}
+
+function promptPolicyStat(bundle) {
+  const policy = feedbackOverlayPromptPolicyFromBundle(bundle);
+  if (!policy) return null;
+  return ["反馈策略", feedbackOverlayPromptPolicySummaryText(policy), "drift"];
 }
 
 function traceWarnings(node, bundle, manifest) {
@@ -237,6 +251,7 @@ function hasFeedbackSignal(node) {
     || node.params?.feedbackEventId
     || node.params?.videoRevision?.lastRevisionJobId
     || node.params?.lastRevisionJobId
+    || feedbackOverlayCount(node.params?.lastContextBundle)
   );
 }
 

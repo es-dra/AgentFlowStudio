@@ -1,4 +1,4 @@
-# Provider Adapter v0.1 / v0.2 Contract
+# Provider Adapter v0.1 / v0.2 / v0.3 Contract
 
 中文摘要：本契约定义 AFS 本地 provider 中转站的最小公共接口。Runtime 只能通过
 `ProviderRegistry.dispatch(...)` 调度 provider；服务能力由 descriptor 描述，账号由
@@ -26,6 +26,46 @@ registry，不直接 import 具体 provider smoke、SDK wrapper 或账号实现�
 
 Runtime 已消费 `prompt_char_limit` 和 `reference_image_slots`，因此 MiniMax 的
 1500 字符与单参考图限制只是服务配置，不再是 resolver 的架构假设。
+
+## Image Edit Capability Fields
+
+`provider_descriptor.v0.3` may add `image_edit_capabilities` for image providers.
+The field is capability metadata only; it does not execute provider calls, wire
+Runtime local-edit routes, or claim provider QA.
+
+Absent `image_edit_capabilities` is the v0.1/v0.2 blocked default:
+
+- `supports_image_edit=false`
+- `supports_true_local_edit=false`
+- no supported local-edit scope kinds
+- no fallback modes
+- `local_edit_truth_label=blocked_no_supported_local_edit`
+
+Registry consumers can distinguish this absent-field default with
+`descriptor.image_edit_capabilities_present`.
+
+Supported local-edit scope kinds are derived from explicit descriptor flags:
+
+- `supports_mask_asset` -> `mask_asset`
+- `supports_bbox_region` -> `bbox`
+- `supports_polygon_region` -> `polygon`
+- `supports_semantic_region` -> `semantic_region`
+
+Fallback labels are intentionally separate from true local edit:
+
+- `provider_full_frame_edit`
+- `full_regeneration_fallback`
+- `reference_image_to_image_fallback`
+
+`fallback_modes` must not contain `true_local_edit`. A full-frame,
+reference-guided, or image-to-image path is not true local edit unless a later
+descriptor and evaluator explicitly classify it as a lower-precision capability.
+`ProviderDispatchRequest.image_operation`, `edit_source_image_path`,
+`edit_reference_image_paths`, and `image_input_fidelity` are adapter inputs, not
+capability claims by themselves.
+
+See `docs/provider_adapter_v03_image_edit_addendum.md` for the scoped image-edit
+descriptor addendum.
 
 ## Account Pool
 

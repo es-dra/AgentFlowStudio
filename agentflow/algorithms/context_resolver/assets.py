@@ -151,7 +151,7 @@ def excluded_assets(
     for asset_id in sorted(refs):
         if asset_id in assets or asset_id in included_ids:
             continue
-        reason = "retired_or_missing_visual_asset"
+        reason = _missing_asset_reason(asset_id)
         if (asset_id, reason) in seen:
             continue
         seen.add((asset_id, reason))
@@ -266,6 +266,12 @@ def _terminal_asset_id(assets: dict[str, dict[str, Any]], ids: list[str]) -> str
 def _asset_recorded_at(asset: dict[str, Any]) -> str:
     review = asset.get("promotion_review") if isinstance(asset.get("promotion_review"), dict) else {}
     return str(review.get("server_recorded_at") or asset.get("created_at") or "")
+
+
+def _missing_asset_reason(asset_id: str) -> str:
+    if str(asset_id).startswith(("asset_card_candidate:", "asset_card:")):
+        return "asset_card_candidate_unconfirmed"
+    return "retired_or_missing_visual_asset"
 
 
 __all__ = (

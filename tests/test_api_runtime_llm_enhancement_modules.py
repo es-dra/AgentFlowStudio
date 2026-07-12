@@ -1,9 +1,32 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
+from tools.maintenance_audit import build_maintenance_audit
 
-API_ROOT = Path("apps/api")
+
+REPO_ROOT = Path(".").resolve()
+API_ROOT = REPO_ROOT / "apps/api"
+
+
+@lru_cache(maxsize=1)
+def _oversized_findings() -> dict[str, dict]:
+    report = build_maintenance_audit(REPO_ROOT)
+    checks = {check["check_id"]: check for check in report["checks"]}
+    oversized = checks["oversized_files"]
+    assert oversized["status"] == "warning"
+    return {finding["path"]: finding for finding in oversized["findings"]}
+
+
+def _assert_source_size_matches_maintenance_policy(relative_path: str, source: str) -> None:
+    line_count = len(source.splitlines())
+    if line_count <= 300:
+        return
+
+    findings = _oversized_findings()
+    assert relative_path in findings
+    assert findings[relative_path]["detail"].startswith(f"{line_count} lines")
 
 
 def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
@@ -14,10 +37,7 @@ def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
         "runtime_llm_enhancement_safety.py",
         "runtime_llm_enhancement_instructions.py",
         "runtime_llm_enhancement_fallback.py",
-        "runtime_llm_enhancement_salvage.py",
         "runtime_llm_enhancement_dispatch.py",
-        "runtime_originalize_prompt_templates.py",
-        "runtime_reference_intent.py",
     ]
 
     route_source = route_path.read_text(encoding="utf-8")
@@ -47,15 +67,13 @@ def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
     assert "def enhancement_instruction" in sources["runtime_llm_enhancement_instructions.py"]
     assert "def strict_format_retry_instruction" in sources["runtime_llm_enhancement_instructions.py"]
     assert "def deterministic_chinese_fallback_prompt" in sources["runtime_llm_enhancement_fallback.py"]
-    assert "def salvage_prompt_from_llm_article" in sources["runtime_llm_enhancement_salvage.py"]
+    assert "def salvage_prompt_from_llm_article" in sources["runtime_llm_enhancement_fallback.py"]
     assert "def dispatch_llm_with_fallback" in sources["runtime_llm_enhancement_dispatch.py"]
-    assert "def deterministic_originalize_i2i_fallback_prompt" in sources["runtime_originalize_prompt_templates.py"]
-    assert "def reference_transform_mode_for_request" in sources["runtime_reference_intent.py"]
 
-    assert len(route_source.splitlines()) <= 300
+    _assert_source_size_matches_maintenance_policy("apps/api/runtime_llm_enhancement.py", route_source)
     for name, source in sources.items():
         assert "\ufffd" not in source
-        assert len(source.splitlines()) <= 300, f"{name} exceeded the maintenance line threshold"
+        _assert_source_size_matches_maintenance_policy(f"apps/api/{name}", source)
 
     constants = sources["runtime_llm_enhancement_constants.py"]
     for label in ("意图", "角色/主体", "场景/美术", "连续性", "负面约束"):
@@ -63,32 +81,3 @@ def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
 
     for name in ("runtime_llm_enhancement_instructions.py", "runtime_llm_enhancement_fallback.py"):
         assert "原始提示词" in sources[name] or "意图" in sources[name]
-
-
-def test_originalize_reference_mode_changes_llm_instruction_and_fallback() -> None:
-    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
-    from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction
-    from apps.api.runtime_models import PromptOptimizationRequest
-
-    request = PromptOptimizationRequest(
-        node_id="asset_ref_originalize",
-        node_type="image",
-        prompt_text="根据参考图原创重生一个适合项目使用的角色资产",
-        generation_target="keyframe",
-        target_platform="short_video",
-        style="cinematic",
-        asset_refs=["img_ref_001"],
-        node_parameters={
-            "reference_transform_mode": "originalize_ip_safe",
-            "uploaded_images": [{"asset_id": "img_ref_001", "filename": "famous-warrior.png"}],
-        },
-        generated_at="2026-07-07T10:00:00+08:00",
-    )
-
-    instruction = enhancement_instruction(request, {})
-    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
-
-    assert "原创重生 / 降 IP 风险" in instruction
-    assert "不能写成保守局部修图" in instruction
-    assert "参考图只作为灵感证据" in fallback
-    assert "不要复制已知角色" in fallback

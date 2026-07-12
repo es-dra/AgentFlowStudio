@@ -1,6 +1,7 @@
 import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
 import { setSubmittingGenerationState } from "./node-generation-progress.js";
+import { appendPreservedOutput, retryFailedItemsPlan, retrySubmittingOptions } from "./node-generation-retry.js";
 import { isKeyframeInProgress } from "./node-generation-results.js";
 import { clearOneRunOverrides, prepareGenerationRequest } from "./node-generation-guards.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
@@ -23,6 +24,11 @@ export async function pollNodeKeyframeGeneration(store, runtime, node) {
   try {
     await startBackgroundKeyframePolling(store, runtime, node.id, jobId, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
   } catch (error) {
+    if (isRecoverableSubmitError(error)) {
+      markKeyframeStillProcessing(store, node.id, jobId);
+      await store.flushRuntimeSave?.();
+      return;
+    }
     setNodeError(store, node.id, `图像生成轮询失败: ${safeError(error)}`);
     await store.flushRuntimeSave?.();
   }
@@ -30,16 +36,23 @@ export async function pollNodeKeyframeGeneration(store, runtime, node) {
 export async function startRemoteKeyframeGeneration(store, runtime, node) {
   const previousNodeState = generationRestoreSnapshot(node);
   const generationKind = nodeGenerationKind(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    n.result = null;
-    n.previewUrl = null;
-    setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: null });
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    else {
+      n.result = null;
+      n.previewUrl = null;
+    }
+    setSubmittingGenerationState(n, generationKind, retryPlan.retrying
+      ? retrySubmittingOptions(submitLabel(generationKind))
+      : { label: submitLabel(generationKind), percent: 8 });
   });
   let submitAttempted = false;
   let submittedAtMs = 0;
+  let submittedJobId = "";
   try {
     let request = buildKeyframeGenerationRequest(store.get(), node);
     request = await prepareGenerationRequest(store, runtime, node, request, "keyframe");
@@ -51,14 +64,21 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     submitAttempted = true;
     submittedAtMs = Date.now();
     const response = await runtime.generateKeyframe(request);
-    applyKeyframeResponse(store, node.id, response, request, { kind: generationKind });
+    submittedJobId = response?.job?.job_id || "";
+    applyKeyframeResponse(store, node.id, response, request, { kind: generationKind, retrying: retryPlan.retrying });
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
     if (isKeyframeInProgress(response) && response?.job?.job_id && runtime?.pollKeyframe) {
-      await startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request);
+      void startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request)
+        .catch((pollError) => handleBackgroundKeyframePollingError(store, node.id, response.job.job_id, pollError));
     }
   } catch (error) {
     if (submitAttempted) clearOneRunOverrides(store, node.id);
+    if (submittedJobId && isRecoverableSubmitError(error)) {
+      markKeyframeStillProcessing(store, node.id, submittedJobId);
+      await store.flushRuntimeSave?.();
+      return;
+    }
     if (submitAttempted && isRecoverableSubmitError(error)) {
       markKeyframeRecovering(store, node.id, nodeGenerationKind(node));
       await store.flushRuntimeSave?.();
@@ -79,7 +99,10 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
     const jobId = node.params.lastKeyframeJobId;
     try {
       const response = await runtime.pollKeyframe(jobId);
-      applyKeyframeResponse(store, node.id, response, fallbackRequest(node), { kind: nodeGenerationKind(node) });
+      applyKeyframeResponse(store, node.id, response, fallbackRequest(node), {
+        kind: nodeGenerationKind(node),
+        retrying: Boolean(node.params?.retryFailedItemsOnly),
+      });
       await store.flushRuntimeSave?.();
       if (isKeyframeInProgress(response)) {
         void startBackgroundKeyframePolling(store, runtime, node.id, jobId, fallbackRequest(node));
@@ -96,15 +119,38 @@ function startBackgroundKeyframePolling(store, runtime, nodeId, jobId, request) 
   activeKeyframePolls.set(key, poll);
   return poll;
 }
+async function handleBackgroundKeyframePollingError(store, nodeId, jobId, error) {
+  if (isRecoverableSubmitError(error)) {
+    markKeyframeStillProcessing(store, nodeId, jobId);
+  } else {
+    setNodeError(store, nodeId, `图像生成轮询失败: ${safeError(error)}`);
+  }
+  await store.flushRuntimeSave?.();
+}
 async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
   let lastResponse = null;
   let lastSavedStatus = "";
+  let transientPollErrors = 0;
   for (let attempt = 0; attempt < MAX_KEYFRAME_POLL_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await sleep(pollDelayMs(attempt));
-    const response = await runtime.pollKeyframe(jobId);
+    let response = null;
+    try {
+      response = await runtime.pollKeyframe(jobId);
+      transientPollErrors = 0;
+    } catch (error) {
+      if (!isRecoverableSubmitError(error)) throw error;
+      transientPollErrors += 1;
+      markKeyframeStillProcessing(store, nodeId, jobId);
+      if (transientPollErrors === 1 || transientPollErrors % 3 === 0) await store.flushRuntimeSave?.();
+      if (transientPollErrors >= 24) return lastResponse;
+      continue;
+    }
     lastResponse = response;
     const fresh = store.get().nodes[nodeId];
-    applyKeyframeResponse(store, nodeId, response, request, { kind: nodeGenerationKind(fresh) });
+    applyKeyframeResponse(store, nodeId, response, request, {
+      kind: nodeGenerationKind(fresh),
+      retrying: Boolean(fresh?.params?.retryFailedItemsOnly),
+    });
     const status = response?.job?.status || "";
     if (shouldSavePollState(attempt, status, lastSavedStatus, response)) {
       await store.flushRuntimeSave?.();

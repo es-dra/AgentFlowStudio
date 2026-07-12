@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import base64
+from pathlib import Path
 
 
 PNG_B64 = base64.b64encode(
@@ -9,6 +10,20 @@ PNG_B64 = base64.b64encode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     )
 ).decode("ascii")
+
+
+def test_model_call_context_feedback_overlay_sanitizer_is_split() -> None:
+    root = Path(__file__).resolve().parents[1]
+    main_source = root / "agentflow" / "algorithms" / "model_call_context" / "__init__.py"
+    helper_source = root / "agentflow" / "algorithms" / "model_call_context" / "feedback_context.py"
+    main_text = main_source.read_text(encoding="utf-8")
+    helper_text = helper_source.read_text(encoding="utf-8")
+
+    assert len(main_text.splitlines()) <= 240
+    assert len(helper_text.splitlines()) <= 120
+    assert "from agentflow.algorithms.model_call_context.feedback_context import" in main_text
+    assert "def _bundle_feedback_context_overlays" not in main_text
+    assert "def bundle_feedback_context_overlays" in helper_text
 
 
 def test_model_call_context_maps_operations_and_blocks_unsafe_boundaries() -> None:
@@ -206,13 +221,32 @@ def test_runtime_prompt_optimization_registers_model_call_context_artifact(tmp_p
     payload = result.json()
     context_ref = payload["artifacts"]["model_call_context"]
     context = client.get(f"/artifacts/{context_ref['artifact_id']}").json()["payload"]
+    contract_ref = payload["artifacts"]["creative_runtime_contract"]
+    contract = client.get(f"/artifacts/{contract_ref['artifact_id']}").json()["payload"]
 
     assert payload["model_call_context_id"] == context["context_id"]
+    assert payload["model_call_context_summary"]["context_id"] == context["context_id"]
+    assert payload["model_call_context_summary"]["artifact"]["artifact_id"] == context_ref["artifact_id"]
+    assert payload["model_call_context_summary"]["operation_intent"] == "prompt_optimize"
+    assert payload["model_call_context_summary"]["context_sources"]["context_bundle_present"] is False
+    assert payload["model_call_context_summary"]["asset_context"]["context_eligible_asset_count"] == 0
+    assert payload["model_call_context_summary"]["provider_constraints"]["provider_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert payload["model_call_context_summary"]["safety_boundary"]["no_provider_raw"] is True
+    assert "feedback_context" not in payload["model_call_context_summary"]
     assert context["operation_intent"] == "prompt_optimize"
     assert context["generation_target"] == "prompt"
     assert context["asset_context"]["context_eligible_asset_ids"] == []
     assert context["preference_context"]["expert_rule_ids"]
     assert context["safety_boundary"]["no_provider_raw"] is True
+    assert payload["creative_runtime_contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["artifact"]["artifact_id"] == contract_ref["artifact_id"]
+    assert payload["creative_runtime_contract_summary"]["model_call_context"]["context_id"] == context["context_id"]
+    assert contract["operation"] == "prompt_optimization"
+    assert contract["evidence_context"]["model_call_context_id"] == context["context_id"]
+    assert contract["provider_context"]["required_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert contract["provider_context"]["provider_calls_started"] is False
+    assert "not_provider_execution" in contract["non_claims"]
 
 
 def test_runtime_keyframe_request_plan_is_projected_from_model_call_context(tmp_path, monkeypatch) -> None:

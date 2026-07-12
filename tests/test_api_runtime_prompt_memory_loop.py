@@ -7,9 +7,19 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
+from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_script_generation_body import is_script_surface_request
+
+
+def _runtime_error_raw_detail(result) -> str:
+    detail = result.json()["detail"]
+    if isinstance(detail, dict):
+        details = detail.get("details") if isinstance(detail.get("details"), dict) else {}
+        return str(details.get("raw_detail") or detail.get("message") or detail.get("error") or "")
+    return str(detail)
 
 
 def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tmp_path) -> None:
@@ -41,7 +51,11 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     brief = client.get(f"/artifacts/{payload['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
     trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
     manifest = client.get(f"/artifacts/{payload['artifacts']['prompt_optimization_safe_manifest']['artifact_id']}").json()["payload"]
-    serialized = json.dumps({"payload": payload, "brief": brief, "trace": trace, "manifest": manifest}, ensure_ascii=False).lower()
+    contract = client.get(f"/artifacts/{payload['artifacts']['creative_runtime_contract']['artifact_id']}").json()["payload"]
+    serialized = json.dumps(
+        {"payload": payload, "brief": brief, "trace": trace, "manifest": manifest, "contract": contract},
+        ensure_ascii=False,
+    ).lower()
 
     assert payload["job"]["action"] == "prompt_optimization"
     assert payload["job"]["status"] == "succeeded"
@@ -64,6 +78,17 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert manifest["provider_calls_started"] is False
     assert manifest["raw_provider_response_stored"] is False
     assert manifest["generated_media_bytes_stored"] is False
+    assert manifest["creative_runtime_contract_id"] == contract["contract_id"]
+    assert manifest["creative_runtime_contract_ref"] == "creative_runtime_contract.json"
+    assert payload["creative_runtime_contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["artifact"]["filename"] == "creative_runtime_contract.json"
+    assert payload["creative_runtime_contract_summary"]["operation"] == "prompt_optimization"
+    assert payload["creative_runtime_contract_summary"]["provider_context"]["required_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert payload["creative_runtime_contract_summary"]["provider_context"]["provider_calls_started"] is False
+    assert contract["model_call_context"]["context_id"] == payload["model_call_context_id"]
+    assert contract["runtime_policy"]["writes_long_term_memory"] is False
+    assert contract["runtime_policy"]["requires_evaluator_before_quality_claim"] is True
+    assert "not_durable_memory_promotion" in contract["non_claims"]
     assert payload["provider_calls_started"] is False
     assert payload["writes_long_term_memory"] is False
     assert payload["writes_company_kb"] is False
@@ -74,6 +99,29 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
     assert "data/processed/runs" not in serialized
+
+
+def test_text_node_script_target_uses_script_surface_instruction() -> None:
+    request = PromptOptimizationRequest(
+        node_id="text-script-surface",
+        node_type="text",
+        prompt_text="片名：《白骨灯》\n\n唐僧娶了白骨精。孙悟空和猪八戒在远处旁观。结尾，红盖头下露出白骨影子。",
+        generation_target="script",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "scriptInputMode": "idea_expanded_script",
+            "remote_optimizer_required": True,
+        },
+        generated_at="2026-07-09T10:00:00+08:00",
+    )
+
+    instruction = enhancement_instruction(request, {"knowledge_rules": []})
+
+    assert is_script_surface_request(request) is True
+    assert "这不是生图提示词优化" in instruction
+    assert "输出仍必须像剧本正文" in instruction
+    assert "意图、角色/主体" in instruction
 
 
 def test_prompt_memory_mvp_openapi_exposes_optimizer_but_not_memory_review_surfaces(tmp_path) -> None:
@@ -645,7 +693,7 @@ def test_studio_prompt_optimizer_requires_remote_llm_when_requested(tmp_path, mo
     )
 
     assert result.status_code == 422
-    assert "remote LLM prompt optimization unavailable" in result.json()["detail"]
+    assert "remote LLM prompt optimization unavailable" in _runtime_error_raw_detail(result)
 
 
 def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rejected(tmp_path, monkeypatch) -> None:
@@ -678,7 +726,207 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
     )
 
     assert result.status_code == 422
-    assert "enhancement missing required sections" in result.json()["detail"]
+    assert "enhancement missing required sections" in _runtime_error_raw_detail(result)
+
+
+def test_studio_prompt_optimizer_rejects_provider_infrastructure_error_text(tmp_path, monkeypatch) -> None:
+    provider_error = (
+        "Unable to read `request.json` or `prompt.md`: the local command sandbox fails "
+        "with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`."
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_error}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_provider_error/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-provider-error",
+            "node_type": "image",
+            "prompt_text": "老师，在办公室，批评玩手机的学生",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T12:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    detail = _runtime_error_raw_detail(result)
+    assert "provider returned infrastructure error" in detail
+    assert "Unable to read" not in detail
+    assert "request.json" not in detail
+    assert "bwrap" not in detail
+
+
+def test_studio_prompt_optimizer_rejects_local_file_access_error_inside_sections(tmp_path, monkeypatch) -> None:
+    provider_error = "I can't access the requested local files in this session."
+    provider_text = "\n".join(
+        [
+            "Intent: create a usable visual prompt for a teacher scolding a student in an office.",
+            f"Subject/Character: {provider_error}",
+            f"Scene/Art Direction: {provider_error}",
+            "Action/Story: a teacher scolds a student for playing with a phone in an office.",
+            f"Camera/Composition: {provider_error}",
+            f"Lighting: {provider_error}",
+            "Motion/Time Progression: keep the single keyframe readable and stable.",
+            "Continuity: keep the teacher, student, clothing, and office consistent.",
+            "Negative Constraints: no watermark, no gibberish text, no identity drift.",
+        ]
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_text}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_local_file_error/prompt-optimizations",
+        json={
+            "node_id": "script-node-local-file-error",
+            "node_type": "script",
+            "prompt_text": "A teacher scolds a student for playing with a phone in an office.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T15:10:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    detail = _runtime_error_raw_detail(result)
+    assert "provider returned infrastructure error" in detail
+    assert "local files" not in detail.lower()
+    assert "requested local files" not in detail.lower()
+
+
+def test_studio_prompt_optimizer_does_not_retry_or_salvage_infrastructure_error(tmp_path, monkeypatch) -> None:
+    first_provider_text = (
+        "I'm unable to read the files because the local command sandbox is failing "
+        "before any command runs."
+    )
+    retry_provider_text = "Unable to read `request.json`: bwrap: Failed RTM_NEWADDR: Operation not permitted"
+
+    class FakeRegistry:
+        def __init__(self):
+            self.calls = 0
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            self.calls += 1
+            return {"text": first_provider_text if self.calls == 1 else retry_provider_text}
+
+    fake_registry = FakeRegistry()
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: fake_registry)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_retry_infra_error/prompt-optimizations",
+        json={
+            "node_id": "script-node-retry-infra-error",
+            "node_type": "script",
+            "prompt_text": "A teacher scolds a student for playing with a phone in an office.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T15:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    assert fake_registry.calls == 1
+    detail = _runtime_error_raw_detail(result)
+    assert "provider returned infrastructure error" in detail
+    assert "sandbox" not in detail.lower()
+    assert "request.json" not in detail
+
+
+def test_prompt_optimizer_failure_file_log_includes_timings(tmp_path, monkeypatch) -> None:
+    provider_error = "Unable to read `request.json`: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted"
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_error}
+
+    log_dir = tmp_path / "logs"
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_FILE_LOG_ENABLED", "true")
+    monkeypatch.setenv("AFS_FILE_LOG_DIR", str(log_dir))
+    monkeypatch.setenv("AFS_FILE_LOG_NAME", "afs-test")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+
+    result = client.post(
+        "/projects/proj_studio_prompt_log/prompt-optimizations",
+        headers={
+            "x-client-request-id": "cli_prompt_log",
+            "x-user-action": "click_optimize_prompt",
+            "x-studio-node-id": "node_prompt_log",
+            "x-studio-node-type": "script",
+        },
+        json={
+            "node_id": "node_prompt_log",
+            "node_type": "script",
+            "prompt_text": "老师，在办公室，批评玩手机的学生",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T14:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    lines = "\n".join(path.read_text(encoding="utf-8") for path in log_dir.glob("afs-test-*.log"))
+    assert "prompt optimize_start" in lines
+    assert "prompt optimize_failed" in lines
+    assert "provider=prompt_optimizer" in lines
+    assert "llm_status=discarded" in lines
+    assert "discard_reason=\"provider returned infrastructure error\"" in lines
+    assert "elapsed_ms=" in lines
+    assert "llm_elapsed_ms=" in lines
+    assert "provider_elapsed_ms=" in lines
+    assert "provider_output_length=" in lines
+    assert "provider_error_markers=" in lines
+    assert "missing_sections=" in lines
+    assert "provider_output_preview=" in lines
+    assert "request.json" in lines
+    assert "bwrap" in lines
 
 
 def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_path, monkeypatch) -> None:
@@ -794,166 +1042,6 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
     assert payload["optimized_prompt"].startswith("意图：")
     trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
     assert trace["llm_enhancement"]["format_retry_count"] == 1
-
-
-def test_studio_prompt_optimizer_discards_tool_failure_text_from_llm(tmp_path, monkeypatch) -> None:
-    polluted_variants = [
-        "I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
-        "Unable to read the files because command execution is failing in the sandbox.",
-    ]
-
-    class FakeRegistry:
-        calls = 0
-
-        def dispatch(self, capability, service_id, request):
-            assert capability == "llm"
-            assert service_id == "prompt_optimizer"
-            fragment = polluted_variants[self.calls]
-            self.calls += 1
-            polluted = "\n".join(
-                [
-                    "意图：围绕“白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
-                    f"人物/主体：{fragment}",
-                    f"场景/美术：{fragment}",
-                    "动作/情节：白雪公主穿越到现代",
-                    f"镜头/构图：{fragment}",
-                    f"灯光：{fragment}",
-                    "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
-                    "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
-                    "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
-                ]
-            )
-            return {"text": polluted}
-
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-
-    result = client.post(
-        "/projects/proj_studio_remote_optimizer_tool_failure/prompt-optimizations",
-        json={
-            "node_id": "text-node-tool-failure",
-            "node_type": "text",
-            "prompt_text": "白雪公主穿越到现代",
-            "generation_target": "prompt",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "node_parameters": {
-                "llm_provider": "prompt_optimizer",
-                "remote_optimizer_required": True,
-            },
-            "generated_at": "2026-06-28T12:00:00+08:00",
-        },
-    )
-
-    assert result.status_code == 200
-    payload = result.json()
-    serialized = json.dumps(payload, ensure_ascii=False).lower()
-    assert payload["provider_calls_started"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "provider_output_tool_failure_text"
-    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
-    assert "local command execution failed" not in serialized
-    assert "unable to read the files" not in serialized
-    assert "command execution is failing in the sandbox" not in serialized
-    assert "bwrap" not in serialized
-    assert "operation not permitted" not in serialized
-
-
-def test_script_expansion_contract_returns_script_not_visual_sections_on_tool_failure(tmp_path, monkeypatch) -> None:
-    class FakeRegistry:
-        def dispatch(self, capability, service_id, request):
-            assert capability == "llm"
-            assert service_id == "prompt_optimizer"
-            assert "原始想法：白雪公主穿越到现代" in request.prompt
-            assert "九段画面提示词" in request.prompt
-            return {"text": "\n".join(
-                [
-                    "意图：围绕“请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。 输出要求： 原始想法：白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
-                    "角色/主体：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
-                    "场景/美术：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
-                    "动作/情节：请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。 原始想法：白雪公主穿越到现代",
-                    "镜头/构图：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
-                    "灯光：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
-                    "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
-                    "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
-                    "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
-                ]
-            )}
-
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-
-    result = client.post(
-        "/projects/proj_script_expansion_tool_failure/prompt-optimizations",
-        json={
-            "node_id": "text-node-script-expansion",
-            "node_type": "script",
-            "prompt_text": "白雪公主穿越到现代",
-            "generation_target": "script",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "node_parameters": {
-                "llm_provider": "prompt_optimizer",
-                "remote_optimizer_required": True,
-                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
-                "source_idea": "白雪公主穿越到现代",
-            },
-            "generated_at": "2026-06-29T16:00:00+08:00",
-        },
-    )
-
-    assert result.status_code == 200
-    payload = result.json()
-    serialized = json.dumps(payload, ensure_ascii=False).lower()
-    assert payload["provider_calls_started"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "script expansion contains tool failure text"
-    assert payload["optimized_prompt"].startswith("片名：《白雪公主穿越到现代》")
-    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
-    assert "意图：" not in payload["optimized_prompt"]
-    assert "角色/主体：" not in payload["optimized_prompt"]
-    assert "输出要求" not in serialized
-    assert "request.json" not in serialized
-    assert "prompt.md" not in serialized
-    assert "unable to read" not in serialized
-
-
-def test_script_expansion_contract_never_returns_local_visual_prompt_when_llm_blocked(tmp_path, monkeypatch) -> None:
-    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-
-    result = client.post(
-        "/projects/proj_script_expansion_llm_blocked/prompt-optimizations",
-        json={
-            "node_id": "text-node-script-expansion-blocked",
-            "node_type": "script",
-            "prompt_text": "白雪公主穿越到现代",
-            "generation_target": "script",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "node_parameters": {
-                "llm_provider": "prompt_optimizer",
-                "llm_model": "prompt-optimizer",
-                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
-                "source_idea": "白雪公主穿越到现代",
-            },
-            "generated_at": "2026-06-29T17:00:00+08:00",
-        },
-    )
-
-    assert result.status_code == 200
-    payload = result.json()
-    assert payload["provider_calls_started"] is False
-    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
-    assert payload["optimized_prompt"].startswith("片名：《白雪公主穿越到现代》")
-    assert payload["user_prompt"] == payload["optimized_prompt"]
-    assert payload["user_prompt_sections"] == []
-    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
-    assert "以原始描述中的主体为核心" not in payload["user_prompt"]
-    assert "依据原始描述补全场景" not in payload["user_prompt"]
-    assert "一个主导镜头运动贯穿始终" not in payload["user_prompt"]
 
 
 def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
@@ -1234,3 +1322,431 @@ def test_i2i_prompt_optimizer_guardrail_uses_uploaded_image_filename_hint(tmp_pa
     assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
     assert "校服周彤" in payload["optimized_prompt"]
     assert "不要染发变浅" in payload["optimized_prompt"]
+
+
+def test_script_prompt_optimization_returns_structured_script_plan(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_plan", "goal": "Script plan contract"})
+
+    response = client.post(
+        "/projects/proj_script_plan/prompt-optimizations",
+        json={
+            "node_id": "script-node-plan",
+            "node_type": "script",
+            "prompt_text": "Expand this idea into a formal short video script, not a shot list.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "source_idea": "A future robot watches stars on a rural rooftop.",
+                "forbidden_output": "storyboard_placeholder_outline",
+            },
+            "generated_at": "2026-06-27T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["script_plan"]["script_type"] == "formal_short_video_script"
+    assert payload["script_plan"]["asset_seed_policy"]["candidate_assets_are_editable"] is True
+    assert payload["script_plan"]["director_scenario"]["primary_scenario"] == "general_short_video"
+    assert "script_plan" in payload["artifacts"]
+    assert "storyboard_placeholder_outline" in payload["script_plan"]["forbidden_outputs"]
+    assert "storyboard_placeholder_outline" not in payload["user_prompt"]
+    assert payload["script_plan"]["script_expansion_strategy"]["section_count_policy"] == "llm_decides_from_idea_density"
+    assert payload["script_plan"]["script_expansion_strategy"]["storyboard_split_deferred"] is True
+
+    artifact = client.get(f"/artifacts/{payload['artifacts']['script_plan']['artifact_id']}").json()["payload"]
+    assert artifact["detected_subject_hints"] == ["future robot"]
+    assert "rooftop platform" in artifact["detected_scene_hints"]
+    assert len(artifact["narrative_sections"]) == 3
+    assert artifact["narrative_sections"][0]["section_id"] == "premise"
+
+
+def test_script_generation_predicate_requires_explicit_script_contract_and_script_surface() -> None:
+    from apps.api.runtime_script_generation_body import is_script_generation_request
+
+    def request(
+        *,
+        node_type: str,
+        generation_target: str,
+        params: dict[str, object],
+    ) -> PromptOptimizationRequest:
+        return PromptOptimizationRequest(
+            node_id="predicate-node",
+            node_type=node_type,
+            prompt_text="一个人在睡觉",
+            generation_target=generation_target,
+            target_platform="short_video",
+            style="cinematic",
+            node_parameters=params,
+            generated_at="2026-07-06T10:05:00+08:00",
+        )
+
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="image",
+                generation_target="keyframe",
+                params={"source_idea": "一个人在睡觉"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="image",
+                generation_target="keyframe",
+                params={"source_idea": "一个人在睡觉", "script_generation_mode": "idea_to_script"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"script_generation_mode": "idea_to_script"},
+            )
+        )
+        is True
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"script_expansion_contract": "formal_script_before_storyboard_breakdown"},
+            )
+        )
+        is True
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="text",
+                generation_target="script",
+                params={"script_generation_mode": "idea_to_script"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"source_idea": "一个人在睡觉"},
+            )
+        )
+        is False
+    )
+
+
+def test_script_prompt_generation_requires_remote_llm_when_gate_closed(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_body", "goal": "Script body contract"})
+    wrapper = "\n".join(
+        [
+            "请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。",
+            "输出要求：先给片名，再给连续叙事正文。",
+            "原始想法：一个人在睡觉",
+        ]
+    )
+
+    response = client.post(
+        "/projects/proj_script_body/prompt-optimizations",
+        json={
+            "node_id": "script-node-body",
+            "node_type": "script",
+            "prompt_text": wrapper,
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "script_generation_mode": "idea_to_script",
+                "source_idea": "一个人在睡觉",
+                "forbidden_output": "storyboard_placeholder_outline",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-06T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 422
+    detail = _runtime_error_raw_detail(response)
+    assert "remote_llm_gate_closed" in detail
+    assert "remote LLM prompt optimization unavailable" in detail
+
+
+def test_script_prompt_generation_applies_gated_llm_body_with_knowledge_rules(tmp_path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            calls.append(request.prompt)
+            assert request.task_type == "prompt_enhancement"
+            assert "专业知识库约束" in request.prompt
+            assert "short_video_hook_visual_promise_v1" in request.prompt
+            assert "storyboard_shot_numbering_handoff_v1" in request.prompt
+            return {
+                "text": (
+                    "片名：《星光屋顶》\n\n"
+                    "遥星R-17站在乡村屋顶的旧水塔旁，夜风吹过金属外壳，远处村庄灯火一点点熄灭。"
+                    "它原本只是校准星图，却在一颗异常移动的星点里收到旧时代的童声。"
+                    "它低头确认胸口第一次亮起的信号灯，又把手伸向夜空，像是在回答一个多年以前的问题。"
+                    "结尾停在它回望屋檐下旧灯泡的瞬间，童声轻轻问它是否还记得回家的路。"
+                )
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_llm_body", "goal": "Script body LLM contract"})
+
+    response = client.post(
+        "/projects/proj_script_llm_body/prompt-optimizations",
+        json={
+            "node_id": "script-node-llm-body",
+            "node_type": "script",
+            "prompt_text": "请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个来自未来的机器人，在农村屋顶上看星星",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "script_generation_mode": "idea_to_script",
+                "source_idea": "一个来自未来的机器人，在农村屋顶上看星星",
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-08T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert calls
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["status"] == "applied"
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is False
+    assert payload["script_generation_body"]["fallback_used"] is False
+    assert payload["optimized_prompt"].startswith("片名：《星光屋顶》")
+    assert "意图：" not in payload["optimized_prompt"]
+    assert "角色/主体：" not in payload["optimized_prompt"]
+
+
+def test_script_surface_optimizer_preserves_script_shape_when_llm_returns_prompt_labels(tmp_path, monkeypatch) -> None:
+    original_script = "\n".join(
+        [
+            "镜号：01",
+            "时长：1.8",
+            "画面描述：@孙悟空 @云栈洞口。低角度仰拍，孙悟空后撤半步，赤色云海压在洞口。",
+            "景别：中景",
+            "光影氛围：冷灰主调，赤云边缘光。",
+            "运镜：轻微推近",
+            "对白/旁白：无明确对白",
+            "音效：铁链拖地声与洞内回响",
+        ]
+    )
+    captured: list[str] = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            captured.append(request.prompt)
+            return {
+                "text": "\n".join(
+                    [
+                        "意图：聚焦孙悟空与猪八戒对峙。",
+                        "角色/主体：孙悟空、猪八戒、洞内呼哑重声。",
+                        "场景/美术：云栈洞口。",
+                        "负面约束：不要水印。",
+                    ]
+                )
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_surface", "goal": "Script surface optimization"})
+
+    response = client.post(
+        "/projects/proj_script_surface/prompt-optimizations",
+        json={
+            "node_id": "text-script-surface",
+            "node_type": "text",
+            "prompt_text": original_script,
+            "generation_target": "prompt",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-08T13:50:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured
+    assert "优化已有短视频剧本或分镜脚本正文" in captured[0]
+    assert "这不是生图提示词优化" in captured[0]
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "optimizer_label_output"
+    assert payload["optimized_prompt"] == original_script
+    assert payload["user_prompt_sections"][0]["title"] == "剧本/分镜正文"
+    assert "意图：" not in payload["optimized_prompt"]
+    assert "角色/主体：" not in payload["optimized_prompt"]
+
+
+def test_script_body_validator_fallbacks_from_wrapper_echo_optimizer_labels_and_template_fillers() -> None:
+    from apps.api.runtime_script_generation_body import script_body_from_candidate
+
+    request = PromptOptimizationRequest(
+        node_id="script-node-validator",
+        node_type="script",
+        prompt_text="请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个人在睡觉",
+        generation_target="script",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "script_generation_mode": "idea_to_script",
+            "source_idea": "一个人在睡觉",
+        },
+        generated_at="2026-07-06T10:10:00+08:00",
+    )
+
+    wrapper = script_body_from_candidate("请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个人在睡觉", request)
+    optimizer = script_body_from_candidate(
+        "\n".join(
+            [
+                "意图：围绕一个人在睡觉形成清晰创作方向。",
+                "角色/主体：Primary character。",
+                "场景/美术：Primary scene。",
+                "负面约束：不要水印。",
+            ]
+        ),
+        request,
+    )
+    template = script_body_from_candidate(
+        "片名：《占位》\n\n推进主体出现。\n展示变化。\n收束结果。",
+        request,
+    )
+
+    assert wrapper["fallback_used"] is True
+    assert wrapper["discard_reason"] == "prompt_wrapper_echo"
+    assert optimizer["fallback_used"] is True
+    assert optimizer["discard_reason"] == "optimizer_label_output"
+    assert template["fallback_used"] is True
+    assert template["discard_reason"] == "template_filler"
+    assert "片名：《" in wrapper["script_body"]
+    assert "沈眠" in wrapper["script_body"]
+    assert "意图：" not in optimizer["script_body"]
+    assert "角色/主体：" not in optimizer["script_body"]
+
+
+def test_non_script_source_idea_only_request_keeps_remote_optimizer_required(tmp_path, monkeypatch) -> None:
+    from apps.api.runtime_script_generation_body import is_script_generation_request
+
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    request_payload = {
+        "node_id": "image-node-source-idea-only",
+        "node_type": "image",
+        "prompt_text": "Generate a cinematic keyframe of a person sleeping in a quiet room.",
+        "generation_target": "keyframe",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "node_parameters": {
+            "llm_provider": "prompt_optimizer",
+            "remote_optimizer_required": True,
+            "source_idea": "一个人在睡觉",
+        },
+        "generated_at": "2026-07-06T10:25:00+08:00",
+    }
+    predicate_request = PromptOptimizationRequest(**request_payload)
+
+    assert is_script_generation_request(predicate_request) is False
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_image_source_idea_only", "goal": "Image optimizer contract"})
+    response = client.post(
+        "/projects/proj_image_source_idea_only/prompt-optimizations",
+        json=request_payload,
+    )
+
+    assert response.status_code == 422
+    assert "remote_llm_gate_closed" in _runtime_error_raw_detail(response)
+
+
+def test_prompt_optimizer_trace_includes_professional_reference_for_rooftop_video(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_prof_ref_prompt", "goal": "Professional reference trace"})
+
+    response = client.post(
+        "/projects/proj_prof_ref_prompt/prompt-optimizations",
+        json={
+            "node_id": "video-node-prof-ref",
+            "node_type": "video",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "generation_target": "video",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-06-27T10:20:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    reference = trace["professional_reference"]
+
+    assert "Professional reference:" in payload["optimized_prompt"]
+    assert "moderate-to-deep" in payload["optimized_prompt"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "motivated night exterior" in reference["lighting"]["decision"]
+    assert reference["writes_long_term_memory"] is False
+    assert reference["writes_company_kb"] is False
+
+
+def test_prompt_optimizer_trace_includes_director_scenario_for_saas_launch(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_director_scenario_prompt", "goal": "Director scenario trace"})
+
+    response = client.post(
+        "/projects/proj_director_scenario_prompt/prompt-optimizations",
+        json={
+            "node_id": "video-node-director-scenario",
+            "node_type": "video",
+            "prompt_text": "A SaaS launch demo shows a dashboard workflow turning a messy task into a clear result.",
+            "generation_target": "video",
+            "target_platform": "short_video",
+            "style": "clean product demo",
+            "generated_at": "2026-06-27T10:35:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    scenario = trace["director_scenario"]
+
+    assert scenario["primary_scenario"] == "saas_launch"
+    assert scenario["writes_company_kb"] is False
+    assert "Director scenario:" in payload["optimized_prompt"]
+    assert "SaaS Launch" in payload["optimized_prompt"]
+    model_context = client.get(f"/artifacts/{payload['artifacts']['model_call_context']['artifact_id']}").json()["payload"]
+    assert "director_scenario:saas_launch" in model_context["preference_context"]["expert_rule_ids"]

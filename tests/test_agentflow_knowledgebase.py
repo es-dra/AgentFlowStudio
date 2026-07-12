@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from agentflow.knowledge.creative_prompt_rules import (
     EXTERNAL_KNOWLEDGE_ROOT,
     REPO_KNOWLEDGE_ROOT,
@@ -15,12 +17,16 @@ from agentflow.knowledge.creative_prompt_rules import (
 )
 
 
+def require_external_knowledgebase() -> Path:
+    if not EXTERNAL_KNOWLEDGE_ROOT.exists():
+        pytest.skip(f"External knowledgebase copy is not available: {EXTERNAL_KNOWLEDGE_ROOT}")
+    return EXTERNAL_KNOWLEDGE_ROOT
+
+
 def test_creative_prompt_knowledgebase_schema_registry_and_sync() -> None:
     assert REPO_KNOWLEDGE_ROOT.exists()
-    assert EXTERNAL_KNOWLEDGE_ROOT.exists()
 
     repo_rules = load_creative_prompt_rules(REPO_KNOWLEDGE_ROOT)
-    external_rules = load_creative_prompt_rules(EXTERNAL_KNOWLEDGE_ROOT)
     rule_ids = [rule["rule_id"] for rule in repo_rules]
 
     assert len(repo_rules) >= 40
@@ -38,8 +44,11 @@ def test_creative_prompt_knowledgebase_schema_registry_and_sync() -> None:
         "director_setup_2d",
         "negative_constraints",
     }
+
+    external_root = require_external_knowledgebase()
+    external_rules = load_creative_prompt_rules(external_root)
     assert [rule["rule_id"] for rule in external_rules] == rule_ids
-    assert normalized_knowledgebase_hash(REPO_KNOWLEDGE_ROOT) == normalized_knowledgebase_hash(EXTERNAL_KNOWLEDGE_ROOT)
+    assert normalized_knowledgebase_hash(REPO_KNOWLEDGE_ROOT) == normalized_knowledgebase_hash(external_root)
     assert_knowledgebase_in_sync()
 
 
@@ -98,3 +107,82 @@ def test_knowledgebase_paths_do_not_overlap_unrelated_learning_notes_state() -> 
         "D:/Learning materials/Learning_notes/10-Startup/70-Projects/AgentFlow-Studio/knowledgebase"
     )
     assert REPO_KNOWLEDGE_ROOT == Path("agentflow/knowledge")
+
+
+def test_professional_reference_context_selects_rooftop_night_video_guidance() -> None:
+    from agentflow.knowledge.professional_reference import format_professional_reference, professional_reference_from_text
+
+    context = professional_reference_from_text(
+        "A future robot watches stars on a rural rooftop platform.",
+        node_type="video",
+        generation_target="video",
+    )
+
+    assert {"night", "observational", "robot", "rooftop", "rural", "video"} <= set(context["tags"])
+    assert "moon/stars" in context["lighting"]["decision"]
+    assert "moderate-to-deep" in context["depth_of_field"]["decision"]
+    assert context["pacing"]["must_include"][0].startswith("0-1s")
+    assert "unapproved chair or stool" in context["scene_continuity"]["avoid"]
+    assert context["writes_company_kb"] is False
+    assert "Professional reference:" in format_professional_reference(context, "Camera/Framing")
+
+
+def test_expert_knowledge_context_covers_video_director_dimensions() -> None:
+    from agentflow.knowledge.expert_knowledge import EXPERT_DOMAINS, expert_knowledge_from_text, format_expert_knowledge_reference
+
+    context = expert_knowledge_from_text(
+        "A future robot watches stars on a rural rooftop platform.",
+        node_type="video",
+        generation_target="video",
+    )
+
+    assert set(EXPERT_DOMAINS) <= set(context["domains"])
+    assert {"night", "observational", "robot", "rooftop", "video"} <= set(context["tags"])
+    assert "rooftop boundary" in context["domains"]["camera"]["decision"]
+    assert "moon/star" in context["domains"]["lighting"]["decision"]
+    assert "moderate-to-deep" in context["domains"]["depth_of_field"]["decision"]
+    assert "mechanical micro motion" in context["domains"]["motion_design"]["decision"]
+    assert context["writes_company_kb"] is False
+    assert "Expert knowledge reference:" in format_expert_knowledge_reference(context)
+
+
+def test_director_scenario_context_selects_saas_launch_pack_and_auxiliary_hook() -> None:
+    from agentflow.knowledge.director_scenarios import (
+        director_scenario_from_text,
+        format_director_scenario_reference,
+    )
+
+    context = director_scenario_from_text(
+        "Create a SaaS product launch video showing an app dashboard workflow demo.",
+        node_type="video",
+        generation_target="video",
+        target_platform="short_video",
+    )
+
+    selected_ids = [pack["scenario_id"] for pack in context["selected_packs"]]
+    assert context["primary_scenario"] == "saas_launch"
+    assert "viral_hook" in selected_ids
+    assert context["external_source_copied"] is False
+    assert context["writes_company_kb"] is False
+    assert "screen geometry remains readable" in context["quality_checks"]
+    assert "Director scenario:" in format_director_scenario_reference(context, "Motion/Temporal Progression")
+
+
+def test_director_scenario_context_selects_faceless_and_podcast_packs() -> None:
+    from agentflow.knowledge.director_scenarios import director_scenario_from_text
+
+    faceless = director_scenario_from_text(
+        "A faceless finance narration uses b-roll and data surfaces.",
+        node_type="script",
+        generation_target="video",
+    )
+    podcast = director_scenario_from_text(
+        "Turn a podcast interview quote into a short visual clip.",
+        node_type="script",
+        generation_target="video",
+    )
+
+    assert faceless["primary_scenario"] == "faceless_channel"
+    assert "no unrequested presenter face" in faceless["negative_constraints"]
+    assert podcast["primary_scenario"] == "podcast_visual"
+    assert "quote focus is clear" in podcast["quality_checks"]

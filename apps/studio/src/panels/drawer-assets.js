@@ -13,6 +13,7 @@ import {
 import { openAssetDetailPopover } from "./asset-detail-popover.js";
 import {
   attachAssetToSelection,
+  canProvideVideoFrame,
   deleteImageAssetFromDrawer,
   focusAssetSource,
   iconForAsset,
@@ -135,9 +136,9 @@ function emptyAssetHint(query, filter) {
 
 function assetActions(state, store, runtime, asset, retired) {
   const actions = el("div", "asset-actions");
-  actions.appendChild(assetAction("用作参考", () => markAssetReference(store, asset)));
+  actions.appendChild(assetAction("用作参考", () => markAssetReference(state, store, asset)));
   const selectedNode = state.nodes[state.selection.nodeIds[0]];
-  if (selectedNode?.type === "video" && isImageAsset(asset)) {
+  if (selectedNode?.type === "video" && canProvideVideoFrame(asset)) {
     actions.appendChild(assetAction("设为首帧", () => setVideoFrameFromAsset(state, store, asset, "first")));
     actions.appendChild(assetAction("设为尾帧", () => setVideoFrameFromAsset(state, store, asset, "last")));
   } else {
@@ -183,7 +184,7 @@ function openAssetContextMenu(event, state, store, runtime, asset, retired) {
     menu.appendChild(button);
   };
   appendItem("查看详情", "image", "打开素材记录和来源", () => openAssetDetailPopover(store, runtime, asset, menu));
-  appendItem("用作参考", "bookmark", "标记为当前生成参考", () => markAssetReference(store, asset));
+  appendItem("用作参考", "bookmark", "标记为当前生成参考", () => markAssetReference(state, store, asset));
   appendContextAttachAction(appendItem, state, store, asset);
   if (isImageAsset(asset) && asset.preview_url) {
     appendItem("导出原图", "archive", "下载原始分辨率图片", () => downloadImageAsset(asset));
@@ -198,7 +199,7 @@ function openAssetContextMenu(event, state, store, runtime, asset, retired) {
 
 function appendContextAttachAction(appendItem, state, store, asset) {
   const selectedNode = state.nodes[state.selection.nodeIds[0]];
-  if (selectedNode?.type === "video" && isImageAsset(asset)) {
+  if (selectedNode?.type === "video" && canProvideVideoFrame(asset)) {
     appendItem("设为首帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "first"));
     appendItem("设为尾帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "last"));
     return;

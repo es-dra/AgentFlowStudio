@@ -29,7 +29,7 @@ def openai_images_payload(*, service: dict[str, Any], model: str, request: Provi
     if request.image_operation == "edit" or request.edit_source_image_path is not None:
         return _openai_images_edit_payload(service=service, model=model, request=request)
     if request.reference_image_paths or request.subject_reference_image_path is not None:
-        raise ModelGatewayError("OpenAI Images relay generation does not accept reference images")
+        raise ModelGatewayError("Image relay generation route does not accept reference images")
     payload: dict[str, Any] = {
         "model": model,
         "prompt": request.prompt,
@@ -49,7 +49,7 @@ def openai_images_payload(*, service: dict[str, Any], model: str, request: Provi
 def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request: ProviderDispatchRequest) -> dict[str, Any]:
     image_paths = _edit_image_paths(request)
     if not image_paths:
-        raise ModelGatewayError("OpenAI Images relay edit requires a source image")
+        raise ModelGatewayError("Image relay edit requires a source image")
     fields: dict[str, Any] = {
         "model": model,
         "prompt": request.prompt,
@@ -106,11 +106,11 @@ def _edit_image_paths(request: ProviderDispatchRequest) -> list[Path | str]:
 def _image_file_part(field_name: str, path: Path | str) -> dict[str, Any]:
     image_path = Path(path)
     if not image_path.is_file():
-        raise ModelGatewayError("OpenAI Images relay edit source image is missing")
+        raise ModelGatewayError("Image relay edit source image is missing")
     image_bytes = image_path.read_bytes()
     mime_type = _mime_type_for_bytes(image_bytes)
     if not mime_type:
-        raise ModelGatewayError("OpenAI Images relay edit source image must be PNG or JPEG")
+        raise ModelGatewayError("Image relay edit source image must be PNG or JPEG")
     return {
         "field_name": field_name,
         "filename": image_path.name or "source.png",
@@ -204,7 +204,11 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     try:
         with urllib.request.urlopen(request, timeout=timeout_sec) as response:
             image_bytes = response.read(MAX_IMAGE_DOWNLOAD_BYTES + 1)
+    except TimeoutError as exc:
+        raise ModelGatewayError("API relay image URL download timed out") from exc
     except urllib.error.URLError as exc:
+        if _looks_like_timeout(str(exc.reason)):
+            raise ModelGatewayError("API relay image URL download timed out") from exc
         raise ModelGatewayError("API relay image URL download failed") from exc
     if len(image_bytes) > MAX_IMAGE_DOWNLOAD_BYTES:
         raise ModelGatewayError("API relay image URL download exceeded size limit")
@@ -229,6 +233,11 @@ def _mime_type_for_bytes(image_bytes: bytes) -> str:
     if image_bytes.startswith(b"\xff\xd8"):
         return "image/jpeg"
     return ""
+
+
+def _looks_like_timeout(value: str) -> bool:
+    lowered = value.lower()
+    return "timed out" in lowered or "timeout" in lowered
 
 
 __all__ = ("openai_images_payload", "write_image_outputs")

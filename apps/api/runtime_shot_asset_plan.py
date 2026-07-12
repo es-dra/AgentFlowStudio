@@ -5,6 +5,9 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from apps.api.runtime_asset_profile_plan import attach_asset_profiles, build_asset_profile_plan
+from apps.api.runtime_asset_graph import attach_graph_asset_ids_to_refs, build_asset_graph
+from apps.api.runtime_asset_extraction import principal_asset_refs_with_diagnostics
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_models import ShotAssetPlanRequest
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -47,6 +50,12 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
     refs = _remove_generic_when_specific(refs)
     refs = _dedupe_refs(refs)
     refs = [_with_evidence(ref, text) for ref in refs]
+    refs, dropped_refs = principal_asset_refs_with_diagnostics(refs)
+    graph_shot = _graph_shot(shot, inferred_shot, refs, text, dropped_refs)
+    asset_graph = build_asset_graph([graph_shot], source_text=request.script_text or text, graph_source="shot_asset_plan")
+    refs = attach_graph_asset_ids_to_refs(refs, asset_graph)
+    asset_profile_plan = build_asset_profile_plan(refs, text)
+    refs = attach_asset_profiles(refs, text)
     safe_manifest = {
         "artifact_type": "agentflow_shot_asset_plan_safe_manifest",
         "schema_version": "0.1.0",
@@ -58,6 +67,9 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
         "generated_media_bytes_stored": False,
         "asset_nodes_created": False,
         "asset_ref_count": len(refs),
+        "asset_profile_count": len(asset_profile_plan),
+        "asset_graph_asset_count": int(asset_graph.get("asset_count") or 0),
+        "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": ASSET_PLAN_NON_CLAIMS,
@@ -66,6 +78,8 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
         "project_id": project_id,
         "node_id": request.node_id,
         "asset_refs": refs,
+        "asset_profile_plan": asset_profile_plan,
+        "asset_graph": asset_graph,
         "asset_nodes_created": False,
         "safe_manifest": safe_manifest,
         "writes_long_term_memory": False,
@@ -73,8 +87,25 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
         "non_claims": ASSET_PLAN_NON_CLAIMS,
     }
     reject_unsafe_payload(safe_manifest)
+    reject_unsafe_payload(asset_graph)
     reject_unsafe_payload(payload)
     return payload
+
+
+def _graph_shot(
+    shot: dict[str, Any],
+    inferred_shot: dict[str, Any],
+    refs: list[dict[str, Any]],
+    text: str,
+    dropped_refs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        **inferred_shot,
+        **{key: value for key, value in shot.items() if key in {"shot_id", "index", "description", "source_text", "source_span", "unsupported_additions"}},
+        "asset_refs": refs,
+        "dropped_asset_ref_diagnostics": list(dropped_refs or []),
+        "source_text": str(shot.get("source_text") or inferred_shot.get("source_text") or text),
+    }
 
 
 def _structured_from_request(shot: dict[str, Any], text: str) -> dict[str, Any]:

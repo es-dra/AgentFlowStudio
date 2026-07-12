@@ -38,6 +38,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
     response.raise_for_status()
     event = response.json()["feedback_event"]
     feedback = event["feedback"]
+    candidate = event["feedback_candidate"]
     serialized = json.dumps(event, ensure_ascii=False).lower()
 
     assert feedback == {
@@ -51,6 +52,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "ratings": {"identity_similarity": 5, "scene_continuity": 4},
         "target_change_success": 3,
         "drift_notes": "Bearer <redacted> <local-path-redacted> <url-redacted> keep note",
+        "feedback_taxonomy": ["character", "scene", "revision"],
         "prompt_char_count": 0,
         "result_char_count": 0,
         "raw_evidence_policy": "raw_evidence_not_memory",
@@ -59,7 +61,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "writes_company_kb": False,
         "safety_boundary": {
             "no_provider_raw": True,
-            "no_signed_url": True,
+            "no_private_external_link": True,
             "no_local_path": True,
             "no_media_bytes": True,
         },
@@ -70,3 +72,136 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         assert forbidden not in serialized
     assert event["writes_long_term_memory"] is False
     assert event["writes_company_kb"] is False
+    assert candidate["artifact_type"] == "agentflow_runtime_feedback_candidate"
+    assert candidate["source_feedback_id"] == event["feedback_id"]
+    assert candidate["source_project_id"] == project_id
+    assert candidate["candidate_scope"] == "quality_feedback_candidate"
+    assert candidate["safe_target"] == {
+        "kind": "studio_quality_feedback",
+        "node_id": "video-node-001",
+        "node_type": "video",
+        "artifact_ref": "artifact-001",
+        "video_job_id": "job-001",
+    }
+    assert candidate["target_binding"] == {
+        "project_id": project_id,
+        "target_kind": "studio_quality_feedback",
+        "bound_refs": {
+            "node_id": "video-node-001",
+            "node_type": "video",
+            "artifact_ref": "artifact-001",
+            "video_job_id": "job-001",
+        },
+        "bound_ref_count": 4,
+        "project_scope_required": True,
+    }
+    assert candidate["scope_policy"] == {
+        "scope_level": "project_target_candidate",
+        "global_scope_allowed": False,
+        "cross_project_reuse_allowed": False,
+        "company_kb_promotion_allowed": False,
+        "requires_human_review": True,
+        "requires_conflict_review": True,
+    }
+    assert candidate["conflict_summary"] == {
+        "status": "no_single_feedback_conflict_signal",
+        "signals": [],
+        "signal_count": 0,
+        "single_feedback_check_performed": True,
+        "cross_candidate_check_performed": False,
+        "cross_candidate_check_required": True,
+        "global_rule_promotion_allowed": False,
+    }
+    assert candidate["safe_evidence_summary"] == {
+        "rating_count": 2,
+        "decision_count": 0,
+        "has_note": True,
+        "taxonomy_count": 3,
+        "raw_evidence_policy": "raw_evidence_not_memory",
+    }
+    assert candidate["feedback_taxonomy"] == ["character", "scene", "revision"]
+    assert candidate["promotion_status"] == "candidate_only"
+    assert candidate["promotion_blocked_by_default"] is True
+    assert candidate["requires_human_promotion_decision"] is True
+    assert candidate["eligible_for_context_overlay"] is False
+    assert candidate["eligible_for_durable_memory"] is False
+    assert candidate["provider_calls_started"] is False
+    assert candidate["writes_long_term_memory"] is False
+    assert candidate["writes_company_kb"] is False
+    assert candidate["safety_boundary"] == {
+        "raw_provider_response_stored": False,
+        "external_private_link_stored": False,
+        "absolute_path_stored": False,
+        "media_bytes_stored": False,
+    }
+    manifest = client.get(f"/projects/{project_id}/manifest").json()["manifest"]
+    assert manifest["feedback_refs"][0]["feedback_id"] == event["feedback_id"]
+
+
+def test_runtime_asset_graph_feedback_records_bounded_taxonomy(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "feedback-asset-graph-taxonomy-demo"
+    client.post("/projects", json={"project_id": project_id, "goal": "Feedback taxonomy demo"}).raise_for_status()
+
+    response = client.post(
+        "/feedback",
+        json={
+            "project_id": project_id,
+            "generated_at": "2026-06-30T12:05:00+08:00",
+            "feedback": {
+                "kind": "studio_asset_graph_feedback",
+                "node_id": "script-node-001",
+                "node_type": "script",
+                "asset_graph_ref": "artifact-asset-graph-001",
+                "decisions": [
+                    {
+                        "graph_asset_id": "asset-character-001",
+                        "decision": "revise",
+                        "label": "character asset",
+                        "note": "Model failed to keep face identity and keyframe framing.",
+                        "continuity_locks": ["wardrobe continuity"],
+                        "negative_locks": ["do not change prop"],
+                    },
+                    {
+                        "graph_asset_id": "asset-scene-002",
+                        "decision": "confirm",
+                        "label": "scene asset",
+                        "note": "Keep environment continuity.",
+                    },
+                    {"graph_asset_id": "unsafe", "decision": "unknown", "note": "drop"},
+                ],
+            },
+        },
+    )
+    response.raise_for_status()
+    event = response.json()["feedback_event"]
+    feedback = event["feedback"]
+    candidate = event["feedback_candidate"]
+    serialized = json.dumps(event, ensure_ascii=False).lower()
+
+    assert feedback["feedback_taxonomy"] == [
+        "character",
+        "scene",
+        "prop",
+        "shot",
+        "provider",
+        "generation_failure",
+        "asset",
+        "revision",
+    ]
+    assert len(feedback["decisions"]) == 2
+    assert feedback["decisions"][0]["decision"] == "revise"
+    assert feedback["decisions"][1]["decision"] == "confirm"
+    assert candidate["candidate_scope"] == "asset_graph_feedback_candidate"
+    assert candidate["feedback_taxonomy"] == feedback["feedback_taxonomy"]
+    assert candidate["target_binding"]["bound_refs"]["asset_graph_ref"] == "artifact-asset-graph-001"
+    assert candidate["scope_policy"]["scope_level"] == "project_asset_graph_candidate"
+    assert candidate["scope_policy"]["global_scope_allowed"] is False
+    assert candidate["conflict_summary"]["status"] == "conflict_signal_present"
+    assert candidate["conflict_summary"]["signals"] == ["mixed_asset_decision_signal"]
+    assert candidate["conflict_summary"]["cross_candidate_check_required"] is True
+    assert candidate["conflict_summary"]["global_rule_promotion_allowed"] is False
+    assert candidate["safe_evidence_summary"]["decision_count"] == 2
+    assert candidate["safe_evidence_summary"]["taxonomy_count"] == 8
+    assert '"provider_raw"' not in serialized
+    assert "signed_url" not in serialized

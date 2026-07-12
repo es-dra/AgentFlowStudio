@@ -1,24 +1,186 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from uuid import uuid4
 
 SCHEMA_VERSION = "production-memory-loop/v1"
+RUNTIME_FEEDBACK_CANDIDATE_SCHEMA_VERSION = "runtime-feedback-candidate/v0.1"
+RUNTIME_FEEDBACK_CANDIDATE_ALGORITHM_ID = "afs.runtime_feedback_candidate_contract.v0.1"
+SAFE_TOKEN_RE = re.compile(r"[^a-zA-Z0-9_.:-]+")
 
 
 def runtime_feedback_event(project_id: str, feedback: dict[str, Any], generated_at: str) -> dict[str, Any]:
+    feedback_id = f"runtime-feedback:{project_id}:{uuid4().hex[:12]}"
     return {
         "artifact_type": "agentflow_runtime_feedback_event",
         "schema_version": SCHEMA_VERSION,
-        "feedback_id": f"runtime-feedback:{project_id}:{uuid4().hex[:12]}",
+        "feedback_id": feedback_id,
         "project_id": project_id,
         "generated_at": generated_at,
         "feedback": feedback,
+        "feedback_candidate": build_runtime_feedback_candidate(
+            project_id=project_id,
+            feedback_id=feedback_id,
+            feedback=feedback,
+            generated_at=generated_at,
+        ),
         "feedback_is_memory": False,
         "writes_long_term_memory": False,
         "writes_company_kb": False,
-        "non_claims": ["not durable memory", "not human acceptance", "not business validation"],
+        "non_claims": [
+            "not durable memory",
+            "not human acceptance",
+            "not business validation",
+            "candidate is not promoted without a separate human decision",
+        ],
     }
+
+
+def build_runtime_feedback_candidate(
+    *,
+    project_id: str,
+    feedback_id: str,
+    feedback: dict[str, Any],
+    generated_at: str,
+) -> dict[str, Any]:
+    kind = _safe_token(feedback.get("kind")) or "runtime_feedback"
+    return {
+        "artifact_type": "agentflow_runtime_feedback_candidate",
+        "schema_version": RUNTIME_FEEDBACK_CANDIDATE_SCHEMA_VERSION,
+        "algorithm_id": RUNTIME_FEEDBACK_CANDIDATE_ALGORITHM_ID,
+        "candidate_id": f"runtime-feedback-candidate:{_safe_token(feedback_id)}",
+        "source_feedback_id": feedback_id,
+        "source_project_id": project_id,
+        "generated_at": generated_at,
+        "candidate_scope": _candidate_scope(kind),
+        "safe_target": _safe_target(feedback),
+        "target_binding": _target_binding(project_id, feedback),
+        "scope_policy": _scope_policy(kind),
+        "conflict_summary": _conflict_summary(feedback),
+        "safe_evidence_summary": _safe_evidence_summary(feedback),
+        "feedback_taxonomy": _safe_taxonomy(feedback.get("feedback_taxonomy")),
+        "promotion_status": "candidate_only",
+        "promotion_blocked_by_default": True,
+        "requires_human_promotion_decision": True,
+        "eligible_for_context_overlay": False,
+        "eligible_for_durable_memory": False,
+        "provider_calls_started": False,
+        "writes_long_term_memory": False,
+        "writes_company_kb": False,
+        "safety_boundary": {
+            "raw_provider_response_stored": False,
+            "external_private_link_stored": False,
+            "absolute_path_stored": False,
+            "media_bytes_stored": False,
+        },
+        "non_claims": [
+            "not durable memory",
+            "not human acceptance",
+            "not business validation",
+            "not provider smoke",
+        ],
+    }
+
+
+def _candidate_scope(kind: str) -> str:
+    if kind == "studio_quality_feedback":
+        return "quality_feedback_candidate"
+    if kind == "studio_asset_graph_feedback":
+        return "asset_graph_feedback_candidate"
+    return "runtime_feedback_candidate"
+
+
+def _safe_target(feedback: dict[str, Any]) -> dict[str, str]:
+    target: dict[str, str] = {"kind": _safe_token(feedback.get("kind")) or "runtime_feedback"}
+    for key in ("node_id", "node_type", "artifact_ref", "video_job_id", "video_revision_job_id", "asset_graph_ref"):
+        value = _safe_token(feedback.get(key))
+        if value:
+            target[key] = value
+    return target
+
+
+def _target_binding(project_id: str, feedback: dict[str, Any]) -> dict[str, Any]:
+    target = _safe_target(feedback)
+    refs = {key: value for key, value in target.items() if key != "kind"}
+    return {
+        "project_id": _safe_token(project_id),
+        "target_kind": target["kind"],
+        "bound_refs": refs,
+        "bound_ref_count": len(refs),
+        "project_scope_required": True,
+    }
+
+
+def _scope_policy(kind: str) -> dict[str, Any]:
+    return {
+        "scope_level": _scope_level(kind),
+        "global_scope_allowed": False,
+        "cross_project_reuse_allowed": False,
+        "company_kb_promotion_allowed": False,
+        "requires_human_review": True,
+        "requires_conflict_review": True,
+    }
+
+
+def _scope_level(kind: str) -> str:
+    if kind == "studio_asset_graph_feedback":
+        return "project_asset_graph_candidate"
+    if kind == "studio_quality_feedback":
+        return "project_target_candidate"
+    return "project_feedback_candidate"
+
+
+def _conflict_summary(feedback: dict[str, Any]) -> dict[str, Any]:
+    signals: list[str] = []
+    ratings = feedback.get("ratings") if isinstance(feedback.get("ratings"), dict) else {}
+    rating_values = [int(value) for value in ratings.values() if isinstance(value, int)]
+    target_change_success = feedback.get("target_change_success")
+    if len(rating_values) >= 2 and max(rating_values) - min(rating_values) >= 3:
+        signals.append("mixed_quality_rating_signal")
+    if isinstance(target_change_success, int) and target_change_success <= 2 and any(value >= 4 for value in rating_values):
+        signals.append("revision_success_conflict_signal")
+    decisions = feedback.get("decisions") if isinstance(feedback.get("decisions"), list) else []
+    decision_values = {str(item.get("decision") or "") for item in decisions if isinstance(item, dict)}
+    if decision_values & {"confirm", "lock"} and decision_values & {"revise", "reject"}:
+        signals.append("mixed_asset_decision_signal")
+    signals = list(dict.fromkeys(signals))
+    return {
+        "status": "conflict_signal_present" if signals else "no_single_feedback_conflict_signal",
+        "signals": signals,
+        "signal_count": len(signals),
+        "single_feedback_check_performed": True,
+        "cross_candidate_check_performed": False,
+        "cross_candidate_check_required": True,
+        "global_rule_promotion_allowed": False,
+    }
+
+
+def _safe_evidence_summary(feedback: dict[str, Any]) -> dict[str, Any]:
+    ratings = feedback.get("ratings") if isinstance(feedback.get("ratings"), dict) else {}
+    decisions = feedback.get("decisions") if isinstance(feedback.get("decisions"), list) else []
+    return {
+        "rating_count": len(ratings),
+        "decision_count": len(decisions),
+        "has_note": bool(str(feedback.get("drift_notes") or feedback.get("note") or "").strip()),
+        "taxonomy_count": len(_safe_taxonomy(feedback.get("feedback_taxonomy"))),
+        "raw_evidence_policy": str(feedback.get("raw_evidence_policy") or "raw_evidence_not_memory"),
+    }
+
+
+def _safe_token(value: Any) -> str:
+    return SAFE_TOKEN_RE.sub("_", str(value or "")).strip("_")[:180]
+
+
+def _safe_taxonomy(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:16]:
+        taxonomy_id = _safe_token(item)
+        if taxonomy_id and taxonomy_id not in result:
+            result.append(taxonomy_id)
+    return result
 
 
 def runtime_review_decision_event(
@@ -52,4 +214,10 @@ def runtime_review_decision_event(
     return event
 
 
-__all__ = ("runtime_feedback_event", "runtime_review_decision_event")
+__all__ = (
+    "RUNTIME_FEEDBACK_CANDIDATE_ALGORITHM_ID",
+    "RUNTIME_FEEDBACK_CANDIDATE_SCHEMA_VERSION",
+    "build_runtime_feedback_candidate",
+    "runtime_feedback_event",
+    "runtime_review_decision_event",
+)

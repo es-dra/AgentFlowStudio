@@ -33,6 +33,22 @@
       "doc_path_exists": true
     },
     {
+      "artifact_type": "agentflow_control_event",
+      "example_path": "examples/agentflow/control_events_active_pending.example.jsonl",
+      "doc_path": "docs/architecture/AFS_CONTROL_EVENT_REGISTER_CONTRACT.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_control_register",
+      "example_path": "examples/agentflow/control_register_active_pending.example.json",
+      "doc_path": "docs/architecture/AFS_CONTROL_EVENT_REGISTER_CONTRACT.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
       "artifact_type": "agentflow_memory_candidate",
       "example_path": "examples/agentflow/memory_candidate.example.json",
       "doc_path": "docs/architecture/production_memory_architecture.md",
@@ -83,7 +99,7 @@
     {
       "artifact_type": "agentflow_intermediate_asset",
       "example_path": "examples/agentflow/intermediate_asset.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -91,7 +107,7 @@
     {
       "artifact_type": "agentflow_reusable_asset_profile",
       "example_path": "examples/agentflow/reusable_asset_profile.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -99,7 +115,7 @@
     {
       "artifact_type": "agentflow_asset_reuse_decision",
       "example_path": "examples/agentflow/asset_reuse_decision.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -107,7 +123,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -115,7 +131,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review_validation",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_validation.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -123,7 +139,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review_gate",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_gate.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -131,7 +147,7 @@
     {
       "artifact_type": "agentflow_production_asset_reuse_dry_run_plan",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_dry_run_plan.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -139,7 +155,7 @@
     {
       "artifact_type": "agentflow_production_asset_reuse_review",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -231,6 +247,21 @@
       "check_id": "cost_quality_trace_is_evidence",
       "status": "passed",
       "note": "Cost-quality trace is execution strategy evidence, not a quality guarantee."
+    },
+    {
+      "check_id": "control_event_archive_ordering",
+      "status": "passed",
+      "note": "Control archive execution follows explicit archive policy evaluation and confirmed ACK delivery."
+    },
+    {
+      "check_id": "control_event_claim_non_claim_separation",
+      "status": "passed",
+      "note": "Control claim-state changes and non-claim boundaries remain separate first-class events."
+    },
+    {
+      "check_id": "control_event_worker_final_ingest_idempotency",
+      "status": "passed",
+      "note": "Worker-final ingest records canonical TD/BU/event ids and uses idempotent duplicate handling."
     },
     {
       "check_id": "candidate_memory_not_reusable_asset",

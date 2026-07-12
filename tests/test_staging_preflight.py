@@ -13,14 +13,14 @@ from tools.staging_preflight import (
 def test_parse_status_keeps_untracked_dirs_and_rename_targets() -> None:
     status = "\n".join(
         [
-            " M DEVLOG.md",
+            " M docs/AOS_CURRENT_STATE.md",
             "?? docs/maintenance/",
             "R  old.py -> tools/staging_preflight.py",
         ]
     )
 
     assert parse_status(status) == [
-        "DEVLOG.md",
+        "docs/AOS_CURRENT_STATE.md",
         "docs/maintenance/",
         "tools/staging_preflight.py",
     ]
@@ -64,9 +64,11 @@ def test_preflight_rejects_hardcoded_startup_secret_path(tmp_path: Path) -> None
 
 def test_preflight_formats_passing_report(tmp_path: Path) -> None:
     repo = tmp_path
-    (repo / "DEVLOG.md").write_text("# DEVLOG\n", encoding="utf-8")
+    docs = repo / "docs"
+    docs.mkdir()
+    (docs / "AOS_CURRENT_STATE.md").write_text("# AOS Current State\n", encoding="utf-8")
 
-    report = run_preflight(repo, " M DEVLOG.md\n")
+    report = run_preflight(repo, " M docs/AOS_CURRENT_STATE.md\n")
 
     assert report.ok
     assert "status: pass" in format_report(report)

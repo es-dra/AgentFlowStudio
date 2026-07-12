@@ -1,7 +1,7 @@
 import { zoomAt } from "./geometry.js";
 import { fitVisibleCanvasViewport, visibleCanvasCenter, visibleCanvasFrame } from "./canvas-safe-area.js";
 import { deleteNodes, duplicateNode, removeEdge } from "./nodes.js";
-import { startNodeGeneration } from "./node-actions.js";
+import { canRunNodeGeneration, startNodeGeneration } from "./node-actions.js";
 import { closeTop, hasOpenOverlay } from "./overlay.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
 import { openShortcutsPanel } from "./panels/shortcuts-panel.js";
@@ -40,7 +40,7 @@ export function arrangeCanvas(store) {
 function handleEscape(e, store) {
   if (e.key !== "Escape") return false;
   if (hasOpenOverlay()) {
-    closeTop();
+    closeTop("escape");
     return true;
   }
   if (store.get().selection.nodeIds.length || store.get().selection.edgeId) {
@@ -59,7 +59,8 @@ function handleNodeCommands(e, store, runtime) {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     const sel = store.get().selection.nodeIds;
-    if (sel.length === 1) startNodeGeneration(store, runtime, store.get().nodes[sel[0]]);
+    const node = sel.length === 1 ? store.get().nodes[sel[0]] : null;
+    if (node && canRunNodeGeneration(node)) startNodeGeneration(store, runtime, node);
     return true;
   }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {

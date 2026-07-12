@@ -6,6 +6,7 @@ from typing import Any
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_recovery_contract import annotate_blocks, recovery_manifest_fields, runtime_recovery_envelope
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_video_candidates import candidate_previews
 from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV, VIDEO_NON_CLAIMS
@@ -17,15 +18,37 @@ def video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], re
     outputs = result.get("outputs") or []
     model_call_context = result.get("model_call_context") if isinstance(result.get("model_call_context"), dict) else {}
     model_call_context_id = str(model_call_context.get("context_id") or (result.get("safe_manifest") or {}).get("model_call_context_id") or "")
+    safe = result.get("safe_manifest") or {}
+    candidate_preview_refs = candidate_previews(project_id, job_id, outputs)
+    requested_count = int((safe.get("batch_summary") or {}).get("requested_count") or 1)
+    recovery = runtime_recovery_envelope(
+        project_id=project_id,
+        job_id=job_id,
+        capability="video",
+        status=str(job.get("status") or result.get("status") or ""),
+        requested_count=requested_count,
+        output_count=len(candidate_preview_refs),
+        blocks=safe.get("blocks") if isinstance(safe.get("blocks"), list) else [],
+        provider_gate=safe.get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
+        provider_calls_started=bool(safe.get("provider_calls_started")),
+        retry_count=int((safe.get("retry") or {}).get("retry_count") or 0),
+        artifacts=job.get("artifacts") or result.get("artifacts") or {},
+        candidate_previews=candidate_preview_refs,
+        reusable_assets=[],
+        stage=str(safe.get("stage") or ""),
+        non_claims=VIDEO_NON_CLAIMS,
+    )
     return {
         "job": job,
-        "provider_gate": (result.get("safe_manifest") or {}).get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
-        "provider_calls_started": bool((result.get("safe_manifest") or {}).get("provider_calls_started")),
+        "provider_gate": safe.get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
+        "provider_calls_started": bool(safe.get("provider_calls_started")),
         "safe_manifest": result.get("safe_manifest"),
         "context_bundle": result.get("context_bundle"),
         "model_call_context_id": model_call_context_id or None,
+        "video_generation_plan": result.get("video_generation_plan") or safe.get("video_generation_plan"),
         "artifacts": job.get("artifacts") or result.get("artifacts") or {},
-        "candidate_previews": candidate_previews(project_id, job_id, outputs),
+        "candidate_previews": candidate_preview_refs,
+        "runtime_recovery": recovery,
         "flow": {"project_id": project_id},
         "non_claims": VIDEO_NON_CLAIMS,
     }
@@ -101,12 +124,20 @@ def result_from_manifest(
     bundle = context_bundle
     if bundle is None and isinstance(task_state, dict) and isinstance(task_state.get("context_bundle"), dict):
         bundle = task_state.get("context_bundle")
+    generation_plan = None
+    if isinstance(model_request_plan, dict):
+        generation_plan = model_request_plan.get("generation_plan")
+    if generation_plan is None and isinstance(task_state, dict):
+        generation_plan = task_state.get("video_generation_plan")
+    if generation_plan is None:
+        generation_plan = safe_manifest.get("video_generation_plan")
     return {
         "status": status,
         "safe_manifest": safe_manifest,
         "task_state": task_state,
         "outputs": outputs or safe_manifest.get("outputs") or [],
         "context_bundle": bundle,
+        "video_generation_plan": generation_plan,
         "artifacts": artifacts or {},
         "model_call_context": model_call_context,
         "model_request_plan": model_request_plan,
@@ -119,11 +150,16 @@ def safe_manifest(
     status: str,
     provider_calls_started: bool,
     provider_gate: dict[str, str] | None = None,
-    blocks: list[dict[str, str]] | None = None,
+    blocks: list[dict[str, Any]] | None = None,
     outputs: list[dict[str, Any]] | None = None,
     context_bundle: dict[str, Any] | None = None,
     model_call_context_id: str | None = None,
+    input_source: dict[str, Any] | None = None,
+    input_mode: str | None = None,
+    generation_path_contract: dict[str, Any] | None = None,
+    duration_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    safe_blocks = annotate_blocks(blocks)
     manifest = {
         "schema_version": "afs_video_generation_safe_manifest.v0.1",
         "status": status,
@@ -132,7 +168,7 @@ def safe_manifest(
         "capability": "video",
         "provider_gate": provider_gate or video_gate(REMOTE_VIDEO_ENV),
         "provider_calls_started": provider_calls_started,
-        "blocks": blocks or [],
+        "blocks": safe_blocks,
         "outputs": outputs or [],
         "media_bytes_returned_by_api": False,
         "provider_raw_response_stored": False,
@@ -141,9 +177,30 @@ def safe_manifest(
         "writes_company_kb": False,
         "non_claims": VIDEO_NON_CLAIMS,
     }
+    manifest.update(
+        recovery_manifest_fields(
+            status=status,
+            requested_count=1,
+            output_count=len(outputs or []),
+            blocks=safe_blocks,
+            provider_calls_started=provider_calls_started,
+            retry_count=0,
+            stage="provider_gate" if status == "blocked" else "",
+            capability="video",
+        )
+    )
     if model_call_context_id:
         manifest["model_call_context_id"] = model_call_context_id
         manifest["model_request_plan_ref"] = "model_request_plan.json"
+    if input_source:
+        manifest["input_source"] = input_source
+    if input_mode:
+        manifest["input_mode"] = input_mode
+    if generation_path_contract:
+        manifest["generation_path"] = str(generation_path_contract.get("path_id") or "")
+        manifest["generation_path_contract"] = generation_path_contract
+    if duration_contract:
+        manifest["duration_contract"] = duration_contract
     if context_bundle:
         manifest["context_bundle_mode"] = context_bundle.get("mode")
         manifest["context_included_asset_count"] = len(context_bundle.get("included_assets") or [])

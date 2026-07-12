@@ -2,6 +2,7 @@ import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-con
 import { connect } from "./nodes.js";
 import { humanWarning } from "./node-result-view.js";
 import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
 
 const CONNECT_NAMED_ASSET_ACTION = "connect-named-asset";
 const TEMPORARY_UNLOCK_ACTION = "temporary-unlock";
@@ -11,20 +12,32 @@ export async function openOptimizer(store, runtime, nodeId, _anchorEl = null, te
   const node = store.get().nodes[nodeId];
   if (!node || !runtime?.optimizePrompt) return;
   const request = buildOptimizationRequest(store.get(), node);
-  setPromptOptimizationState(store, nodeId, { status: "running", started_at: new Date().toISOString() });
+  setPromptOptimizationState(store, nodeId, {
+    status: "running",
+    percent: 12,
+    label: "提示词优化",
+    started_at: new Date().toISOString(),
+  });
   textarea?.classList?.add("prompt-shimmer");
   try {
     const result = await runtime.optimizePrompt(request);
     const outcome = normalizeOptimization(result, request);
     applyPrompt(store, nodeId, outcome.optimized, outcome.plain || outcome.optimized, textarea);
+    recordOptimizationEvidence(store, nodeId, outcome);
     setPromptOptimizationState(store, nodeId, {
       status: "complete",
+      percent: 100,
       completed_at: new Date().toISOString(),
       summary: optimizationSummary(request, outcome),
+      model_call_context_id: outcome.model_call_context_id || "",
+      model_call_context_summary: outcome.model_call_context_summary || null,
+      creative_runtime_contract_id: outcome.creative_runtime_contract_id || "",
+      creative_runtime_contract_summary: outcome.creative_runtime_contract_summary || null,
     });
   } catch (error) {
     setPromptOptimizationState(store, nodeId, {
       status: "error",
+      percent: 100,
       completed_at: new Date().toISOString(),
       message: safeError(error),
     });
@@ -45,6 +58,23 @@ function applyPrompt(store, nodeId, text, plainText, textarea) {
     node.params.lastOptimizedPromptPlain = plainText || stripSectionHeaders(text);
   });
   if (textarea && store.get().nodes[nodeId]) textarea.value = text;
+}
+
+function recordOptimizationEvidence(store, nodeId, outcome) {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.params = node.params || {};
+    if (outcome.context_bundle) node.params.lastContextBundle = outcome.context_bundle;
+    if (outcome.model_call_context_id) node.params.lastModelCallContextId = outcome.model_call_context_id;
+    if (outcome.model_call_context_summary) node.params.lastModelCallContextSummary = outcome.model_call_context_summary;
+    if (outcome.creative_runtime_contract_id) {
+      node.params.lastCreativeRuntimeContractId = outcome.creative_runtime_contract_id;
+    }
+    if (outcome.creative_runtime_contract_summary) {
+      node.params.lastCreativeRuntimeContractSummary = outcome.creative_runtime_contract_summary;
+    }
+  }, { history: false, persist: true });
 }
 
 function isTextContentNode(node) {
@@ -129,10 +159,5 @@ function stripSectionHeaders(value) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/provider service not found|remote LLM prompt optimization unavailable|AFS_ALLOW_REMOTE_LLM/i.test(clean)) {
-    return "提示词优化服务未就绪，请检查 LLM provider 配置与 Runtime 启动环境后重试。";
-  }
-  return clean.slice(0, 180);
+  return formatRuntimeError(error, "提示词优化失败，请稍后重试。");
 }

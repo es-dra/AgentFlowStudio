@@ -113,36 +113,6 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     assert "d:\\" not in serialized
 
 
-def test_codex_image_handoff_ignores_pool_credential_env_for_local_none_auth(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    payload = _codex_provider_config()
-    payload["account_pools"]["codex_image_pool"]["accounts"][0]["credential_env"] = "AFS_MODEL_RELAY_API_KEY"
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
-    monkeypatch.delenv("AFS_MODEL_RELAY_API_KEY", raising=False)
-    store = _store(tmp_path, payload)
-    registry = ProviderRegistry.from_store(store)
-    output_dir = tmp_path / "run"
-
-    task = registry.submit(
-        "image",
-        "codex_image",
-        ProviderDispatchRequest(
-            prompt="Generate a reusable prop reference sheet.",
-            output_dir=output_dir,
-            aspect_ratio="1:1",
-            candidate_count=1,
-        ),
-    )
-
-    assert task["task"]["status"] == "submitted"
-    request_path = next((output_dir / "codex_image_job" / "pending").glob("*/request.json"))
-    serialized = request_path.read_text(encoding="utf-8").lower()
-    assert "afs_model_relay_api_key" not in serialized
-    assert "api_key" not in serialized
-
-
 def test_codex_image_worker_prompt_has_non_visual_job_nonce() -> None:
     prompt = codex_image_worker._worker_prompt(  # noqa: SLF001 - guard regression for the worker prompt contract.
         {
@@ -167,21 +137,19 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    submit = client.post(
-        "/projects/proj_codex_image/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled character keyframe.",
-            "optimized_prompt": "A controlled character keyframe, cinematic lighting.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "provider_service_id": "codex_image",
-            "seed": 120617,
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled character keyframe.",
+        "optimized_prompt": "A controlled character keyframe, cinematic lighting.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "provider_service_id": "codex_image",
+        "seed": 120617,
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, "proj_codex_image", request)
     assert submit.status_code == 200
     submitted_payload = submit.json()
     job_id = submitted_payload["job"]["job_id"]
@@ -242,16 +210,14 @@ def test_codex_image_handoff_runtime_poll_recovers_terminal_failed_state_after_w
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_codex_terminal_recovery"
 
-    submit = client.post(
-        f"/projects/{project_id}/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled tabby cat keyframe.",
-            "optimized_prompt": "A controlled tabby cat keyframe, cinematic lighting.",
-            "provider_service_id": "codex_image",
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled tabby cat keyframe.",
+        "optimized_prompt": "A controlled tabby cat keyframe, cinematic lighting.",
+        "provider_service_id": "codex_image",
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, project_id, request)
     assert submit.status_code == 200
     job_id = submit.json()["job"]["job_id"]
     output_dir = tmp_path / "runs" / project_id / job_id
@@ -286,16 +252,14 @@ def test_codex_image_handoff_poll_fails_safely_when_provider_config_disappears(t
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    submit = client.post(
-        "/projects/proj_codex_missing_config/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled keyframe.",
-            "optimized_prompt": "A controlled keyframe.",
-            "provider_service_id": "codex_image",
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled keyframe.",
+        "optimized_prompt": "A controlled keyframe.",
+        "provider_service_id": "codex_image",
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, "proj_codex_missing_config", request)
     assert submit.status_code == 200
     job_id = submit.json()["job"]["job_id"]
     monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
@@ -343,46 +307,6 @@ def test_codex_image_handoff_worker_trims_failed_job_payload_after_result(tmp_pa
     assert "request.json" not in serialized
     assert "worker_prompt.md" not in serialized
     assert "references/" not in serialized
-
-
-def test_codex_image_handoff_runtime_poll_preserves_worker_safe_failure_reason(tmp_path, monkeypatch) -> None:
-    class MissingCliExecutor:
-        def execute(self, request, work_dir):  # noqa: ANN001 - test protocol double.
-            raise RuntimeError("Codex image worker command is not available")
-
-    provider_path = tmp_path / "providers.local.json"
-    provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
-    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_path))
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-    project_id = "proj_codex_worker_safe_reason"
-
-    submit = client.post(
-        f"/projects/{project_id}/keyframe-generations",
-        json={
-            "node_id": "asset-card-node",
-            "prompt_text": "Generate a reusable prop reference sheet.",
-            "optimized_prompt": "Generate a reusable prop reference sheet.",
-            "provider_service_id": "codex_image",
-            "node_parameters": {"node_role": "asset_card_draft"},
-            "generated_at": "2026-06-29T20:26:00+08:00",
-        },
-    )
-    assert submit.status_code == 200
-    job_id = submit.json()["job"]["job_id"]
-    output_dir = tmp_path / "runs" / project_id / job_id
-    processed = process_one(output_dir, executor=MissingCliExecutor())
-    assert processed is not None
-    assert processed.status == "failed"
-
-    poll = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
-
-    assert poll.status_code == 200
-    payload = poll.json()
-    assert payload["job"]["status"] == "failed"
-    block = payload["safe_manifest"]["blocks"][0]
-    assert block["block_id"] == "remote_image_provider_not_ready"
-    assert block["reason"] == "Image generation worker command is not available."
 
 
 def test_codex_image_worker_resolves_user_local_codex_when_path_is_missing(tmp_path, monkeypatch) -> None:
@@ -635,33 +559,19 @@ def test_codex_image_executor_uses_job_scoped_codex_home(tmp_path, monkeypatch) 
     assert codex_home.name == ".codex-home"
 
 
-def test_codex_image_executor_preserves_configured_codex_home(tmp_path, monkeypatch) -> None:
-    configured_home = tmp_path / "configured-codex-home"
-    work_dir = tmp_path / "work"
-    work_dir.mkdir()
-    captured: dict[str, dict[str, str]] = {}
-
-    def fake_popen(command, *, cwd, env, **kwargs):  # noqa: ANN001, ANN202
-        captured["env"] = dict(env)
-        (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
-        return FakeCodexProcess(returncode=0)
-
-    monkeypatch.setenv("AFS_CODEX_HOME", str(configured_home))
-    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
-    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda command: command)
-    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", fake_popen)
-
-    CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
-
-    assert Path(captured["env"]["CODEX_HOME"]) == configured_home
-    assert configured_home.is_dir()
-    assert not (work_dir / ".codex-home").exists()
-
-
 def _store(tmp_path: Path, payload: dict):
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return load_company_provider_secrets(path)
+
+
+def _submit_keyframe_with_preflight(client: TestClient, project_id: str, request: dict[str, object]):
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
+    )
 
 
 def _image_worker_request() -> dict:

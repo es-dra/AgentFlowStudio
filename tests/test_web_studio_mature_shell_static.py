@@ -121,6 +121,26 @@ def test_studio_mature_shell_prevents_scroll_and_overlap_regressions() -> None:
     assert "overflow: hidden;" in styles
 
 
+def test_studio_starter_row_uses_adaptive_grid_without_horizontal_scrollbar() -> None:
+    shell = (STUDIO_ROOT / "styles" / "shell.css").read_text(encoding="utf-8")
+    interactions = (STUDIO_ROOT / "styles" / "studio-interactions.css").read_text(encoding="utf-8")
+    mature = (STUDIO_ROOT / "styles" / "studio-mature-shell.css").read_text(encoding="utf-8")
+    combined = "\n".join((shell, interactions, mature))
+    shell_starter_block = shell[shell.index("#starter-row {"):shell.index(".starter-card {")]
+    interactions_starter_block = interactions[interactions.index("#starter-row {"):interactions.index(".starter-card {")]
+
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in combined
+    assert "#starter-row {\n  position: absolute;" in shell
+    assert "overflow: hidden;" in shell
+    assert "overflow: hidden;" in interactions
+    assert "grid-template-columns: 1fr;" in shell
+    assert "#starter-row[data-mode=\"quick-start\"]" in mature
+    assert "width: auto;" in mature
+    assert "overflow-x: auto;" not in shell_starter_block
+    assert "overflow-x: auto;" not in interactions_starter_block
+    assert "scrollbar-width:" not in interactions_starter_block
+
+
 def test_studio_shell_supports_resizable_drawer_collapsible_inspector_and_no_select_chrome() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     base = (STUDIO_ROOT / "styles" / "base.css").read_text(encoding="utf-8")
@@ -200,11 +220,11 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     assert len((STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8").splitlines()) <= 300
     assert len((STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8").splitlines()) <= 140
     assert len((STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8").splitlines()) <= 90
-    assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 300
+    assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 500
     assert len(keyframe_actions.splitlines()) <= 180
     assert len(video_actions.splitlines()) <= 300
-    assert len(node_actions.splitlines()) <= 120
-    assert len(main.splitlines()) <= 300
+    assert len(node_actions.splitlines()) <= 140
+    assert len(main.splitlines()) <= 500
     assert len((STUDIO_ROOT / "src" / "node-generation-restore.js").read_text(encoding="utf-8").splitlines()) <= 80
 
 

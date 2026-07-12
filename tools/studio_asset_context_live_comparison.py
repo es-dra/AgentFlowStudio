@@ -118,22 +118,32 @@ def _preflight(args: argparse.Namespace) -> dict[str, Any] | None:
 def _run_comparison(client: TestClient, args: argparse.Namespace) -> dict[str, Any]:
     image_asset_id = _upload_reference_image(client, args.reference_image)
     visual_asset = _promote_fixed_asset(client, image_asset_id)
+    request_payload = {
+        "node_id": "target-shot-001",
+        "prompt_text": "Lin Wan stands on a rain rooftop, cinematic keyframe.",
+        "optimized_prompt": "A controlled rain-rooftop keyframe. Lin Wan faces camera, practical neon rim light, stable red trench coat, tight medium shot, cinematic realism.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "seed": 260612,
+        "provider_service_id": args.provider_service_id,
+        "context_subgraph": _context_subgraph(visual_asset["asset_id"]),
+        "manual_scores": {},
+        "generated_at": "2026-06-12T20:00:00+08:00",
+    }
+    preflight = client.post(
+        f"/projects/{PROJECT_ID}/generation-comparisons/preflight",
+        json=request_payload,
+    )
+    if preflight.status_code != 200:
+        raise RuntimeError(f"comparison preflight failed: {preflight.status_code} {preflight.text}")
+    preflight_token = str(preflight.json().get("preflight_token") or "")
+    if not preflight_token:
+        raise RuntimeError("comparison preflight did not return a token")
     response = client.post(
         f"/projects/{PROJECT_ID}/generation-comparisons",
-        json={
-            "node_id": "target-shot-001",
-            "prompt_text": "Lin Wan stands on a rain rooftop, cinematic keyframe.",
-            "optimized_prompt": "A controlled rain-rooftop keyframe. Lin Wan faces camera, practical neon rim light, stable red trench coat, tight medium shot, cinematic realism.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "seed": 260612,
-            "provider_service_id": args.provider_service_id,
-            "context_subgraph": _context_subgraph(visual_asset["asset_id"]),
-            "manual_scores": {},
-            "generated_at": "2026-06-12T20:00:00+08:00",
-        },
+        json={**request_payload, "preflight_token": preflight_token},
     )
     if response.status_code != 200:
         raise RuntimeError(f"comparison request failed: {response.status_code} {response.text}")

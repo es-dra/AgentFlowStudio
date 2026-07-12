@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -67,7 +69,7 @@ def test_prompt_optimizer_records_creative_agent_candidates_and_node_constraints
     assert selected["candidate_id"] in {candidate["candidate_id"] for candidate in agent["candidates"]}
     assert selected["score"]["visual_controllability"] >= selected["score"]["preference_fit"]
     assert agent["provider_translation"]["capability"] == "image_keyframe"
-    assert agent["provider_translation"]["provider"] == "codex_image"
+    assert agent["provider_translation"]["provider"] == "image_relay"
     assert agent["constraint_layers"]["hard_constraints"]
     assert any(item["key"] == "aspect_ratio" and item["value"] == "9:16" for item in agent["constraint_layers"]["hard_constraints"])
     assert trace["conflict_resolution"]["suppressed_count"] >= 1
@@ -220,20 +222,18 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_preview/keyframe-generations",
-        json={
-            "node_id": "image-node-preview-001",
-            "prompt_text": "A controlled vertical keyframe of a founder in a night studio.",
-            "optimized_prompt": "Intent: keyframe.\nCamera/Framing: aspect ratio 9:16.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "seed": 120612,
-            "generated_at": "2026-06-12T10:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-preview-001",
+        "prompt_text": "A controlled vertical keyframe of a founder in a night studio.",
+        "optimized_prompt": "Intent: keyframe.\nCamera/Framing: aspect ratio 9:16.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "seed": 120612,
+        "generated_at": "2026-06-12T10:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_preview", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -270,6 +270,227 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     assert reusable_preview.status_code == 200
     assert reusable_preview.headers["content-type"].startswith("image/png")
     assert reusable_preview.content == PNG_BYTES
+
+
+def test_keyframe_partial_outputs_are_preserved_with_failed_item_retry_scope(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    def fake_dispatch(capability, service_id, request):
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "status": "partially_complete",
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                }
+            ],
+            "blocks": [
+                {
+                    "candidate_id": "candidate_002",
+                    "block_id": "remote_image_provider_not_ready",
+                    "reason": "provider temporarily unavailable",
+                }
+            ],
+        }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = _submit_keyframe_with_preflight(
+        client,
+        "proj_keyframe_partial",
+        {
+            "node_id": "image-node-partial-001",
+            "prompt_text": "A controlled two candidate keyframe batch.",
+            "optimized_prompt": "A controlled two candidate keyframe batch.",
+            "aspect_ratio": "9:16",
+            "candidate_count": 2,
+            "generated_at": "2026-06-24T12:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    recovery = payload["runtime_recovery"]
+    manifest = client.get(
+        f"/artifacts/{payload['artifacts']['keyframe_generation_safe_manifest']['artifact_id']}"
+    ).json()["payload"]
+
+    assert payload["job"]["status"] == "partially_complete"
+    assert payload["candidate_previews"][0]["candidate_id"] == "candidate_001"
+    assert payload["reusable_image_assets"][0]["source_candidate_id"] == "candidate_001"
+    assert manifest["batch_status"] == "partially_complete"
+    assert manifest["retry"]["default_scope"] == "failed_items_only"
+    assert manifest["retry"]["preserved_item_ids"] == ["candidate_001"]
+    assert manifest["retry"]["retryable_item_ids"] == ["candidate_002"]
+    assert recovery["status"] == "partially_complete"
+    assert recovery["outputs"][0]["state"] == "complete"
+    assert recovery["outputs"][0]["image_asset_id"] == payload["reusable_image_assets"][0]["asset_id"]
+    assert recovery["outputs"][1]["state"] == "failed"
+    assert recovery["retry"]["full_batch_rerun"]["default"] is False
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "image_candidates/candidate_001.png" not in serialized
+    assert "provider temporarily unavailable" in serialized
+    assert "api_key" not in serialized
+
+
+def test_async_keyframe_poll_safe_manifest_does_not_echo_provider_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    class AsyncPartialDescriptor:
+        prompt_char_limit = DEFAULT_IMAGE_PROMPT_LIMIT
+        reference_image_slots = 1
+        required_gate = "AFS_ALLOW_REMOTE_IMAGE"
+        execution_mode = "async"
+
+    class AsyncPartialRegistry:
+        def descriptor(self, service_id: str) -> AsyncPartialDescriptor:
+            return AsyncPartialDescriptor()
+
+        def submit(self, capability: str, service_id: str, request):
+            return {"service_id": service_id, "capability": capability, "task": {"status": "submitted", "task_id": "async-partial"}}
+
+        def poll(self, capability: str, service_id: str, task):
+            output_dir = Path(task["task"]["output_dir"])
+            image_dir = output_dir / "image_candidates"
+            image_dir.mkdir(parents=True, exist_ok=True)
+            image_path = image_dir / "candidate_001.png"
+            image_path.write_bytes(PNG_BYTES)
+            return {
+                "status": "partially_complete",
+                "outputs": [
+                    {
+                        "candidate_id": "candidate_001",
+                        "image_path": "image_candidates/candidate_001.png",
+                        "byte_count": image_path.stat().st_size,
+                        "sha256": "fake-sha256",
+                        "width": 1,
+                        "height": 1,
+                        "aspect_ratio": "1:1",
+                    }
+                ],
+                "blocks": [
+                    {
+                        "candidate_id": "candidate_002",
+                        "block_id": "remote_image_provider_not_ready",
+                        "reason": "provider temporarily unavailable",
+                    }
+                ],
+            }
+
+    registry = AsyncPartialRegistry()
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: registry)
+    monkeypatch.setattr("apps.api.runtime_keyframe_async.load_provider_registry", lambda: registry)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    request = {
+        "node_id": "image-node-async-partial-001",
+        "prompt_text": "A controlled async two candidate keyframe batch.",
+        "optimized_prompt": "A controlled async two candidate keyframe batch.",
+        "aspect_ratio": "9:16",
+        "candidate_count": 2,
+        "generated_at": "2026-06-24T12:20:00+08:00",
+    }
+    submitted = _submit_keyframe_with_preflight(client, "proj_keyframe_async_partial", request)
+    assert submitted.status_code == 200
+    job_id = submitted.json()["job"]["job_id"]
+
+    polled = client.post(f"/projects/proj_keyframe_async_partial/keyframe-generations/{job_id}/poll")
+
+    assert polled.status_code == 200
+    payload = polled.json()
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert payload["job"]["status"] == "partially_complete"
+    assert "outputs" not in payload["safe_manifest"]
+    assert payload["candidate_previews"][0]["preview_url"].endswith("/candidates/candidate_001/preview")
+    assert payload["runtime_recovery"]["outputs"][0]["preview_url"].endswith("/candidates/candidate_001/preview")
+    assert payload["runtime_recovery"]["retry"]["preserved_item_ids"] == ["candidate_001"]
+    assert payload["runtime_recovery"]["retry"]["retryable_item_ids"] == ["candidate_002"]
+    assert "image_candidates/" not in serialized
+    assert "image_ref" not in serialized
+    assert "image_path" not in serialized
+    assert "output_dir" not in serialized
+    assert "request.json" not in serialized
+    assert "codex_image_job" not in serialized
+
+
+def test_sync_keyframe_provider_can_continue_in_runtime_background(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_KEYFRAME_BACKGROUND_SYNC_IMAGE", "true")
+
+    provider_started = threading.Event()
+    release_provider = threading.Event()
+
+    def fake_dispatch(capability, service_id, request):
+        provider_started.set()
+        if not release_provider.wait(5):
+            raise TimeoutError("background provider was not released")
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                }
+            ]
+        }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    request = {
+        "node_id": "image-node-background-sync-001",
+        "prompt_text": "A controlled background keyframe.",
+        "optimized_prompt": "A controlled background keyframe.",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-07-08T18:20:00+00:00",
+    }
+    submitted = _submit_keyframe_with_preflight(client, "proj_keyframe_background_sync", request)
+    payload = submitted.json()
+    assert submitted.status_code == 200
+    assert payload["job"]["status"] == "running"
+    assert payload["candidate_previews"] == []
+    assert payload["provider_calls_started"] is True
+    assert provider_started.wait(2)
+
+    release_provider.set()
+    terminal = payload
+    for _ in range(40):
+        polled = client.post(
+            f"/projects/proj_keyframe_background_sync/keyframe-generations/{payload['job']['job_id']}/poll"
+        )
+        assert polled.status_code == 200
+        terminal = polled.json()
+        if terminal["job"]["status"] == "succeeded":
+            break
+        time.sleep(0.05)
+
+    assert terminal["job"]["status"] == "succeeded"
+    assert terminal["candidate_previews"][0]["candidate_id"] == "candidate_001"
+    assert terminal["reusable_image_assets"][0]["source_node_id"] == "image-node-background-sync-001"
+    serialized = json.dumps(terminal, ensure_ascii=False).lower()
+    assert "image_candidates/" not in serialized
+    assert "output_dir" not in serialized
 
 
 def test_uploaded_image_asset_can_be_deleted_from_project_runtime(tmp_path) -> None:
@@ -344,17 +565,15 @@ def test_async_image_provider_already_complete_returns_succeeded_preview(tmp_pat
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: DoneRegistry())
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_async_done/keyframe-generations",
-        json={
-            "node_id": "image-node-async-done-001",
-            "prompt_text": "A controlled character sheet.",
-            "optimized_prompt": "A controlled character sheet.",
-            "aspect_ratio": "16:9",
-            "candidate_count": 1,
-            "generated_at": "2026-06-23T06:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-async-done-001",
+        "prompt_text": "A controlled character sheet.",
+        "optimized_prompt": "A controlled character sheet.",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "generated_at": "2026-06-23T06:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_async_done", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -395,17 +614,15 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_retry/keyframe-generations",
-        json={
-            "node_id": "image-node-retry-001",
-            "prompt_text": "A controlled vertical keyframe.",
-            "optimized_prompt": "A controlled vertical keyframe.",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "generated_at": "2026-06-12T12:10:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-retry-001",
+        "prompt_text": "A controlled vertical keyframe.",
+        "optimized_prompt": "A controlled vertical keyframe.",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-06-12T12:10:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_retry", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -430,17 +647,15 @@ def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monke
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_timeout/keyframe-generations",
-        json={
-            "node_id": "image-node-timeout-001",
-            "prompt_text": "A controlled character reference sheet.",
-            "optimized_prompt": "A controlled character reference sheet.",
-            "aspect_ratio": "16:9",
-            "candidate_count": 1,
-            "generated_at": "2026-06-24T15:40:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-timeout-001",
+        "prompt_text": "A controlled character reference sheet.",
+        "optimized_prompt": "A controlled character reference sheet.",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "generated_at": "2026-06-24T15:40:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_timeout", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -454,6 +669,15 @@ def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monke
     assert manifest["status"] == "blocked"
     assert manifest["retry_count"] == 1
     assert manifest["blocks"][0]["block_id"] == "remote_image_provider_not_ready"
+    assert manifest["blocks"][0]["failure_class"] == "provider_timeout"
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    assert manifest["blocks"][0]["retry_count"] == 1
+    assert manifest["blocks"][0]["attempt_count"] == 2
+    assert manifest["provider_diagnostics"]["failure_class"] == "provider_timeout"
+    assert manifest["provider_diagnostics"]["provider_stage"] == "provider_request_read"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
     assert "timed out" in manifest["blocks"][0]["reason"]
 
 
@@ -510,17 +734,15 @@ def test_keyframe_generation_uses_provider_descriptor_prompt_limit(tmp_path, mon
     )
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_descriptor_limit/keyframe-generations",
-        json={
-            "node_id": "image-node-limit-001",
-            "prompt_text": "A long keyframe prompt.",
-            "optimized_prompt": "A cinematic rooftop prompt with many details. " * 20,
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "generated_at": "2026-06-12T10:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-limit-001",
+        "prompt_text": "A long keyframe prompt.",
+        "optimized_prompt": "A cinematic rooftop prompt with many details. " * 20,
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-06-12T10:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_descriptor_limit", request)
 
     assert result.status_code == 200
     assert len(str(captured["prompt"])) <= 64
@@ -544,6 +766,15 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     assert "provider_config" not in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+def _submit_keyframe_with_preflight(client: TestClient, project_id: str, request: dict[str, object]):
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
+    )
 
 
 class _FakeDescriptor:

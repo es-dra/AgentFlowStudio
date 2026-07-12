@@ -63,8 +63,7 @@ class CodexExecImageExecutor:
         prompt_path = work_dir / "worker_prompt.md"
         prompt_path.write_text(_worker_prompt(request), encoding="utf-8")
         codex_env_source = dict(os.environ)
-        if not _has_configured_codex_home(codex_env_source):
-            codex_env_source["AFS_CODEX_HOME"] = str(work_dir / ".codex-home")
+        codex_env_source["AFS_CODEX_HOME"] = str(work_dir / ".codex-home")
         codex_env = codex_subprocess_env(codex_env_source)
         process: subprocess.Popen[str] | None = None
         try:
@@ -374,10 +373,6 @@ def _resolve_codex_cli_command(cli_command: str) -> str:
     if local_bin_command.is_file():
         return str(local_bin_command)
     return command
-
-
-def _has_configured_codex_home(env: dict[str, str]) -> bool:
-    return bool(str(env.get("AFS_CODEX_HOME") or env.get("CODEX_HOME") or "").strip())
 
 
 def _safe_process_error(value: str) -> str:

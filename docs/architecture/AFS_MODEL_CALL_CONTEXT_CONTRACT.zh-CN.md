@@ -13,10 +13,10 @@ Studio 只消费 `context_id`、safe summary 和 artifact ref。
 | identity | Engineering Delivery Lead + Runtime/API Integrator + Rule Steward + QA Gatekeeper |
 | task type | Deep contract / algorithm hardening |
 | context pack | `engineering_delivery`, `afs_project`, `rule_steward` |
-| write scope | `agentflow/algorithms/`, `apps/api/`, `tests/`, `docs/architecture/`, `docs/handoff/`, project records |
+| write scope | `agentflow/algorithms/`, `apps/api/`, `tests/`, `docs/architecture/`, current project records |
 | non-goals | SaaS 化、live provider smoke、human acceptance、business validation、durable memory promotion |
 | provider gates | 全部默认关闭；本契约不授权任何 provider call |
-| evidence | deterministic tests, safe artifacts, handoff, DEVLOG/TASK_TRACKER |
+| evidence | deterministic tests, safe artifacts, PR body or focused current program state |
 | feedback route | repo 记录执行投影；COS 只走 candidate/limited，不自动 active |
 
 ## 契约定位

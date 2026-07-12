@@ -1,5 +1,6 @@
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
+import { nodeStatusSummary } from "../generation-status-policy.js";
 import { setRuntimeMediaSource } from "../runtime-media-source.js";
 import { openCreationProcessPanel } from "./creation-process-panel.js";
 
@@ -42,14 +43,15 @@ function renderHistory(state, store, center) {
 }
 
 function jobLike(node) {
-  return ["generating", "error", "cancelled"].includes(node.status)
+  return ["generating", "error", "partial", "cancelled"].includes(node.status)
     || node.params?.lastKeyframeJobId
     || node.params?.lastVideoJobId
     || node.params?.lastVideoArtifactId;
 }
 
 function jobCard(state, store, node, compact = false) {
-  const card = el("button", `job-center-card ${node.status || "draft"}`);
+  const summary = nodeStatusSummary(node);
+  const card = el("button", `job-center-card ${node.status || "draft"} ${summary.tone}`);
   card.appendChild(jobThumb(node));
   const main = el("span", "job-main");
   main.innerHTML = [
@@ -57,7 +59,7 @@ function jobCard(state, store, node, compact = false) {
     `<small>${escapeHtml(jobSummary(node, compact))}</small>`,
   ].join("");
   card.appendChild(main);
-  card.appendChild(el("span", "job-state", stateText(node.status)));
+  card.appendChild(el("span", "job-state", summary.displayLabel || summary.displayStatus));
   card.addEventListener("click", () => {
     store.set((s) => { s.selection = { nodeIds: [node.id], edgeId: null }; }, { history: false, persist: false });
     if (compact) openCreationProcessPanel(state, node);
@@ -140,20 +142,17 @@ function jobThumb(node) {
 }
 
 function jobSummary(node, compact) {
-  if (node.params?.lastVideoJobId) return `视频任务 ${node.params.lastVideoJobId}`;
-  if (node.params?.lastKeyframeJobId) return `关键帧任务 ${node.params.lastKeyframeJobId}`;
-  if (node.params?.lastVideoArtifactId) return `输出 ${node.params.lastVideoArtifactId}`;
+  const summary = nodeStatusSummary(node);
+  const suffixParts = [];
+  if (summary.blockedReason) suffixParts.push(`blocked reason: ${summary.blockedReason}`);
+  if (summary.nextAction) suffixParts.push(`next action: ${summary.nextAction}`);
+  const suffix = suffixParts.length ? ` · ${suffixParts.join(" · ")}` : "";
+  if (node.params?.lastVideoJobId) return `视频任务 ${node.params.lastVideoJobId}${suffix}`;
+  if (node.params?.lastKeyframeJobId) return `关键帧任务 ${node.params.lastKeyframeJobId}${suffix}`;
+  if (node.params?.lastVideoArtifactId) return `输出 ${node.params.lastVideoArtifactId}${suffix}`;
+  if (node.status === "partial") return `partially_complete · partial result preserved${suffix}`;
   if (compact && node.previewUrl) return "已有预览";
   return node.result ? String(node.result).slice(0, 80) : "本地草稿";
-}
-
-function stateText(status) {
-  return {
-    generating: "生成中",
-    complete: "已完成",
-    error: "失败",
-    cancelled: "已取消",
-  }[status] || "草稿";
 }
 
 function iconForNode(node) {

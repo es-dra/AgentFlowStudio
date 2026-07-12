@@ -23,11 +23,20 @@ def script_provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str
     }
 
 
-def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
-    return {
+def prompt_memory_artifacts(
+    store: RuntimeStore,
+    output_dir: Path,
+    *,
+    include_script_plan: bool = False,
+) -> dict[str, Any]:
+    artifacts = {
         "model_call_context": store.register_artifact(
             output_dir / "model_call_context.json",
             role="model_call_context",
+        ),
+        "creative_runtime_contract": store.register_artifact(
+            output_dir / "creative_runtime_contract.json",
+            role="creative_runtime_contract",
         ),
         "creative_brief": store.register_artifact(
             output_dir / "creative_brief.json",
@@ -37,15 +46,25 @@ def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, 
             output_dir / "prompt_assembly_trace.json",
             role="prompt_assembly_trace",
         ),
+        "prompt_optimization_review_summary": store.register_artifact(
+            output_dir / "prompt_optimization_review_summary.json",
+            role="prompt_optimization_review_summary",
+        ),
         "prompt_optimization_safe_manifest": store.register_artifact(
             output_dir / "prompt_optimization_safe_manifest.json",
             role="prompt_optimization_safe_manifest",
         ),
     }
+    if include_script_plan:
+        artifacts["script_plan"] = store.register_artifact(
+            output_dir / "script_plan.json",
+            role="script_plan",
+        )
+    return artifacts
 
 
 def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
-    return {
+    artifacts = {
         "model_call_context": store.register_artifact(
             output_dir / "model_call_context.json",
             role="model_call_context",
@@ -67,6 +86,13 @@ def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict
             role="keyframe_generation_safe_manifest",
         ),
     }
+    bridge_path = output_dir / "keyframe_generation_bridge.json"
+    if bridge_path.is_file():
+        artifacts["keyframe_generation_bridge"] = store.register_artifact(
+            bridge_path,
+            role="keyframe_generation_bridge",
+        )
+    return artifacts
 
 
 def feedback_ref(artifact: dict[str, Any], feedback_id: str) -> dict[str, Any]:

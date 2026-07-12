@@ -1,8 +1,11 @@
+import { responseStatusSummary } from "./generation-status-policy.js";
+import { redactUnsafeText } from "./safe-text-redaction.js";
+
 const KIND_LABELS = {
   asset: "资产图生成",
   keyframe: "图片生成",
   video: "视频生成",
-  video_revision: "视频修订",
+  video_revision: "视频重生成尝试",
 };
 
 const STATUS_PROGRESS = {
@@ -13,8 +16,29 @@ const STATUS_PROGRESS = {
   cancelled: 100,
   cancelled_local_only: 100,
 };
-const INDETERMINATE_ACTIVE_STATUSES = new Set(["pending", "running"]);
+const ACTIVE_STATUS_PROGRESS = {
+  submitted: 8,
+  pending: 18,
+  running: 58,
+};
 const ACTIVE_STATUSES = new Set(["submitted", "pending", "running"]);
+const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/[a-zA-Z0-9_.-]+\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
+const SAFE_IDENTIFIER_RE = /^[a-zA-Z0-9_.:-]+$/;
+const UNSAFE_IDENTIFIER_FRAGMENT_RE = /(?:authorization|auth|token|secret|credential|api[_-]?key|cookie|session)/i;
+const ALLOWED_FAILURE_CLASSES = new Set([
+  "provider_timeout",
+  "provider_gate_closed",
+  "provider_policy_block",
+  "provider_http_error",
+  "provider_not_ready",
+  "provider_output_missing",
+  "provider_failed",
+  "provider_error",
+  "validation_block",
+  "skipped",
+  "remote_vision_gate_closed",
+  "remote_vision_provider_not_ready",
+]);
 
 export function setSubmittingGenerationState(node, kind, options = {}) {
   const params = ensureParams(node);
@@ -29,6 +53,15 @@ export function setSubmittingGenerationState(node, kind, options = {}) {
     terminal: false,
   };
   params.progressPercent = params.jobProgress.percent;
+  params.generationPolicyStatus = options.retrying ? "retrying" : "";
+  params.generationStatusDetail = options.retrying
+    ? "Retrying failed items. Preserved outputs remain visible."
+    : "Waiting for generation status. Keep the page open.";
+  params.generationBlockedReason = "";
+  params.generationNextAction = options.retrying
+    ? "Wait for Runtime status; provider quota may be used."
+    : "Wait for Runtime status; completed outputs will remain visible.";
+  params.retryFailedItemsOnly = Boolean(options.retrying);
   if (options.clearPreview !== false) {
     params.candidatePreviewUrls = [];
   }
@@ -49,6 +82,13 @@ export function updateNodeGenerationState(node, response, options = {}) {
   params.jobProgress = progress;
   params.progressPercent = progress.percent;
   if (progress.terminal) params.terminalProgress = progress;
+  const summary = responseStatusSummary(response, { retrying: options.retrying });
+  params.generationPolicyStatus = summary.policyStatus;
+  params.generationStatusDetail = summary.detail;
+  params.generationBlockedReason = summary.blockedReason;
+  params.generationNextAction = summary.nextAction;
+  params.generationSafeRefs = summary.safeRefs;
+  params.retryFailedItemsOnly = summary.policyStatus === "retrying";
   const candidates = candidatePreviewItems(response);
   if (candidates.length) {
     params.candidatePreviewUrls = candidates;
@@ -57,40 +97,268 @@ export function updateNodeGenerationState(node, response, options = {}) {
 }
 
 export function candidatePreviewItems(response) {
+  const candidates = [];
+  const byKey = new Map();
+  const blocks = candidateFailureBlocks(response);
+  const recoveryOutputs = Array.isArray(response?.runtime_recovery?.outputs) ? response.runtime_recovery.outputs : [];
+  for (const output of recoveryOutputs) {
+    addCandidatePreview(candidates, byKey, normalizeRecoveryCandidate(output, blocks));
+  }
   const raw = Array.isArray(response?.candidate_previews) ? response.candidate_previews : [];
-  return raw
-    .map((item) => normalizeCandidatePreview(item))
-    .filter((item) => item.url);
+  for (const item of raw) {
+    addCandidatePreview(candidates, byKey, normalizeCandidatePreview(item));
+  }
+  if (!recoveryOutputs.length) {
+    for (const block of blocks) addCandidatePreview(candidates, byKey, normalizeFailedCandidate(block));
+  }
+  return candidates.filter(hasCandidateEvidence);
 }
 
 export function firstCandidatePreview(response) {
-  return candidatePreviewItems(response)[0] || null;
+  return candidatePreviewItems(response).find((item) => item.url || item.preview_url) || null;
 }
 
 function normalizeCandidatePreview(item) {
-  if (typeof item === "string") return { url: item };
-  const url = item?.preview_url || item?.url || "";
-  return {
+  if (typeof item === "string") {
+    const url = safePreviewUrl(item);
+    if (!url) return null;
+    return {
+      candidate_id: candidateIdFromUrl(url),
+      url,
+      preview_url: url,
+      status: "succeeded",
+      state: "complete",
+      preserved: true,
+    };
+  }
+  if (!item || typeof item !== "object") return null;
+  const url = firstSafePreviewUrl(item.preview_url, item.url, item.image_asset_preview_url);
+  return compactCandidate({
+    candidate_id: safeCandidateId(item.candidate_id || item.item_id || item.id) || candidateIdFromUrl(url),
     url,
-    preview_url: item?.preview_url || url,
-    width: item?.width || null,
-    height: item?.height || null,
-    aspect_ratio: item?.aspect_ratio || null,
-    artifact_id: item?.artifact_id || null,
-  };
+    preview_url: url,
+    width: safeOptionalCount(item.width, 20000),
+    height: safeOptionalCount(item.height, 20000),
+    aspect_ratio: safeAspectRatio(item.aspect_ratio),
+    artifact_id: safeIdentifier(item.artifact_id, 160),
+    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
+    byte_count: safeOptionalCount(item.byte_count, 100000000),
+    attempt_index: safeOptionalCount(item.attempt_index, 9999),
+    requested_count: safeOptionalCount(item.requested_count, 9999),
+    returned_count: safeOptionalCount(item.returned_count, 9999),
+    status: "succeeded",
+    state: "complete",
+    preserved: true,
+  });
+}
+
+function normalizeRecoveryCandidate(item, blocks) {
+  if (!item || typeof item !== "object") return null;
+  const candidateId = safeCandidateId(item.item_id || item.candidate_id || item.id);
+  const block = blocks.find((candidateBlock) => safeCandidateId(candidateBlock.candidate_id) === candidateId) || {};
+  const url = firstSafePreviewUrl(item.preview_url, item.image_asset_preview_url, item.url);
+  const status = candidateStatus(item.status || item.state || (url ? "succeeded" : ""));
+  const state = candidateState(item.state || item.status || status);
+  return compactCandidate({
+    candidate_id: candidateId,
+    url,
+    preview_url: url,
+    width: safeOptionalCount(item.width, 20000),
+    height: safeOptionalCount(item.height, 20000),
+    aspect_ratio: safeAspectRatio(item.aspect_ratio),
+    artifact_id: safeIdentifier(item.artifact_id, 160),
+    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
+    byte_count: safeOptionalCount(item.byte_count, 100000000),
+    attempt_index: safeOptionalCount(item.attempt_index, 9999),
+    requested_count: safeOptionalCount(item.requested_count, 9999),
+    returned_count: safeOptionalCount(item.returned_count, 9999),
+    status,
+    state: state || (status === "succeeded" ? "complete" : status),
+    preserved: Boolean(item.preserved || status === "succeeded" || state === "complete"),
+    failure_class: safeFailureClass(item.failure_class || block.failure_class || block.block_id),
+    reason: safeReason(item.reason || block.reason || ""),
+  });
+}
+
+function normalizeFailedCandidate(block) {
+  if (!block || typeof block !== "object") return null;
+  return compactCandidate({
+    candidate_id: safeCandidateId(block.candidate_id || block.item_id || block.id),
+    status: "failed",
+    state: "failed",
+    preserved: false,
+    failure_class: safeFailureClass(block.failure_class || block.block_id || block.reason),
+    reason: safeReason(block.reason || block.message || block.error || ""),
+    attempt_index: safeOptionalCount(block.attempt_index, 9999),
+    requested_count: safeOptionalCount(block.requested_count, 9999),
+    returned_count: safeOptionalCount(block.returned_count, 9999),
+  });
+}
+
+function candidateFailureBlocks(response) {
+  const blocks = Array.isArray(response?.safe_manifest?.blocks) ? response.safe_manifest.blocks : [];
+  return blocks.filter((block) => block && typeof block === "object");
+}
+
+function addCandidatePreview(candidates, byKey, candidate) {
+  if (!hasCandidateEvidence(candidate)) return;
+  const key = candidateKey(candidate, candidates.length);
+  if (byKey.has(key)) {
+    Object.assign(byKey.get(key), mergeCandidatePreview(byKey.get(key), candidate));
+    return;
+  }
+  byKey.set(key, candidate);
+  candidates.push(candidate);
+}
+
+function mergeCandidatePreview(current, next) {
+  const merged = { ...current };
+  for (const [key, value] of Object.entries(next)) {
+    if (value === "" || value == null) continue;
+    merged[key] = value;
+  }
+  if (!next.url && current.url) merged.url = current.url;
+  if (!next.preview_url && current.preview_url) merged.preview_url = current.preview_url;
+  if (current.status === "succeeded" || next.status === "succeeded") merged.status = "succeeded";
+  if (current.state === "complete" || next.state === "complete") merged.state = "complete";
+  merged.preserved = Boolean(current.preserved || next.preserved || merged.status === "succeeded");
+  return merged;
+}
+
+function candidateKey(candidate, fallbackIndex) {
+  return candidate.candidate_id || candidate.url || candidate.preview_url || `candidate_${fallbackIndex + 1}`;
+}
+
+function hasCandidateEvidence(candidate) {
+  return Boolean(candidate && (candidate.url || candidate.preview_url || candidate.candidate_id || candidate.status));
+}
+
+function candidateStatus(value) {
+  const status = redactedLowerText(value, 80);
+  const normalized = status.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["complete", "completed", "success", "succeeded", "preserved"].includes(normalized)) return "succeeded";
+  if (["failed", "failure", "error", "timeout", "timed_out", "poll_failed"].includes(normalized)) return "failed";
+  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(normalized)) return normalized;
+  if (/\b(?:complete|completed|success|succeeded|preserved)\b/.test(status)) return "succeeded";
+  if (/\b(?:failed|failure|error|timeout|timed out|timed_out|poll_failed)\b/.test(status)) return "failed";
+  if (/\b(?:blocked|gate)\b/.test(status)) return "blocked";
+  if (/\bneeds[_\s-]?attention\b/.test(status)) return "needs_attention";
+  if (/\bcancel/.test(status)) return "cancelled";
+  if (/\bretry/.test(status)) return "retryable";
+  if (/\bpartial\b/.test(status)) return "partial";
+  return "";
+}
+
+function safeCandidateId(value) {
+  return safeIdentifier(value, 40);
+}
+
+function safeReason(value) {
+  return redactUnsafeText(value, 180);
+}
+
+function candidateState(value) {
+  const state = redactedLowerText(value, 80);
+  const normalized = state.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["complete", "completed"].includes(normalized)) return "complete";
+  if (/\bcomplete(?:d)?\b/.test(state)) return "complete";
+  return candidateStatus(value);
+}
+
+function safeFailureClass(value) {
+  const text = redactedLowerText(value, 140);
+  if (!text) return "";
+  const normalized = text.replace(/<redacted>/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (ALLOWED_FAILURE_CLASSES.has(normalized)) return normalized;
+  if (text.includes("timeout") || text.includes("timed out")) return "provider_timeout";
+  if (text.includes("gate_closed") || text.includes("gate closed")) return "provider_gate_closed";
+  if (text.includes("policy") || text.includes("copyright")) return "provider_policy_block";
+  if (text.includes("validation") || text.includes("invalid") || text.includes("unsupported")) return "validation_block";
+  if (text.includes("not_ready") || text.includes("not ready") || text.includes("service_not_found")) return "provider_not_ready";
+  if (text.includes("missing")) return "provider_output_missing";
+  if (text.includes("http")) return "provider_http_error";
+  if (text.includes("skipped")) return "skipped";
+  return "provider_failed";
+}
+
+function safeIdentifier(value, limit) {
+  const original = String(value || "").trim();
+  if (!original || original.length > limit) return "";
+  const redacted = redactUnsafeText(original, 512);
+  if (redacted !== original) return "";
+  if (UNSAFE_IDENTIFIER_FRAGMENT_RE.test(original)) return "";
+  return SAFE_IDENTIFIER_RE.test(original) ? original : "";
+}
+
+function firstSafePreviewUrl(...values) {
+  for (const value of values) {
+    const url = safePreviewUrl(value);
+    if (url) return url;
+  }
+  return "";
+}
+
+function safePreviewUrl(value) {
+  const original = String(value || "").trim();
+  if (!original) return "";
+  const redacted = redactUnsafeText(original, 512);
+  if (redacted !== original) return "";
+  return SAFE_PREVIEW_ROUTE_RE.test(original) ? original : "";
+}
+
+function candidateIdFromUrl(url) {
+  const match = String(url || "").match(/\/candidates\/([^/]+)\/preview$/);
+  return safeCandidateId(match?.[1]);
+}
+
+function safeAspectRatio(value) {
+  const original = String(value || "").trim();
+  if (!original || original.length > 20) return null;
+  const redacted = redactUnsafeText(original, 80);
+  if (redacted !== original) return null;
+  const match = original.match(/^([1-9]\d?):([1-9]\d?)$/);
+  return match ? `${Number(match[1])}:${Number(match[2])}` : null;
+}
+
+function safeOptionalCount(value, max) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.min(max, Math.round(number)));
+}
+
+function compactCandidate(candidate) {
+  const result = {};
+  for (const [key, value] of Object.entries(candidate)) {
+    if (value === "" || value == null) continue;
+    result[key] = value;
+  }
+  return result;
+}
+
+function redactedLowerText(value, limit) {
+  return redactUnsafeText(value, limit).toLowerCase();
 }
 
 function progressPercent(response, status, override) {
-  if (override === null || ACTIVE_STATUSES.has(status)) return null;
+  if (override === null) return null;
+  const mode = response?.job?.progress?.mode || response?.progress?.mode;
+  if (String(mode || "") === "indeterminate") return null;
   const explicit = override
     ?? response?.job?.progress?.percent
     ?? response?.job?.progress_percent
     ?? response?.progress?.percent
     ?? response?.progress_percent;
-  if (explicit == null || explicit === "") return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
+  if (explicit == null || explicit === "") {
+    return STATUS_PROGRESS[status]
+      ?? ACTIVE_STATUS_PROGRESS[status]
+      ?? (isTerminalStatus(status) ? 100 : null);
+  }
   const explicitPercent = Number(explicit);
   if (Number.isFinite(explicitPercent)) return clampPercent(explicitPercent);
-  return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
+  return STATUS_PROGRESS[status]
+    ?? ACTIVE_STATUS_PROGRESS[status]
+    ?? (isTerminalStatus(status) ? 100 : null);
 }
 
 function progressMode(response, status) {

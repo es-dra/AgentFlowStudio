@@ -364,12 +364,6 @@ def _worker_failed_block(reason: str = "Image generation worker failed.") -> dic
 
 def _safe_error(value: str) -> str:
     lowered = value.lower()
-    if "command is not available" in lowered:
-        return "Image generation worker command is not available."
-    if "timed out" in lowered:
-        return "Image generation worker timed out before creating a usable image."
-    if "did not create" in lowered:
-        return "Image generation worker did not create a usable image."
     if any(term in lowered for term in ("api", "key", "secret", "token", "authorization", "cookie")):
         return "Image generation worker configuration is not ready."
     if any(term in lowered for term in ("codex", "handoff", "request.json", "candidate_001")):

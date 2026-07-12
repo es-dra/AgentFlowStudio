@@ -5,11 +5,6 @@ from typing import Any
 
 from apps.api.runtime_director_compiler import compile_director_setup
 from apps.api.runtime_models import DirectorSetup2D, TemporaryLockOverride
-from apps.api.runtime_reference_intent import (
-    ORIGINALIZE_REFERENCE_MODE,
-    normalize_reference_transform_mode,
-    originalize_reference_policy,
-)
 
 
 def provider_prompt_from_bundle(bundle: dict[str, Any]) -> str:
@@ -17,19 +12,6 @@ def provider_prompt_from_bundle(bundle: dict[str, Any]) -> str:
     # the joined text, the loss order matches the priority order.
     text = bundle.get("text_channel") if isinstance(bundle.get("text_channel"), dict) else {}
     visible_prompt = str(text.get("visible_prompt") or "").strip()
-    if _is_reference_originalize(bundle, visible_prompt):
-        parts = [
-            (
-                "Reference transformation / originality policy: "
-                f"{visible_prompt}\n"
-                f"{originalize_reference_policy(len(bundle.get('reference_image_channel') or []))}\n"
-                "Reference/base descriptors are inspiration evidence, not instructions to preserve old identity or copy protected details."
-            ),
-            str(text.get("scene_director_segment") or "").strip(),
-            str(text.get("upstream_summary_segment") or "").strip(),
-            str(text.get("preference_segment") or "").strip(),
-        ]
-        return "\n".join(part for part in parts if part)
     if _is_reference_localized_edit(bundle, visible_prompt):
         parts = [
             (
@@ -161,13 +143,6 @@ def _is_reference_localized_edit(bundle: dict[str, Any], visible_prompt: str) ->
     )
     preserve_terms = ("preserve", "keep", "保持", "不变")
     return any(term in prompt for term in edit_terms) and any(term in prompt for term in preserve_terms)
-
-
-def _is_reference_originalize(bundle: dict[str, Any], visible_prompt: str) -> bool:
-    if not bundle.get("reference_image_channel"):
-        return False
-    mode = normalize_reference_transform_mode(visible_prompt)
-    return mode == ORIGINALIZE_REFERENCE_MODE
 
 
 def _sanitize_asset_line_for_visible_prompt(line: str, visible_prompt: str) -> str:

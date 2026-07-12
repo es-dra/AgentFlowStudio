@@ -15,7 +15,6 @@ export function structureSignature(node) {
     node.id, node.type, p.model,
     p.spec ? JSON.stringify(p.spec) : "",
     p.camera ? "cam" : "", p.motion || "", p.styleRef || "", p.effect || "",
-    p.assetReferenceMode || "",
     (p.attachments || []).length,
   ].join("~");
 }
@@ -46,6 +45,20 @@ export function positionBar(bar, state, node) {
   const x = Math.max(8, Math.min(bottom.x - width / 2, window.innerWidth - width - 8));
   bar.style.left = `${Math.round(x)}px`;
   bar.style.top = `${Math.round(y)}px`;
+}
+
+export function bindBarResizePositioning(bar, store, nodeId) {
+  if (!window.ResizeObserver) return;
+  const observer = new ResizeObserver(() => {
+    if (!bar.isConnected) {
+      observer.disconnect();
+      return;
+    }
+    const state = store.get();
+    const fresh = state.nodes[nodeId];
+    if (fresh) positionBar(bar, state, fresh);
+  });
+  observer.observe(bar);
 }
 
 export function chooseNonOverlappingY({ belowY, aboveY, height, topY, bottomY, dockSafe }) {

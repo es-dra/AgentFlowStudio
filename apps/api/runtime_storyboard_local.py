@@ -3,10 +3,22 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from apps.api.runtime_asset_extraction import (
+    normalize_asset_ref_for_contract,
+    normalize_asset_refs_with_diagnostics,
+    principal_asset_refs_with_diagnostics,
+)
+from apps.api.runtime_storyboard_grounding import (
+    grounding_status_for_unsupported,
+    storyboard_source_span,
+    unsupported_additions_for_description,
+)
+from apps.api.runtime_storyboard_planning import storyboard_plan_fields
+
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
-SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
-KNOWN_CHARACTER_NAMES = ("孙悟空", "金刚狼")
+SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "云栈洞口", "洞口", "洞内", "山洞", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
+KNOWN_CHARACTER_NAMES = ("唐僧", "白骨精", "孙悟空", "猪八戒", "沙僧", "金刚狼", "林晚")
 CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "女生", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", "皇帝", "侦探", *KNOWN_CHARACTER_NAMES)
 PROP_HINTS = ("金箍棒", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
 GENERIC_CHARACTER_LABELS = {"主角", "角色", "人物"}
@@ -14,30 +26,69 @@ GENERIC_SCENE_LABELS = {"主要场景", "场景"}
 
 
 def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None) -> list[dict[str, Any]]:
+    source = _clean(script_text)
     chunks = _script_chunks(script_text, shot_count_hint=shot_count_hint)
-    global_refs = _asset_refs(_clean(script_text))
-    return [structured_shot(chunk, index + 1, global_refs=global_refs) for index, chunk in enumerate(chunks[:80])]
+    global_refs = _asset_refs(source)
+    total_count = len(chunks[:80])
+    return [
+        structured_shot(
+            chunk,
+            index + 1,
+            global_refs=global_refs,
+            full_source=source,
+            total_count=total_count,
+            shot_count_hint=shot_count_hint,
+        )
+        for index, chunk in enumerate(chunks[:80])
+    ]
 
 
-def structured_shot(text: str, index: int, global_refs: list[dict[str, str]] | None = None) -> dict[str, Any]:
+def structured_shot(
+    text: str,
+    index: int,
+    global_refs: list[dict[str, Any]] | None = None,
+    *,
+    full_source: str = "",
+    total_count: int | None = None,
+    shot_count_hint: int | None = None,
+) -> dict[str, Any]:
     source = _clean(text)
-    refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
+    raw_refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
+    refs, dropped_refs = normalize_asset_refs_with_diagnostics(raw_refs, context=source, include_inferred=True)
+    refs, dropped_refs = principal_asset_refs_with_diagnostics(refs, dropped_refs)
+    plan_fields = storyboard_plan_fields(source, index)
+    description = _description_with_assets(source, refs)
+    source_span = storyboard_source_span(source, full_source or source, index)
+    unsupported = unsupported_additions_for_description(description, source_span["text"])
     return {
         "shot_id": f"shot_{index:02d}",
         "index": index,
         "duration": _duration(source),
-        "description": _description_with_assets(source, refs),
+        "description": description,
         "shot_size": _shot_size(source),
         "light_atmosphere": _lighting(source),
         "camera_motion": _camera_motion(source),
         "dialogue": _dialogue(source),
         "sound": _sound(source),
         "asset_refs": refs,
+        "dropped_asset_ref_diagnostics": dropped_refs,
         "source_text": source,
+        "source_span": source_span,
+        "grounding_status": grounding_status_for_unsupported(unsupported),
+        "unsupported_additions": unsupported,
+        "planning_agent": {
+            "agent_id": "storyboard_local_fallback",
+            "mode": "deterministic_grounded_fallback",
+            "dynamic_shot_count": shot_count_hint is None,
+            "shot_count_hint": shot_count_hint,
+            "resolved_shot_count": total_count,
+            "evidence_policy": "source_span_required",
+        },
+        **plan_fields,
     }
 
 
-def _resolve_shot_refs(source: str, refs: list[dict[str, str]], global_refs: list[dict[str, str]]) -> list[dict[str, str]]:
+def _resolve_shot_refs(source: str, refs: list[dict[str, Any]], global_refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     named_characters = [ref for ref in global_refs if ref["asset_type"] == "character" and ref["label"] not in GENERIC_CHARACTER_LABELS]
     named_scenes = [ref for ref in global_refs if ref["asset_type"] == "scene" and ref["label"] not in GENERIC_SCENE_LABELS]
     if named_characters and (
@@ -54,23 +105,11 @@ def _resolve_shot_refs(source: str, refs: list[dict[str, str]], global_refs: lis
     return refs
 
 
-def normalize_asset_ref(asset: Any, index: int, context: str = "") -> dict[str, str]:
+def normalize_asset_ref(asset: Any, index: int, context: str = "") -> dict[str, Any]:
     if not isinstance(asset, dict):
         return {}
-    label = str(asset.get("label") or asset.get("name") or "").strip()[:24]
-    asset_type = str(asset.get("asset_type") or "character")
-    if asset_type not in {"character", "scene", "prop"}:
-        asset_type = "character"
-    if not label:
-        return {}
-    label = _semantic_asset_label(label, asset_type, context)
-    return {
-        "label": label,
-        "asset_id": str(asset.get("asset_id") or f"candidate:{asset_type}:{index + 1}"),
-        "asset_type": asset_type,
-        "status": str(asset.get("status") or "candidate"),
-        "source": str(asset.get("source") or "llm"),
-    }
+    normalized, _diagnostic = normalize_asset_ref_for_contract(asset, index, context=context)
+    return normalized or {}
 
 
 def _script_chunks(text: str, shot_count_hint: int | None = None) -> list[str]:
@@ -135,8 +174,8 @@ def _balanced_chunks(units: list[str], target_count: int) -> list[str]:
     return chunks
 
 
-def _asset_refs(text: str) -> list[dict[str, str]]:
-    refs: list[dict[str, str]] = []
+def _asset_refs(text: str) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
     for match in ASSET_RE.finditer(text):
         _push_ref(refs, match.group(1), _classify_asset(match.group(1), text), "explicit", text)
     for label in _infer_character_labels(text):
@@ -146,19 +185,17 @@ def _asset_refs(text: str) -> list[dict[str, str]]:
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
     if not any(ref["asset_type"] == "scene" for ref in refs) and any(hint in text for hint in SCENE_HINTS):
         _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
-    if not any(ref["asset_type"] == "prop" for ref in refs):
-        for prop in _infer_prop_labels(text):
-            _push_ref(refs, prop, "prop", "candidate", text)
     if not refs:
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
         _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
     return refs
 
 
-def _push_ref(refs: list[dict[str, str]], label: str, asset_type: str, source: str, context: str = "") -> None:
+def _push_ref(refs: list[dict[str, Any]], label: str, asset_type: str, source: str, context: str = "") -> None:
     clean = _semantic_asset_label(label, asset_type, context)
     if not clean or any(ref["label"] == clean for ref in refs):
         return
+    evidence = _asset_evidence_for_label(context, clean)
     refs.append(
         {
             "label": clean,
@@ -166,18 +203,21 @@ def _push_ref(refs: list[dict[str, str]], label: str, asset_type: str, source: s
             "asset_type": asset_type,
             "status": "mentioned" if source == "explicit" else "candidate",
             "source": source,
+            "scope": "shot_tree",
+            "confidence": _asset_confidence(asset_type, clean, context),
+            "evidence_text": evidence,
         }
     )
 
 
-def _description_with_assets(source: str, refs: list[dict[str, str]]) -> str:
+def _description_with_assets(source: str, refs: list[dict[str, Any]]) -> str:
     visible_source = _replace_generic_asset_tokens(source, refs)
     missing = [ref for ref in refs if f"@{ref['label']}" not in visible_source]
     prefix = " ".join(f"@{ref['label']}" for ref in missing)
     return f"{prefix}。{visible_source}" if prefix else visible_source
 
 
-def _replace_generic_asset_tokens(source: str, refs: list[dict[str, str]]) -> str:
+def _replace_generic_asset_tokens(source: str, refs: list[dict[str, Any]]) -> str:
     text = str(source or "")
     character = next((ref for ref in refs if ref["asset_type"] == "character" and ref["label"] not in GENERIC_CHARACTER_LABELS), None)
     scene = next((ref for ref in refs if ref["asset_type"] == "scene" and ref["label"] not in GENERIC_SCENE_LABELS), None)
@@ -199,15 +239,46 @@ def _semantic_asset_label(label: str, asset_type: str, context: str) -> str:
     return clean
 
 
+def _asset_confidence(asset_type: str, label: str, context: str) -> float:
+    if f"@{label}" in context:
+        return 0.92
+    if label and label in context:
+        return 0.82
+    if asset_type == "scene" and any(hint in context for hint in SCENE_HINTS):
+        return 0.68
+    if asset_type == "character" and any(hint in context for hint in CHARACTER_HINTS):
+        return 0.68
+    return 0.6
+
+
+def _asset_evidence_for_label(text: str, label: str) -> str:
+    clean = str(text or "").strip()
+    if not clean:
+        return ""
+    sentences = [part.strip() for part in re.split(r"(?<=[。！？!?；;])\s*", clean) if part.strip()]
+    for sentence in sentences:
+        if label and label in sentence:
+            return sentence[:240]
+    for sentence in sentences:
+        if re.search(r"机器人|人物|角色|屋顶|天台|农村|乡村|城市|山巅|石台|战场|金箍棒|钢爪", sentence):
+            return sentence[:240]
+    return sentences[0][:240] if sentences else clean[:240]
+
+
 def _infer_character_labels(text: str) -> list[str]:
     source = str(text or "")
     labels: list[str] = []
-    for left, right in re.findall(r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})大战([\u4e00-\u9fffA-Za-z0-9·]{2,12})", source):
+    for left, right in re.findall(
+        r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})(?:大战|对决|迎娶|娶了|娶|嫁给|爱上|遇见|面对|追击|追杀|营救|守护)([\u4e00-\u9fffA-Za-z0-9·]{2,12})",
+        source,
+    ):
         for item in (left, right):
             _append_label(labels, _trim_character_name(item))
-    for name in KNOWN_CHARACTER_NAMES:
-        if name in source:
-            _append_label(labels, name)
+    for name, _index in sorted(
+        ((name, source.find(name)) for name in KNOWN_CHARACTER_NAMES if source.find(name) >= 0),
+        key=lambda item: item[1],
+    ):
+        _append_label(labels, name)
     if re.search(r"女生|女孩|少女", source):
         _append_label(labels, "女生" if "女生" in source else "女孩")
     for name in _repeated_actor_names(source):
@@ -254,7 +325,9 @@ def _append_label(labels: list[str], value: str) -> None:
 
 def _trim_character_name(value: str) -> str:
     clean = re.sub(r"^(以|把|将|当|用|和|与|及|、)+", "", str(value or "")).strip()
+    clean = re.sub(r"^.*(?:是|讲述|关于|围绕)", "", clean).strip()
     clean = re.sub(r"(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$", "", clean).strip()
+    clean = re.sub(r"(但是|但|却|旁观|观战|从旁).*$", "", clean).strip()
     return clean
 
 
@@ -273,6 +346,8 @@ def _infer_scene_label(text: str) -> str:
         return "屋顶平台"
     if is_city:
         return "城市场景"
+    if re.search(r"云栈洞口|洞口|洞内|山洞", source):
+        return "云栈洞口" if "云栈" in source else "山洞场景"
     if re.search(r"暗办公室|昏暗办公室", source):
         return "暗办公室"
     if "办公室" in source:
@@ -281,6 +356,10 @@ def _infer_scene_label(text: str) -> str:
         return "室内空间"
     if re.search(r"街道|街区|路面", source):
         return "街道空间"
+    if re.search(r"海边|海面|沙滩|灯塔", source):
+        return "海边"
+    if "餐厅" in source:
+        return "餐厅"
     if re.search(r"山巅|山脊|石台|云海|战场", source):
         return "山巅石台战场"
     return ""
@@ -388,4 +467,11 @@ def _clean(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
-__all__ = ("local_storyboard_shots", "normalize_asset_ref", "structured_shot")
+__all__ = (
+    "grounding_status_for_unsupported",
+    "local_storyboard_shots",
+    "normalize_asset_ref",
+    "storyboard_source_span",
+    "structured_shot",
+    "unsupported_additions_for_description",
+)

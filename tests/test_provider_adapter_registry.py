@@ -111,6 +111,93 @@ def test_provider_registry_exposes_codex_image_descriptor(tmp_path) -> None:
     assert descriptor.prompt_char_limit == 4000
     assert descriptor.rate_limit_hint == "test-only"
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+    assert descriptor.image_edit_capabilities_present is False
+    assert descriptor.image_edit_capabilities.supports_image_edit is False
+    assert descriptor.image_edit_capabilities.supports_true_local_edit is False
+    assert descriptor.image_edit_capabilities.local_edit_scope_kinds() == []
+    assert descriptor.image_edit_capabilities.fallback_modes == []
+
+
+def test_provider_registry_defaults_absent_image_edit_capabilities_to_blocked(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].pop("image_edit_capabilities", None)
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    descriptor = registry.descriptor("codex_image")
+    capabilities = descriptor.image_edit_capabilities
+
+    assert descriptor.schema_version == "provider_descriptor.v0.1"
+    assert descriptor.image_edit_capabilities_present is False
+    assert capabilities.has_image_edit_claims() is False
+    assert capabilities.supports_image_edit is False
+    assert capabilities.supports_true_local_edit is False
+    assert capabilities.local_edit_scope_kinds() == []
+    assert capabilities.fallback_modes == []
+    assert capabilities.local_edit_truth_label == "blocked_no_supported_local_edit"
+
+
+def test_provider_registry_builds_future_image_edit_descriptor_v03(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "supports_true_local_edit": False,
+                "supports_mask_asset": True,
+                "supports_semantic_region": True,
+                "supports_preserve_locks": "prompt_only",
+                "supports_negative_locks": "prompt_only",
+                "fallback_modes": ["provider_full_frame_edit", "reference_image_to_image_fallback"],
+                "max_mask_count": 1,
+                "max_reference_images": 1,
+                "input_fidelity_modes": ["low", "high"],
+                "local_edit_truth_label": "provider_masked_edit",
+            },
+        }
+    )
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    descriptor = registry.descriptor("codex_image")
+    capabilities = descriptor.image_edit_capabilities
+
+    assert descriptor.image_edit_capabilities_present is True
+    assert capabilities.supports_image_edit is True
+    assert capabilities.supports_true_local_edit is False
+    assert capabilities.local_edit_scope_kinds() == ["mask_asset", "semantic_region"]
+    assert capabilities.fallback_modes == ["provider_full_frame_edit", "reference_image_to_image_fallback"]
+    assert capabilities.local_edit_truth_label == "provider_masked_edit"
+
+
+def test_provider_registry_rejects_image_edit_capabilities_on_v01_descriptor(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"]["image_edit_capabilities"] = {
+        "supports_image_edit": True,
+        "fallback_modes": ["provider_full_frame_edit"],
+    }
+    store = _store(tmp_path, payload)
+
+    with pytest.raises(ModelConfigError, match="provider_descriptor.v0.3"):
+        ProviderRegistry.from_store(store)
+
+
+def test_provider_registry_rejects_true_local_edit_as_fallback_mode(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "fallback_modes": ["true_local_edit"],
+            },
+        }
+    )
+    store = _store(tmp_path, payload)
+
+    with pytest.raises(ModelConfigError, match="fallback_modes"):
+        ProviderRegistry.from_store(store)
 
 
 def test_provider_registry_normalizes_legacy_narratocut_gate_prefix(tmp_path) -> None:
@@ -681,8 +768,39 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert result["outputs"][0]["provider_url_persisted"] is False
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
-    assert "myqcloud.com" not in json.dumps(result, ensure_ascii=False)
+    assert "media.crazyrouter.com" not in json.dumps(result, ensure_ascii=False)
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_provider_registry_reports_openai_images_download_timeout_stage(tmp_path, monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/generations":
+            return _JsonResponse({"data": [{"url": "http://251000800.vod2.myqcloud.com/task-artifacts/result.png"}]})
+        if request.full_url == "http://251000800.vod2.myqcloud.com/task-artifacts/result.png":
+            raise TimeoutError("The read operation timed out")
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["account_ref"] = "crazyrouter"
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    with pytest.raises(ModelGatewayError, match="image URL download timed out"):
+        registry.dispatch(
+            "image",
+            "relay_image",
+            ProviderDispatchRequest(prompt="Generate a clean asset sheet", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+        )
 
 
 def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_image_field(
@@ -744,6 +862,34 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_i
     assert captured["timeout"] == 120.0
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_provider_registry_projects_legacy_codex_image_api_relay_to_image_relay(tmp_path) -> None:
+    config = _api_relay_provider_config(include_image=True)
+    service = config["services"].pop("relay_image")
+    service["endpoint"] = "/images/generations"
+    service["request_format"] = "openai_images"
+    service["model"] = "gpt-image-2"
+    service["descriptor"]["account_pool_id"] = "codex_image_pool"
+    service["descriptor"]["reference_image_slots"] = 0
+    config["services"]["codex_image"] = service
+    pool = config["account_pools"].pop("image_pool")
+    pool["accounts"][0]["service_id"] = "codex_image"
+    config["account_pools"]["codex_image_pool"] = pool
+
+    store = _store(tmp_path, config)
+    registry = ProviderRegistry.from_store(store)
+
+    assert "codex_image" not in store.services
+    assert "codex_image_pool" not in store.account_pools
+    assert store.services["image_relay"]["provider"] == "api_relay"
+    assert store.services["image_relay"]["edit_endpoint"] == "/images/edits"
+    assert store.account_pools["image_relay_pool"]["accounts"][0]["service_id"] == "image_relay"
+    descriptor = registry.descriptor("image_relay")
+    assert descriptor.account_pool_id == "image_relay_pool"
+    assert descriptor.reference_image_slots == 1
+    with pytest.raises(ModelConfigError, match="Provider service not found: codex_image"):
+        registry.descriptor("codex_image")
 
 
 def test_provider_example_config_builds_registry_without_secret_values() -> None:

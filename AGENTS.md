@@ -1,205 +1,220 @@
-# AGENTS.md
+# AgentFlow Studio Agent Instructions
 
-## 项目使命
+## Mission
 
-AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。
+AgentFlow Studio is an Agent-native production operating layer for AI content
+production. The current product surface is the Studio canvas at `/studio/`,
+backed by the Runtime Service and provider-gated generation paths.
 
-当前仓库分层：
+Current scope is local internal testing and hardening. Repository changes must
+not be described as SaaS readiness, public release readiness, provider QA,
+generated-media QA, human acceptance, business validation, legal readiness, or
+durable Company OS promotion.
 
-```text
-agentflow/             平台 contract、harness、router、memory、skills
-examples/agentflow_production/  内容生产侧结构化 handoff 示例输入
-agentflow_studio/      短视频分发侧包装、审查、报告
-apps/                  CLI、Runtime Service、AFS Studio Web 画布
-```
+## Rule Order
 
-当前 MVP 链路：
-
-```text
-/studio/ canvas -> Runtime Service -> prompt optimization -> fixed visual assets
-  -> graph context resolver -> provider-gated keyframe/image evidence
-```
-
-近期主线是本地内测可用，不是 SaaS，也不是商业试点。当前用户侧 Web 入口是 `/studio/`，对应源码为 `apps/studio/`；Runtime Service 是前端唯一后端边界。旧 Workbench / memory-workbench 不再作为当前产品入口；subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata 分发链为 legacy/optional，不再是当前 MVP 主线。
-
-## 规则层级
-
-遇到多层规则时，按下面顺序理解：
+Read rules in this order when they conflict:
 
 ```text
 D:\Learning materials\Learning_notes\10-Startup
-  -> 全局 workflow skills
-  -> 本文件 AGENTS.md
-  -> docs/company_operating_model.md
-  -> TASK_TRACKER.md / branch handoff
-  -> 当前任务
+  -> project-development-workflow skill
+  -> AGENTS.md
+  -> docs/AOS_CURRENT_STATE.md
+  -> docs/README.md
+  -> current task
 ```
 
-`10-Startup` 是公司源头知识库。AFS 仓库只保存执行投影：代码、测试、contract、runbook、handoff、可公开或半公开工程说明。
+The `10-Startup` tree is the source knowledge base. This repository is only an
+execution projection: code, tests, contracts, safe docs, and current project
+state needed to work on AFS.
 
-当前 COS/GFR 源头控制文件：
+## Startup
+
+When entering, resuming, scanning, debugging, or editing this repository:
+
+1. Use the `project-development-workflow` skill first.
+2. Run a startup scan before changing files.
+3. Read `docs/AOS_CURRENT_STATE.md` and `docs/README.md`.
+4. Read `docs/company_operating_model.md` or `docs/GFR_EXECUTION_PROJECTION.md`
+   only when the task touches operating rules, AOS/GFR projection, cleanup, or
+   cross-surface state.
+5. Define the write scope, forbidden scope, verification route, provider/tool
+   gates, non-claims, and closeout shape before substantial edits.
+
+Do not read old full trackers, handoff directories, smoke logs, or retired
+Workbench material as startup context. Historical records are recoverable from
+Git history or a targeted restored reference when a task has a specific ID,
+file path, branch name, PR number, or keyword.
+
+## AOS Task Shape
+
+For substantial work, internally apply an AOS Startup Packet:
 
 ```text
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
-D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+Goal Contract
+Task Packet
+Evidence target
+Runtime Surface Vector when local/GitHub/server/process/provider state can drift
+Integration Queue route
+Improvement Queue route
 ```
 
-AFS 仓库内执行投影：
+Minimum fields:
 
 ```text
-docs\GFR_EXECUTION_PROJECTION.md
+target outcome
+read scope
+write scope
+forbidden scope
+provider/tool gates
+verification route
+non-claims
+stop conditions
+closeout shape
 ```
 
-禁止把以下内容写入仓库：
+## Scale-Up Mode
 
-- secret、token、cookie、provider key、signed URL。
-- 本地私有素材字节、生成媒体、provider 原始响应。
-- 未公开商业判断、真实成本、客户信息、合作方判断。
-- 公司内部失败复盘原文。
+The default control plane is one accountable main thread, but substantial work
+does not have to stay single-lane. Use Deep or Program mode when the task spans
+multiple product surfaces, runtime state, provider gates, broad cleanup, or
+research/evaluation.
 
-## 启动规则
+Scale-up rules:
 
-进入、恢复、扫描、调试或编辑本项目时：
+- Keep one main control thread responsible for scope, evidence, integration,
+  and closeout.
+- Add temporary worker or evaluator lanes only with a bounded lane contract:
+  target, read/write scope, forbidden scope, evidence target, verification
+  command, stop condition, and return route.
+- Do not recreate permanent CEO/CTO/CPO/COO/PM threads.
+- Do not use heartbeat as status reporting. A control tick must advance,
+  integrate, evaluate, retire, unblock, or record a concrete no-op reason.
+- For user-facing Studio, Runtime Service, provider, release, cleanup with
+  deletion risk, or quality-claim work, add an evaluator gate before closeout.
+- For multi-surface work, maintain a compact integration queue instead of
+  creating new long-running ledgers.
+- For release or runtime work, use a separate Release Lane. Updating `/opt` or
+  another deploy checkout is not enough: the managed process must be restarted
+  or reloaded through its service manager, and a fresh runtime health/process
+  check must prove that the target commit is loaded.
 
-1. 先使用 `project-development-workflow` skill。
-2. 先做 startup scan，再改文件。
-3. 读取本文件、`docs/company_operating_model.md`、`TASK_TRACKER.md`。
-4. 按任务难度分类：`Light` / `Standard` / `Deep` / `Strategic`。
-5. 明确写入范围、非目标、验证命令、provider gate、handoff 位置。
+If the working tree already contains a broad uncommitted cleanup, either finish
+and integrate that cleanup first or isolate the new task in a fresh worktree.
+Do not bury product/runtime changes inside a huge governance cleanup diff
+unless the task explicitly authorizes that tradeoff.
 
-当前任务如果是维护、清理、重构、中文化，必须先有维护账本。
+## Worktree And Branches
 
-## Worktree 与分支
+- Use `codex/*` for new branches unless instructed otherwise.
+- Prefer an isolated worktree for substantial multi-file, provider, Runtime
+  Service, Web, architecture, or cleanup work.
+- Do not use `git reset --hard` or destructive checkout commands unless the
+  user explicitly requests them.
+- Preserve unrelated dirty changes. If another change affects the task, work
+  with it instead of reverting it.
 
-- 默认使用 `codex/*` 分支。
-- 非 trivial、多文件、provider、Runtime Service、Web、架构或清理任务，优先使用隔离 worktree。
-- 当前项目 worktree 约定路径：
+## Provider Gates
 
-```text
-C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\
-```
+Remote provider capabilities are closed by default and must be authorized by
+capability:
 
-如果当前 checkout 已经有必须集成的未提交成果，可以在当前工作树切到新的 `codex/*` 维护分支，但必须记录 dirty ownership ledger。
-
-禁止：
-
-- `git reset --hard` 或无账本删除。
-- 因为分支已 push 就直接合并。
-- 多个任务并行修改同一 schema、registry、CLI 入口或核心 contract。
-
-## Provider Gate
-
-远程 provider 默认关闭，必须按能力单独授权：
-
-| 能力 | 默认 | gate |
+| Capability | Default | Gate |
 |---|---|---|
-| LLM | 关闭 | `AFS_ALLOW_REMOTE_LLM=true` |
-| ASR | 关闭 | `AFS_ALLOW_REMOTE_ASR=true` |
-| image | 关闭 | `AFS_ALLOW_REMOTE_IMAGE=true` |
-| video | 关闭 | 任务级显式授权，或后续独立 gate |
-| external download | 关闭 | 任务级来源、用途、保存路径和清理策略 |
+| LLM | closed | `AFS_ALLOW_REMOTE_LLM=true` |
+| ASR | closed | `AFS_ALLOW_REMOTE_ASR=true` |
+| image | closed | `AFS_ALLOW_REMOTE_IMAGE=true` |
+| video | closed | task-level explicit authorization or a future separate gate |
+| external download | closed | task-level source, purpose, storage, and cleanup policy |
 
-授权 image 不代表授权 video、LLM、ASR 或下载。
+Image authorization does not authorize video, LLM, ASR, or external downloads.
 
-## 工程边界
+## Engineering Boundaries
 
-- schema-first / contract-first。
-- artifact-first，再做 UI。
-- harness-first，再接 agent/provider。
-- trace-first，再写结论。
-- 本地 deterministic 先通过，再打开 provider。
-- feedback 是 raw evidence，不自动成为 memory。
-- candidate memory 不是 durable memory。
-- runtime verification 不是 human acceptance。
-- provider smoke 不是 business validation。
+- Prefer schema-first and contract-first changes.
+- Build deterministic harnesses before provider paths.
+- Treat runtime verification, provider smoke, human acceptance, business
+  validation, and durable memory promotion as different evidence levels.
+- Feedback and candidate memory are evidence, not automatic durable memory.
+- Runtime success does not prove human acceptance or business validation.
+- Provider smoke does not prove generated-media QA.
 
-## 前后端边界
+## Frontend / Runtime Boundary
 
-后端对接面是 Runtime Service，不是 CLI 内部实现。
+The frontend talks to the Runtime Service boundary, not CLI internals.
 
-前端可以使用：
+Frontend-safe values include:
 
 - `project_id`
 - `job_id`
 - `artifact_id`
-- safe summary
-- safe manifest
-- OpenAPI
+- safe summaries
+- safe manifests
+- OpenAPI fields
 
-前端不应接触：
+Frontend code must not receive provider secrets, local absolute private asset
+paths, signed URLs, generated media bytes, or internal orchestration details.
 
-- provider secret。
-- 本地素材绝对路径。
-- signed URL。
-- 生成媒体字节。
-- CLI 内部编排细节。
+## Documentation Maintenance
 
-## 文件维护规则
+Keep the active documentation surface small and current:
 
-- 理想单文件不超过 300 行。
-- 301-500 行进入维护审计 warning。
-- 超过 500 行必须有拆分计划或充分理由。
-- 新模块只做一个职责。
-- API route、job orchestration、artifact store、provider adapter、report writer、UI render 不要混在一个文件里。
+- `docs/AOS_CURRENT_STATE.md` is the compact startup surface.
+- `docs/README.md` is the documentation entrypoint.
+- `docs/company_operating_model.md` and `docs/GFR_EXECUTION_PROJECTION.md` are
+  AOS/GFR projections, not source rules.
+- Current architecture and contract documents belong under `docs/architecture/`
+  or focused root docs.
 
-## 本地配置
+Long historical ledgers and handoff archives are not active state. Delete them
+from the working tree when replacement contracts or Git history are sufficient.
+Do not keep noisy documents merely because they once supported a loop.
 
-- 推荐 Python 3.12。
-- 项目声明 `>=3.11,<3.13`。
-- 不要切到 Python 3.13，除非媒体、ASR、model/provider 依赖已验证。
-- 只提交 example config。
-- `configs/models.yaml` 是本地配置，已被 git ignore。
-- `.env`、`.dev.vars` 只用于本地，不能提交。
+Do not resurrect `DEVLOG.md`, `TASK_TRACKER.md`, `docs/handoff/INDEX.md`, or a
+retired handoff archive to satisfy a worker habit or resolve a rebase conflict.
+Use the PR body, thread closeout, and focused current state/program documents
+unless a task-specific audit reason proves a durable repo record is required.
 
-## 验证
+## Verification
 
-改动完成前，按风险运行相关命令。基础命令：
+Choose verification by blast radius. Common commands:
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main --help
 .\.venv\Scripts\python.exe -m apps.cli.main version
 .\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
 git diff --check
 ```
 
-维护/清理/中文化任务追加：
+For release/runtime freshness claims, also verify:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\maintenance_audit.py
+git -C <deploy-checkout> rev-parse HEAD
+systemctl status <service> --no-pager
+ss -ltnp | Select-String "8790|8791|8792"
+curl -fsS http://127.0.0.1:8790/health
 ```
 
-## 记录
+If service restart requires an unavailable sudo or service-manager capability,
+record `deploy_dir_updated` plus `runtime_stale`; do not claim delivery and do
+not bypass systemd by killing the process unless the task explicitly authorizes
+that emergency route.
 
-有意义的工作必须更新项目记录：
+For COS/GFR projection work, also use the current `10-Startup` audit:
 
-- `TASK_TRACKER.md`
-- `DEVLOG.md`
-- `docs/handoff/`
-- `docs/maintenance/`
-
-需要反馈到 COS 的经验只能进入 `10-Startup` 的 candidate/limited 流程，不能由 Agent 自动晋升为 active rule。
-## COS / GFR Projection
-
-When connecting this repo to Company OS, use the source-KB control entry first:
-
-```text
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
-D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
-D:\Projects\AgentFlowStudio\docs\GFR_EXECUTION_PROJECTION.md
+```powershell
+python "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\tools\gfr_audit.py" --root "D:\Learning materials\Learning_notes\10-Startup" --pack-index "D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json"
 ```
 
-GFR compiles each task into identity, context pack, read/write scope, evidence
-standard, provider/tool gates, verification route, and Company OS feedback
-route. Do not read old AFS drafts by default.
+## Records
 
-AFS repo remains the execution projection. Company OS source rules, private
-strategy, secrets, customer material, real costs, and unpublished commercial
-judgments stay in `10-Startup` or secure local storage, not this repo.
+Update project records only when the update creates reusable current state,
+verification evidence, integration decisions, or handoff value. Prefer one
+focused current surface over multiple governance artifacts. Do not write
+secrets, provider raw responses, signed URLs, private strategy, real customer
+data, real costs, or unpublished commercial judgments into this repository.
+
+Experience that should feed back to Company OS must enter the `10-Startup`
+candidate/limited flow. Agents cannot promote repo observations into active
+Company OS rules on their own.

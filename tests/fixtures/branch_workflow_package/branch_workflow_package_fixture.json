@@ -1,0 +1,605 @@
+{
+  "fixture_id": "branch_workflow_package_contract_fixture_v0",
+  "fixture_claim_level": "deterministic_branch_workflow_package_contract_only",
+  "schema_version": "0.1.0",
+  "source_branch_package_fixture_path": "tests/fixtures/interactive_manga_branch_package/branch_package_fixture.json",
+  "source_boundary_refs": ["docs/AOS_CURRENT_STATE.md", "docs/architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md", "interactive_manga_branch_package_fixture_v0"],
+  "residual_boundaries": ["pb3_local_package_commit_8296afa31b639224bcb3e7c1f8dea70000ea00b4_review_pending_local_package", "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate", "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready", "stage1_evaluator_system_error_residual"],
+  "non_claims": {
+    "reader_playback": false,
+    "public_interactive_runtime": false,
+    "runtime_implemented": false,
+    "runtime_route": false,
+    "openapi_path": false,
+    "studio_ui": false,
+    "provider_prompt_inclusion": false,
+    "provider_smoke": false,
+    "generated_media": false,
+    "generated_media_quality": false,
+    "human_creative_acceptance": false,
+    "business_validation": false,
+    "public_release": false,
+    "public_legal_patent_readiness": false,
+    "deploy_runtime_health": false,
+    "companyos_projection": false,
+    "durable_memory_promotion": false,
+    "cos_active_rule_promotion": false,
+    "final_schema_acceptance": false,
+    "product_readiness": false
+  },
+  "branch_workflow_package": {
+    "package_id": "branch_pkg_map_choice_demo",
+    "package_ref": "branch_package:map-choice-demo",
+    "project_id": "project:demo-afs-stage1",
+    "source_script_ref": "script:demo-segment-001",
+    "source_storyboard_ref": "storyboard:demo-001",
+    "package_stage": "review_ready",
+    "production_graph_references": [
+      {
+        "production_graph_ref": "production_graph_ref:storyboard-demo-001",
+        "artifact_id": "artifact_production_graph_snapshot_demo",
+        "node_refs": [
+          "production_graph_node:shot-base-001"
+        ],
+        "extension_policy": "reference_only_no_node_write",
+        "graph_node_writes_required": false,
+        "branch_graph_node_refs": []
+      }
+    ],
+    "review_status": {
+      "review_state": "structure_verified_pending_review",
+      "open_questions": [
+        {
+          "question_ref": "review_question:branch-specific-assets-confirmation",
+          "question_state": "open",
+          "residual_ref": "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+          "target_refs": [
+            "asset_need:ally-trust-reveal",
+            "asset_need:shadow-cover-hide"
+          ],
+          "evidence_refs": [
+            "evidence_req:implementation-ready-assets"
+          ],
+          "blocked_stages": [
+            "accepted_for_generation_planning"
+          ],
+          "implementation_ready_evidence_allowed": false,
+          "owner": "future_asset_confirmation_lane",
+          "next_action": "Confirm or explicitly exclude branch-specific candidate assets before generation planning.",
+          "close_condition": "owner_decision_recorded_or_branch_specific_assets_remain_excluded"
+        },
+        {
+          "question_ref": "review_question:pb3-residual-boundary-final-schema",
+          "question_state": "residual_open",
+          "residual_ref": "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready",
+          "target_refs": [
+            "branch_package:map-choice-demo"
+          ],
+          "evidence_refs": [
+            "evidence_req:workflow-structure"
+          ],
+          "blocked_stages": [
+            "accepted_for_generation_planning"
+          ],
+          "implementation_ready_evidence_allowed": false,
+          "owner": "future_spec2_evaluator_lane",
+          "next_action": "Run the future SPEC2 evaluator gate before final schema or generation-planning acceptance.",
+          "close_condition": "residual_evaluator_gate_passes_or_package_stays_review_only"
+        }
+      ],
+      "blockers": ["branch_specific_assets_unconfirmed"],
+      "residual_boundary": {
+        "boundary_ref": "residual_boundary:t54-pb3-review-envelope",
+        "residual_risk_state": "open_residual_review_only",
+        "residual_ref": "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+        "source_residual_refs": [
+          "pb3_local_package_commit_8296afa31b639224bcb3e7c1f8dea70000ea00b4_review_pending_local_package",
+          "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+          "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready",
+          "stage1_evaluator_system_error_residual"
+        ],
+        "allowed_stage": "review_ready",
+        "blocked_stages": [
+          "accepted_for_generation_planning"
+        ],
+        "implementation_ready_evidence_allowed": false,
+        "claim_boundary": "review_ready_with_residual_risk_not_schema_or_product_acceptance",
+        "protected_non_claim_refs": [
+          "final_schema_acceptance",
+          "product_readiness",
+          "provider_smoke",
+          "generated_media_quality",
+          "human_creative_acceptance",
+          "business_validation"
+        ]
+      }
+    },
+    "fixed_asset_confirmation_evidence": {
+      "evidence_ref": "fixed_asset_confirmation_evidence:branch-workflow-package-v0",
+      "evidence_origin": "repo_local_fixture",
+      "confirmation_state": "pending_branch_specific_confirmation",
+      "local_confirmation_evidence_refs": [
+        "evidence:fixed-asset-confirmation-map-v1"
+      ],
+      "provider_prompt_inclusion_allowed": false,
+      "graph_node_writes_required": false,
+      "asset_confirmation_records": [
+        {
+          "confirmation_ref": "asset_confirmation:map-v1",
+          "evidence_origin": "repo_local_fixture",
+          "asset_need_ref": "asset_need:map-shared",
+          "source_asset_ref": "fixed_asset:map-v1",
+          "target_refs": [
+            "asset_need:map-shared",
+            "fixed_asset:map-v1"
+          ],
+          "confirmation_source_refs": [
+            "evidence:human-gate-map-v1"
+          ],
+          "owner_decision_ref": "owner_decision:map-v1-fixed",
+          "reviewer_decision_ref": "reviewer_decision:map-v1-fixed",
+          "decision_state": "confirmed_for_generation_planning",
+          "close_condition_ref": "close_condition:map-v1-fixed-non-claim-preserving",
+          "close_condition": "non_claim_preserving_owner_decision_recorded",
+          "implementation_ready_evidence_allowed": true,
+          "provider_prompt_inclusion_allowed": false,
+          "graph_node_writes_required": false,
+          "protected_non_claim_refs": [
+            "provider_smoke",
+            "generated_media_quality",
+            "human_creative_acceptance",
+            "business_validation",
+            "final_schema_acceptance",
+            "product_readiness"
+          ]
+        }
+      ],
+      "residual_question_closures": []
+    },
+    "choice_points": [
+      {
+        "choice_point_id": "cp_reveal_map",
+        "choice_point_ref": "choice_point:reveal-map",
+        "source_ref": "shot:base-001",
+        "prompt_to_creator": "Production-only choice: reveal the map to the ally now or keep it hidden.",
+        "decision_axis": "reveal",
+        "required_branch_count": 2,
+        "shared_setup_shot_refs": [
+          "shot:base-001"
+        ],
+        "branch_path_refs": [
+          "branch_path:reveal",
+          "branch_path:hide"
+        ],
+        "choice_constraints": [
+          "The folded map design remains the same in both paths."
+        ],
+        "status": "needs_review"
+      }
+    ],
+    "branch_paths": [
+      {
+        "branch_path_id": "path_reveal",
+        "branch_path_ref": "branch_path:reveal",
+        "choice_point_id": "cp_reveal_map",
+        "choice_point_ref": "choice_point:reveal-map",
+        "path_label": "reveal_map",
+        "narrative_consequence": "The ally learns the route early and trust improves while pursuit risk increases.",
+        "entry_state": "map hidden; ally suspicious; pursuer nearby",
+        "exit_state": "map known to ally; trust improves; pursuer risk increases",
+        "converges_to": "shot:base-002",
+        "branch_shot_refs": [
+          "branch_shot:reveal-001",
+          "branch_shot:reveal-002"
+        ],
+        "asset_need_refs": [
+          "asset_need:map-shared",
+          "asset_need:ally-trust-reveal"
+        ],
+        "continuity_constraint_refs": [
+          "continuity:map-design-shared",
+          "continuity:ally-costume-shared",
+          "continuity:trust-state-divergence"
+        ],
+        "evidence_state": "structure_verified"
+      },
+      {
+        "branch_path_id": "path_hide",
+        "branch_path_ref": "branch_path:hide",
+        "choice_point_id": "cp_reveal_map",
+        "choice_point_ref": "choice_point:reveal-map",
+        "path_label": "hide_map",
+        "narrative_consequence": "The ally stays suspicious but the pursuer is delayed.",
+        "entry_state": "map hidden; ally suspicious; pursuer nearby",
+        "exit_state": "map remains hidden; trust worsens; pursuer risk decreases",
+        "converges_to": "shot:base-002",
+        "branch_shot_refs": [
+          "branch_shot:hide-001",
+          "branch_shot:hide-002"
+        ],
+        "asset_need_refs": [
+          "asset_need:map-shared",
+          "asset_need:shadow-cover-hide"
+        ],
+        "continuity_constraint_refs": [
+          "continuity:map-design-shared",
+          "continuity:ally-costume-shared",
+          "continuity:trust-state-divergence"
+        ],
+        "evidence_state": "structure_verified"
+      }
+    ],
+    "branch_shots": [
+      {
+        "branch_shot_id": "reveal_shot_001",
+        "branch_shot_ref": "branch_shot:reveal-001",
+        "branch_path_ref": "branch_path:reveal",
+        "shot_role": "choice_consequence",
+        "storyboard_ref": "storyboard:demo-001",
+        "base_shot_ref": "shot:base-001",
+        "branch_specific_shot_ref": "shot:branch-reveal-001",
+        "production_graph_ref": "production_graph_ref:storyboard-demo-001",
+        "required_assets": [
+          "asset_need:map-shared",
+          "fixed_asset:map-v1",
+          "asset_need:ally-trust-reveal"
+        ],
+        "continuity_notes": [
+          "Map tear and ally costume remain stable."
+        ],
+        "evidence_refs": [
+          "evidence:branch-structure-check"
+        ],
+        "handoff_state": "ready_for_generation_planning"
+      },
+      {
+        "branch_shot_id": "reveal_shot_002",
+        "branch_shot_ref": "branch_shot:reveal-002",
+        "branch_path_ref": "branch_path:reveal",
+        "shot_role": "emotional_beat",
+        "storyboard_ref": "storyboard:demo-001",
+        "base_shot_ref": "shot:base-002",
+        "branch_specific_shot_ref": "shot:branch-reveal-002",
+        "production_graph_ref": "production_graph_ref:storyboard-demo-001",
+        "required_assets": [
+          "asset_need:map-shared",
+          "asset_need:ally-trust-reveal"
+        ],
+        "continuity_notes": [
+          "Trust state may diverge only inside the reveal path."
+        ],
+        "evidence_refs": [
+          "evidence:branch-structure-check"
+        ],
+        "handoff_state": "ready_for_generation_planning"
+      },
+      {
+        "branch_shot_id": "hide_shot_001",
+        "branch_shot_ref": "branch_shot:hide-001",
+        "branch_path_ref": "branch_path:hide",
+        "shot_role": "choice_consequence",
+        "storyboard_ref": "storyboard:demo-001",
+        "base_shot_ref": "shot:base-001",
+        "branch_specific_shot_ref": "shot:branch-hide-001",
+        "production_graph_ref": "production_graph_ref:storyboard-demo-001",
+        "required_assets": [
+          "asset_need:map-shared",
+          "fixed_asset:map-v1",
+          "asset_need:shadow-cover-hide"
+        ],
+        "continuity_notes": [
+          "Map tear and ally costume remain stable."
+        ],
+        "evidence_refs": [
+          "evidence:branch-structure-check"
+        ],
+        "handoff_state": "ready_for_generation_planning"
+      },
+      {
+        "branch_shot_id": "hide_shot_002",
+        "branch_shot_ref": "branch_shot:hide-002",
+        "branch_path_ref": "branch_path:hide",
+        "shot_role": "emotional_beat",
+        "storyboard_ref": "storyboard:demo-001",
+        "base_shot_ref": "shot:base-002",
+        "branch_specific_shot_ref": "shot:branch-hide-002",
+        "production_graph_ref": "production_graph_ref:storyboard-demo-001",
+        "required_assets": [
+          "asset_need:map-shared",
+          "asset_need:shadow-cover-hide"
+        ],
+        "continuity_notes": [
+          "Trust state may diverge only inside the hide path."
+        ],
+        "evidence_refs": [
+          "evidence:branch-structure-check"
+        ],
+        "handoff_state": "ready_for_generation_planning"
+      }
+    ],
+    "asset_needs": [
+      {
+        "asset_need_id": "asset_map",
+        "asset_need_ref": "asset_need:map-shared",
+        "asset_kind": "prop",
+        "scope": "shared_across_package",
+        "source_asset_ref": "fixed_asset:map-v1",
+        "confirmation_state": "fixed_asset_available",
+        "implementation_ready_evidence_allowed": true,
+        "reuse_policy": "Reuse the same folded map design across reveal and hide paths.",
+        "negative_constraints": [
+          "Do not change the tear mark on the upper right corner.",
+          "Do not replace the map with a phone or tablet."
+        ],
+        "provider_enrichment_gate": "closed_future_gate_required",
+        "provider_prompt_inclusion_allowed": false
+      },
+      {
+        "asset_need_id": "asset_ally_trust_reveal",
+        "asset_need_ref": "asset_need:ally-trust-reveal",
+        "asset_kind": "character",
+        "scope": "branch_specific",
+        "source_asset_ref": "asset_candidate:hero-map",
+        "confirmation_state": "candidate",
+        "implementation_ready_evidence_allowed": false,
+        "reuse_policy": "Only applies to reveal path expression and gesture changes.",
+        "negative_constraints": [
+          "Do not alter the ally costume identity."
+        ],
+        "provider_enrichment_gate": "closed_future_gate_required",
+        "provider_prompt_inclusion_allowed": false
+      },
+      {
+        "asset_need_id": "asset_shadow_cover_hide",
+        "asset_need_ref": "asset_need:shadow-cover-hide",
+        "asset_kind": "scene",
+        "scope": "branch_specific",
+        "source_asset_ref": null,
+        "confirmation_state": "candidate",
+        "implementation_ready_evidence_allowed": false,
+        "reuse_policy": "Only applies to hide path cover-shadow composition.",
+        "negative_constraints": [
+          "Do not introduce a new location."
+        ],
+        "provider_enrichment_gate": "closed_future_gate_required",
+        "provider_prompt_inclusion_allowed": false
+      }
+    ],
+    "continuity_constraints": [
+      {
+        "constraint_id": "cont_map_design_shared",
+        "constraint_ref": "continuity:map-design-shared",
+        "constraint_type": "prop",
+        "applies_to": [
+          "branch_path:reveal",
+          "branch_path:hide",
+          "asset_need:map-shared"
+        ],
+        "must_remain_stable": [
+          "Folded paper map silhouette",
+          "Tear mark on upper right corner"
+        ],
+        "allowed_divergence": [
+          "Whether the ally has seen the map"
+        ],
+        "risk_level": "medium",
+        "review_method": "structural_check",
+        "status": "structure_verified"
+      },
+      {
+        "constraint_id": "cont_ally_costume_shared",
+        "constraint_ref": "continuity:ally-costume-shared",
+        "constraint_type": "wardrobe",
+        "applies_to": [
+          "branch_path:reveal",
+          "branch_path:hide"
+        ],
+        "must_remain_stable": [
+          "Ally jacket color",
+          "Satchel strap direction"
+        ],
+        "allowed_divergence": [
+          "Expression and hand position"
+        ],
+        "risk_level": "low",
+        "review_method": "structural_check",
+        "status": "structure_verified"
+      },
+      {
+        "constraint_id": "cont_trust_state_divergence",
+        "constraint_ref": "continuity:trust-state-divergence",
+        "constraint_type": "branch_logic",
+        "applies_to": [
+          "branch_path:reveal",
+          "branch_path:hide",
+          "branch_shot:reveal-002",
+          "branch_shot:hide-002"
+        ],
+        "must_remain_stable": [
+          "Both paths begin with the same suspicion state"
+        ],
+        "allowed_divergence": [
+          "Reveal path improves trust and increases pursuer risk",
+          "Hide path worsens trust and reduces pursuer risk"
+        ],
+        "risk_level": "medium",
+        "review_method": "structural_check",
+        "status": "structure_verified"
+      }
+    ],
+    "evidence_requirements": [
+      {
+        "evidence_requirement_id": "ev_workflow_structure",
+        "evidence_requirement_ref": "evidence_req:workflow-structure",
+        "evidence_type": "structure",
+        "evidence_origin": "repo_local_fixture",
+        "required_for_stage": "review_ready",
+        "source_refs": [
+          "storyboard:demo-001",
+          "branch_package:map-choice-demo"
+        ],
+        "accepted_evidence_states": [
+          "structure_verified"
+        ],
+        "missing_evidence_action": "block",
+        "evidence_state": "structure_verified",
+        "mapped_refs": {
+          "storyboard_refs": [
+            "storyboard:demo-001"
+          ],
+          "production_graph_artifact_refs": [
+            "artifact_production_graph_snapshot_demo"
+          ],
+          "asset_refs": [
+            "asset_need:map-shared",
+            "fixed_asset:map-v1"
+          ],
+          "candidate_asset_refs": [
+            "asset_need:ally-trust-reveal",
+            "asset_need:shadow-cover-hide"
+          ],
+          "evidence_refs": [
+            "evidence:storyboard-safe-manifest",
+            "evidence:branch-structure-check"
+          ],
+          "handoff_envelope_refs": [
+            "handoff:t54-branch-workflow-review"
+          ]
+        }
+      },
+      {
+        "evidence_requirement_id": "ev_implementation_ready_assets",
+        "evidence_requirement_ref": "evidence_req:implementation-ready-assets",
+        "evidence_type": "implementation_ready_asset",
+        "evidence_origin": "repo_local_fixture",
+        "required_for_stage": "accepted_for_generation_planning",
+        "source_refs": [
+          "fixed_asset:map-v1",
+          "asset_need:ally-trust-reveal",
+          "asset_need:shadow-cover-hide"
+        ],
+        "accepted_evidence_states": [
+          "fixed_asset_available",
+          "owner_decision_recorded"
+        ],
+        "missing_evidence_action": "block",
+        "evidence_state": "partial",
+        "evidence_gap_reason": "branch-specific candidate assets are not confirmed for implementation-ready evidence",
+        "implementation_ready_evidence_refs": [
+          "asset_need:map-shared",
+          "fixed_asset:map-v1"
+        ],
+        "excluded_unconfirmed_candidate_refs": [
+          "asset_need:ally-trust-reveal",
+          "asset_need:shadow-cover-hide"
+        ],
+        "mapped_refs": {
+          "storyboard_refs": [
+            "storyboard:demo-001"
+          ],
+          "production_graph_artifact_refs": [
+            "artifact_production_graph_snapshot_demo"
+          ],
+          "asset_refs": [
+            "asset_need:map-shared",
+            "fixed_asset:map-v1"
+          ],
+          "candidate_asset_refs": [
+            "asset_need:ally-trust-reveal",
+            "asset_need:shadow-cover-hide"
+          ],
+          "evidence_refs": [
+            "evidence:human-gate-map-v1",
+            "evidence:branch-structure-check"
+          ],
+          "handoff_envelope_refs": [
+            "handoff:t54-branch-workflow-review"
+          ]
+        }
+      },
+      {
+        "evidence_requirement_id": "ev_handoff_non_claims",
+        "evidence_requirement_ref": "evidence_req:handoff-non-claims",
+        "evidence_type": "handoff",
+        "evidence_origin": "repo_local_fixture",
+        "required_for_stage": "review_ready",
+        "source_refs": [
+          "handoff:t54-branch-workflow-review"
+        ],
+        "accepted_evidence_states": [
+          "structure_verified"
+        ],
+        "missing_evidence_action": "block",
+        "evidence_state": "structure_verified",
+        "mapped_refs": {
+          "storyboard_refs": [
+            "storyboard:demo-001"
+          ],
+          "production_graph_artifact_refs": [
+            "artifact_production_graph_snapshot_demo"
+          ],
+          "asset_refs": [
+            "fixed_asset:map-v1"
+          ],
+          "candidate_asset_refs": [],
+          "evidence_refs": [
+            "evidence:branch-structure-check"
+          ],
+          "handoff_envelope_refs": [
+            "handoff:t54-branch-workflow-review"
+          ]
+        }
+      }
+    ],
+    "handoff": {
+      "handoff_id": "handoff_t54_branch_workflow_review",
+      "handoff_ref": "handoff:t54-branch-workflow-review",
+      "handoff_target": "ceo_integration_review",
+      "next_owner": "ceo_integration_lane",
+      "next_action": "review branch workflow package readiness wrapper before Runtime OpenAPI Studio provider storage or reader work",
+      "write_scope_proposal": [
+        "contract review only",
+        "future lanes must separately authorize runtime UI provider storage or reader surfaces"
+      ],
+      "verification_route": [
+        "focused branch_workflow_package pytest",
+        "T53 interactive_manga_branch_package tests",
+        "T52 shared_object_evidence tests",
+        "algorithm library contract tests",
+        "maintenance audit",
+        "git diff check"
+      ],
+      "target_refs": [
+        "branch_package:map-choice-demo",
+        "choice_point:reveal-map",
+        "branch_path:reveal",
+        "branch_path:hide",
+        "production_graph_ref:storyboard-demo-001"
+      ],
+      "evidence_refs": [
+        "evidence:branch-structure-check",
+        "evidence:storyboard-safe-manifest"
+      ],
+      "blocked_reasons": [
+        "branch_specific_assets_need_future_confirmation_before_generation"
+      ],
+      "close_condition": "implementation_ready_for_review_or_blocked_with_reason",
+      "non_claims": {
+        "reader_playback": false,
+        "runtime_route": false,
+        "openapi_path": false,
+        "studio_ui": false,
+        "provider_prompt_inclusion": false,
+        "provider_smoke": false,
+        "generated_media_quality": false,
+        "human_creative_acceptance": false,
+        "business_validation": false,
+        "deploy_runtime_health": false,
+        "companyos_projection": false,
+        "cos_active_rule_promotion": false,
+        "final_schema_acceptance": false,
+        "product_readiness": false
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_professional_prompt_contract import apply_professional_slot_overrides
 
 
 ZH_SUBJECT_PATTERN = re.compile(r"(一个|一位|这位|那个)?(男孩|女孩|男人|女人|少年|少女|老人|侦探|创始人|导演|艺术家|角色[A-Z]?)")
@@ -35,7 +36,7 @@ def extract_prompt_slots(request: PromptOptimizationRequest) -> dict[str, str]:
         slots["asset_refs"] = ",".join(request.asset_refs)
     if request.director_setup:
         slots["director_setup"] = _director_setup_summary(request.director_setup.model_dump(mode="json"))
-    return slots
+    return apply_professional_slot_overrides(request, slots)
 
 
 def _contains_zh(value: str) -> bool:

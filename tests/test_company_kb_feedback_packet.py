@@ -130,6 +130,7 @@ def test_candidate_packet_example_is_registered_candidate_only_contract() -> Non
     assert "company_kb_feedback_candidates_not_written" in rule_ids
 
 
+@pytest.mark.legacy(reason="production-memory CLI surface is retired from the product command registry")
 def test_cli_company_kb_feedback_candidate_packet_writes_json_and_markdown(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     report_dir = tmp_path / "report"

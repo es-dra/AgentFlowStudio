@@ -2,38 +2,42 @@ import { assetsFromNode, carryChainItems, assetCarryLabel, assetCarryState, asse
 import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { icon } from "./icons.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
+import { canRunNodeGeneration } from "./node-actions.js";
+import { generationStatusCard } from "./generation-status-view.js";
+import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
+import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
   if (node.collapsed) return out;
   const carry = carryChainView(node);
   if (carry) out.push(carry);
-  if (node.type === "director") return directorBody(node, def);
-  if (node.status === "generating") return generationBody(node);
-  if (node.status === "cancelled") return cancelledBody(node);
-  if (node.type === "image" && node.status === "complete" && node.previewUrl) return completeBody(node);
-  if (node.status === "complete" && node.result) return completeBody(node);
-  if (node.status === "error") return errorBody(node);
+  if (node.type === "director") return withCreativeRuntimeContract(node, directorBody(node, def));
+  if (node.status === "generating") return withCreativeRuntimeContract(node, generationBody(node));
+  if (node.status === "cancelled") return withCreativeRuntimeContract(node, cancelledBody(node));
+  if (node.status === "partial") return withCreativeRuntimeContract(node, partialBody(node));
+  if (node.type === "image" && node.status === "complete" && node.previewUrl) {
+    return withCreativeRuntimeContract(node, completeBody(node));
+  }
+  if (node.status === "complete" && node.result) return withCreativeRuntimeContract(node, completeBody(node));
+  if (node.status === "error") return withCreativeRuntimeContract(node, errorBody(node));
   if (node.content) {
     out.push(contentBlock(node, store));
-    return out;
+    return withCreativeRuntimeContract(node, out);
   }
-  return emptyBody(node, def);
+  return withCreativeRuntimeContract(node, emptyBody(node, def));
 }
 
 export function candidatePreviews(node) {
-  const raw = node.params?.candidatePreviewUrls || node.params?.candidate_previews || node.params?.candidates || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => (typeof item === "string" ? { url: item } : item))
-    .filter((item) => item?.url || item?.preview_url);
+  return candidatePreviewsFromNode(node);
 }
 
 export function generationProgress(node) {
   const value = node.params?.progressPercent ?? node.params?.jobProgress?.percent ?? node.params?.terminalProgress?.percent;
   const mode = String(node.params?.jobProgress?.mode || "");
-  if (mode === "indeterminate" || mode === "queued") {
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) {
     return {
       percent: null,
       mode,
@@ -42,8 +46,6 @@ export function generationProgress(node) {
       hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
     };
   }
-  const percent = Number(value);
-  if (!Number.isFinite(percent)) return null;
   return {
     percent: Math.max(0, Math.min(100, Math.round(percent))),
     mode,
@@ -54,16 +56,7 @@ export function generationProgress(node) {
 }
 
 export function statusLabel(status) {
-  return {
-    empty: "待生成",
-    idle: "待生成",
-    running: "生成中",
-    generating: "生成中",
-    pending: "排队中",
-    complete: "已完成",
-    error: "需检查",
-    cancelled: "已取消",
-  }[status] || "待生成";
+  return studioStatusLabel(status, "草稿");
 }
 
 export function escapeHtml(value) {
@@ -78,10 +71,15 @@ export function nodeBodySignature(node) {
     node.result ? node.result.length : 0,
     node.previewUrl || "",
     node.params?.previewAspectRatio || "",
-    candidatePreviews(node).map((item) => item.url || item.preview_url || "").join(","),
+    candidatePreviews(node).map((item) => [
+      item.candidate_id || "",
+      item.status || item.state || "",
+      item.url || item.preview_url || "",
+    ].join(":")).join(","),
     generationProgress(node)?.percent ?? "",
     node.params?.visualAssets?.length || 0,
     node.params?.lastContextBundle?.included_assets?.length || 0,
+    node.params?.lastCreativeRuntimeContractSummary?.contract_id || "",
     carryChainItems(node).map((asset) => `${asset.asset_id || asset.assetId || ""}:${assetCarryState(asset)}`).join(","),
     node.type,
     node.collapsed ? 1 : 0,
@@ -111,6 +109,7 @@ function directorBody(node, def) {
 
 function generationBody(node) {
   const out = [generationProgressView(node)];
+  out.push(generationStatusCard(node, { compact: true, refs: false }));
   if (node.result) out.push(resultView(node));
   return out;
 }
@@ -129,13 +128,21 @@ function completeBody(node) {
   if (node.type === "image" && node.previewUrl) return imageCompleteBody(node);
   const ok = document.createElement("div");
   ok.className = "node-status success";
-  ok.innerHTML = `${icon("check", 13)}<span>已完成</span>`;
+  ok.innerHTML = `${icon("check", 13)}<span>complete · ready for review · not yet accepted</span>`;
   const bundle = bundleSummary(node);
   return bundle ? [ok, bundle, resultView(node)] : [ok, resultView(node)];
 }
 
 function imageCompleteBody(node) {
   return [resultView(node)];
+}
+
+function partialBody(node) {
+  const out = [generationStatusCard(node)];
+  const bundle = bundleSummary(node);
+  if (bundle) out.push(bundle);
+  if (node.result || node.previewUrl) out.push(resultView(node));
+  return out;
 }
 
 function contentBlock(node, store) {
@@ -147,9 +154,81 @@ function contentBlock(node, store) {
   return view;
 }
 
+function withCreativeRuntimeContract(node, items) {
+  const contract = creativeRuntimeContractSummary(node);
+  return contract ? [...items, contract] : items;
+}
+
+function creativeRuntimeContractSummary(node) {
+  const summary = node.params?.lastCreativeRuntimeContractSummary
+    || node.params?.promptOptimizationState?.creative_runtime_contract_summary;
+  if (!summary?.contract_id) return null;
+  const provider = safeSummaryObject(summary.provider_context);
+  const knowledge = safeSummaryObject(summary.knowledge_context);
+  const assets = safeSummaryObject(summary.asset_context);
+  const modelContext = safeSummaryObject(summary.model_call_context);
+  const artifact = safeSummaryObject(summary.artifact);
+  const box = document.createElement("details");
+  box.className = "creative-runtime-contract-summary";
+
+  const header = document.createElement("summary");
+  header.innerHTML = [
+    `<span>${icon("sparkles", 12)}</span>`,
+    `<strong>Creative contract</strong>`,
+    `<small>${escapeHtml(summary.operation || "runtime")} / ${escapeHtml(provider.required_gate || "gate pending")}</small>`,
+  ].join("");
+  box.appendChild(header);
+
+  const detail = document.createElement("div");
+  detail.className = "creative-runtime-contract-detail";
+  appendContractChip(detail, "contract", shortRef(summary.contract_id));
+  appendContractChip(detail, "model", shortRef(modelContext.context_id || summary.evidence_context?.model_call_context_id));
+  appendContractChip(detail, "provider", provider.provider_calls_started ? "started" : "not started");
+  appendContractChip(detail, "gate", [provider.required_gate, provider.gate_status].filter(Boolean).join(" / "));
+  appendContractChip(detail, "rules", safeCount(knowledge.rule_count));
+  appendContractChip(detail, "assets", [
+    `fixed ${safeCount(assets.fixed_asset_count)}`,
+    `draft ${safeCount(assets.draft_asset_count)}`,
+    `unresolved ${safeCount(assets.unresolved_asset_count)}`,
+  ].join(" / "));
+  appendContractChip(detail, "artifact", artifact.filename || "summary only");
+  appendContractChip(detail, "non-claims", safeArray(summary.non_claims).length);
+  box.appendChild(detail);
+
+  return box;
+}
+
+function appendContractChip(parent, label, value) {
+  const chip = document.createElement("span");
+  chip.className = "creative-runtime-contract-chip";
+  chip.textContent = `${label}: ${value === 0 ? "0" : String(value || "none")}`;
+  parent.appendChild(chip);
+}
+
+function safeSummaryObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function safeCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+}
+
+function shortRef(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= 18) return text;
+  return `${text.slice(0, 10)}...${text.slice(-6)}`;
+}
+
 function editableContentBlock(node, store, expanding) {
   const textarea = document.createElement("textarea");
-  textarea.className = `text-content-view node-content-editor${expanding ? " content-shimmer" : ""}`;
+  const assetCardEditor = node.params?.assetCardDraft ? " asset-card-content-editor" : "";
+  textarea.className = `text-content-view node-content-editor${assetCardEditor}${expanding ? " content-shimmer" : ""}`;
   textarea.value = node.content || "";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
@@ -177,10 +256,13 @@ function isEditableContentNode(node) {
 }
 
 function errorBody(node) {
+  const out = [generationStatusCard(node)];
   const err = document.createElement("div");
   err.className = "node-status error";
-  err.innerHTML = `${icon("x", 13)}<span>生成失败，可在节点菜单重试</span>`;
-  const out = [];
+  const message = canRunNodeGeneration(node)
+    ? "failed · retry failed items"
+    : "处理失败，请检查该节点的专用操作或错误详情";
+  err.innerHTML = `${icon("x", 13)}<span>${escapeHtml(message)}</span>`;
   const bundle = bundleSummary(node);
   if (bundle) out.push(err, bundle);
   else out.push(err);
@@ -210,7 +292,7 @@ function emptyBody(node, def) {
 function generationProgressView(node) {
   const progress = generationProgress(node);
   const status = document.createElement("div");
-  const isIndeterminate = !progress || progress?.mode === "indeterminate" || progress?.mode === "queued" || progress?.percent == null;
+  const isIndeterminate = !progress || progress?.percent == null;
   status.className = `node-status generation-progress-layer${isIndeterminate ? " indeterminate" : ""}`;
   const percentLabel = isIndeterminate ? (progress?.mode === "queued" ? "排队中" : "生成中") : `${progress.percent}%`;
   status.innerHTML = [

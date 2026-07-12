@@ -323,3 +323,126 @@
   gap: 5px;
   color: var(--text-primary);
 }
+
+.accepted-generation-plan-modal {
+  width: min(780px, calc(100vw - 80px));
+}
+
+.accepted-generation-plan-head small {
+  color: var(--text-faint);
+  margin-left: 8px;
+}
+
+.accepted-generation-plan-body,
+.accepted-plan-content {
+  display: grid;
+  gap: 12px;
+}
+
+.accepted-plan-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.accepted-plan-mode {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.accepted-plan-mode.active {
+  color: var(--text-primary);
+  border-color: rgba(90, 200, 250, 0.45);
+  background: rgba(90, 200, 250, 0.12);
+}
+
+.accepted-plan-status,
+.accepted-plan-empty,
+.accepted-plan-error,
+.accepted-plan-section {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+}
+
+.accepted-plan-status {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.accepted-plan-status span,
+.accepted-plan-empty svg,
+.accepted-plan-error svg {
+  color: var(--accent);
+}
+
+.accepted-plan-status.blocked span,
+.accepted-plan-error svg {
+  color: var(--danger);
+}
+
+.accepted-plan-status strong,
+.accepted-plan-empty strong,
+.accepted-plan-error strong {
+  display: block;
+  color: var(--text-primary);
+}
+
+.accepted-plan-status small,
+.accepted-plan-empty small,
+.accepted-plan-error small,
+.accepted-plan-list-empty {
+  color: var(--text-faint);
+}
+
+.accepted-plan-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.accepted-plan-metric {
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.accepted-plan-metric small {
+  display: block;
+  color: var(--text-faint);
+}
+
+.accepted-plan-metric strong {
+  display: block;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
+.accepted-plan-section h4 {
+  margin: 0 0 8px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.accepted-plan-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.accepted-plan-list span {
+  max-width: 100%;
+  border-radius: 7px;
+  padding: 5px 7px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  overflow-wrap: anywhere;
+}

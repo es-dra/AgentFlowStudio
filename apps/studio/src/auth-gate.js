@@ -1,12 +1,13 @@
 import { icon } from "./icons.js";
 import { el, showModal } from "./overlay.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
 
 export async function ensureAuthSession(runtime, options = {}) {
   let status;
   try {
     status = await runtime.authStatus();
-  } catch {
-    return { auth_required: false, authenticated: false, user: null };
+  } catch (error) {
+    return showAuthStatusBlocked(runtime, options, error);
   }
   if (!status?.auth_required || status.authenticated) return status;
   return showAuthGate(runtime, options);
@@ -44,6 +45,7 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
     const displayName = field("昵称", "text", "可选");
     const inviteCode = field("邀请码", "text", "由管理员分发");
     const error = el("div", "modal-error");
+    error.setAttribute("role", "alert");
     error.hidden = true;
     body.append(intro, email.wrap, password.wrap, displayName.wrap, inviteCode.wrap, error);
 
@@ -54,6 +56,8 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
 
     const close = showModal(modal, {
       closeOnOutside: false,
+      closeOnEscape: false,
+      initialFocus: email.input,
       onClose: () => {
         if (!settled) resolve({ auth_required: true, authenticated: false, user: null });
       },
@@ -110,7 +114,62 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
       }
     }
 
-    requestAnimationFrame(() => email.input.focus());
+  });
+}
+
+function showAuthStatusBlocked(runtime, options, initialError) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const modal = el("div", "modal compact auth-modal auth-status-blocked-modal");
+    const head = el("div", "modal-head auth-head");
+    const title = el("div", "auth-title");
+    title.appendChild(el("span", "auth-mark", "AFS"));
+    title.appendChild(el("strong", "", "无法确认账号状态"));
+    head.appendChild(title);
+
+    const body = el("div", "modal-body auth-body");
+    body.appendChild(el("p", "auth-copy", "Runtime 账号状态确认失败。已暂停项目加载、同步和 Runtime 写入；请检查 Runtime Service 后重试。"));
+    const error = el("div", "modal-error", safeError(initialError));
+    error.setAttribute("role", "alert");
+    body.appendChild(error);
+
+    const actions = el("div", "modal-actions auth-actions");
+    const retry = el("button", "primary-btn", "重试账号状态检查");
+    actions.appendChild(retry);
+    modal.append(head, body, actions);
+
+    const close = showModal(modal, {
+      closeOnOutside: false,
+      closeOnEscape: false,
+      initialFocus: retry,
+      ariaLabel: "Runtime auth status blocked",
+      onClose: () => {
+        if (!settled) resolve({ auth_status_unknown: true, blocked: true, authenticated: false, user: null });
+      },
+    });
+
+    retry.addEventListener("click", retryStatus);
+
+    async function retryStatus() {
+      retry.disabled = true;
+      retry.innerHTML = `${icon("clock", 14)}<span>检查中</span>`;
+      error.hidden = true;
+      try {
+        const status = await runtime.authStatus();
+        settled = true;
+        close();
+        if (!status?.auth_required || status.authenticated) {
+          resolve(status);
+          return;
+        }
+        resolve(await showAuthGate(runtime, options));
+      } catch (statusError) {
+        error.textContent = safeError(statusError);
+        error.hidden = false;
+        retry.disabled = false;
+        retry.textContent = "重试账号状态检查";
+      }
+    }
   });
 }
 
@@ -126,6 +185,5 @@ function field(label, type, placeholder) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "登录失败");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+  return formatRuntimeError(error, "认证请求失败，请检查 Runtime Service 后重试。");
 }

@@ -25,6 +25,18 @@
       "contract_surface": "raw_feedback"
     },
     {
+      "artifact_type": "agentflow_control_event",
+      "example_path": "examples/agentflow/control_events_active_pending.example.jsonl",
+      "doc_path": "docs/architecture/AFS_CONTROL_EVENT_REGISTER_CONTRACT.md",
+      "contract_surface": "control_event_log"
+    },
+    {
+      "artifact_type": "agentflow_control_register",
+      "example_path": "examples/agentflow/control_register_active_pending.example.json",
+      "doc_path": "docs/architecture/AFS_CONTROL_EVENT_REGISTER_CONTRACT.md",
+      "contract_surface": "control_register_materialization"
+    },
+    {
       "artifact_type": "agentflow_memory_candidate",
       "example_path": "examples/agentflow/memory_candidate.example.json",
       "doc_path": "docs/architecture/production_memory_architecture.md",
@@ -105,49 +117,49 @@
     {
       "artifact_type": "agentflow_intermediate_asset",
       "example_path": "examples/agentflow/intermediate_asset.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "intermediate_asset"
     },
     {
       "artifact_type": "agentflow_reusable_asset_profile",
       "example_path": "examples/agentflow/reusable_asset_profile.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "reusable_asset"
     },
     {
       "artifact_type": "agentflow_asset_reuse_decision",
       "example_path": "examples/agentflow/asset_reuse_decision.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "asset_reuse_decision"
     },
     {
       "artifact_type": "agentflow_production_asset_feedback_review",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "agentflow_production_asset_feedback_review"
     },
     {
       "artifact_type": "agentflow_production_asset_feedback_review_validation",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_validation.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "agentflow_production_asset_feedback_review_harness"
     },
     {
       "artifact_type": "agentflow_production_asset_feedback_review_gate",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_gate.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "agentflow_production_asset_feedback_review_gate"
     },
     {
       "artifact_type": "agentflow_production_asset_reuse_dry_run_plan",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_dry_run_plan.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "agentflow_production_asset_reuse_dry_run_plan"
     },
     {
       "artifact_type": "agentflow_production_asset_reuse_review",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "contract_surface": "agentflow_production_asset_reuse_review"
     }
   ],
@@ -163,6 +175,18 @@
     {
       "rule_id": "no_private_paths_or_secrets",
       "description": "Examples must not include private local paths, generated media, credentials, tokens, cookies, or signed URLs."
+    },
+    {
+      "rule_id": "control_event_archive_ordering",
+      "description": "Control archive execution must follow an explicit archive policy evaluation and confirmed ACK delivery."
+    },
+    {
+      "rule_id": "control_event_claim_non_claim_separation",
+      "description": "Claim-state changes and non-claim boundaries are separate first-class control events."
+    },
+    {
+      "rule_id": "control_event_worker_final_ingest_idempotency",
+      "description": "Worker-final ingest records canonical TD/BU/event ids, dedupes identical repeats, and rejects conflicting duplicate finals."
     },
     {
       "rule_id": "router_decision_only",

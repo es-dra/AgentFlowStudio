@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from apps.api.generation_path_contract import GenerationPathId, validate_generation_path_request_inputs
 
 
 ProjectStatus = Literal["in_progress", "blocked", "ready_for_next_round"]
@@ -173,25 +175,58 @@ class KeyframeGenerationRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class VideoInputSource(BaseModel):
+    source_mode: Literal[
+        "text_prompt",
+        "uploaded_image",
+        "upstream_uploaded_image",
+        "upstream_generated_image",
+        "visual_asset_reference",
+        "explicit_first_frame_selection",
+        "reference_video",
+        "director_setup",
+    ]
+    source_asset_id: str | None = Field(default=None, min_length=1)
+    source_node_id: str | None = None
+    source_job_id: str | None = None
+    visual_asset_id: str | None = None
+    role: Literal[
+        "prompt_only",
+        "first_frame",
+        "last_frame",
+        "reference_image",
+        "reference_video",
+        "director_setup",
+    ] = "first_frame"
+
+
 class VideoGenerationRequest(BaseModel):
     node_id: str | None = None
+    generation_path: GenerationPathId | None = None
     prompt_text: str = Field(min_length=1)
     optimized_prompt: str | None = None
     provider_service_id: str = "seedance_i2v"
-    first_frame_image_asset_id: str = Field(min_length=1)
+    first_frame_image_asset_id: str | None = Field(default=None, min_length=1)
     last_frame_image_asset_id: str | None = None
-    duration_sec: int = Field(default=5, gt=0)
+    reference_video_artifact_id: str | None = Field(default=None, min_length=1)
+    input_source: VideoInputSource | None = None
+    director_setup: DirectorSetup2D | None = None
+    duration_sec: int = Field(default=5, ge=1, le=15)
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
     motion: str = ""
     candidate_count: int = Field(default=1, ge=1, le=1)
-    node_parameters: dict[str, Any] | None = None
     context_subgraph: ContextSubgraph | None = None
     temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
     temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)
     preflight_token: str | None = None
     quota_override_confirmed: bool = False
     generated_at: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_generation_path_inputs(self) -> "VideoGenerationRequest":
+        validate_generation_path_request_inputs(self)
+        return self
 
 
 class VideoRevisionRequest(BaseModel):
@@ -211,7 +246,8 @@ class VideoRevisionRequest(BaseModel):
     provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str = Field(min_length=1)
     last_frame_image_asset_id: str | None = None
-    duration_sec: int = Field(default=5, gt=0)
+    input_source: VideoInputSource | None = None
+    duration_sec: int = Field(default=5, ge=1, le=15)
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
     motion: str = ""
@@ -236,6 +272,7 @@ class GenerationComparisonRequest(BaseModel):
     provider_service_id: str = "image_relay"
     context_subgraph: ContextSubgraph | None = None
     manual_scores: dict[str, Any] = Field(default_factory=dict)
+    preflight_token: str | None = None
     generated_at: str = Field(min_length=1)
 
 
@@ -248,6 +285,10 @@ class VisualAssetPromoteRequest(BaseModel):
     negative_locks: list[str] = Field(default_factory=list)
     source_node_id: str | None = None
     supersedes_asset_id: str | None = None
+    reuse_intent: Literal["link_existing", "replace", "create_new"] | None = None
+    link_existing_asset_id: str | None = None
+    source_human_gate_id: str | None = None
+    source_asset_card_candidate_id: str | None = None
     review_decision: Literal["fixed", "rejected"]
     reviewed_at: str = Field(min_length=1)
 
@@ -294,6 +335,41 @@ class FeedbackRecordRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class FeedbackCandidatePromotionRequest(BaseModel):
+    feedback_artifact_id: str = Field(min_length=1)
+    candidate_id: str = Field(min_length=1)
+    decision: Literal["promote_to_context_overlay", "reject", "needs_more_evidence"]
+    rationale: str = Field(min_length=1)
+    reviewed_at: str = Field(min_length=1)
+
+
+class FeedbackCandidateContextOverlayRequest(BaseModel):
+    promotion_decision_artifact_id: str = Field(min_length=1)
+    overlay_intent: str = Field(min_length=1)
+    generated_at: str = Field(min_length=1)
+
+
+class HumanGateDecisionRequest(BaseModel):
+    target_type: Literal["asset_card_candidate", "keyframe_generation_bridge", "accepted_generation_plan_packet"]
+    target_id: str = Field(min_length=1)
+    decision: Literal["accepted_for_next_step", "needs_revision", "rejected"]
+    artifact_id: str | None = None
+    node_id: str | None = None
+    scope: str | None = None
+    note: str = ""
+    reviewed_at: str = Field(min_length=1)
+
+
+class StudioClientEventRequest(BaseModel):
+    event_type: str = Field(min_length=1, max_length=80)
+    severity: Literal["info", "warning", "error"] = "info"
+    message: str = Field(default="", max_length=240)
+    project_id: str = Field(default="", max_length=160)
+    action: str = Field(default="", max_length=120)
+    details: dict[str, Any] = Field(default_factory=dict)
+    generated_at: str = Field(min_length=1)
+
+
 class SpriteChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1200)
     node_id: str | None = None
@@ -311,8 +387,11 @@ __all__ = (
     "ContextSubgraphEdge",
     "ContextSubgraphNode",
     "DirectorSetup2D",
+    "FeedbackCandidateContextOverlayRequest",
+    "FeedbackCandidatePromotionRequest",
     "FeedbackRecordRequest",
     "GenerationComparisonRequest",
+    "HumanGateDecisionRequest",
     "ImageAssetUploadRequest",
     "KeyframeGenerationRequest",
     "PromptOptimizationRequest",
@@ -325,11 +404,13 @@ __all__ = (
     "ShotAssetPlanRequest",
     "SourceAssetRegisterRequest",
     "StoryboardBreakdownRequest",
+    "StudioClientEventRequest",
     "SpriteChatRequest",
     "TemporaryLockOverride",
     "VisualAssetPromoteRequest",
     "VisualAssetRetireRequest",
     "VideoAssetPromoteRequest",
     "VideoGenerationRequest",
+    "VideoInputSource",
     "VideoRevisionRequest",
 )

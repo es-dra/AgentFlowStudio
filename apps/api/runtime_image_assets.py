@@ -18,26 +18,11 @@ from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payloa
 
 
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
-UPLOAD_ERROR_MESSAGES = {
-    "reference_image_upload_invalid_base64": "上传图片数据不是有效的 base64，请重新选择图片后再试。",
-    "reference_image_upload_empty": "上传图片为空，请选择有效的 PNG 或 JPG 图片。",
-    "reference_image_upload_too_large": "上传图片超过 8MB，请压缩后再上传。",
-    "reference_image_file_type_mismatch": "上传图片内容与声明格式不一致，请重新导出 PNG/JPG 后再上传。",
-    "reference_image_file_type_not_allowed": "仅支持 PNG 或 JPG 参考图。",
-    "reference_image_dimensions_required": "上传图片无法读取宽高，请重新导出标准 PNG/JPG 后再上传。",
-}
 IMAGE_SUFFIX_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
 }
-
-
-class ImageUploadValidationError(ValueError):
-    def __init__(self, code: str, field: str = "data_base64") -> None:
-        super().__init__(UPLOAD_ERROR_MESSAGES.get(code, "上传图片无效。"))
-        self.code = code
-        self.field = field
 
 
 def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> None:
@@ -54,7 +39,7 @@ def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> No
             suffix, mime_type = _image_kind(image_bytes, request.mime_type)
             dimensions = image_dimensions(image_bytes)
             if not dimensions:
-                raise ImageUploadValidationError("reference_image_dimensions_required")
+                raise ValueError("image dimensions are required")
             asset_id = f"img_{uuid4().hex[:12]}"
             asset_dir = _asset_dir(store, project_id, asset_id)
             asset_dir.mkdir(parents=True, exist_ok=True)
@@ -72,8 +57,6 @@ def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> No
             reject_unsafe_payload(metadata)
             write_json(metadata_path, metadata)
             artifact = store.register_artifact(metadata_path, role="image_asset_metadata")
-        except ImageUploadValidationError as exc:
-            raise HTTPException(status_code=422, detail=image_upload_error_detail(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_image_asset")) from exc
         return {
@@ -242,7 +225,7 @@ def _asset_metadata(
         asset_id=asset_id,
         source_node_id=request.node_id,
         role=request.role,
-        filename=Path(request.filename).name or "upload",
+        filename=_safe_upload_filename(request.filename) or "upload",
         image_bytes=image_bytes,
         mime_type=mime_type,
         dimensions=dimensions,
@@ -269,7 +252,7 @@ def _image_asset_metadata(
         "asset_id": asset_id,
         "source_node_id": source_node_id,
         "role": safe_id(role or "reference_image"),
-        "filename": Path(filename).name or "image",
+        "filename": _safe_upload_filename(filename) or "image",
         "mime_type": mime_type,
         "file_suffix": _suffix_for_mime(mime_type),
         "byte_count": len(image_bytes),
@@ -292,11 +275,11 @@ def _decode_image(value: str) -> bytes:
     try:
         image_bytes = base64.b64decode(str(value or ""), validate=True)
     except (ValueError, TypeError) as exc:
-        raise ImageUploadValidationError("reference_image_upload_invalid_base64") from exc
+        raise ValueError("image upload must be valid base64") from exc
     if not image_bytes:
-        raise ImageUploadValidationError("reference_image_upload_empty")
+        raise ValueError("image upload is empty")
     if len(image_bytes) > MAX_UPLOAD_BYTES:
-        raise ImageUploadValidationError("reference_image_upload_too_large")
+        raise ValueError("image upload exceeds the 8MB limit")
     return image_bytes
 
 
@@ -306,21 +289,16 @@ def _image_kind(image_bytes: bytes, declared_mime: str) -> tuple[str, str]:
     if image_bytes.startswith(b"\xff\xd8"):
         return ".jpg", "image/jpeg"
     if declared_mime.lower() in {"image/png", "image/jpeg", "image/jpg"}:
-        raise ImageUploadValidationError("reference_image_file_type_mismatch", field="mime_type")
-    raise ImageUploadValidationError("reference_image_file_type_not_allowed", field="mime_type")
-
-
-def image_upload_error_detail(error: ImageUploadValidationError) -> dict[str, Any]:
-    return {
-        "error": error.code,
-        "detail_code": error.code,
-        "field": error.field,
-        "reason": UPLOAD_ERROR_MESSAGES.get(error.code, "上传图片无效。"),
-    }
+        raise ValueError("image bytes do not match the declared MIME type")
+    raise ValueError("image upload must be PNG or JPEG")
 
 
 def _suffix_for_mime(mime_type: str) -> str:
     return ".png" if mime_type == "image/png" else ".jpg"
+
+
+def _safe_upload_filename(value: str) -> str:
+    return str(value or "").replace("\\", "/").split("/")[-1].strip()
 
 
 def _asset_dir(store: RuntimeStore, project_id: str, asset_id: str) -> Path:

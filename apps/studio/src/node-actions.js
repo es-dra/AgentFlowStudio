@@ -1,19 +1,26 @@
 import { createNode, connect } from "./nodes.js";
-import { isRemoteImageModel, isRemoteVideoModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { imageAssetFromVisualAsset, lastImageAsset } from "./node-image-assets.js";
-import { setNodeError } from "./node-action-utils.js";
-import { startRemoteKeyframeGeneration } from "./node-keyframe-actions.js";
-import { startRemoteVideoGeneration, startRemoteVideoRevision } from "./node-video-actions.js";
+import { safeError, setNodeError } from "./node-action-utils.js";
+import { canStartGenerationForNode, startNodeGeneration as runNodeGeneration } from "./node-generation-actions.js";
 import { importScriptFileIntoTextNode, splitTextNodeToStoryboardNodes } from "./script-breakdown.js";
 import { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
+import {
+  createKeyframeLocalEditDraft as createStudioLocalKeyframeLocalEditDraft,
+  recordKeyframeLocalEditRuntimePreflight,
+  recordKeyframeLocalEditRuntimePreflightError,
+} from "./keyframe-local-edit-contract.js";
 
 export { uploadNodeImage } from "./node-upload-actions.js";
 export { visibleAssetForNode } from "./node-visible-assets.js";
 export { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
 export { pollNodeKeyframeGeneration } from "./node-keyframe-actions.js";
 export { cancelNodeVideoGeneration, enableVideoRevisionDraft, pollNodeVideoGeneration, setNodeVideoFrame } from "./node-video-actions.js";
+
+export function canRunNodeGeneration(node) {
+  return canStartGenerationForNode(node);
+}
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -92,24 +99,26 @@ export function lastFixedVisualAsset(node) {
   return [...assets].reverse().find((asset) => ["fixed", "ready", ""].includes(String(asset?.status || ""))) || null;
 }
 
-// 发送（Ctrl+Enter / 发送按钮）：当前 MVP 只允许图片节点触发真实 keyframe。
+export async function createKeyframeLocalEditDraft(store, runtime, node, options = {}) {
+  const draft = createStudioLocalKeyframeLocalEditDraft(store, node, options);
+  if (!draft) return null;
+  if (!runtime?.preflightKeyframeLocalEdit) {
+    await store.flushRuntimeSave?.();
+    return draft;
+  }
+  try {
+    const runtimePreflight = await runtime.preflightKeyframeLocalEdit(draft.request);
+    const updated = recordKeyframeLocalEditRuntimePreflight(store, node.id, runtimePreflight);
+    await store.flushRuntimeSave?.();
+    return updated || draft;
+  } catch (error) {
+    const updated = recordKeyframeLocalEditRuntimePreflightError(store, node.id, safeError(error));
+    await store.flushRuntimeSave?.();
+    return updated || draft;
+  }
+}
+
+// 发送（Ctrl+Enter / 发送按钮）：图片/视频生成调度实现位于 node-generation-actions.js。
 export async function startNodeGeneration(store, runtime, node, resultText) {
-  const fresh = store.get().nodes[node.id] || node;
-  if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
-    await startRemoteKeyframeGeneration(store, runtime, fresh);
-    return;
-  }
-  if (fresh.type === "video" && isRemoteVideoModel(fresh.params?.model) && runtime?.generateVideo) {
-    if (fresh.params?.videoRevision?.enabled && runtime?.generateVideoRevision) {
-      await startRemoteVideoRevision(store, runtime, fresh);
-      return;
-    }
-    await startRemoteVideoGeneration(store, runtime, fresh);
-    return;
-  }
-  setNodeError(
-    store,
-    fresh.id,
-    resultText || "当前版本仅图片节点支持真实生成；视频、音频、脚本和合成通道仍在开发中。",
-  );
+  return runNodeGeneration(store, runtime, node, resultText);
 }

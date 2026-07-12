@@ -1,13 +1,21 @@
 import { buildContextSubgraph } from "./optimizer-contract.js";
 import { providerServiceForVideoModel } from "./presets/models.js";
-import { lastImageAsset, resizeNodeForImagePreview } from "./node-image-assets.js";
-import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll } from "./video-node-flow.js";
+import { lastImageAsset } from "./node-image-assets.js";
+import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll, videoInputSourceForRequest } from "./video-node-flow.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
-import { firstCandidatePreview, setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
-import { parseDuration, videoResultText, videoRevisionResultText } from "./node-generation-results.js";
+import { setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
+import { parseDuration } from "./node-generation-results.js";
 import { clearOneRunOverrides, normalizeStringList, prepareGenerationRequest } from "./node-generation-guards.js";
-import { reconcileVisualAssetBadges } from "./node-generation-context.js";
+import { appendPreservedOutput, retryFailedItemsPlan, retryResultText, retrySubmittingOptions } from "./node-generation-retry.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration } from "./node-generation-restore.js";
+import { applyVideoResponse, applyVideoRevisionResponse } from "./node-video-response.js";
+
+const VIDEO_LOCAL_EDIT_UNAVAILABLE = {
+  status: "unavailable",
+  required_capability: "video_edit_or_masked_temporal_edit",
+  reason: "current_video_revision_is_global_regeneration_attempt",
+  user_message: "局部视频编辑未开放；当前草稿只会按提示词和首帧提交整段重生成尝试。",
+};
 
 export function setNodeVideoFrame(store, node, slot = "first") {
   const imageAsset = lastImageAsset(node);
@@ -46,12 +54,14 @@ export function enableVideoRevisionDraft(store, node) {
       locked_aspects: previous.locked_aspects || ["character_identity", "scene_layout", "camera_path", "duration"],
       temporal_scope: previous.temporal_scope || { kind: "whole_clip" },
       feature_flag_env: "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION",
+      local_edit_availability: { ...VIDEO_LOCAL_EDIT_UNAVAILABLE },
     };
     n.result = [
-      "Experimental video revision draft is enabled.",
-      "Edit this node prompt to describe only the intended change.",
-      "Preservation is best-effort, not pixel-identical.",
-      "Requires AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION for submit.",
+      "视频重生成草稿已启用。",
+      "这不是局部编辑：当前只会基于提示词、首帧和基础视频信息提交整段重生成尝试。",
+      "局部/蒙版/逐帧编辑未开放；需要 video-edit/mask/temporal 能力。",
+      "可以描述目标变化，但未点名的画面、运动或身份仍可能漂移。",
+      "提交仍需要 AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION。",
     ].join("\n");
   });
 }
@@ -114,14 +124,24 @@ export async function startRemoteVideoGeneration(store, runtime, node) {
     setNodeError(store, node.id, "请先在节点菜单中上传图片并设为首帧，再生成图生视频。");
     return;
   }
+  if (!String(node.prompt || node.params?.lastOptimizedPromptPlain || "").trim()) {
+    setNodeError(store, node.id, "请先填写视频提示词，再提交图生视频。");
+    return;
+  }
   node = store.get().nodes[node.id] || node;
   const previousNodeState = generationRestoreSnapshot(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    setSubmittingGenerationState(n, "video", { label: "正在提交视频任务", percent: 8 });
-    n.result = "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    setSubmittingGenerationState(n, "video", retryPlan.retrying
+      ? retrySubmittingOptions("正在提交视频任务")
+      : { label: "正在提交视频任务", percent: 8 });
+    n.result = retryPlan.retrying
+      ? retryResultText()
+      : "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
   });
   let submitAttempted = false;
   try {
@@ -160,12 +180,18 @@ export async function startRemoteVideoRevision(store, runtime, node) {
   }
   node = store.get().nodes[node.id] || node;
   const previousNodeState = generationRestoreSnapshot(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    setSubmittingGenerationState(n, "video_revision", { label: "正在提交视频修订", percent: 8 });
-    n.result = "Preparing experimental video revision...";
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    setSubmittingGenerationState(n, "video_revision", retryPlan.retrying
+      ? retrySubmittingOptions("正在提交视频重生成尝试")
+      : { label: "正在提交视频重生成尝试", percent: 8 });
+    n.result = retryPlan.retrying
+      ? retryResultText()
+      : "正在准备视频重生成尝试；这不是局部编辑，未点名内容也可能变化。";
   });
   let submitAttempted = false;
   try {
@@ -182,7 +208,7 @@ export async function startRemoteVideoRevision(store, runtime, node) {
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   } catch (error) {
-    setNodeError(store, node.id, `Experimental video revision request failed: ${safeError(error)}`);
+    setNodeError(store, node.id, `视频重生成尝试请求失败：${safeError(error)}`);
     if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }
@@ -191,19 +217,17 @@ export async function startRemoteVideoRevision(store, runtime, node) {
 function buildVideoGenerationRequest(store, node, firstFrame) {
   return {
     node_id: node.id,
-    prompt_text: node.prompt || "保持首帧主体身份，生成自然克制的镜头运动。",
+    prompt_text: node.prompt || node.params?.lastOptimizedPromptPlain || "",
     optimized_prompt: node.params?.lastOptimizedPromptPlain || null,
     provider_service_id: providerServiceForVideoModel(node.params?.model),
     first_frame_image_asset_id: firstFrame,
     last_frame_image_asset_id: node.params?.lastFrameImageAssetId || null,
+    input_source: videoInputSourceForRequest(node, firstFrame),
     duration_sec: parseDuration(node.params?.spec?.duration),
     resolution: String(node.params?.spec?.resolution || "720P").toLowerCase(),
     aspect_ratio: node.params?.spec?.ratio || "9:16",
     motion: node.params?.motion || "",
     candidate_count: 1,
-    node_parameters: {
-      reference_transform_mode: node.params?.assetReferenceMode || node.params?.referenceTransformMode || null,
-    },
     context_subgraph: buildContextSubgraph(store.get(), node, "context_generate"),
     temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
     temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],
@@ -226,49 +250,4 @@ function buildVideoRevisionRequest(store, node, revision, baseVideoJobId, firstF
     preserve_policy: "best_effort",
     provider_capability_mode: "i2v_revision_attempt",
   };
-}
-
-function applyVideoRevisionResponse(store, nodeId, response) {
-  const status = response?.job?.status || "blocked";
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    const preview = firstCandidatePreview(response);
-    updateNodeGenerationState(n, response, { kind: "video_revision" });
-    if (preview?.url) {
-      n.previewUrl = preview.url;
-      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
-    }
-    n.params.videoRevision = {
-      ...(n.params.videoRevision || {}),
-      enabled: true,
-      experimental: true,
-      lastRevisionJobId: response?.job?.job_id || null,
-      lastSafeManifest: response?.safe_manifest || null,
-    };
-    n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
-    n.result = videoRevisionResultText(response);
-  });
-}
-
-function applyVideoResponse(store, nodeId, response) {
-  const status = response?.job?.status || "blocked";
-  if (!["submitted", "running"].includes(status)) clearVideoAutoPoll(nodeId);
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    const preview = firstCandidatePreview(response);
-    const previewUrl = preview?.url || null;
-    updateNodeGenerationState(n, response, { kind: "video" });
-    n.params.lastVideoJobId = response?.job?.job_id || null;
-    n.params.lastVideoPreviewUrl = previewUrl;
-    n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
-    reconcileVisualAssetBadges(n, response?.context_bundle || null);
-    if (previewUrl) {
-      n.previewUrl = previewUrl;
-      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
-    }
-    n.status = status === "succeeded" ? "complete" : status === "cancelled_local_only" ? "cancelled" : ["submitted", "running"].includes(status) ? "generating" : "error";
-    n.result = videoResultText(response);
-  });
 }

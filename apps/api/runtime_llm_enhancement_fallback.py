@@ -1,23 +1,21 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agentflow.algorithms.creative_intent_control import deterministic_video_fallback_prompt as algorithm_video_fallback_prompt
+from apps.api.runtime_llm_enhancement_constants import BANNED_GENERIC_PHRASES
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import (
     compact,
+    contains_cjk,
     reference_role,
     reference_hint_terms,
+    reject_provider_error_text,
     slot,
     visual_reference_hint,
 )
 from apps.api.runtime_models import PromptOptimizationRequest
-from apps.api.runtime_reference_intent import (
-    ORIGINALIZE_REFERENCE_MODE,
-    reference_transform_mode_for_request,
-)
-from apps.api.runtime_originalize_prompt_templates import deterministic_originalize_i2i_fallback_prompt
-from apps.api.runtime_llm_enhancement_salvage import salvage_prompt_from_llm_article
 from apps.api.runtime_store import reject_unsafe_text
 
 ANIMAL_TERMS = (
@@ -101,10 +99,6 @@ def deterministic_chinese_fallback_prompt(
 def deterministic_i2i_fallback_prompt(request: PromptOptimizationRequest) -> str:
     prompt_text = compact(request.prompt_text)
     reference_hint = visual_reference_hint(request)
-    if reference_transform_mode_for_request(request) == ORIGINALIZE_REFERENCE_MODE:
-        prompt = deterministic_originalize_i2i_fallback_prompt(prompt_text, reference_hint)
-        reject_unsafe_text(prompt)
-        return prompt
     if reference_role(request) == "style":
         prompt = "\n".join(
             [
@@ -234,6 +228,73 @@ def deterministic_video_fallback_prompt(request: PromptOptimizationRequest, asse
     )
     reject_unsafe_text(prompt)
     return prompt
+
+
+def salvage_prompt_from_llm_article(value: str, request: PromptOptimizationRequest) -> str:
+    reject_provider_error_text(value)
+    candidate = extract_article_prompt_candidate(value)
+    if not candidate:
+        raise ValueError("enhancement missing required sections")
+    negative = extract_article_negative_prompt(value)
+    prompt = "\n".join(
+        [
+            f"意图：围绕“{compact(request.prompt_text, 160)}”生成可直接用于本节点的画面提示词。",
+            f"角色/主体：{compact(candidate, 260)}",
+            f"场景/美术：{compact(candidate, 260)}",
+            f"动作/情节：{compact(request.prompt_text, 180)}",
+            f"镜头/构图：{compact(candidate, 220)}",
+            f"灯光：{compact(candidate, 220)}",
+            "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读；视频节点再强调短时间动作方向。",
+            "连续性：保持上文主体、场景、服装、身份和项目风格一致，不漂移到无关题材。",
+            f"负面约束：{negative or '不要水印、文字乱码、畸形肢体、身份漂移、无关角色或不合理背景元素。'}",
+        ]
+    )
+    reject_unsafe_text(prompt)
+    return prompt
+
+
+def extract_article_prompt_candidate(value: str) -> str:
+    lines = str(value or "").splitlines()
+    candidates: list[tuple[int, str]] = []
+    prefer_chinese = False
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "中文" in line and "Prompt" in line:
+            prefer_chinese = True
+            continue
+        cleaned = line.lstrip(">").strip().strip("*` ")
+        if len(cleaned) < 40:
+            continue
+        lowered = cleaned.lower()
+        if any(phrase in lowered for phrase in BANNED_GENERIC_PHRASES):
+            continue
+        if "negative prompt" in lowered or lowered.startswith(("low quality", "使用技巧", "要素 |")):
+            continue
+        if "|" in cleaned and cleaned.count("|") >= 2:
+            continue
+        score = len(cleaned)
+        if prefer_chinese or contains_cjk(cleaned):
+            score += 500
+        if "prompt" in lowered:
+            score -= 80
+        candidates.append((score, cleaned))
+    if not candidates:
+        return ""
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def extract_article_negative_prompt(value: str) -> str:
+    lowered = str(value or "").lower()
+    if "negative prompt" not in lowered and "负向提示" not in str(value) and "负面" not in str(value):
+        return ""
+    fenced = re.findall(r"```(?:[a-zA-Z0-9_-]+)?\s*(.*?)```", str(value), flags=re.DOTALL)
+    for block in fenced:
+        text = " ".join(block.split())
+        if len(text) >= 20:
+            return compact(text, 220)
+    return ""
 
 
 __all__ = ("deterministic_chinese_fallback_prompt", "deterministic_i2i_fallback_prompt", "deterministic_video_fallback_prompt", "salvage_prompt_from_llm_article")

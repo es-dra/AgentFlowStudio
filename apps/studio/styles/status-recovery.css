@@ -1,0 +1,163 @@
+.generation-status-card,
+.generation-gate-panel {
+  display: grid;
+  gap: 7px;
+  margin: 0 14px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.generation-status-card.compact {
+  margin-top: -2px;
+}
+
+.generation-status-card-head,
+.generation-gate-head,
+.generation-status-row,
+.generation-gate-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.generation-status-card-head strong,
+.generation-gate-head strong {
+  color: var(--text-primary);
+}
+
+.generation-status-row small,
+.generation-gate-row small {
+  flex: 0 0 92px;
+  color: var(--text-faint);
+}
+
+.generation-status-row span,
+.generation-gate-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.generation-status-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.generation-status-refs span {
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-faint);
+}
+
+.generation-status-card.partial,
+.node-state-strip.partial .dot,
+.job-center-card.partial .job-state {
+  color: var(--energy);
+}
+
+.generation-status-card.failed,
+.generation-status-card.attention,
+.node-state-strip.partial .dot,
+.node-state-strip.error .dot,
+.job-center-card.partial .job-state {
+  border-color: rgba(255, 194, 133, 0.26);
+}
+
+.node-state-strip.partial .dot { background: var(--energy); }
+.job-center-card.partial { border-color: rgba(245, 196, 81, 0.28); }
+.job-center-card.retrying .job-state { color: var(--energy); }
+.job-center-card.attention .job-state { color: #ffc285; }
+
+.job-center.jobs .job-center-card.partial,
+.job-center.jobs .job-center-card.failed,
+.job-center.jobs .job-center-card.error,
+.job-center.jobs .job-center-card.attention,
+.job-center.jobs .job-center-card.needs_attention {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.job-center.jobs .job-center-card.partial .job-state,
+.job-center.jobs .job-center-card.failed .job-state,
+.job-center.jobs .job-center-card.error .job-state,
+.job-center.jobs .job-center-card.attention .job-state,
+.job-center.jobs .job-center-card.needs_attention .job-state {
+  margin-left: auto;
+  max-width: calc(100% - 54px);
+  overflow-wrap: anywhere;
+  padding-top: 2px;
+  text-align: right;
+}
+
+.job-center.jobs .job-center-card.partial .job-main,
+.job-center.jobs .job-center-card.failed .job-main,
+.job-center.jobs .job-center-card.error .job-main,
+.job-center.jobs .job-center-card.attention .job-main,
+.job-center.jobs .job-center-card.needs_attention .job-main {
+  order: 3;
+  flex: 1 0 100%;
+  min-width: 100%;
+}
+
+.job-center.jobs .job-center-card.partial .job-main strong,
+.job-center.jobs .job-center-card.partial .job-main small,
+.job-center.jobs .job-center-card.failed .job-main strong,
+.job-center.jobs .job-center-card.failed .job-main small,
+.job-center.jobs .job-center-card.error .job-main strong,
+.job-center.jobs .job-center-card.error .job-main small,
+.job-center.jobs .job-center-card.attention .job-main strong,
+.job-center.jobs .job-center-card.attention .job-main small,
+.job-center.jobs .job-center-card.needs_attention .job-main strong,
+.job-center.jobs .job-center-card.needs_attention .job-main small {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.job-center.jobs .job-center-card.partial .job-main small,
+.job-center.jobs .job-center-card.failed .job-main small,
+.job-center.jobs .job-center-card.error .job-main small,
+.job-center.jobs .job-center-card.attention .job-main small,
+.job-center.jobs .job-center-card.needs_attention .job-main small {
+  line-height: 1.42;
+}
+
+.generation-gate-panel {
+  margin: 0;
+}
+
+.generation-gate-panel.blocked {
+  border-color: rgba(255, 122, 92, 0.32);
+}
+
+.generation-gate-list {
+  display: grid;
+  gap: 5px;
+}
+
+@media (max-width: 520px) {
+  .generation-status-card,
+  .generation-gate-panel {
+    margin-inline: 10px;
+    padding: 8px;
+  }
+
+  .generation-status-row,
+  .generation-gate-row {
+    display: grid;
+    gap: 2px;
+  }
+
+  .generation-status-row small,
+  .generation-gate-row small {
+    flex-basis: auto;
+  }
+}

@@ -16,6 +16,8 @@ def test_codex_local_missing_cli_is_reported_as_model_gateway_error(tmp_path, mo
 
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_codex_local.subprocess.run", missing_codex)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_CODEX_HOME", str(tmp_path / "codex-home"))
+    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
     registry = ProviderRegistry.from_store(_store(tmp_path, _codex_local_provider_config()))
 
     with pytest.raises(ModelGatewayError, match="Codex local provider command is not available"):

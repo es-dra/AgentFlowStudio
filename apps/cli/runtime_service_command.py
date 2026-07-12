@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import typer
+
+
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def runtime_service_command(
@@ -21,9 +25,9 @@ def runtime_service_command(
 
     from apps.api.runtime_service import create_runtime_app
 
-    app = create_runtime_app(runtime_root=runtime_root)
+    app = create_runtime_app(runtime_root=runtime_root, runtime_bind_host=host)
     typer.echo(f"AgentFlow Runtime Service listening on http://{host}:{port}")
-    uvicorn.run(app, host=host, port=port, reload=False)
+    uvicorn.run(app, host=host, port=port, reload=False, access_log=_access_log_enabled())
 
 
 def runtime_service_openapi_export_command(
@@ -49,3 +53,7 @@ def runtime_service_openapi_export_command(
 
 
 __all__ = ("runtime_service_command", "runtime_service_openapi_export_command")
+
+
+def _access_log_enabled() -> bool:
+    return os.environ.get("AFS_UVICORN_ACCESS_LOG", "").strip().lower() in TRUE_VALUES

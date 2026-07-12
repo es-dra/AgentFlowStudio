@@ -103,9 +103,7 @@
 .node .node-content-editor {
   width: 100%;
   min-height: 180px;
-  max-height: min(460px, calc(100vh - 220px));
   resize: vertical;
-  overflow-y: auto;
   border: 1px solid transparent;
   border-radius: 8px;
   background: rgba(12, 14, 16, 0.18);
@@ -113,6 +111,11 @@
   padding: 8px;
   font: inherit;
   user-select: text;
+}
+
+.node .node-content-editor.asset-card-content-editor {
+  min-height: 112px;
+  max-height: 220px;
 }
 
 .node .node-content-editor:focus {
@@ -267,10 +270,10 @@
 }
 
 .generation-field textarea {
-  min-height: 120px;
-  max-height: min(420px, 60vh);
+  min-height: 132px;
+  max-height: min(360px, 46vh);
   resize: vertical;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 .generation-setting-grid {

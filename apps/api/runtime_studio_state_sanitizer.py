@@ -25,9 +25,19 @@ FORBIDDEN_STUDIO_KEYS = {
     "knowledge_weights",
     "hidden_memory",
 }
+ALLOWED_PUBLIC_SAFETY_KEYS = {
+    "no_credentialed_url",
+    "no_local_path",
+    "no_media_bytes",
+    "no_provider_raw",
+    "no_secrets",
+    "trace_summary",
+}
 PRUNED_RUNTIME_PARAM_KEYS = {
     "lastContextBundle",
+    "lastKeyframeSourceEvidenceTrace",
     "temporaryLockOverrides",
+    "feedbackOverlayDecisions",
 }
 
 
@@ -142,12 +152,43 @@ def _order(value: Any, nodes: Any) -> list[str]:
 
 def _reject_forbidden(value: Any) -> None:
     serialized = json.dumps(value, ensure_ascii=False)
-    lowered = serialized.lower()
-    for key in FORBIDDEN_STUDIO_KEYS:
-        if key in lowered:
-            raise ValueError(f"studio state contains forbidden field: {key}")
     if LOCAL_PATH_PATTERN.search(serialized):
         raise ValueError("studio state contains local path or runtime artifact path")
+    _reject_forbidden_recursive(value)
+
+
+def _reject_forbidden_recursive(value: Any) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if _is_forbidden_studio_key(str(key)):
+                raise ValueError(f"studio state contains forbidden field: {key}")
+            _reject_forbidden_recursive(item)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _reject_forbidden_recursive(item)
+        return
+    if isinstance(value, str):
+        lowered = value.lower()
+        for key in FORBIDDEN_STUDIO_KEYS:
+            if key in lowered:
+                raise ValueError(f"studio state contains forbidden field: {key}")
+
+
+def _is_forbidden_studio_key(key: str) -> bool:
+    lowered = key.lower()
+    normalized = "".join(ch for ch in lowered if ch.isalnum())
+    if lowered in ALLOWED_PUBLIC_SAFETY_KEYS or normalized in {
+        "".join(ch for ch in item if ch.isalnum()) for item in ALLOWED_PUBLIC_SAFETY_KEYS
+    }:
+        return False
+    for forbidden in FORBIDDEN_STUDIO_KEYS:
+        forbidden_norm = "".join(ch for ch in forbidden.lower() if ch.isalnum())
+        if lowered == forbidden or normalized == forbidden_norm:
+            return True
+        if forbidden in lowered or forbidden_norm in normalized:
+            return True
+    return False
 
 
 def _reject_forbidden_known_surfaces(value: dict[str, Any]) -> None:
@@ -173,9 +214,10 @@ def _reject_node_params(params: Any) -> None:
     for key, item in params.items():
         if key in PRUNED_RUNTIME_PARAM_KEYS:
             continue
-        lowered = str(key).lower()
-        if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
+        if _is_forbidden_studio_key(str(key)):
             raise ValueError(f"studio state contains forbidden field: {key}")
+        if key in {"keyframeConstraints", "keyframeLocalEditDraft"}:
+            continue
         if key in SAFE_NODE_PARAM_KEYS:
             _reject_forbidden(item)
 

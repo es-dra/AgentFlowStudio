@@ -5,6 +5,19 @@ from typing import Any, Callable
 from apps.api import runtime_studio_state_param_values as param_values
 from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS, sanitize_generation_param
 from apps.api.runtime_studio_state_context import sanitize_context_bundle
+from apps.api.runtime_studio_state_feedback_overlay import sanitize_feedback_overlay_decisions
+from apps.api.runtime_studio_state_human_gate import sanitize_human_gate_decisions
+from apps.api.runtime_studio_state_keyframe_local_edit import (
+    sanitize_keyframe_local_edit_draft,
+    sanitize_local_edit_availability,
+)
+from apps.api.runtime_studio_state_quality_feedback import sanitize_quality_feedback_candidates
+from apps.api.runtime_studio_state_runtime_summaries import (
+    generation_manifest_summary,
+    model_call_context_summary,
+    safe_public_text,
+    safe_refs,
+)
 from apps.api.runtime_store import safe_id
 
 
@@ -16,13 +29,21 @@ SAFE_NODE_PARAM_KEYS = (
     "model", "spec", "camera", "motion", "styleRef", "attachments", "directorSetup", "directorRef",
     "isReference", "intent", "uploads", "previewAspectRatio", "visualAssets", "visual_asset_ids",
     "firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastVideoPreviewUrl",
+    "videoInputSource",
     *SAFE_GENERATION_PARAM_KEYS,
     "quotaOverrideConfirmed", "lastContextBundle", "nodeRole", "sourceTextNodeId", "scriptSegmentIndex",
     "structuredShot", "shotAssetRefs", "assetPrepState", "asset_prep", "assetCardDraft",
     "assetCardRevision",
+    "assetAutoBindingGraph", "asset_auto_binding_graph", "nodeReferenceStack", "node_reference_stack",
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
+    "keyframeConstraints", "keyframeLocalEditDraft", "local_edit_availability",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
+    "lastModelCallContextId", "lastModelCallContextSummary",
+    "lastGenerationManifest", "generationPolicyStatus", "generationStatusDetail",
+    "generationBlockedReason", "generationNextAction", "generationSafeRefs",
+    "lastGenerationBridgeArtifactId",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
+    "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
 )
 
 
@@ -55,10 +76,20 @@ def _sanitize_param(
 ) -> Any:
     if key == "uploads":
         return param_values.uploads(value, project_id=project_id, preview_url=preview_url, text=text, number=number)
-    if key in {"firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastKeyframeJobId", "lastKeyframeCompletedJobId"}:
+    if key in {
+        "firstFrameImageAssetId",
+        "lastFrameImageAssetId",
+        "lastVideoJobId",
+        "lastKeyframeJobId",
+        "lastKeyframeCompletedJobId",
+        "lastModelCallContextId",
+        "lastGenerationBridgeArtifactId",
+    }:
         return safe_id(text(value, "", 120))
     if key == "lastVideoPreviewUrl":
         return preview_url(value, project_id=project_id)
+    if key == "videoInputSource":
+        return _video_input_source(value, text=text)
     if key in SAFE_GENERATION_PARAM_KEYS:
         return sanitize_generation_param(key, value, project_id=project_id, preview_url=preview_url, text=text, number=number)
     if key == "quotaOverrideConfirmed":
@@ -81,12 +112,39 @@ def _sanitize_param(
         return param_values.safe_object(value, text=text, number=number, max_items=32)
     if key == "storyboardBreakdown":
         return param_values.storyboard_breakdown(value, text=text, number=number)
+    if key in {"assetAutoBindingGraph", "asset_auto_binding_graph"}:
+        return param_values.asset_auto_binding_graph(value, text=text, number=number)
+    if key in {"nodeReferenceStack", "node_reference_stack"}:
+        return param_values.node_reference_stack(value, text=text, number=number)
     if key == "keyframeLayer":
         return param_values.keyframe_layer(value, text=text)
+    if key == "keyframeConstraints":
+        return param_values.keyframe_constraints(value, text=text, number=number)
+    if key == "keyframeLocalEditDraft":
+        return sanitize_keyframe_local_edit_draft(value, text=text, number=number)
+    if key == "local_edit_availability":
+        return sanitize_local_edit_availability(value, text=text)
     if key == "lastVisualAssetWarnings":
         return param_values.warnings(value, text=text)
     if key == "temporaryAssetExclusions":
         return param_values.asset_exclusions(value, text=text)
+    if key == "lastModelCallContextSummary":
+        return model_call_context_summary(value, text=text, number=number)
+    if key == "lastGenerationManifest":
+        return generation_manifest_summary(value, text=text, number=number)
+    if key == "generationSafeRefs":
+        return safe_refs(value, text=text)
+    if key in {"generationStatusDetail", "generationBlockedReason", "generationNextAction"}:
+        return safe_public_text(value, text=text, limit=360)
+    if key == "generationPolicyStatus":
+        status = text(value, "", 40)
+        return status if status in {"complete", "partially_complete", "failed", "retrying", "needs_attention"} else ""
+    if key == "humanGateDecisions":
+        return sanitize_human_gate_decisions(value, text=text)
+    if key == "feedbackOverlayDecisions":
+        return sanitize_feedback_overlay_decisions(value, text=text)
+    if key == "qualityFeedbackCandidates":
+        return sanitize_quality_feedback_candidates(value, text=text)
     if key == "scriptSegmentIndex":
         return int(max(0, min(9999, number(value, 0))))
     if key in {"nodeRole", "sourceTextNodeId", "directorRef"}:
@@ -94,6 +152,29 @@ def _sanitize_param(
     if key == "lastOptimizedPromptPlain":
         return text(value, "", 4000)
     return value
+
+
+def _video_input_source(value: Any, *, text: TextSanitizer) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    source_mode = text(value.get("source_mode"), "", 80)
+    if source_mode not in {
+        "uploaded_image",
+        "upstream_uploaded_image",
+        "upstream_generated_image",
+        "visual_asset_reference",
+        "explicit_first_frame_selection",
+    }:
+        source_mode = "explicit_first_frame_selection"
+    result = {
+        "source_mode": source_mode,
+        "source_asset_id": safe_id(text(value.get("source_asset_id"), "", 120)),
+        "source_node_id": safe_id(text(value.get("source_node_id"), "", 120)),
+        "source_job_id": safe_id(text(value.get("source_job_id"), "", 120)),
+        "visual_asset_id": safe_id(text(value.get("visual_asset_id"), "", 120)),
+        "role": "first_frame",
+    }
+    return {key: item for key, item in result.items() if item}
 
 
 __all__ = ("SAFE_NODE_PARAM_KEYS", "sanitize_node_params")

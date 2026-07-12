@@ -5,6 +5,8 @@ import json
 import re
 from typing import Any
 
+from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
+from agentflow.algorithms.model_call_context.feedback_context import bundle_feedback_context_overlays
 from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
 
 
@@ -42,8 +44,10 @@ def build_model_call_context(
     rejected_assets: list[dict[str, Any]] | None = None,
     retired_assets: list[dict[str, Any]] | None = None,
     reference_image_refs: list[str] | None = None,
+    input_source: dict[str, Any] | None = None,
     upstream_refs: list[str] | None = None,
     user_preferences: dict[str, Any] | None = None,
+    duration_contract: dict[str, Any] | None = None,
     expert_rule_ids: list[str] | None = None,
     provider_constraints: dict[str, Any] | None = None,
     feedback_events: list[dict[str, Any]] | None = None,
@@ -60,6 +64,15 @@ def build_model_call_context(
     retired_ids = _asset_ids(retired_assets)
     refs = _dedupe([*_bundle_reference_refs(bundle), *(reference_image_refs or [])])
     events = [sanitize_quality_feedback(item) for item in (feedback_events or []) if isinstance(item, dict)]
+    overlays = bundle_feedback_context_overlays(
+        bundle,
+        sanitize_text=_sanitize_text,
+        safe_ref_list=_safe_ref_list,
+    )
+    overlay_prompt_policy = feedback_overlay_prompt_policy(
+        context_bundle=bundle,
+        context_overlays=overlays,
+    )
     payload = {
         "schema_version": SCHEMA_VERSION,
         "algorithm_id": ALGORITHM_ID,
@@ -80,6 +93,8 @@ def build_model_call_context(
             "context_bundle_algorithm_id": bundle.get("algorithm_id"),
             "included_asset_count": len(bundle.get("included_assets") or []),
             "excluded_asset_count": len(bundle.get("excluded_assets") or []),
+            "feedback_context_overlay_count": len(overlays),
+            "feedback_context_overlay_prompt_policy_id": overlay_prompt_policy["policy_id"],
             "upstream_ref_count": len(upstream_refs or []),
         },
         "asset_context": {
@@ -93,13 +108,17 @@ def build_model_call_context(
         "reference_context": {
             "reference_image_refs": _safe_ref_list(refs),
             "reference_image_count": len(refs),
+            "input_source": _sanitize_payload(input_source or {}),
         },
         "preference_context": {
             "user_preferences": user_preferences or {},
+            "duration_contract": _sanitize_payload(duration_contract or {}),
             "expert_rule_ids": _safe_ref_list(expert_rule_ids or []),
         },
         "feedback_context": {
             "events": events,
+            "context_overlays": overlays,
+            "prompt_policy": overlay_prompt_policy,
             "revision_control": revision_control or {},
             "feedback_is_memory": False,
         },
@@ -115,6 +134,8 @@ def build_model_call_context(
             "context_bundle_present": bool(context_bundle),
             "included_asset_ids": _bundle_asset_ids(bundle, "included_assets"),
             "excluded_asset_ids": _bundle_asset_ids(bundle, "excluded_assets"),
+            "feedback_context_overlay_ids": [item["overlay_id"] for item in overlays if item.get("overlay_id")],
+            "feedback_context_overlay_prompt_policy": overlay_prompt_policy,
             "warning_ids": _warning_ids(bundle),
             "draft_assets_rejected": True,
             "raw_evidence_not_memory": True,

@@ -1,0 +1,40 @@
+.visual-asset-promotion-gate-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  background: var(--bg-card-soft);
+  padding: 7px 9px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.visual-asset-promotion-gate-summary strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.visual-asset-promotion-gate-summary small {
+  grid-column: 2;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.visual-asset-reuse-intent {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  background: var(--bg-card-soft);
+  padding: 9px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.visual-asset-reuse-intent label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}

@@ -94,6 +94,9 @@ class FakeAsyncVideoAdapter:
             raise ModelConfigError(f"prompt_char_limit exceeded for {self.service_id}")
         if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
             raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
+        input_mode = request.input_mode or ("first_last_frame" if len(request.reference_image_paths) > 1 else "first_frame")
+        if self.descriptor.frame_modes and input_mode not in self.descriptor.frame_modes:
+            raise ModelConfigError(f"unsupported input mode for {self.service_id}: {input_mode}")
 
     def translate(
         self,

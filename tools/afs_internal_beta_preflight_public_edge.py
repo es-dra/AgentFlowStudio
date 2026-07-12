@@ -56,6 +56,7 @@ def safe_public_edge_status(value: Any) -> dict[str, Any]:
         "writes_company_kb": bool(value.get("writes_company_kb")),
         "writes_long_term_memory": bool(value.get("writes_long_term_memory")),
         "summary": _safe_public_edge_summary(value.get("summary")),
+        "readiness_boundary": _safe_readiness_boundary(value.get("readiness_boundary")),
     }
 
 
@@ -66,4 +67,19 @@ def _safe_public_edge_summary(value: Any) -> dict[str, bool | int | str]:
         "public_edge_http_status": int(value.get("public_edge_http_status") or 0),
         "edge_basic_auth": bool(value.get("edge_basic_auth")),
         "runtime_status": str(value.get("runtime_status") or ""),
+        "auth_required": bool(value.get("auth_required")),
+        "acceptance_ready": bool(value.get("acceptance_ready")),
+    }
+
+
+def _safe_readiness_boundary(value: Any) -> dict[str, bool | str]:
+    if not isinstance(value, dict):
+        value = {}
+    return {
+        "public_edge_auth_ready": bool(value.get("public_edge_auth_ready")),
+        "runtime_three_end_alignment_evidence": bool(value.get("runtime_three_end_alignment_evidence")),
+        "runtime_loaded_code_freshness_claim": str(value.get("runtime_loaded_code_freshness_claim") or "not_claimed"),
+        "acceptance_ready": bool(value.get("acceptance_ready")),
+        "human_acceptance_claim": str(value.get("human_acceptance_claim") or "not_claimed"),
+        "product_readiness_claim": str(value.get("product_readiness_claim") or "not_claimed"),
     }

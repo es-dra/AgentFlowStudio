@@ -9,6 +9,9 @@ from tools.afs_internal_beta_acceptance_client import HttpAcceptanceClient
 from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
 from tools.afs_internal_beta_preflight_public_edge import collect_public_edge_status, safe_public_edge_status
 from tools.afs_internal_beta_preflight_three_end import collect_three_end_status, safe_three_end_status
+from tools.afs_readiness_claims import safe_readiness_projection
+
+HTTP_PREFLIGHT_NON_CLAIMS = ["HTTP preflight only", "not provider smoke", "not generated-media QA", "not human creative acceptance", "not product or business readiness", "not public or legal readiness", "not CompanyOS promotion"]
 
 
 def run_http_preflight(
@@ -130,12 +133,7 @@ def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | N
             checks,
             "public_edge_auth",
             "passed" if safe_public_edge.get("status") == "ready_for_public_auth" else "failed",
-            {
-                "status": str(safe_public_edge.get("status") or ""),
-                "public_edge_http_status": int(summary.get("public_edge_http_status") or 0),
-                "edge_basic_auth": bool(summary.get("edge_basic_auth")),
-                "runtime_status": str(summary.get("runtime_status") or ""),
-            },
+            {"status": str(safe_public_edge.get("status") or ""), "public_edge_http_status": int(summary.get("public_edge_http_status") or 0), "edge_basic_auth": bool(summary.get("edge_basic_auth")), "runtime_status": str(summary.get("runtime_status") or ""), "auth_required": bool(summary.get("auth_required")), "acceptance_ready": bool(summary.get("acceptance_ready"))},
         )
     failed_count = sum(1 for item in checks if item["status"] == "failed")
     passed_count = sum(1 for item in checks if item["status"] == "passed")
@@ -147,7 +145,20 @@ def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | N
         "provider_calls_started": False,
         "requires_invite_codes": bool(auth_payload.get("invite_registration_available") or health.get("auth_required")),
         "human_acceptance_claim": "not_claimed",
+        "product_readiness_claim": "not_claimed",
         "business_validation_claim": "not_claimed",
+        "readiness_claims": {
+            "http_preflight_ready": failed_count == 0,
+            "service_ready": health.get("status") == "ready",
+            "auth_required": bool(health.get("auth_required")),
+            "public_edge_auth_ready": bool(safe_public_edge.get("readiness_boundary", {}).get("public_edge_auth_ready")) if safe_public_edge is not None else False,
+            "runtime_three_end_alignment_evidence": bool(safe_three_end and safe_three_end.get("status") == "aligned"),
+            "runtime_loaded_code_freshness_claim": "not_claimed",
+            "acceptance_ready": False,
+            "human_creative_acceptance": False,
+            "product_readiness": False,
+        },
+        "non_claims": list(HTTP_PREFLIGHT_NON_CLAIMS),
         "writes_company_kb": False,
         "writes_long_term_memory": False,
         "summary": {"passed_check_count": passed_count, "failed_check_count": failed_count},
@@ -183,6 +194,7 @@ def _safe_health(health: dict[str, Any]) -> dict[str, Any]:
         "auth_required": bool(health.get("auth_required")),
         "studio_static": _safe_studio_static(health.get("studio_static")),
         "provider_gates": _safe_provider_gates(health.get("provider_gates")),
+        "readiness": safe_readiness_projection(health.get("readiness")),
     }
 
 

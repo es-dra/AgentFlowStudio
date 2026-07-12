@@ -14,6 +14,12 @@ PNG_BYTES = base64.b64decode(
 PNG_B64 = base64.b64encode(PNG_BYTES).decode("ascii")
 
 
+def _with_keyframe_preflight_token(client: TestClient, project_id: str, request: dict) -> dict:
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return {**request, "preflight_token": preflight.json()["preflight_token"]}
+
+
 def test_asset_card_revision_allows_legacy_zero_reference_slots_for_source_edit(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     captured: dict[str, object] = {}
@@ -49,30 +55,31 @@ def test_asset_card_revision_allows_legacy_zero_reference_slots_for_source_edit(
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_asset_card_revision_zero_slots"
     ref = _upload_reference(client, project_id)
+    request = {
+        "node_id": "asset-card-node",
+        "prompt_text": "Regenerate the robot asset reference sheet after a card edit.",
+        "optimized_prompt": "Regenerate the robot asset reference sheet after a card edit.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "asset_refs": [ref],
+        "node_parameters": {
+            "node_role": "asset_card_draft",
+            "asset_card_revision": {
+                "mode": "image_guided_partial_revision",
+                "changed_fields": [
+                    {"field": "appearance", "label": "外形辨识", "from": "金属机身", "to": "毛绒机身"},
+                ],
+                "preserve_locks": ["保持体态比例"],
+            },
+        },
+        "generated_at": "2026-06-23T13:40:00+08:00",
+    }
 
     result = client.post(
         f"/projects/{project_id}/keyframe-generations",
-        json={
-            "node_id": "asset-card-node",
-            "prompt_text": "Regenerate the robot asset reference sheet after a card edit.",
-            "optimized_prompt": "Regenerate the robot asset reference sheet after a card edit.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "16:9",
-            "candidate_count": 1,
-            "asset_refs": [ref],
-            "node_parameters": {
-                "node_role": "asset_card_draft",
-                "asset_card_revision": {
-                    "mode": "image_guided_partial_revision",
-                    "changed_fields": [
-                        {"field": "appearance", "label": "外形辨识", "from": "金属机身", "to": "毛绒机身"},
-                    ],
-                    "preserve_locks": ["保持体态比例"],
-                },
-            },
-            "generated_at": "2026-06-23T13:40:00+08:00",
-        },
+        json=_with_keyframe_preflight_token(client, project_id, request),
     )
 
     assert result.status_code == 200

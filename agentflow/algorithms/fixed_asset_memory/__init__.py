@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentflow.algorithms.fixed_asset_memory.continuity import asset_continuity_context
+from agentflow.algorithms.fixed_asset_memory.promotion_gate import promotion_gate, public_promotion_gate, public_source_evidence
 
 
 ALGORITHM_ID = "afs.fixed_asset_memory.v0.1"
@@ -11,7 +12,7 @@ OUTPUT_CONTRACT = "safe fixed asset records and public projections for Runtime a
 FAILURE_MODES = ("missing_signature", "empty_feature_card", "draft_context_pollution", "unsafe_projection")
 EVIDENCE_BOUNDARY = "human-confirmed safe fields only; no media bytes, provider raw response, signed URLs, or durable memory writes"
 
-VISUAL_ASSET_SCHEMA_VERSION = "0.2.0"
+VISUAL_ASSET_SCHEMA_VERSION = "0.3.0"
 VIDEO_ASSET_SCHEMA_VERSION = "0.1.0"
 ASSET_STATUSES = {"draft", "fixed", "rejected", "retired"}
 
@@ -44,12 +45,15 @@ def build_visual_asset_record(
         "version": 1,
         "source_node_id": request.source_node_id,
         "supersedes_asset_id": request.supersedes_asset_id.strip() if request.supersedes_asset_id else None,
+        "reuse_intent": request.reuse_intent,
+        "link_existing_asset_id": request.link_existing_asset_id.strip() if request.link_existing_asset_id else None,
         "created_at": created_at,
         "image_asset_refs": clean_refs(request.source_image_asset_refs),
         "signature": request.signature.strip(),
         "feature_card": clean_feature_card(request.feature_card),
         "negative_locks": clean_locks(request.negative_locks),
         "promotion_review": _promotion_review(request.review_decision, request.reviewed_at, server_recorded_at),
+        "promotion_gate": promotion_gate(request),
         "claim_boundary": "fixed_asset_runtime_contract_not_provider_validation",
         "safe_fields_only": True,
         "media_bytes_returned_by_api": False,
@@ -106,6 +110,8 @@ def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
         "image_asset_refs": list(record.get("image_asset_refs") or []),
         "source_node_id": record.get("source_node_id"),
         "supersedes_asset_id": record.get("supersedes_asset_id"),
+        "reuse_intent": record.get("reuse_intent"),
+        "link_existing_asset_id": record.get("link_existing_asset_id"),
         "created_at": record.get("created_at"),
         "reviewed_at": review.get("reviewed_at"),
         "server_recorded_at": review.get("server_recorded_at"),
@@ -113,6 +119,12 @@ def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
     if retirement:
         payload["retired_at"] = retirement.get("retired_at")
         payload["retirement_server_recorded_at"] = retirement.get("server_recorded_at")
+    gate = public_promotion_gate(record.get("promotion_gate"))
+    if gate:
+        payload["promotion_gate"] = gate
+    source_evidence = public_source_evidence(record.get("promotion_gate"), result_asset_status=str(record.get("status") or ""))
+    if source_evidence:
+        payload["source_evidence"] = source_evidence
     return payload
 
 

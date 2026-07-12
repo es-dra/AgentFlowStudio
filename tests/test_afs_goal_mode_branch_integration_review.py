@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+from tools.afs_branch_size_thresholds import build_branch_size_thresholds
+from tools.afs_goal_mode_branch_integration_review import build_branch_integration_blockers
+
+
+def test_branch_integration_review_allows_known_demo_docs_untracked() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="codex/afs-project-book-full-goal-20260630",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="abc123",
+        remote="abc123",
+        base_head="base123",
+        local_base_head="base123",
+        base_is_ancestor=True,
+        status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n?? docs/demo-docs-20260629/\n",
+        changed_files=[
+            "docs/AOS_CURRENT_STATE.md",
+            "docs/architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md",
+            "tools/afs_provider_connected_validation_readiness.py",
+        ],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert blockers == []
+
+
+def test_branch_integration_review_blocks_legacy_handoff_path_changes() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="codex/afs-project-book-full-goal-20260630",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="abc123",
+        remote="abc123",
+        base_head="base123",
+        local_base_head="base123",
+        base_is_ancestor=True,
+        status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
+        changed_files=["docs/handoff/AFS-NEW-TASKRUN.md"],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert blockers == [
+        {
+            "block_id": "legacy_handoff_paths_changed",
+            "paths": ["docs/handoff/AFS-NEW-TASKRUN.md"],
+            "replacement": "Use docs/AOS_CURRENT_STATE.md or a focused docs/architecture contract.",
+        }
+    ]
+
+
+def test_branch_integration_review_blocks_forbidden_artifact_paths() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="codex/afs-project-book-full-goal-20260630",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="abc123",
+        remote="abc123",
+        base_head="base123",
+        local_base_head="base123",
+        base_is_ancestor=True,
+        status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
+        changed_files=["runs/live-smoke.json", "docs/AOS_CURRENT_STATE.md", "apps/studio/assets/generated.png"],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert blockers == [
+        {
+            "block_id": "forbidden_changed_paths",
+            "paths": ["runs/live-smoke.json", "apps/studio/assets/generated.png"],
+        }
+    ]
+
+
+def test_branch_integration_review_blocks_unpushed_or_wrong_branch_state() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="master",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="old456",
+        remote="",
+        base_head="base123",
+        local_base_head="base999",
+        base_is_ancestor=True,
+        status_text="## master...origin/master\n M docs/AOS_CURRENT_STATE.md\n?? scratch.txt\n",
+        changed_files=[],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert [block["block_id"] for block in blockers] == [
+        "unexpected_branch",
+        "upstream_not_aligned",
+        "remote_branch_not_aligned",
+        "local_base_not_aligned_with_origin",
+        "disallowed_worktree_dirty",
+    ]
+
+
+def test_branch_integration_review_blocks_base_divergence_from_head() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="codex/afs-project-book-full-goal-20260630",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="abc123",
+        remote="abc123",
+        base_head="base123",
+        local_base_head="base123",
+        base_is_ancestor=False,
+        status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
+        changed_files=[],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert blockers == [
+        {
+            "block_id": "base_not_ancestor_of_head",
+            "base": "base123",
+            "head": "abc123",
+        }
+    ]
+
+
+def test_branch_size_thresholds_allow_small_provider_closed_slice() -> None:
+    thresholds = build_branch_size_thresholds(commit_count=3, changed_file_count=12, insertion_count=499)
+
+    assert thresholds["threshold_reached"] is False
+    assert thresholds["reached"] == []
+    assert thresholds["required_action"] == "continue_provider_closed_slice"
+
+
+def test_branch_size_thresholds_enter_review_at_each_limit() -> None:
+    thresholds = build_branch_size_thresholds(commit_count=20, changed_file_count=80, insertion_count=5000)
+
+    assert thresholds["threshold_reached"] is True
+    assert thresholds["reached"] == ["commits", "changed_files", "insertions"]
+    assert thresholds["required_action"] == "enter_merge_review_gate"

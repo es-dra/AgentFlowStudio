@@ -8,6 +8,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from tools.afs_readiness_claims import safe_readiness_projection
+
 
 DEFAULT_HOME_PATH = "/home/afs-ops/AgentFlowStudio"
 DEFAULT_OPT_PATH = "/opt/afs/AgentFlowStudio"
@@ -131,6 +133,7 @@ def build_three_end_report(
     safe_health = safe_runtime_health(runtime_health or {})
     health_ready = runtime_health is None or safe_health.get("status") == "ready"
     all_aligned = aligned_count == len(snapshots) and health_ready
+    runtime_three_end_alignment_evidence = all_aligned and runtime_health is not None
     return {
         "artifact_type": "afs_three_end_status_report",
         "schema_version": "0.1.0",
@@ -146,6 +149,25 @@ def build_three_end_report(
         },
         "ends": {item.label: asdict(item) for item in snapshots},
         "runtime_health": safe_health,
+        "readiness_claims": {
+            "repo_ends_aligned": aligned_count == len(snapshots),
+            "runtime_service_ready": health_ready,
+            "runtime_three_end_alignment_evidence": runtime_three_end_alignment_evidence,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
+            "acceptance_ready": False,
+            "human_creative_acceptance": False,
+            "product_readiness": False,
+        },
+        "non_claims": [
+            "three-end alignment only",
+            "not runtime loaded-code freshness",
+            "not provider smoke",
+            "not generated-media QA",
+            "not human creative acceptance",
+            "not product or business readiness",
+            "not public or legal readiness",
+            "not CompanyOS promotion",
+        ],
     }
 
 
@@ -159,6 +181,7 @@ def safe_runtime_health(payload: dict[str, Any]) -> dict[str, Any]:
         "auth_required": bool(payload.get("auth_required")),
         "studio_static": _safe_studio_static(payload.get("studio_static")),
         "provider_gates": _safe_provider_gates(payload.get("provider_gates")),
+        "readiness": safe_readiness_projection(payload.get("readiness")),
     }
 
 
@@ -182,8 +205,6 @@ def _safe_provider_gates(value: Any) -> dict[str, bool]:
     if not isinstance(value, dict):
         return {}
     return {str(key): bool(val) for key, val in value.items() if str(key) in SAFE_GATE_KEYS}
-
-
 def _run(args: list[str], *, cwd: Path | None = None) -> str:
     result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, check=False)
     if result.returncode != 0:

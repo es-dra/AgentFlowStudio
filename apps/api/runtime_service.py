@@ -10,6 +10,7 @@ from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedb
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_cors import configure_runtime_cors
 from apps.api.runtime_errors import safe_error_detail
+from apps.api.runtime_exception_handlers import configure_runtime_exception_handlers
 from apps.api.runtime_info import runtime_capabilities_payload, runtime_health_payload
 from apps.api.runtime_artifacts import feedback_ref
 from apps.api.runtime_events import runtime_feedback_event
@@ -22,6 +23,7 @@ from apps.api.runtime_jobs import (
 from apps.api.runtime_models import (
     FeedbackRecordRequest,
     ProjectCreateRequest,
+    StudioClientEventRequest,
 )
 from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory_routes
 from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
@@ -29,7 +31,11 @@ from apps.api.runtime_social_square import register_runtime_social_square_routes
 from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
+from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
+from apps.api.runtime_feedback_candidate import register_runtime_feedback_candidate_routes
+from apps.api.runtime_human_gate import register_runtime_human_gate_routes
+from apps.api.runtime_keyframe_local_edit import register_runtime_keyframe_local_edit_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
@@ -43,6 +49,13 @@ from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_threadpool_compat import configure_runtime_threadpool_compat
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_auth_routes import configure_runtime_auth_middleware, register_runtime_auth_routes
+from apps.api.runtime_logging import (
+    client_request_id_from_request,
+    configure_runtime_logging,
+    configure_runtime_request_logging,
+    log_business_event,
+    request_id_from_request,
+)
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import (
     DEFAULT_SITE_ROOT,
@@ -84,7 +97,9 @@ def create_runtime_app(
     runtime_root: Path = DEFAULT_RUNTIME_ROOT,
     studio_root: Path = DEFAULT_STUDIO_ROOT,
     site_root: Path = DEFAULT_SITE_ROOT,
+    runtime_bind_host: str | None = None,
 ) -> FastAPI:
+    configure_runtime_logging()
     configure_runtime_threadpool_compat()
     store = RuntimeStore(runtime_root)
     auth = RuntimeAuthStore(store)
@@ -93,6 +108,8 @@ def create_runtime_app(
         version="0.2.0",
         summary="Local AFS API adapter for AFS Studio canvas integration.",
     )
+    configure_runtime_request_logging(app)
+    configure_runtime_exception_handlers(app)
     configure_runtime_cors(app)
     configure_runtime_auth_middleware(app, auth)
     register_runtime_auth_routes(app, auth)
@@ -102,11 +119,31 @@ def create_runtime_app(
         return runtime_health_payload(
             runtime_root=runtime_root,
             studio_static=studio_static_status(studio_root),
+            runtime_bind_host=runtime_bind_host,
         )
 
     @app.get("/capabilities")
     def capabilities() -> dict[str, Any]:
         return runtime_capabilities_payload()
+
+    @app.post("/studio/client-events")
+    def record_studio_client_event(request: Request, body: StudioClientEventRequest) -> dict[str, Any]:
+        log_business_event(
+            "studio_client_event",
+            request_id=request_id_from_request(request),
+            client_request_id=client_request_id_from_request(request),
+            event_type=body.event_type,
+            severity=body.severity,
+            message=body.message,
+            project_id=body.project_id,
+            action=body.action,
+            details=body.details,
+            generated_at=body.generated_at,
+            file_log_domain="studio",
+            file_log_event=body.event_type,
+            file_log_level="ERROR" if body.severity == "error" else "WARNING" if body.severity == "warning" else "INFO",
+        )
+        return {"ok": True}
 
     @app.get("/projects")
     def list_projects(request: Request) -> dict[str, Any]:
@@ -134,6 +171,81 @@ def create_runtime_app(
         ref = store.register_artifact(store.project_manifest_path(body.project_id), role="project_manifest")
         return {"project_id": body.project_id, "manifest": manifest, "artifact": ref, "flow": build_flow_summary(store, body.project_id)}
 
+    @app.delete("/projects/{project_id}")
+    def delete_project(project_id: str, request: Request) -> dict[str, Any]:
+        try:
+            user = auth.require_user(request) if auth.enabled() else None
+            marker = store.soft_delete_project(
+                project_id,
+                deleted_by=str(user["user_id"]) if user else "",
+                reason="user_requested",
+            )
+        except KeyError as exc:
+            detail = safe_error_detail(
+                "project_not_found",
+                message="项目不存在或已经被删除。",
+                user_action="请刷新项目列表后重试。",
+                request_id=request_id_from_request(request),
+                client_request_id=client_request_id_from_request(request),
+                project_id=project_id,
+                action="delete_project",
+                stage="project_delete",
+            )
+            log_business_event(
+                "project_delete_rejected",
+                request_id=detail.get("request_id"),
+                client_request_id=detail.get("client_request_id"),
+                project_id=project_id,
+                action="delete_project",
+                stage="project_delete",
+                error=detail.get("error"),
+                file_log_domain="project",
+                file_log_event="delete_rejected",
+                file_log_level="WARNING",
+            )
+            raise HTTPException(status_code=404, detail=detail) from exc
+        except ValueError as exc:
+            detail = safe_error_detail(
+                "invalid_project_manifest",
+                message="项目数据校验失败，无法完成删除操作。",
+                user_action="请联系管理员查看该项目的 manifest 数据。",
+                request_id=request_id_from_request(request),
+                client_request_id=client_request_id_from_request(request),
+                project_id=project_id,
+                action="delete_project",
+                stage="project_delete",
+            )
+            log_business_event(
+                "project_delete_rejected",
+                request_id=detail.get("request_id"),
+                client_request_id=detail.get("client_request_id"),
+                project_id=project_id,
+                action="delete_project",
+                stage="project_delete",
+                error=detail.get("error"),
+                file_log_domain="project",
+                file_log_event="delete_rejected",
+                file_log_level="ERROR",
+            )
+            raise HTTPException(status_code=422, detail=detail) from exc
+        log_business_event(
+            "project_delete_succeeded",
+            request_id=request_id_from_request(request),
+            client_request_id=client_request_id_from_request(request),
+            project_id=project_id,
+            action="delete_project",
+            stage="project_delete",
+            delete_mode=marker.get("delete_mode"),
+            file_log_domain="project",
+            file_log_event="delete_succeeded",
+        )
+        return {
+            "project_id": project_id,
+            "deleted": True,
+            "delete_mode": marker.get("delete_mode", "soft_delete"),
+            "deleted_at": marker.get("deleted_at", ""),
+        }
+
     @app.get("/projects/{project_id}/manifest")
     def project_manifest(project_id: str) -> dict[str, Any]:
         try:
@@ -146,8 +258,9 @@ def create_runtime_app(
     @app.get("/artifacts/{artifact_id}")
     def artifact(artifact_id: str, request: Request) -> dict[str, Any]:
         try:
+            artifact_project_id = store.artifact_project_id(artifact_id)
             artifact_payload = store.read_artifact(artifact_id)
-            _enforce_payload_project_access(auth, request, artifact_payload)
+            _enforce_payload_project_access(auth, request, artifact_payload, artifact_project_id=artifact_project_id)
             return artifact_payload
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="artifact not found") from exc
@@ -211,10 +324,14 @@ def create_runtime_app(
     register_runtime_image_asset_routes(app, store)
     register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
+    register_runtime_feedback_candidate_routes(app, store)
+    register_runtime_human_gate_routes(app, store)
     register_runtime_keyframe_routes(app, store)
+    register_runtime_keyframe_local_edit_routes(app, store)
     register_runtime_video_routes(app, store)
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
+    register_runtime_accepted_generation_plan_routes(app, store)
     register_runtime_studio_state_routes(app, store)
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)
@@ -239,11 +356,35 @@ def _enforce_project_access(auth: RuntimeAuthStore, request: Request, project_id
         raise HTTPException(status_code=403, detail="project access denied")
 
 
-def _enforce_payload_project_access(auth: RuntimeAuthStore, request: Request, payload: dict[str, Any]) -> None:
+def _enforce_payload_project_access(
+    auth: RuntimeAuthStore,
+    request: Request,
+    payload: dict[str, Any],
+    *,
+    artifact_project_id: str = "",
+) -> None:
     body = payload.get("payload") if isinstance(payload.get("payload"), dict) else payload
-    project_id = str(body.get("project_id", "") if isinstance(body, dict) else "")
+    project_id = artifact_project_id or _project_id_from_payload(body)
     if project_id:
         _enforce_project_access(auth, request, project_id)
+
+
+def _project_id_from_payload(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("project_id", "source_project_id"):
+            project_id = str(value.get(key) or "")
+            if project_id:
+                return project_id
+        for item in value.values():
+            project_id = _project_id_from_payload(item)
+            if project_id:
+                return project_id
+    if isinstance(value, list):
+        for item in value:
+            project_id = _project_id_from_payload(item)
+            if project_id:
+                return project_id
+    return ""
 
 
 __all__ = (

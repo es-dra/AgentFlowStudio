@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from apps.api.runtime_studio_state_feedback_policy import bundle_feedback_overlay_prompt_policy
 from apps.api.runtime_store import safe_id
 
 
@@ -30,6 +31,18 @@ def sanitize_context_bundle(value: Any) -> dict[str, Any]:
     budget = _bundle_budget(value.get("budget"))
     if budget:
         result["budget"] = budget
+    overlays = _bundle_feedback_overlay_list(value.get("feedback_context_overlays"))
+    if overlays:
+        result["feedback_context_overlays"] = overlays
+    trace = value.get("trace_summary") if isinstance(value.get("trace_summary"), dict) else {}
+    policy = bundle_feedback_overlay_prompt_policy(
+        value.get("feedback_context_overlay_prompt_policy")
+        or trace.get("feedback_context_overlay_prompt_policy"),
+        text=_text,
+        safe_id=safe_id,
+    )
+    if policy:
+        result["feedback_context_overlay_prompt_policy"] = policy
     return result
 
 
@@ -133,6 +146,122 @@ def _bundle_budget(value: Any) -> dict[str, Any]:
                 safe_segments[safe_id(str(name))[:80]] = safe_segment
         if safe_segments:
             result["segments"] = safe_segments
+    return result
+
+
+def _bundle_feedback_overlay_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for item in value[:5]:
+        if not isinstance(item, dict):
+            continue
+        overlay: dict[str, Any] = {}
+        for key in (
+            "overlay_id",
+            "source_feedback_id",
+            "source_promotion_decision_id",
+            "candidate_id",
+            "candidate_scope",
+            "overlay_scope",
+            "overlay_intent",
+            "decision_effect",
+        ):
+            text = _text(item.get(key), "", 600 if key == "overlay_intent" else 180)
+            if text:
+                overlay[key] = text
+        safe_target = _safe_text_dict(item.get("safe_target"), max_items=12, max_length=180)
+        if safe_target:
+            overlay["safe_target"] = safe_target
+        for key in ("target_binding", "scope_policy", "conflict_summary"):
+            payload = _safe_payload(item.get(key))
+            if payload:
+                overlay[key] = payload
+        evidence = _safe_evidence_summary(item.get("safe_evidence_summary"))
+        if evidence:
+            overlay["safe_evidence_summary"] = evidence
+        taxonomy = _safe_text_list(item.get("feedback_taxonomy"), limit=16, max_length=80)
+        if taxonomy:
+            overlay["feedback_taxonomy"] = taxonomy
+        for key in (
+            "context_overlay_consumed",
+            "candidate_feedback_included_in_context",
+            "provider_calls_started",
+            "writes_long_term_memory",
+            "writes_company_kb",
+        ):
+            if key in item:
+                overlay[key] = bool(item.get(key))
+        artifact_ref = _safe_artifact_ref(item.get("artifact_ref"))
+        if artifact_ref:
+            overlay["artifact_ref"] = artifact_ref
+        if overlay.get("overlay_id"):
+            result.append(overlay)
+    return result
+
+
+def _safe_text_dict(value: Any, *, max_items: int, max_length: int) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, str] = {}
+    for key, item in list(value.items())[:max_items]:
+        safe_key = safe_id(_text(key, "", 80))[:80]
+        safe_value = _text(item, "", max_length)
+        if safe_key and safe_value:
+            result[safe_key] = safe_value
+    return result
+
+
+def _safe_evidence_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    for key in ("rating_count", "decision_count", "taxonomy_count"):
+        if key in value:
+            result[key] = int(max(0, min(1000, _number(value.get(key), 0))))
+    if "has_note" in value:
+        result["has_note"] = bool(value.get("has_note"))
+    policy = _text(value.get("raw_evidence_policy"), "", 120)
+    if policy:
+        result["raw_evidence_policy"] = policy
+    return result
+
+
+def _safe_text_list(value: Any, *, limit: int, max_length: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:limit]:
+        text = _text(item, "", max_length)
+        if text and text not in result:
+            result.append(text)
+    return result
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            safe_id(_text(key, "", 80))[:80]: _safe_payload(item)
+            for key, item in list(value.items())[:24]
+            if safe_id(_text(key, "", 80))[:80]
+        }
+    if isinstance(value, list):
+        return [_safe_payload(item) for item in value[:24]]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return int(max(0, min(1000, value)))
+    return _text(value, "", 180)
+
+
+def _safe_artifact_ref(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, str] = {}
+    for key in ("artifact_id", "artifact_type", "role", "filename"):
+        text = _text(value.get(key), "", 180)
+        if text:
+            result[key] = text
     return result
 
 

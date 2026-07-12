@@ -16,6 +16,7 @@ export function renderTopbar(options) {
     onOpenHome,
     onBeforeSiteHome,
     authUser,
+    runtimeSurfaceStatus,
     onSignOut,
   } = options;
   const topbar = document.getElementById("topbar");
@@ -26,6 +27,10 @@ export function renderTopbar(options) {
     state.meta.canvasName,
     state.ui.saveState,
     state.ui.saveMessage,
+    runtimeSurfaceStatus?.state || "runtime-unknown",
+    runtimeSurfaceStatus?.label || "",
+    runtimeSurfaceStatus?.authLabel || "",
+    runtimeSurfaceStatus?.providerGateLabel || "",
     showAllProjects ? "all-projects" : "studio-projects",
     authUser?.user_id || "anonymous",
     projectSummaries.map((item) => item.project_id).join(","),
@@ -45,6 +50,7 @@ export function renderTopbar(options) {
 
   topbar.appendChild(el("div", "topbar-spacer"));
   const right = el("div", "topbar-right");
+  if (runtimeSurfaceStatus) right.appendChild(runtimeStatusBadge(runtimeSurfaceStatus));
   if (authUser) right.appendChild(accountButton(authUser, onSignOut));
   const save = el("span", `save-pill ${saveClass(state.ui.saveState)}`, state.ui.saveState || "本地暂存");
   if (state.ui.saveMessage) save.title = state.ui.saveMessage;
@@ -102,6 +108,28 @@ function accountButton(user, onSignOut) {
   button.title = "退出登录";
   button.addEventListener("click", () => onSignOut?.());
   return button;
+}
+
+function runtimeStatusBadge(status) {
+  const state = safeRuntimeStatusState(status?.state);
+  const label = String(status?.label || "Runtime unknown");
+  const authLabel = String(status?.authLabel || "Auth unknown");
+  const badge = el("span", `runtime-status-badge ${state}`);
+  badge.dataset.state = state;
+  badge.appendChild(el("span", "runtime-status-dot"));
+  badge.appendChild(el("span", "runtime-status-label", label));
+  badge.appendChild(el("span", "runtime-status-meta", authLabel));
+  badge.title = status?.detail || [
+    authLabel,
+    status?.providerGateLabel,
+    "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed.",
+  ].filter(Boolean).join(" | ");
+  return badge;
+}
+
+function safeRuntimeStatusState(value) {
+  const state = String(value || "").trim().toLowerCase();
+  return ["checking", "ready", "attention", "unavailable"].includes(state) ? state : "attention";
 }
 
 function appendProjectControls(topbar, options) {

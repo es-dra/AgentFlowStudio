@@ -1,5 +1,6 @@
 import { icon } from "../icons.js";
 import { el, showModal } from "../overlay.js";
+import { qualityFeedbackView } from "../quality-feedback.js";
 
 export function openCreationProcessPanel(state, node) {
   if (!node) return null;
@@ -16,6 +17,8 @@ export function openCreationProcessPanel(state, node) {
   body.appendChild(hero(node));
   body.appendChild(stepList(state, node));
   body.appendChild(detailGrid(node));
+  const feedback = qualityFeedbackView(node);
+  if (feedback) body.appendChild(reviewSection(feedback));
 
   modal.append(head, body);
   const close = showModal(modal);
@@ -63,12 +66,25 @@ function detailGrid(node) {
   const section = el("section", "creation-process-section");
   section.appendChild(el("h4", "", "可继续操作"));
   const grid = el("div", "creation-process-actions");
-  grid.appendChild(action(node, "继续生成", "沿用当前结果创建下一步", "play", "afs:studio-open-generation-panel"));
+  grid.appendChild(action(
+    node,
+    node.status === "partial" ? "Retry failed items" : "继续生成",
+    node.status === "partial" ? "保留 partial result，只重试失败项" : "沿用当前结果创建下一步",
+    node.status === "partial" ? "retry" : "play",
+    "afs:studio-open-generation-panel",
+  ));
   grid.appendChild(action(node, "固定为素材", "把稳定结果加入项目素材", "bookmark", "afs:studio-fix-visual-asset"));
   grid.appendChild(action(node, "整理卡片", "整理画面、片段和可复用信息", "frames", "afs:video-asset-card-draft"));
   section.appendChild(grid);
   const note = el("p", "creation-process-note", "这些入口只展示当前可用方向；真实生成仍需在节点中确认。");
   section.appendChild(note);
+  return section;
+}
+
+function reviewSection(feedback) {
+  const section = el("section", "creation-process-section");
+  section.appendChild(el("h4", "", "Review feedback"));
+  section.appendChild(feedback);
   return section;
 }
 

@@ -7,6 +7,7 @@ def test_algorithm_library_exports_runtime_algorithm_contracts() -> None:
     from agentflow import algorithms
     from agentflow.algorithms import (
         asset_card_drafting,
+        content_quality_evaluation,
         context_resolver,
         creative_intent_control,
         fixed_asset_memory,
@@ -19,6 +20,7 @@ def test_algorithm_library_exports_runtime_algorithm_contracts() -> None:
     assert algorithms.ALGORITHM_LIBRARY_VERSION.startswith("afs_algorithm_library_")
     for module in (
         asset_card_drafting,
+        content_quality_evaluation,
         context_resolver,
         creative_intent_control,
         fixed_asset_memory,
@@ -115,6 +117,37 @@ def test_quality_feedback_scoring_sanitizes_raw_evidence_without_memory_promotio
     assert "c:\\secret" not in serialized
 
 
+def test_quality_feedback_sanitizes_asset_graph_feedback_overlay() -> None:
+    from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
+
+    payload = sanitize_quality_feedback(
+        {
+            "kind": "studio_asset_graph_feedback",
+            "node_id": "video-node-1",
+            "asset_graph_ref": "artifact:asset_graph",
+            "decisions": [
+                {
+                    "graph_asset_id": "graph:character:future_robot",
+                    "decision": "lock",
+                    "label": "future robot https://example.test/signed?token=abc",
+                    "continuity_locks": ["plush robot head shell", r"C:\\secret\\bad.png"],
+                    "negative_locks": ["do not replace with metal skull"],
+                },
+                {"graph_asset_id": "graph:scene:eaves", "decision": "invalid"},
+            ],
+        }
+    )
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert payload["kind"] == "studio_asset_graph_feedback"
+    assert len(payload["decisions"]) == 1
+    assert payload["decisions"][0]["decision"] == "lock"
+    assert payload["feedback_is_memory"] is False
+    assert payload["writes_company_kb"] is False
+    assert "token=abc" not in serialized
+    assert "c:\\secret" not in serialized
+
+
 def test_creative_intent_video_prompt_algorithm_handles_i2v_contract() -> None:
     from agentflow.algorithms.creative_intent_control import (
         deterministic_video_fallback_prompt,
@@ -175,3 +208,269 @@ def test_context_resolver_reference_algorithm_merges_bundle_and_request_refs() -
     )
 
     assert refs == ["img_context_ref", "img_uploaded_ref"]
+
+
+def test_video_generation_plan_algorithm_returns_second_level_motion_beats() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    assert plan["motion_plan"]["time_beats"][0]["time"] == "0.0s-1.0s"
+    assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
+    assert plan["motion_plan"]["time_beats"][2]["time"] == "3.5s-5.0s"
+    assert "rooftop platform and sky relationship" in plan["editing_plan"]["continuity_locks"]
+    assert "unrequested chair" in plan["editing_plan"]["forbidden_changes"]
+
+
+def test_video_generation_plan_uses_asset_graph_context() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "confidence": 0.91,
+                "continuity_locks": ["plush robot head shell", "white mechanical body proportions"],
+                "negative_locks": ["do not replace plush shell with metal skull"],
+            },
+            {
+                "graph_asset_id": "graph:scene:rooftop_platform",
+                "asset_id": "asset_rooftop",
+                "asset_type": "scene",
+                "label": "rural rooftop platform",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "confidence": 0.87,
+                "continuity_locks": ["flat rural rooftop boundary", "open sky relationship"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+        "unsupported_additions": [{"shot_id": "shot_01", "addition": "chair"}],
+    }
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph},
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph},
+    )
+
+    assert plan["asset_graph_context"]["asset_count"] == 2
+    assert "graph:character:future_robot" in plan["asset_graph_context"]["graph_asset_ids"]
+    assert plan["prompt_contract"]["asset_graph_context_used"] is True
+    assert "plush robot head shell" in plan["editing_plan"]["continuity_locks"]
+    assert "do not add unapproved eaves" in plan["editing_plan"]["forbidden_changes"]
+    assert "Asset graph continuity:" in prompt
+    assert "graph:scene:rooftop_platform" in prompt
+
+
+def test_video_generation_plan_returns_second_level_director_timeline() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    timeline = plan["temporal_director_plan"]
+    assert timeline["granularity"] == "second_level"
+    assert [beat["time"] for beat in timeline["beats"]] == [
+        "0.0s-1.0s",
+        "1.0s-2.0s",
+        "2.0s-3.0s",
+        "3.0s-4.0s",
+        "4.0s-5.0s",
+    ]
+    assert "rooftop boundary" in timeline["beats"][0]["camera_state"]
+    assert "moderate-to-deep" in timeline["beats"][0]["depth_of_field"]
+    assert plan["prompt_contract"]["second_level_director_timeline_required"] is True
+    assert plan["prompt_contract"]["expert_knowledge_used"] is True
+    assert "Second-level director timeline:" in prompt
+    assert "Expert knowledge reference:" in prompt
+
+
+def test_asset_graph_feedback_overlay_updates_plan_context() -> None:
+    from agentflow.algorithms.provider_gate_manifest import build_asset_graph_feedback_overlay, video_generation_plan, video_provider_prompt
+
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "continuity_locks": ["robot head shell"],
+                "negative_locks": ["do not change identity"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "asset_id": "asset_eaves",
+                "asset_type": "scene",
+                "label": "wrong eaves",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "continuity_locks": ["eaves geometry"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+    }
+    overlay = build_asset_graph_feedback_overlay(
+        {
+            "kind": "studio_asset_graph_feedback",
+            "decisions": [
+                {
+                    "graph_asset_id": "graph:character:future_robot",
+                    "decision": "lock",
+                    "continuity_locks": ["plush robot head shell must remain"],
+                },
+                {
+                    "graph_asset_id": "graph:scene:wrong_eaves",
+                    "decision": "reject",
+                    "note": "Not part of the approved rooftop platform.",
+                },
+            ],
+        }
+    )
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph, "asset_graph_feedback_overlay": overlay},
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph, "asset_graph_feedback_overlay": overlay},
+    )
+
+    context = plan["asset_graph_context"]
+    assert context["feedback_decisions"][0]["decision"] == "lock"
+    assert "graph:scene:wrong_eaves" in context["blocked_graph_asset_ids"]
+    assert "graph:scene:wrong_eaves" not in context["graph_asset_ids"]
+    assert "plush robot head shell must remain" in plan["editing_plan"]["continuity_locks"]
+    assert plan["prompt_contract"]["asset_graph_feedback_used"] is True
+    assert "Feedback guard: do not use rejected asset graph entries" in prompt
+
+
+def test_video_generation_plan_includes_professional_reference_and_prompt_guidance() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    reference = plan["professional_reference"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert "0-1s" in reference["pacing"]["must_include"][0]
+    assert "Professional video reference:" in prompt
+    assert "motivated night exterior" in prompt
+    assert "conflicting" not in prompt.lower()
+    assert "conflict" not in prompt.lower()
+
+    neutral_prompt = video_provider_prompt(
+        prompt_text="Generate a continuous video from the first frame.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="fixed camera",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    assert "conflicting" not in neutral_prompt.lower()
+    assert "conflict" not in neutral_prompt.lower()
+    neutral_plan = video_generation_plan(
+        prompt_text="Generate a continuous video from the first frame.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="fixed camera",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    assert "inconsistent motion directions" in neutral_plan["professional_reference"]["pacing"]["avoid"]
+
+
+def test_video_generation_plan_includes_director_scenario_and_prompt_guidance() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    plan = video_generation_plan(
+        prompt_text="A podcast interview quote becomes a short visual clip with a warm studio microphone.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The speaker subtly reacts while the microphone light glows.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A podcast interview quote becomes a short visual clip with a warm studio microphone.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The speaker subtly reacts while the microphone light glows.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    scenario = plan["director_scenario"]
+    assert scenario["primary_scenario"] == "podcast_visual"
+    assert "quote focus is clear" in scenario["quality_checks"]
+    assert plan["prompt_contract"]["director_scenario_selected"] is True
+    assert "Director scenario video guidance:" in prompt
+    assert "Podcast Visual" in prompt
