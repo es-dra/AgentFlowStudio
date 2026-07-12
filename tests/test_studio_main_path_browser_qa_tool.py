@@ -199,7 +199,7 @@ def test_main_path_evidence_assertion_accepts_blocked_overlay_selected_chain() -
 def test_accepted_generation_plan_modal_evidence_requires_blocked_non_claim_preview() -> None:
     evidence = main_path_qa.accepted_generation_plan_modal_evidence(
         _accepted_generation_plan_preview_payload(),
-        "Blocked pending prerequisites\nProvider calls\nnot started\nProduct readiness\nnot claimed",
+        "前置条件未满足，已阻断\nProvider 调用\n未启动\n产品就绪\n未声明",
     )
 
     main_path_qa.assert_accepted_generation_plan_modal_evidence(evidence)
@@ -215,7 +215,7 @@ def test_accepted_generation_plan_modal_evidence_rejects_claimed_product_readine
     payload["operator_evidence"]["non_claim_boundaries"]["product_readiness"] = True
     evidence = main_path_qa.accepted_generation_plan_modal_evidence(
         payload,
-        "Blocked pending prerequisites\nProvider calls\nnot started\nProduct readiness\nnot claimed",
+        "前置条件未满足，已阻断\nProvider 调用\n未启动\n产品就绪\n未声明",
     )
 
     try:

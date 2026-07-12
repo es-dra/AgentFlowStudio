@@ -1,4 +1,5 @@
 const RUNTIME_STATUS_BOUNDARY = "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed.";
+const RUNTIME_STATUS_BOUNDARY_VISIBLE = "Health only";
 
 export function initialRuntimeSurfaceStatus() {
   return {
@@ -6,6 +7,7 @@ export function initialRuntimeSurfaceStatus() {
     label: "Runtime checking",
     authLabel: "Auth unknown",
     providerGateLabel: "Provider gates unknown",
+    boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
     detail: "Checking Runtime Service health and auth boundary.",
   };
 }
@@ -30,6 +32,7 @@ export async function loadRuntimeSurfaceStatus(runtime, { authState = null, form
       label: "Runtime offline",
       authLabel: "Auth unknown",
       providerGateLabel: "Provider gates unknown",
+      boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
       detail: `Runtime Service health check failed: ${formatError(error)}`,
     };
   }
@@ -63,9 +66,10 @@ function runtimeSurfaceStatusFromHealth(health, authState) {
   const statusText = String(health?.status || health?.service_health?.status || "unknown");
   return {
     state: serviceReady ? (authUnknown ? "attention" : "ready") : "attention",
-    label: serviceReady ? "Runtime ready" : "Runtime attention",
+    label: serviceReady ? "Runtime service ready" : "Runtime attention",
     authLabel,
     providerGateLabel,
+    boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
     detail: [
       `Runtime status: ${statusText}`,
       authLabel,

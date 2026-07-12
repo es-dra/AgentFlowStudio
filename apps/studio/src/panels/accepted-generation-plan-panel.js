@@ -17,8 +17,8 @@ const NON_CLAIM_BOUNDARY_LABELS = [
 export function openAcceptedGenerationPlanPanel(runtime) {
   const modal = el("div", "modal compact accepted-generation-plan-modal");
   const head = el("div", "modal-head accepted-generation-plan-head");
-  head.appendChild(el("strong", "", "Generation plan review"));
-  head.appendChild(el("small", "", "Provider-closed / not yet accepted"));
+  head.appendChild(el("strong", "", "生成计划预览（已阻断）"));
+  head.appendChild(el("small", "", "本地预览 / 未接受 / 不启动 provider"));
   const closeBtn = el("button", "modal-close");
   closeBtn.type = "button";
   closeBtn.innerHTML = icon("x", 15);
@@ -27,8 +27,8 @@ export function openAcceptedGenerationPlanPanel(runtime) {
 
   const body = el("div", "modal-body accepted-generation-plan-body");
   const controls = el("div", "accepted-plan-controls");
-  const defaultBtn = modeButton("Default package (blocked)", DEFAULT_FIXTURE_MODE);
-  const confirmedBtn = modeButton("Fixture demo (blocked)", CONFIRMED_FIXTURE_MODE);
+  const defaultBtn = modeButton("默认包（已阻断）", DEFAULT_FIXTURE_MODE);
+  const confirmedBtn = modeButton("演示夹具（已阻断）", CONFIRMED_FIXTURE_MODE);
   controls.append(defaultBtn, confirmedBtn);
   const content = el("div", "accepted-plan-content");
   body.append(controls, content);
@@ -72,7 +72,7 @@ function setActiveMode(controls, fixtureMode) {
 function renderLoading(content, fixtureMode) {
   content.replaceChildren();
   const panel = el("div", "accepted-plan-empty");
-  panel.innerHTML = `${icon("layers", 20)}<strong>Loading ${escapeHtml(fixtureMode)}</strong><small>Plan preview only. No provider call is started; not yet accepted.</small>`;
+  panel.innerHTML = `${icon("layers", 20)}<strong>正在加载 ${escapeHtml(fixtureMode)}</strong><small>仅生成计划预览；不会启动 provider 调用，当前未接受。</small>`;
   content.appendChild(panel);
 }
 
@@ -94,11 +94,11 @@ function renderPlan(content, response) {
 
   const status = el("section", `accepted-plan-status ${state.accepted ? "accepted" : "blocked"}`);
   const acceptedTitle = provenance.source_mode === "project_artifact"
-    ? "Plan step-gate evidence recorded for review"
-    : "Local fixture demo remains blocked and not accepted";
+    ? "计划步骤门证据已记录，等待复核"
+    : "本地演示夹具仍处于阻断状态，未被接受";
   const statusCopy = state.accepted
-    ? `${acceptedTitle}; not package complete, not human acceptance`
-    : "needs_attention · Blocked pending prerequisites";
+    ? `${acceptedTitle}；未声明包完成或人工接受`
+    : "needs_attention · 前置条件未满足，已阻断";
   status.innerHTML = [
     `<span>${icon(state.accepted ? "check" : "lock", 18)}</span>`,
     `<div><strong>${escapeHtml(statusCopy)}</strong>`,
@@ -107,30 +107,30 @@ function renderPlan(content, response) {
   content.appendChild(status);
 
   content.appendChild(metricGrid([
-    ["Plan review state", state.accepted ? "step-gate evidence recorded" : "needs_attention"],
-    ["State", state.packet_state || ""],
-    ["Request", state.request_state || ""],
-    ["Source", provenance.source_mode || provenance.evidence_origin || ""],
+    ["计划状态", state.accepted ? "步骤门证据已记录" : "needs_attention"],
+    ["状态", state.packet_state || ""],
+    ["请求", state.request_state || ""],
+    ["来源", provenance.source_mode || provenance.evidence_origin || ""],
   ]));
-  content.appendChild(listSection("Blocked reasons / next actions", [
+  content.appendChild(listSection("阻断原因 / 下一步", [
     ...(blockers.blocked_reasons || []),
     ...(blockers.pending_branch_asset_refs || []),
     ...(blockers.unresolved_open_question_refs || []),
-  ], "No blocked reason returned in this preview packet."));
-  content.appendChild(listSection("Residual closure refs", blockers.residual_closure_refs || [], "No residual closures are recorded."));
+  ], "此预览包未返回阻断原因。"));
+  content.appendChild(listSection("残留关闭引用", blockers.residual_closure_refs || [], "尚未记录残留关闭证据。"));
   content.appendChild(listSection(
-    "Non-claim boundaries",
+    "非声明边界",
     nonClaims.explicit_non_claims || NON_CLAIM_BOUNDARY_LABELS,
-    "No non-claim boundary was returned.",
+    "未返回非声明边界。",
   ));
   content.appendChild(metricGrid([
-    ["Provider calls", nonClaims.provider_calls_started ? "started" : "not started"],
-    ["Provider pass", "not claimed"],
-    ["Media QA", "not claimed"],
-    ["Human acceptance", "not claimed"],
-    ["Package complete", "not claimed"],
-    ["Product readiness", "not claimed"],
-    ["Business validation", "not claimed"],
+    ["Provider 调用", nonClaims.provider_calls_started ? "已启动" : "未启动"],
+    ["Provider 通过", "未声明"],
+    ["媒体 QA", "未声明"],
+    ["人工接受", "未声明"],
+    ["包完成", "未声明"],
+    ["产品就绪", "未声明"],
+    ["业务验证", "未声明"],
   ]));
 }
 

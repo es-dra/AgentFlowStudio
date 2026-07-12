@@ -217,7 +217,11 @@ def submit_keyframe_generation(page: Page, project_id: str, keyframe_id: str) ->
 
 def check_accepted_generation_plan_modal(page: Page) -> dict[str, Any]:
     with page.expect_response(lambda r: "/accepted-generation-plan-packets/preview" in r.url and r.request.method == "POST") as preview_response:
-        page.locator('#dock .dock-btn[title="Accepted generation plan"]').click()
+        page.locator(
+            '#dock .dock-btn[title="计划预览（已阻断）"], '
+            '#dock .dock-btn[title="Generation plan review"], '
+            '#dock .dock-btn[title="Accepted generation plan"]'
+        ).click()
     if preview_response.value.status != 200:
         raise AssertionError(f"accepted generation plan preview failed: {preview_response.value.status} {preview_response.value.text()}")
     payload = preview_response.value.json()
@@ -260,9 +264,12 @@ def accepted_generation_plan_modal_evidence(payload: dict[str, Any], modal_text:
         "explicit_non_claims": explicit_non_claims,
         "artifact_id": artifact.get("artifact_id", ""),
         "job_id": job.get("job_id", ""),
-        "rendered_blocked_status": "Blocked pending prerequisites" in modal_text,
-        "rendered_provider_not_started": "not started" in modal_text,
-        "rendered_product_readiness_not_claimed": "Product readiness" in modal_text and "not claimed" in modal_text,
+        "rendered_blocked_status": "前置条件未满足，已阻断" in modal_text or "Blocked pending prerequisites" in modal_text,
+        "rendered_provider_not_started": "未启动" in modal_text or "not started" in modal_text,
+        "rendered_product_readiness_not_claimed": (
+            ("产品就绪" in modal_text and "未声明" in modal_text)
+            or ("Product readiness" in modal_text and "not claimed" in modal_text)
+        ),
     }
 
 

@@ -16,10 +16,10 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
     assert "load(DEFAULT_FIXTURE_MODE)" in panel
     assert "previewAcceptedGenerationPlanPacket" in panel
     assert "accepted-plan-status" in panel
-    assert "Generation plan review" in panel
-    assert "Local fixture demo remains blocked and not accepted" in panel
-    assert "not yet accepted" in panel
-    assert "Plan step-gate evidence recorded for review" in panel
+    assert "生成计划预览（已阻断）" in panel
+    assert "本地演示夹具仍处于阻断状态，未被接受" in panel
+    assert "当前未接受" in panel
+    assert "计划步骤门证据已记录，等待复核" in panel
     assert "source_mode" in panel
     assert "residual_blockers" in panel
     assert "non_claim_boundaries" in panel
@@ -35,6 +35,8 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
     assert "provider_service_id" not in panel
 
     assert "openAcceptedGenerationPlanPanel" in dock
+    assert "计划预览（已阻断）" in dock
+    assert "Generation plan review" not in dock
     assert "previewAcceptedGenerationPlanPacket(payload = {})" in runtime_client
     assert 'payload: { fixture_mode: "default_unconfirmed", ...payload }' in runtime_client
     assert "accepted-generation-plan-packets/preview" in runtime_client
@@ -46,9 +48,9 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
 def test_studio_accepted_generation_plan_panel_requires_explicit_confirmed_fixture_control() -> None:
     panel = (STUDIO_ROOT / "src" / "panels" / "accepted-generation-plan-panel.js").read_text(encoding="utf-8")
 
-    assert 'modeButton("Default package (blocked)", DEFAULT_FIXTURE_MODE)' in panel
-    assert 'modeButton("Fixture demo (blocked)", CONFIRMED_FIXTURE_MODE)' in panel
+    assert 'modeButton("默认包（已阻断）", DEFAULT_FIXTURE_MODE)' in panel
+    assert 'modeButton("演示夹具（已阻断）", CONFIRMED_FIXTURE_MODE)' in panel
     assert "confirmedBtn.addEventListener" in panel
     assert "load(CONFIRMED_FIXTURE_MODE)" in panel
     assert "Accepted local plan packet" not in panel
-    assert "Blocked pending prerequisites" in panel
+    assert "前置条件未满足，已阻断" in panel
