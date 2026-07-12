@@ -1007,7 +1007,7 @@ def _safe_error(value: str) -> str:
     if "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
         return "Image relay credential is not ready."
     if "api relay http error" in lowered:
-        return " ".join(value.split())[:160]
+        return "Image relay request failed at the provider HTTP boundary."
     if any(term in lowered for term in ("api key", "secret", "token", "authorization", "cookie", "bearer ")):
         return "Image relay configuration is not ready."
     return " ".join(value.split())[:160]
