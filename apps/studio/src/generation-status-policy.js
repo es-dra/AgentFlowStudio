@@ -1,4 +1,5 @@
 import { canonicalStudioStatusId, studioStatusLabel } from "./studio-entity-status-vocabulary.js";
+import { redactUnsafeText } from "./safe-text-redaction.js";
 
 const ACTIVE_RUNTIME_STATUSES = new Set(["submitted", "pending", "running", "generating"]);
 const COMPLETE_RUNTIME_STATUSES = new Set(["complete", "completed", "succeeded", "success", "generated"]);
@@ -179,18 +180,12 @@ export function capturePreservedOutputs(node) {
 }
 
 export function safePublicText(value, maxLength = 220) {
-  return String(value || "")
+  return redactUnsafeText(String(value || "")
     .replace(/provider[_\s-]*raw(?:[_\s-]*(?:response|persisted|stored))?/gi, "<provider-response-redacted>")
     .replace(/raw[_\s-]*provider[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
     .replace(/raw[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
     .replace(/provider[_\s-]*response/gi, "<provider-response-redacted>")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/Authorization\s*[:=]\s*\S+/gi, "Authorization=<redacted>")
-    .replace(/\b(?:token|secret|credential)\s*[:=]\s*\S+/gi, "<redacted>")
-    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
-    .slice(0, maxLength);
+    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>"), maxLength);
 }
 
 function statusTone(policyStatus, runtimeStatus) {

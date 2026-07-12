@@ -1,4 +1,5 @@
-import { responseStatusSummary, safePublicText } from "./generation-status-policy.js";
+import { responseStatusSummary } from "./generation-status-policy.js";
+import { redactUnsafeText } from "./safe-text-redaction.js";
 
 const KIND_LABELS = {
   asset: "资产图生成",
@@ -138,7 +139,7 @@ function normalizeRecoveryCandidate(item, blocks) {
     state: item.state || status,
     preserved: Boolean(item.preserved || status === "succeeded"),
     failure_class: item.failure_class || block.failure_class || "",
-    reason: safePublicText(item.reason || block.reason || "", 180),
+    reason: safeReason(item.reason || block.reason || ""),
   };
 }
 
@@ -150,7 +151,7 @@ function normalizeFailedCandidate(block) {
     state: "failed",
     preserved: false,
     failure_class: block.failure_class || block.block_id || "",
-    reason: safePublicText(block.reason || block.message || block.error || "", 180),
+    reason: safeReason(block.reason || block.message || block.error || ""),
   };
 }
 
@@ -198,6 +199,10 @@ function candidateStatus(value) {
 
 function safeCandidateId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+}
+
+function safeReason(value) {
+  return redactUnsafeText(value, 180);
 }
 
 function progressPercent(response, status, override) {

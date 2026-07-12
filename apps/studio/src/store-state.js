@@ -1,3 +1,5 @@
+import { redactUnsafeText } from "./safe-text-redaction.js";
+
 const HISTORY_LIMIT = 80;
 const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/([a-zA-Z0-9_.-]+)\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
 const HTML_ERROR_RE = /<\/?(html|head|body|center|title|h1|hr)\b/i;
@@ -495,16 +497,12 @@ function sanitizeCountMap(value) {
 }
 
 function safePublicStatusText(value, limit) {
-  return String(value || "")
+  return redactUnsafeText(String(value || "")
     .replace(/provider[_\s-]*raw(?:[_\s-]*(?:response|persisted|stored))?/gi, "<provider-response-redacted>")
     .replace(/raw[_\s-]*provider[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
     .replace(/raw[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
     .replace(/provider[_\s-]*response/gi, "<provider-response-redacted>")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
-    .slice(0, limit);
+    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>"), limit);
 }
 
 function safeShortText(value, limit) {

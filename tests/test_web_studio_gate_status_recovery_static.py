@@ -32,10 +32,24 @@ def test_generation_status_policy_exposes_safe_recovery_vocabulary() -> None:
         "runtime_recovery",
         "safe_artifact_pointers",
         "Bearer <redacted>",
-        "<local-path-redacted>",
-        "<url-redacted>",
+        "redactUnsafeText",
     ):
         assert marker in policy + view
+
+    script = textwrap.dedent(
+        """
+        import { safePublicText } from "./apps/studio/src/generation-status-policy.js";
+
+        const text = safePublicText("Bearer abc /home/owner/private.png https://signed.example/private token=abc api_key=def Authorization=ghi", 260);
+        for (const forbidden of ["Bearer abc", "/home/owner", "signed.example", "token=abc", "api_key", "Authorization=ghi"]) {
+          if (text.includes(forbidden)) throw new Error(`safePublicText leaked ${forbidden}: ${text}`);
+        }
+        if (!text.includes("<local-path-redacted>") || !text.includes("<url-redacted>")) {
+          throw new Error(`safePublicText did not apply canonical redactions: ${text}`);
+        }
+        """
+    )
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
 
     assert './styles/status-recovery.css' in index
     assert ".generation-status-card" in styles
@@ -337,6 +351,158 @@ def test_studio_preserves_multi_image_candidate_lists_across_result_and_restore(
         if (rebuiltItems.length !== 2 || rebuiltItems[0].candidate_id !== "candidate_001" || rebuiltItems[1].status !== "failed") {
           throw new Error(`runtime-style restore did not rebuild candidate evidence: ${JSON.stringify(rebuiltItems)}`);
         }
+        """
+    )
+
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
+def test_candidate_failure_reasons_are_redacted_before_state_restore_and_dom() -> None:
+    script = textwrap.dedent(
+        """
+        import { applyKeyframeResponse } from "./apps/studio/src/node-keyframe-response.js";
+        import { candidatePreviewsFromNode } from "./apps/studio/src/node-candidate-previews.js";
+        import { resultView } from "./apps/studio/src/node-result-view.js";
+        import { normalizeSnapshot } from "./apps/studio/src/store-state.js";
+
+        function makeStore(node) {
+          const state = { nodes: { node_1: node }, assets: [] };
+          return {
+            get: () => state,
+            set: (mutator) => mutator(state),
+            nextId: (prefix) => `${prefix}_001`,
+          };
+        }
+
+        function makeElement(tagName) {
+          const element = {
+            tagName: String(tagName || "").toUpperCase(),
+            children: [],
+            dataset: {},
+            style: {},
+            attributes: {},
+            className: "",
+            title: "",
+            disabled: false,
+            textContent: "",
+            innerHTML: "",
+            appendChild(child) {
+              this.children.push(child);
+              return child;
+            },
+            append(...children) {
+              children.forEach((child) => this.appendChild(child));
+            },
+            addEventListener() {},
+            setAttribute(name, value) {
+              this.attributes[name] = String(value);
+              this[name] = String(value);
+            },
+          };
+          element.classList = {
+            add(...names) {
+              const current = new Set(String(element.className || "").split(/\\s+/).filter(Boolean));
+              names.forEach((name) => current.add(name));
+              element.className = [...current].join(" ");
+            },
+          };
+          Object.defineProperty(element, "innerText", {
+            get() {
+              const own = [this.textContent, String(this.innerHTML || "").replace(/<[^>]+>/g, " ")]
+                .filter(Boolean)
+                .join(" ");
+              return [own, ...this.children.map((child) => child.innerText || child.textContent || "")]
+                .filter(Boolean)
+                .join(" ")
+                .replace(/\\s+/g, " ")
+                .trim();
+            },
+          });
+          return element;
+        }
+
+        function titles(element) {
+          return [
+            element.title || "",
+            ...element.children.flatMap((child) => titles(child)),
+          ].filter(Boolean);
+        }
+
+        function assertNoUnsafe(label, value) {
+          const text = JSON.stringify(value);
+          const forbidden = [
+            "Authorization=TOPSECRET",
+            "TOPSECRET",
+            "token=MYTOKEN",
+            "MYTOKEN",
+            "secret=MYSECRET",
+            "MYSECRET",
+            "api_key=APIKEY",
+            "APIKEY",
+          ];
+          for (const item of forbidden) {
+            if (text.includes(item)) {
+              throw new Error(`${label} leaked ${item}: ${text}`);
+            }
+          }
+          if (text.toLowerCase().includes("api_key")) {
+            throw new Error(`${label} leaked api_key marker: ${text}`);
+          }
+        }
+
+        globalThis.document = { createElement: makeElement };
+
+        const projectId = "studio-redaction-candidates";
+        const firstUrl = `/projects/${projectId}/keyframe-generations/job_redact_001/candidates/candidate_001/preview`;
+        const unsafe = "Authorization=TOPSECRET token=MYTOKEN secret=MYSECRET api_key=APIKEY";
+        const response = {
+          job: { status: "failed", job_id: "job_redact_001" },
+          safe_manifest: {
+            batch_status: "partially_complete",
+            output_count: 1,
+            blocks: [{ candidate_id: "candidate_002", reason: unsafe, failure_class: "provider_timeout" }],
+          },
+          candidate_previews: [
+            { candidate_id: "candidate_001", preview_url: firstUrl, width: 1024, height: 576, aspect_ratio: "16:9" },
+          ],
+          runtime_recovery: {
+            status: "partially_complete",
+            outputs: [
+              { item_id: "candidate_001", state: "complete", preserved: true, preview_url: firstUrl },
+              { item_id: "candidate_002", state: "failed", preserved: false, reason: unsafe },
+            ],
+          },
+        };
+
+        const node = { id: "node_1", type: "image", title: "Keyframe", prompt: "prompt", params: {} };
+        applyKeyframeResponse(makeStore(node), "node_1", response, { aspect_ratio: "16:9" });
+        const candidates = candidatePreviewsFromNode(node);
+        assertNoUnsafe("candidate objects", candidates);
+
+        const restored = normalizeSnapshot({
+          meta: { projectId },
+          nodes: {
+            node_1: {
+              id: "node_1",
+              type: "image",
+              previewUrl: firstUrl,
+              status: "partial",
+              result: node.result,
+              params: {
+                candidatePreviewUrls: node.params.candidatePreviewUrls,
+                lastGenerationManifest: {
+                  blocks: [{ candidate_id: "candidate_002", reason: unsafe, failure_class: "provider_timeout" }],
+                },
+              },
+            },
+          },
+          order: ["node_1"],
+        });
+        assertNoUnsafe("normalized persistence state", restored.nodes.node_1.params);
+
+        const view = resultView(restored.nodes.node_1);
+        assertNoUnsafe("DOM text", view.innerText);
+        assertNoUnsafe("DOM titles", titles(view));
         """
     )
 

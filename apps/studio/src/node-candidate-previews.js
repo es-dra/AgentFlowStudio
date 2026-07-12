@@ -1,3 +1,5 @@
+import { redactUnsafeText } from "./safe-text-redaction.js";
+
 export function candidatePreviewsFromNode(node) {
   const raw = node?.params?.candidatePreviewUrls || node?.params?.candidate_previews || node?.params?.candidates || [];
   const result = [];
@@ -26,13 +28,20 @@ function normalizeStoredCandidate(item) {
   const url = item.url || item.preview_url || "";
   const status = candidateStatus(item.status || item.state || (url ? "succeeded" : ""));
   return {
-    ...item,
     candidate_id: safeCandidateId(item.candidate_id || item.item_id || item.id || candidateIdFromUrl(url)),
     url,
     preview_url: item.preview_url || url,
+    width: safeOptionalCount(item.width),
+    height: safeOptionalCount(item.height),
+    aspect_ratio: safeToken(item.aspect_ratio, 20),
+    artifact_id: safeToken(item.artifact_id, 160),
+    image_asset_id: safeToken(item.image_asset_id || item.asset_id, 160),
+    byte_count: safeOptionalCount(item.byte_count),
     status,
     state: item.state || (status === "succeeded" ? "complete" : status),
     preserved: Boolean(item.preserved || status === "succeeded"),
+    failure_class: safeToken(item.failure_class || item.block_id, 80),
+    reason: safeReason(item.reason || item.message || item.error),
   };
 }
 
@@ -113,15 +122,13 @@ function safeToken(value, limit) {
   return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, limit);
 }
 
+function safeOptionalCount(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.min(999999, Math.round(number)));
+}
+
 function safeReason(value) {
-  return String(value || "")
-    .replace(/provider[_\s-]*raw(?:[_\s-]*(?:response|persisted|stored))?/gi, "<provider-response-redacted>")
-    .replace(/raw[_\s-]*provider[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
-    .replace(/raw[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
-    .replace(/provider[_\s-]*response/gi, "<provider-response-redacted>")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
-    .slice(0, 180);
+  return redactUnsafeText(value, 180);
 }
