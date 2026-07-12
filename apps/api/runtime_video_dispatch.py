@@ -11,6 +11,7 @@ from typing import Any
 from agentflow.algorithms.request_projection import build_request_plan
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest
+from apps.api.generation_path_contract import generation_path_submit_error
 from apps.api.runtime_errors import RuntimeApiError
 from apps.api.runtime_file_logging import runtime_file_event
 from apps.api.runtime_generation_preflight import video_generation_preflight
@@ -19,7 +20,12 @@ from apps.api.runtime_media_validation import reference_image_size_blocks
 from apps.api.runtime_model_call_context import video_generation_model_call_context
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_store import RuntimeStore, read_json
-from apps.api.runtime_video_contract import video_duration_contract, video_input_mode, video_input_source_contract
+from apps.api.runtime_video_contract import (
+    video_duration_contract,
+    video_generation_path_contract,
+    video_input_mode,
+    video_input_source_contract,
+)
 from apps.api.runtime_video_candidates import safe_outputs
 from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV
 from apps.api.runtime_video_gate import gate_closed_block, provider_not_ready_block, video_gate
@@ -91,6 +97,7 @@ def submit_video_generation(
         resolution=request.resolution,
         aspect_ratio=request.aspect_ratio,
         candidate_count=request.candidate_count,
+        generation_path=request.generation_path or "",
         input_mode=video_input_mode(request),
         input_source_mode=video_input_source_contract(request).get("source_mode"),
     )
@@ -101,6 +108,14 @@ def submit_video_generation(
             stage="request_validation",
             user_action="请将候选数量设置为 1 后重新生成。",
             details={"candidate_count": request.candidate_count, "allowed": 1},
+        )
+    if path_error := generation_path_submit_error(request):
+        raise RuntimeApiError(
+            "unsupported_generation_path",
+            path_error["message"],
+            stage=path_error["stage"],
+            user_action="Choose a supported generation path before submitting to a video provider.",
+            details=path_error["details"],
         )
     try:
         first_frame_path = image_asset_file_path(store, project_id, request.first_frame_image_asset_id)
@@ -516,6 +531,8 @@ def _model_call_context(project_id: str, request: VideoGenerationRequest, contex
             "capability": "video",
             "provider_service_id": request.provider_service_id,
             "required_gate": REMOTE_VIDEO_ENV,
+            "generation_path": video_generation_path_contract(request)["path_id"],
+            "generation_path_contract": video_generation_path_contract(request),
             "duration_sec": request.duration_sec,
             "duration_contract": video_duration_contract(request.duration_sec),
             "resolution": request.resolution,
@@ -729,6 +746,7 @@ def _task_state(
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
         "input_source": video_input_source_contract(request),
         "input_mode": video_input_mode(request),
+        "generation_path_contract": video_generation_path_contract(request),
         "duration_contract": video_duration_contract(request.duration_sec),
         "created_at": now,
         "submitted_at": now,
@@ -756,6 +774,9 @@ def _manifest_contract_kwargs(model_call_context: dict[str, Any], model_request_
     return {
         "input_source": input_source if isinstance(input_source, dict) else {},
         "input_mode": str(provider_constraints.get("input_mode") or ""),
+        "generation_path_contract": provider_constraints.get("generation_path_contract")
+        if isinstance(provider_constraints.get("generation_path_contract"), dict)
+        else {},
         "duration_contract": duration_contract if isinstance(duration_contract, dict) else {},
     }
 
@@ -764,6 +785,9 @@ def _manifest_contract_kwargs_from_state(state: dict[str, Any]) -> dict[str, Any
     return {
         "input_source": state.get("input_source") if isinstance(state.get("input_source"), dict) else {},
         "input_mode": str(state.get("input_mode") or ""),
+        "generation_path_contract": state.get("generation_path_contract")
+        if isinstance(state.get("generation_path_contract"), dict)
+        else {},
         "duration_contract": state.get("duration_contract") if isinstance(state.get("duration_contract"), dict) else {},
     }
 

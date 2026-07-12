@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from apps.api.generation_path_contract import GenerationPathId, validate_generation_path_request_inputs
 
 
 ProjectStatus = Literal["in_progress", "blocked", "ready_for_next_round"]
@@ -175,27 +177,40 @@ class KeyframeGenerationRequest(BaseModel):
 
 class VideoInputSource(BaseModel):
     source_mode: Literal[
+        "text_prompt",
         "uploaded_image",
         "upstream_uploaded_image",
         "upstream_generated_image",
         "visual_asset_reference",
         "explicit_first_frame_selection",
+        "reference_video",
+        "director_setup",
     ]
-    source_asset_id: str = Field(min_length=1)
+    source_asset_id: str | None = Field(default=None, min_length=1)
     source_node_id: str | None = None
     source_job_id: str | None = None
     visual_asset_id: str | None = None
-    role: Literal["first_frame", "last_frame", "reference_image"] = "first_frame"
+    role: Literal[
+        "prompt_only",
+        "first_frame",
+        "last_frame",
+        "reference_image",
+        "reference_video",
+        "director_setup",
+    ] = "first_frame"
 
 
 class VideoGenerationRequest(BaseModel):
     node_id: str | None = None
+    generation_path: GenerationPathId | None = None
     prompt_text: str = Field(min_length=1)
     optimized_prompt: str | None = None
     provider_service_id: str = "seedance_i2v"
-    first_frame_image_asset_id: str = Field(min_length=1)
+    first_frame_image_asset_id: str | None = Field(default=None, min_length=1)
     last_frame_image_asset_id: str | None = None
+    reference_video_artifact_id: str | None = Field(default=None, min_length=1)
     input_source: VideoInputSource | None = None
+    director_setup: DirectorSetup2D | None = None
     duration_sec: int = Field(default=5, ge=1, le=15)
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
@@ -207,6 +222,11 @@ class VideoGenerationRequest(BaseModel):
     preflight_token: str | None = None
     quota_override_confirmed: bool = False
     generated_at: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_generation_path_inputs(self) -> "VideoGenerationRequest":
+        validate_generation_path_request_inputs(self)
+        return self
 
 
 class VideoRevisionRequest(BaseModel):

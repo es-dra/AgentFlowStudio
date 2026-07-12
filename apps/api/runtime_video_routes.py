@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
+from apps.api.generation_path_contract import generation_path_submit_error
 from apps.api.runtime_errors import RuntimeApiError, runtime_api_error_detail, safe_error_detail
 from apps.api.runtime_generation_preflight import (
     preflight_token_matches,
@@ -108,8 +109,26 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
             resolution=request.resolution,
             aspect_ratio=request.aspect_ratio,
             candidate_count=request.candidate_count,
+            generation_path=request.generation_path or None,
             has_preflight_token=bool(request.preflight_token),
         )
+        if path_error := generation_path_submit_error(request):
+            detail = safe_error_detail(
+                "unsupported_generation_path",
+                detail_code=path_error["error"],
+                message=path_error["message"],
+                user_action="Choose a supported generation path before submitting to a video provider.",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=node_id,
+                action="video_generation",
+                stage=path_error["stage"],
+                status="blocked",
+                details=path_error["details"],
+            )
+            _log_video_rejected(http_request, detail)
+            raise HTTPException(status_code=422, detail=detail)
         preflight_requirement = provider_submit_preflight_requirement("video", request)
         if preflight_requirement["required"] and not request.preflight_token:
             detail = safe_error_detail(
