@@ -153,6 +153,7 @@ import {
   DEFAULT_STUDIO_VIDEO_CAPABILITIES,
   VIDEO_GENERATION_PATH_CONTRACTS,
   generationPathContract,
+  normalizeGenerationPathContract,
   normalizeVideoCapabilities,
 } from "./apps/studio/src/presets/video-capabilities.js";
 
@@ -182,6 +183,61 @@ process.stdout.write(JSON.stringify({
     assert payload["normalizedSupportedPaths"] == ["i2v_first_frame", "i2v_first_last"]
     assert payload["t2v"]["adoptionState"] == "planned"
     assert payload["t2v"]["safePreflight"]["providerCallsStarted"] is False
+    assert payload["t2v"]["safePreflight"]["providerSubmitAllowed"] is False
+    assert payload["t2v"]["safePreflight"]["preflightBlocked"] is True
     assert "first_frame_image_asset_id" not in payload["t2v"]["requiredInputs"]
     assert payload["i2v"]["adoptionState"] == "supported"
     assert "first_frame_image_asset_id" in payload["i2v"]["requiredInputs"]
+
+
+def test_studio_generation_path_contracts_block_unknown_and_read_backend_safety_preflight() -> None:
+    payload = _run_node(
+        r'''
+import {
+  generationPathContract,
+  normalizeGenerationPathContract,
+} from "./apps/studio/src/presets/video-capabilities.js";
+
+const backendT2v = normalizeGenerationPathContract({
+  schema_version: "afs_generation_path_contract.v1",
+  path_id: "t2v",
+  label: "Text to video",
+  required_inputs: ["prompt_text"],
+  allowed_media_families: { inputs: ["text"], output: "video" },
+  provider_capability: "video.t2v",
+  adoption_state: "planned",
+  safety_preflight: {
+    provider_calls_started: false,
+    media_bytes_required_by_preflight: false,
+    provider_submit_allowed: false,
+    preflight_blocked: true,
+  },
+});
+const unknownString = generationPathContract("unknown_path");
+const unknownObject = normalizeGenerationPathContract({
+  path_id: "unknown_external",
+  safety_preflight: {
+    provider_calls_started: false,
+    provider_submit_allowed: false,
+    preflight_blocked: true,
+  },
+});
+
+process.stdout.write(JSON.stringify({ backendT2v, unknownString, unknownObject }));
+'''
+    )
+
+    assert payload["backendT2v"]["pathId"] == "t2v"
+    assert payload["backendT2v"]["adoptionState"] == "planned"
+    assert payload["backendT2v"]["safePreflight"]["providerSubmitAllowed"] is False
+    assert payload["backendT2v"]["safePreflight"]["preflightBlocked"] is True
+
+    for key in ("unknownString", "unknownObject"):
+        contract = payload[key]
+        assert contract["pathId"].startswith("unknown")
+        assert contract["adoptionState"] == "blocked"
+        assert contract["providerCapability"] == "unknown"
+        assert contract["allowedMediaFamilies"]["output"] == "unknown"
+        assert contract["safePreflight"]["providerSubmitAllowed"] is False
+        assert contract["safePreflight"]["preflightBlocked"] is True
+        assert "first_frame_image_asset_id" not in contract["requiredInputs"]

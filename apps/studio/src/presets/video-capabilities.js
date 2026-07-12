@@ -189,18 +189,20 @@ export function videoPreflightBlockMessage(preflight) {
 }
 
 export function generationPathContract(pathId = DEFAULT_VIDEO_GENERATION_PATH) {
-  return normalizeGenerationPathContract(
-    VIDEO_GENERATION_PATH_CONTRACTS[stringValue(pathId)] || VIDEO_GENERATION_PATH_CONTRACTS[DEFAULT_VIDEO_GENERATION_PATH],
-  );
+  const cleanPathId = stringValue(pathId);
+  return normalizeGenerationPathContract(VIDEO_GENERATION_PATH_CONTRACTS[cleanPathId] || cleanPathId);
 }
 
 export function normalizeGenerationPathContract(value = {}) {
   const raw = typeof value === "string" ? { path_id: value } : objectValue(value);
-  const fallback = VIDEO_GENERATION_PATH_CONTRACTS[stringValue(raw.pathId || raw.path_id)]
-    || VIDEO_GENERATION_PATH_CONTRACTS[DEFAULT_VIDEO_GENERATION_PATH];
+  const requestedPathId = stringValue(raw.pathId || raw.path_id);
+  const fallback = requestedPathId
+    ? VIDEO_GENERATION_PATH_CONTRACTS[requestedPathId] || unknownGenerationPathContract(requestedPathId)
+    : VIDEO_GENERATION_PATH_CONTRACTS[DEFAULT_VIDEO_GENERATION_PATH];
   const source = { ...fallback, ...raw };
   const media = objectValue(source.allowedMediaFamilies || source.allowed_media_families);
-  const preflight = objectValue(source.safePreflight || source.safe_preflight);
+  const preflight = objectValue(source.safePreflight || source.safe_preflight || source.safetyPreflight || source.safety_preflight);
+  const adoptionState = stringValue(source.adoptionState || source.adoption_state || fallback.adoption_state);
   return {
     schemaVersion: stringValue(source.schemaVersion || source.schema_version || GENERATION_PATH_CONTRACT_SCHEMA_VERSION),
     pathId: stringValue(source.pathId || source.path_id || fallback.path_id),
@@ -212,12 +214,31 @@ export function normalizeGenerationPathContract(value = {}) {
       output: stringValue(media.output || fallback.allowed_media_families.output),
     },
     providerCapability: stringValue(source.providerCapability || source.provider_capability || fallback.provider_capability),
-    adoptionState: stringValue(source.adoptionState || source.adoption_state || fallback.adoption_state),
+    adoptionState,
     safePreflight: {
       providerCallsStarted: Boolean(preflight.providerCallsStarted || preflight.provider_calls_started),
       mediaBytesRequiredByPreflight: Boolean(preflight.mediaBytesRequiredByPreflight || preflight.media_bytes_required_by_preflight),
-      providerSubmitAllowed: preflight.providerSubmitAllowed ?? preflight.provider_submit_allowed ?? null,
-      preflightBlocked: Boolean(preflight.preflightBlocked || preflight.preflight_blocked),
+      providerSubmitAllowed: preflight.providerSubmitAllowed ?? preflight.provider_submit_allowed ?? adoptionState === "supported",
+      preflightBlocked: Boolean(preflight.preflightBlocked ?? preflight.preflight_blocked ?? adoptionState !== "supported"),
+    },
+  };
+}
+
+function unknownGenerationPathContract(pathId) {
+  return {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: pathId || "unknown",
+    label: pathId || "Unknown generation path",
+    required_inputs: [],
+    optional_inputs: [],
+    allowed_media_families: { inputs: [], output: "unknown" },
+    provider_capability: "unknown",
+    adoption_state: "blocked",
+    safety_preflight: {
+      provider_calls_started: false,
+      media_bytes_required_by_preflight: false,
+      provider_submit_allowed: false,
+      preflight_blocked: true,
     },
   };
 }
