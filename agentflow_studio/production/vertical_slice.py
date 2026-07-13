@@ -207,6 +207,13 @@ class DeterministicProductionSlice:
         review = QualityReview.model_validate(self.state["artifacts"]["quality_review"])
         if review.decision != "approve":
             raise ValueError("quality review rejected export")
+        if self.state["stage"] == "exported":
+            export_artifact = self.state["artifacts"]["export"]
+            return {
+                "delivery": self.output_dir / export_artifact["delivery_ref"],
+                "evidence": self.output_dir / export_artifact["evidence_ref"],
+                "state": self.state_path,
+            }
 
         source_state_integrity = self.state["checkpoint_integrity"]["chain_digest"]
         delivery_id = _stable_id("delivery", self.project.project_id, review.review_id)
@@ -307,6 +314,15 @@ class DeterministicProductionSlice:
             if state.get("project_fingerprint") != fingerprint:
                 raise ValueError("existing checkpoint belongs to a different project input")
             state["recovery_count"] += 1
+            if state["stage"] == "exported":
+                evidence_path = self.output_dir / state["artifacts"]["export"]["evidence_ref"]
+                evidence = _read_json(evidence_path)
+                evidence["recovery"]["recovery_count"] = state["recovery_count"]
+                evidence["recovery"]["last_checkpoint"] = "exported"
+                _write_json(evidence_path, evidence)
+                state["artifacts"]["export"]["evidence_sha256"] = hashlib.sha256(
+                    evidence_path.read_bytes()
+                ).hexdigest()
             self.state = state
             self._write_state()
             return self.state
@@ -453,8 +469,8 @@ class DeterministicProductionSlice:
             raise ValueError("checkpoint stage is invalid")
         recovery_count = _require_nonnegative_int(self.state.get("recovery_count"), "checkpoint recovery count")
         sequence = previous_sequence + 1
-        if sequence < STAGES.index(stage) + recovery_count:
-            raise ValueError("checkpoint write sequence precedes stage and recovery count")
+        if sequence != _expected_checkpoint_sequence(stage, recovery_count):
+            raise ValueError("checkpoint write sequence does not match stage and recovery count")
         state_digest = _digest(_checkpoint_state_payload(self.state))
         integrity = {
             "algorithm": "sha256",
@@ -503,14 +519,13 @@ class DeterministicProductionSlice:
         actual_state_digest = _digest(_checkpoint_state_payload(state))
         if integrity.get("state_digest") != actual_state_digest:
             raise ValueError("checkpoint state integrity validation failed")
-        minimum_sequence = STAGES.index(state["stage"]) + recovery_count
-        if sequence < minimum_sequence:
-            raise ValueError("checkpoint sequence precedes stage and recovery count")
         actual_chain_digest = _checkpoint_chain_digest(
             {**integrity, "state_digest": actual_state_digest}
         )
         if integrity.get("chain_digest") != actual_chain_digest:
             raise ValueError("checkpoint chain integrity validation failed")
+        if sequence != _expected_checkpoint_sequence(state["stage"], recovery_count):
+            raise ValueError("checkpoint sequence does not match stage and recovery count")
 
     @staticmethod
     def _validate_lineage(lineage: Any) -> None:
@@ -559,7 +574,13 @@ def _checkpoint_state_payload(state: dict[str, Any]) -> dict[str, Any]:
 def _checkpoint_chain_digest(integrity: dict[str, Any]) -> str:
     if set(integrity) - {"chain_digest"} != CHECKPOINT_CHAIN_INPUT_FIELDS:
         raise ValueError("checkpoint chain seal field inventory is invalid")
+    # This canonical hash detects inconsistent checkpoint content; it is not a
+    # keyed authenticity proof against an actor who can rewrite and reseal all fields.
     return _digest({key: integrity[key] for key in CHECKPOINT_CHAIN_INPUT_FIELDS})
+
+
+def _expected_checkpoint_sequence(stage: str, recovery_count: int) -> int:
+    return STAGES.index(stage) + recovery_count
 
 
 def _require_nonnegative_int(value: Any, label: str) -> int:

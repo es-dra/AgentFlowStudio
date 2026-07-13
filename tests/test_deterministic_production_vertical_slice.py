@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -68,6 +69,19 @@ def _value_at_path(value, path):
     for part in path:
         value = value[part]
     return value
+
+
+def _resequence_and_reseal(checkpoint: dict, sequence: int) -> dict:
+    """Independent test oracle for the public canonical SHA-256 chain contract."""
+    mutated = copy.deepcopy(checkpoint)
+    mutated["checkpoint_integrity"]["sequence"] = sequence
+    chain_input = {
+        field: mutated["checkpoint_integrity"][field]
+        for field in ("algorithm", "sequence", "previous_chain_digest", "state_digest")
+    }
+    canonical = json.dumps(chain_input, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    mutated["checkpoint_integrity"]["chain_digest"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return mutated
 
 
 def test_deterministic_vertical_slice_exports_concrete_delivery_and_evidence(tmp_path: Path) -> None:
@@ -241,9 +255,12 @@ def test_completed_run_is_replayable_without_duplicate_lineage(tmp_path: Path) -
         tmp_path,
     )
     second_evidence = json.loads(second["evidence"].read_text(encoding="utf-8"))
+    second_state = json.loads(second["state"].read_text(encoding="utf-8"))
 
     assert second_evidence["lineage"] == first_evidence["lineage"]
     assert second_evidence["recovery"]["recovery_count"] == 1
+    assert second_state["stage"] == "exported"
+    assert second_state["checkpoint_integrity"]["sequence"] == 7
 
 
 def test_creator_must_select_exactly_one_candidate_for_every_shot(tmp_path: Path) -> None:
@@ -356,11 +373,9 @@ def test_each_checkpoint_integrity_field_mutation_blocks_reopen_and_export(tmp_p
         (True, "must be a nonnegative integer"),
         ("5", "must be a nonnegative integer"),
         (5.0, "must be a nonnegative integer"),
-        (4, "precedes stage and recovery count"),
-        (6, "checkpoint chain integrity validation failed"),
     ],
 )
-def test_checkpoint_sequence_type_range_and_monotonic_consistency_fail_closed(
+def test_checkpoint_sequence_type_and_range_fail_closed(
     tmp_path: Path, replacement, message: str
 ) -> None:
     project, _ = _run_to_quality_gate(tmp_path)
@@ -370,6 +385,63 @@ def test_checkpoint_sequence_type_range_and_monotonic_consistency_fail_closed(
     checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
+        DeterministicProductionSlice(project, tmp_path)
+
+
+def test_stale_sequence_mutation_fails_chain_digest_before_semantic_validation(tmp_path: Path) -> None:
+    project, _ = _run_to_quality_gate(tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["checkpoint_integrity"]["sequence"] += 1
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint chain integrity validation failed"):
+        DeterministicProductionSlice(project, tmp_path)
+
+
+@pytest.mark.parametrize("delta", [-1, 1])
+def test_resealed_quality_gate_sequence_gap_fails_semantic_invariant(tmp_path: Path, delta: int) -> None:
+    project, run = _run_to_quality_gate(tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    mutated = _resequence_and_reseal(
+        original,
+        original["checkpoint_integrity"]["sequence"] + delta,
+    )
+    run.state = copy.deepcopy(mutated)
+    checkpoint_path.write_text(json.dumps(mutated), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint sequence does not match stage and recovery count"):
+        run.export()
+    assert not (tmp_path / "production_delivery.json").exists()
+    assert not (tmp_path / "evidence.json").exists()
+    with pytest.raises(ValueError, match="checkpoint sequence does not match stage and recovery count"):
+        DeterministicProductionSlice(project, tmp_path)
+
+
+@pytest.mark.parametrize("recovery_count", [0, 1])
+@pytest.mark.parametrize("delta", [-1, 1])
+def test_resealed_exported_sequence_gap_fails_before_idempotent_replay(
+    tmp_path: Path, recovery_count: int, delta: int
+) -> None:
+    project, run = _run_to_quality_gate(tmp_path)
+    run.export()
+    if recovery_count:
+        run = DeterministicProductionSlice(project, tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert original["recovery_count"] == recovery_count
+    assert original["checkpoint_integrity"]["sequence"] == 6 + recovery_count
+    mutated = _resequence_and_reseal(
+        original,
+        original["checkpoint_integrity"]["sequence"] + delta,
+    )
+    run.state = copy.deepcopy(mutated)
+    checkpoint_path.write_text(json.dumps(mutated), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint sequence does not match stage and recovery count"):
+        run.export()
+    with pytest.raises(ValueError, match="checkpoint sequence does not match stage and recovery count"):
         DeterministicProductionSlice(project, tmp_path)
 
 
@@ -385,15 +457,20 @@ def test_checkpoint_previous_link_semantics_fail_closed(tmp_path: Path) -> None:
         DeterministicProductionSlice(project, tmp_path)
 
 
-def test_in_memory_sequence_tamper_cannot_be_resealed_on_advance(tmp_path: Path) -> None:
+@pytest.mark.parametrize("delta", [-1, 1])
+def test_resealed_in_memory_sequence_gap_cannot_advance_transition(tmp_path: Path, delta: int) -> None:
     project = _load_model("project.example.json", ProjectIP)
     run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
     checkpoint_path = tmp_path / "production_state.json"
     original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-    run.state["checkpoint_integrity"]["sequence"] = 10
+    run.state = _resequence_and_reseal(
+        run.state,
+        run.state["checkpoint_integrity"]["sequence"] + delta,
+    )
 
-    with pytest.raises(ValueError, match="previous checkpoint"):
-        run.advance_to_candidates()
+    with pytest.raises(ValueError, match="checkpoint write sequence does not match stage and recovery count"):
+        run.record_creator_decision(_load_model("creator_decision.example.json", CreatorDecision))
     assert json.loads(checkpoint_path.read_text(encoding="utf-8")) == original
 
 
@@ -404,7 +481,7 @@ def test_each_quality_gate_checkpoint_leaf_mutation_blocks_reopen_and_export(tmp
     sealed_state = {key: original[key] for key in CHECKPOINT_STATE_SEAL_FIELDS}
     paths = list(_leaf_paths(sealed_state))
 
-    assert len(paths) > 100
+    assert len(paths) == 182
     assert {path[0] for path in paths} == CHECKPOINT_STATE_SEAL_FIELDS
     for path in paths:
         mutated = copy.deepcopy(original)
@@ -430,6 +507,7 @@ def test_each_exported_checkpoint_leaf_mutation_blocks_reopen(tmp_path: Path) ->
     paths = list(_leaf_paths(sealed_state))
 
     assert original["stage"] == "exported"
+    assert len(paths) == 199
     assert {"delivery_ref", "delivery_sha256", "evidence_ref", "evidence_sha256", "source_state_chain_digest"} == set(
         original["artifacts"]["export"]
     )
