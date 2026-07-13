@@ -334,7 +334,7 @@ def create_runtime_app(
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
     register_runtime_accepted_generation_plan_routes(app, store)
-    register_runtime_studio_state_routes(app, store)
+    register_runtime_studio_state_routes(app, store, auth)
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)
     configure_studio_static(app, studio_root)

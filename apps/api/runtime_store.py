@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from agentflow.contracts.project_manifest import validate_project_manifest
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
-from agentflow.harness.json_io import write_json
+from agentflow.harness.json_io import exclusive_file_lock, write_json
 
 
 SAFE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
@@ -26,6 +26,7 @@ class RuntimeStore:
         for path in (self.projects_dir, self.runs_dir, self.jobs_dir, self.feedback_dir):
             path.mkdir(parents=True, exist_ok=True)
         self.index_path = self.root / "artifact_index.json"
+        self.index_transaction_lock_path = self.root / "artifact_index.transaction.lock"
         if not self.index_path.exists():
             write_json(self.index_path, {"artifacts": {}})
         else:
@@ -268,9 +269,10 @@ class RuntimeStore:
         project_id = _project_id_from_artifact_relative_path(relative_path)
         if project_id:
             entry["project_id"] = project_id
-        index = self._artifact_index()
-        index.setdefault("artifacts", {})[artifact_id] = entry
-        write_json(self.index_path, index)
+        with exclusive_file_lock(self.index_transaction_lock_path):
+            index = self._artifact_index()
+            index.setdefault("artifacts", {})[artifact_id] = entry
+            write_json(self.index_path, index)
         return public_artifact_ref(entry)
 
     def artifact_project_id(self, artifact_id: str) -> str:

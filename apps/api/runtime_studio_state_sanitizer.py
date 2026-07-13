@@ -152,43 +152,9 @@ def _order(value: Any, nodes: Any) -> list[str]:
 
 
 def _production(value: Any) -> dict[str, Any]:
-    data = value if isinstance(value, dict) else {}
-    active_run_id = safe_id(_text(data.get("active_run_id"), "", 160)) if data.get("active_run_id") else ""
-    selected_candidate_id = (
-        safe_id(_text(data.get("selected_candidate_id"), "", 160)) if data.get("selected_candidate_id") else ""
-    )
-    selected_revision_id = (
-        safe_id(_text(data.get("selected_revision_id"), "", 160)) if data.get("selected_revision_id") else ""
-    )
-    last_export_id = safe_id(_text(data.get("last_export_id"), "", 160)) if data.get("last_export_id") else ""
-    try:
-        checkpoint_version = max(0, int(data.get("checkpoint_version") or 0))
-    except (TypeError, ValueError):
-        checkpoint_version = 0
-    result = {
-        "schema_version": "afs_studio_production_binding.v0.1",
-        "authoritative_source": "runtime_production_run",
-        "compatibility_mode": "backend_authoritative_summary_only",
-        "active_run_id": active_run_id,
-        "checkpoint_version": checkpoint_version,
-        "checkpoint_digest": _sha256(data.get("checkpoint_digest")),
-        "subject_digest": _sha256(data.get("subject_digest")),
-        "selected_candidate_id": selected_candidate_id,
-        "selected_candidate_digest": _sha256(data.get("selected_candidate_digest")),
-        "selected_revision_id": selected_revision_id,
-        "selected_revision_digest": _sha256(data.get("selected_revision_digest")),
-        "last_export_id": last_export_id,
-    }
-    if not active_run_id:
-        return {}
-    return {key: item for key, item in result.items() if item not in ("", 0)}
-
-
-def _sha256(value: Any) -> str:
-    digest = str(value or "").strip().lower()
-    if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
-        return ""
-    return digest
+    # Production authority is reconstructed from the authenticated project ledger
+    # by the route. A Studio snapshot never persists client-supplied authority.
+    return {}
 
 
 def _reject_forbidden(value: Any) -> None:

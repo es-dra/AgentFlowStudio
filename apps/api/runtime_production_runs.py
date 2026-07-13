@@ -15,6 +15,7 @@ from apps.api.runtime_production_models import (
     PRODUCTION_RUN_SCHEMA_VERSION,
     STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION,
     CreatorDecisionRequest,
+    ProductionCheckpoint,
     ProductionExportRequest,
     ProductionQualityReviewRequest,
     ProductionRunCreateRequest,
@@ -31,7 +32,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         body: ProductionRunCreateRequest,
         request: Request,
     ) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         request_payload = body.model_dump(mode="json")
         request_digest = canonical_json_digest(request_payload)
         runs_dir = store.production_runs_dir(project_id)
@@ -104,7 +105,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
 
     @app.get("/projects/{project_id}/production-runs")
     def list_production_runs(project_id: str, request: Request) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         runs = store.list_production_runs(project_id)
         for run in runs:
             _require_run_owner(run, owner_user_id)
@@ -114,7 +115,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
 
     @app.get("/projects/{project_id}/production-runs/{run_id}")
     def get_production_run(project_id: str, run_id: str, request: Request) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         try:
             run = store.load_production_run(project_id, run_id)
         except KeyError as exc:
@@ -131,7 +132,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         body: CreatorDecisionRequest,
         request: Request,
     ) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         request_digest = canonical_json_digest(body.model_dump(mode="json"))
         with exclusive_file_lock(store.production_run_lock_path(project_id)):
             run = _load_owned_run(store, project_id, run_id, owner_user_id)
@@ -228,7 +229,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         body: ProductionQualityReviewRequest,
         request: Request,
     ) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         request_digest = canonical_json_digest(body.model_dump(mode="json"))
         with exclusive_file_lock(store.production_run_lock_path(project_id)):
             run = _load_owned_run(store, project_id, run_id, owner_user_id)
@@ -275,7 +276,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         body: ProductionExportRequest,
         request: Request,
     ) -> dict[str, Any]:
-        owner_user_id = _require_project_owner(auth, request, project_id)
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
         request_digest = canonical_json_digest(body.model_dump(mode="json"))
         with exclusive_file_lock(store.production_run_lock_path(project_id)):
             run = _load_owned_run(store, project_id, run_id, owner_user_id)
@@ -375,10 +376,10 @@ def _validate_checkpoint(run: dict[str, Any]) -> None:
     checkpoint = run.get("checkpoint")
     if not isinstance(checkpoint, dict):
         raise HTTPException(status_code=409, detail="production checkpoint is missing")
-    if checkpoint.get("schema_version") != PRODUCTION_CHECKPOINT_SCHEMA_VERSION:
-        raise HTTPException(status_code=409, detail="production checkpoint schema is unsupported")
-    if not isinstance(checkpoint.get("version"), int) or int(checkpoint["version"]) < 1:
-        raise HTTPException(status_code=409, detail="production checkpoint version is invalid")
+    try:
+        ProductionCheckpoint.model_validate(checkpoint)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="production checkpoint control metadata is invalid") from exc
     if str(checkpoint.get("state_digest") or "") != checkpoint_digest(run):
         raise HTTPException(status_code=409, detail="production checkpoint integrity mismatch")
 
@@ -561,9 +562,35 @@ def _studio_binding(run: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in binding.items() if value not in ("", 0)}
 
 
-def _require_project_owner(auth: RuntimeAuthStore, request: Request, project_id: str) -> str:
+def resolve_project_studio_binding(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    owner_user_id: str | None = None,
+) -> dict[str, Any]:
+    if store.is_project_deleted(project_id):
+        return {}
+    runs = store.list_production_runs(project_id)
+    if owner_user_id:
+        runs = [run for run in runs if str(run.get("owner_user_id") or "") == owner_user_id]
+    if not runs:
+        return {}
+    run = max(runs, key=lambda item: (str(item.get("updated_at") or ""), str(item.get("run_id") or "")))
+    _validate_checkpoint(run)
+    _validate_export_artifacts(store, project_id, run)
+    return _studio_binding(run)
+
+
+def _require_project_owner(
+    store: RuntimeStore,
+    auth: RuntimeAuthStore,
+    request: Request,
+    project_id: str,
+) -> str:
     if not auth.enabled():
         raise HTTPException(status_code=403, detail="authenticated production runs require runtime auth")
+    if store.is_project_deleted(project_id):
+        raise HTTPException(status_code=404, detail="project not found")
     user = auth.require_user(request)
     user_id = str(user.get("user_id") or "")
     if not user_id or not auth.user_can_access_project(user_id, project_id):
@@ -580,4 +607,4 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-__all__ = ("register_runtime_production_run_routes",)
+__all__ = ("register_runtime_production_run_routes", "resolve_project_studio_binding")
