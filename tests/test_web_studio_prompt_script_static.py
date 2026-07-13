@@ -361,6 +361,11 @@ const snapshot = normalizeSnapshot({
       content: "剧本正文",
       status: "complete",
       params: {
+        uploads: [{
+          asset_id: "img_unsafe_note",
+          role: "reference_image",
+          user_intent: "Authorization=TOPSECRET token=MYTOKEN secret=MYSECRET api_key=APIKEY signed_url=https://private.example/out.png",
+        }],
         lastContextBundle: {
           included_assets: [{ asset_id: "asset_1", provider_raw: { unsafe: true }, label: "孙悟空" }],
           text_channel: { raw_provider_response: { unsafe: true }, safe_summary: "safe" },
@@ -436,8 +441,14 @@ process.stdout.write(JSON.stringify(snapshot));
     assert "provider_raw_persisted" not in serialized
     assert "raw_provider_response_stored" not in serialized
     assert '"provider_raw"' not in serialized
+    assert "Authorization=TOPSECRET" not in serialized
+    assert "MYTOKEN" not in serialized
+    assert "MYSECRET" not in serialized
+    assert "APIKEY" not in serialized
+    assert "signed_url" not in serialized
     summary = payload["nodes"]["text_1"]["params"]["lastModelCallContextSummary"]
     assert summary["safety_boundary"]["no_provider_raw"] is True
+    assert summary["safety_boundary"]["no_secrets"] is False
     assert summary["artifact"]["filename"] == "model_call_context.json"
     manifest = payload["nodes"]["text_1"]["params"]["lastGenerationManifest"]
     assert manifest["stage"] == "provider_request_read"
