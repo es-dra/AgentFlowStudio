@@ -302,6 +302,7 @@ export function syncPromptBarState(bar, node) {
 }
 
 function syncAssetReferenceModeTabs(root, activeMode) {
+  if (!root?.querySelectorAll) return;
   for (const tab of root.querySelectorAll(".asset-reference-mode-tabs [data-mode]")) {
     const active = tab.dataset.mode === activeMode;
     tab.classList.toggle("active", active);
