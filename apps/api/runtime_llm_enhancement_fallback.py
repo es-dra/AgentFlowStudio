@@ -16,6 +16,8 @@ from apps.api.runtime_llm_enhancement_safety import (
     visual_reference_hint,
 )
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_originalize_prompt_templates import deterministic_originalize_i2i_fallback_prompt
+from apps.api.runtime_reference_intent import ORIGINALIZE_REFERENCE_MODE, reference_transform_mode_for_request
 from apps.api.runtime_store import reject_unsafe_text
 
 ANIMAL_TERMS = (
@@ -99,6 +101,10 @@ def deterministic_chinese_fallback_prompt(
 def deterministic_i2i_fallback_prompt(request: PromptOptimizationRequest) -> str:
     prompt_text = compact(request.prompt_text)
     reference_hint = visual_reference_hint(request)
+    if reference_transform_mode_for_request(request) == ORIGINALIZE_REFERENCE_MODE:
+        prompt = deterministic_originalize_i2i_fallback_prompt(prompt_text, reference_hint)
+        reject_unsafe_text(prompt)
+        return prompt
     if reference_role(request) == "style":
         prompt = "\n".join(
             [

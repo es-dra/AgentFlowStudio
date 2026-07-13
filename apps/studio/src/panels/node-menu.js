@@ -23,6 +23,11 @@ import {
   importScriptFileIntoTextNode,
   splitTextNodeToStoryboardNodes,
 } from "../script-breakdown.js";
+import {
+  ASSET_REFERENCE_MODES,
+  assetReferenceMode,
+  canUseAssetReferenceMode,
+} from "../asset-revision-references.js";
 import { openAddAssetModal } from "./add-asset-modal.js";
 import { openAssetCardPanel } from "./asset-card-panel.js";
 import { openRetireAssetModal } from "./drawer-asset-actions.js";
@@ -85,6 +90,9 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);
     });
+    if (canUseAssetReferenceMode(node)) {
+      addItem("wand", referenceModeMenuLabel(node), () => toggleReferenceMode(store, nodeId));
+    }
     addItem("bookmark", "标记为角色/场景/道具资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
@@ -219,6 +227,27 @@ function retryMenuLabel(node) {
   if (node.type === "video" && node.params?.videoRevision?.enabled) return "提交视频重生成尝试";
   if (node.type === "video") return "重新生成整段视频";
   return "重试生成";
+}
+
+function referenceModeMenuLabel(node) {
+  return assetReferenceMode(node) === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
+    ? "参考图模式：原创重生"
+    : "参考图模式：局部修订";
+}
+
+function toggleReferenceMode(store, nodeId) {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    const current = assetReferenceMode(node);
+    node.params.assetReferenceMode = current === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
+      ? ASSET_REFERENCE_MODES.LOCALIZED_EDIT
+      : ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
+    if (node.params.assetCardRevision) node.params.assetCardRevision.mode = node.params.assetReferenceMode;
+    delete node.params.lastOptimizedPromptPlain;
+    s.selection = { nodeIds: [node.id], edgeId: null };
+    s.ui.promptBarNodeId = node.id;
+  }, { history: false });
 }
 
 function requestVideoAssetCardDraft(store, nodeId) {

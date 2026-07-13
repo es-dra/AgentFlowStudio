@@ -10,7 +10,13 @@ import {
 import { el, showModal } from "./overlay.js";
 import { icon } from "./icons.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
-import { reportClientError } from "./client-error-reporter.js";
+import {
+  createProjectWithRetry,
+  isTestProject,
+  reportProjectAccessRecovery,
+  reportProjectCreateClientError,
+  reportProjectDeleteClientError,
+} from "./studio-project-runtime-ops.js";
 
 const EMPTY_PROJECT_ID = "studio-empty";
 
@@ -18,14 +24,23 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   let projectSummaries = [];
   let showAllProjects = false;
   let currentAuthUser = null;
+  let projectAccessRecovery = null;
 
-  async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true } = {}) {
+  async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true, recoverOnDenied = true } = {}) {
     const safe = safeProjectId(projectId) || "studio-local-001";
     persistActiveProject(safe);
     rememberProject(safe);
     syncProjectUrl(safe);
     setRuntime(runtimeClient);
-    await store.switchProject(safe, runtimeClient);
+    const switchResult = await store.switchProject(safe, runtimeClient);
+    if (isProjectAccessDeniedError(switchResult?.error)) {
+      if (recoverOnDenied) {
+        await recoverProjectAccessDenied(switchResult.error);
+      } else {
+        await showEmptyProjectState();
+      }
+      return;
+    }
     if (projectName) {
       store.set((s) => {
         s.meta.projectName = projectName;
@@ -64,6 +79,32 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     await showEmptyProjectState();
   }
 
+  async function recoverProjectAccessDenied(error = null) {
+    if (projectAccessRecovery) return projectAccessRecovery;
+    projectAccessRecovery = (async () => {
+      await refreshProjectSummaries();
+      const runtime = getRuntime();
+      const currentId = runtime.projectId || store.get().meta.projectId;
+      if (projectSummaries.some((item) => item.project_id === currentId)) {
+        return false;
+      }
+      const next = projectSummaries.find((item) => item.project_id);
+      if (next?.project_id) {
+        await applyProject(next.project_id, createRuntimeClient(next.project_id), {
+          projectName: projectDisplayName(next),
+          recoverOnDenied: false,
+        });
+      } else {
+        await showEmptyProjectState();
+      }
+      reportProjectAccessRecovery(runtime, error, currentId, next?.project_id || EMPTY_PROJECT_ID, safeError);
+      return true;
+    })().finally(() => {
+      projectAccessRecovery = null;
+    });
+    return projectAccessRecovery;
+  }
+
   async function switchProject(projectId) {
     const safe = safeProjectId(projectId) || "studio-local-001";
     if (!safe || safe === getRuntime().projectId) {
@@ -85,7 +126,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
       return true;
     } catch (error) {
-      reportProjectCreateClientError(getRuntime(), error);
+      reportProjectCreateClientError(getRuntime(), error, safeError);
       showProjectCreateError(error);
       return false;
     }
@@ -111,7 +152,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       }
       showProjectDeleteSuccess(label, projectSummaries.length);
     } catch (error) {
-      reportProjectDeleteClientError(getRuntime(), error, projectId);
+      reportProjectDeleteClientError(getRuntime(), error, projectId, safeError);
       showProjectDeleteError(error);
     }
   }
@@ -127,7 +168,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       },
     };
     const known = projectSummaries.length ? [...projectSummaries] : [];
-    if (currentId && currentId !== EMPTY_PROJECT_ID && !known.some((item) => item.project_id === currentId)) {
+    if (!projectSummaries.length && currentId && currentId !== EMPTY_PROJECT_ID && !known.some((item) => item.project_id === currentId)) {
       known.unshift(current);
     }
     const recent = recentProjectIds();
@@ -167,6 +208,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     },
     refreshProjectSummaries,
     ensureAccessibleStartupProject,
+    recoverProjectAccessDenied,
     switchProject,
     createNewProject,
     deleteProject,
@@ -329,50 +371,13 @@ function projectDisplayName(project) {
   return project?.studio_state_meta?.projectName || project?.goal || project?.project_id || "";
 }
 
-function reportProjectCreateClientError(runtime, error) {
-  const message = safeError(error);
-  reportClientError({
-    event_type: "project_create_failed",
-    severity: "error",
-    message,
-    action: "create_project",
-    runtime,
-    error,
-  });
-}
-
-function reportProjectDeleteClientError(runtime, error, projectId) {
-  const message = safeError(error);
-  reportClientError({
-    event_type: "project_delete_failed",
-    severity: "error",
-    message,
-    action: "delete_project",
-    project_id: projectId,
-    runtime,
-    error,
-    details: { project_id: projectId },
-  });
-}
-
-async function createProjectWithRetry(runtime, payload) {
-  try {
-    return await runtime.createProject(payload);
-  } catch (error) {
-    if (!isTransientRuntimeError(error)) throw error;
-    await delay(900);
-    return runtime.createProject(payload);
-  }
-}
-
-function isTransientRuntimeError(error) {
-  const status = Number(error?.status || 0);
+function isProjectAccessDeniedError(error) {
+  if (!error) return false;
+  const code = String(error.errorCode || error.payload?.error || error.payload?.detail?.error || "").trim();
+  if (code === "project_access_denied") return true;
+  const status = Number(error.status || 0);
   const message = error instanceof Error ? error.message : String(error || "");
-  return status === 0 || status === 502 || status === 503 || status === 504 || /network connection interrupted|Failed to fetch|Gateway timeout/i.test(message);
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return status === 403 && /project[_ ]access[_ ]denied|没有访问该项目的权限/i.test(message);
 }
 
 function showProjectCreateError(error) {
@@ -478,11 +483,4 @@ function safeError(error) {
     return "Runtime 连接短暂中断，请刷新项目列表后再重试。";
   }
   return formatted;
-}
-
-function isTestProject(item) {
-  const id = String(item?.project_id || "").toLowerCase();
-  const goal = String(item?.goal || "").toLowerCase();
-  const name = String(item?.studio_state_meta?.projectName || "").toLowerCase();
-  return /(smoke|qa|debug|test|browser|walkthrough|proj_|codex|frontend|review|loop|joint|gate|regression|probe|upload|optimize|empty)/.test(`${id} ${goal} ${name}`);
 }

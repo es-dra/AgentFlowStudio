@@ -116,6 +116,7 @@ async function requestJson(route, { method = "GET", payload = null, meta = null 
     error.errorCode = parsed?.error || "";
     error.requestId = parsed?.request_id || response.headers.get("X-Request-ID") || "";
     error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
+    dispatchProjectAccessDenied(error, parsed);
     logStudioRequestFinished(requestMeta, {
       status: "failed",
       status_code: response.status,
@@ -134,6 +135,22 @@ async function requestJson(route, { method = "GET", payload = null, meta = null 
     elapsed_ms: Date.now() - started,
   });
   return result;
+}
+
+function dispatchProjectAccessDenied(error, parsed = null) {
+  if (error?.errorCode !== "project_access_denied") return;
+  try {
+    window.dispatchEvent(new CustomEvent("afs:project-access-denied", {
+      detail: {
+        project_id: parsed?.project_id || projectIdFromRoute(error.route),
+        route: error.route,
+        request_id: error.requestId,
+        client_request_id: error.clientRequestId,
+      },
+    }));
+  } catch {
+    // The Studio can run under tests without a browser event target.
+  }
 }
 
 function staleRuntimeRouteMessage(response, route, body, parsed = null) {

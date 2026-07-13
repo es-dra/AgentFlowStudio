@@ -405,6 +405,41 @@ def test_i2i_style_reference_fallback_does_not_reuse_reference_subject() -> None
     assert "对ChatGPT Image" not in fallback
 
 
+def test_i2i_originalize_reference_fallback_redesigns_instead_of_preserving_identity() -> None:
+    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-originalize-reference-fallback",
+        node_type="image",
+        prompt_text="参考这张图的气质，重新设计成原创角色",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        asset_refs=["img_reference_ip_risk"],
+        node_parameters={
+            "model": "image2-keyframe",
+            "reference_transform_mode": "originalize_ip_safe",
+            "uploaded_images": [
+                {
+                    "asset_id": "img_reference_ip_risk",
+                    "filename": "reference-character.png",
+                    "role": "reference_image",
+                    "reference_target": "asset_card_draft",
+                }
+            ],
+        },
+        generated_at="2026-07-12T10:00:00+08:00",
+    )
+
+    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
+
+    assert "降低可识别 IP 相似度" in fallback
+    assert "重新设计身份" in fallback
+    assert "不要复制已知角色" in fallback
+    assert "保持参考图脸部辨识度" not in fallback
+    assert "primary visual source of truth" not in fallback
+
+
 def test_i2i_animal_subject_reference_fallback_avoids_human_template() -> None:
     from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
 
