@@ -1,5 +1,7 @@
 import { productionDeliverySummary } from "./production-delivery-controller.js";
 
+const SHA256_RE = /^[a-f0-9]{64}$/;
+const SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const CHECKS = [
   ["story_intent_preserved", "故事意图已核对"],
   ["character_continuity_checked", "角色连续性已核对"],
@@ -11,15 +13,25 @@ export function productionDeliveryView(node, candidates) {
   if (!Array.isArray(candidates) || candidates.length < 2) return null;
   const selection = selectionSummary(node);
   const delivery = productionDeliverySummary(node);
-  const selected = Boolean(selection.selected_candidate_id && selection.selected_revision_id);
-  const busy = ["quality_saving", "exporting", "refreshing"].includes(delivery.status);
-  const exactDeliveryIdentity = selected
-    && delivery.run_id === selection.run_id
-    && delivery.selected_candidate_id === selection.selected_candidate_id
-    && delivery.selected_candidate_digest === selection.selected_candidate_digest
-    && delivery.selected_revision_id === selection.selected_revision_id
-    && delivery.selected_revision_digest === selection.selected_revision_digest
-    && delivery.parent_job_id === selection.selected_parent_job_id;
+  const selectionIdentity = canonicalAuthorityTuple({
+    run_id: selection.run_id,
+    parent_job_id: selection.selected_parent_job_id,
+    candidate_id: selection.selected_candidate_id,
+    candidate_digest: selection.selected_candidate_digest,
+    revision_id: selection.selected_revision_id,
+    revision_digest: selection.selected_revision_digest,
+  });
+  const deliveryIdentity = canonicalAuthorityTuple({
+    run_id: delivery.run_id,
+    parent_job_id: delivery.parent_job_id,
+    candidate_id: delivery.selected_candidate_id,
+    candidate_digest: delivery.selected_candidate_digest,
+    revision_id: delivery.selected_revision_id,
+    revision_digest: delivery.selected_revision_digest,
+  });
+  const selected = Boolean(selectionIdentity);
+  const exactDeliveryIdentity = authorityTuplesMatch(selectionIdentity, deliveryIdentity);
+  const busy = exactDeliveryIdentity && ["quality_saving", "exporting", "refreshing"].includes(delivery.status);
   const exactApproval = exactDeliveryIdentity && delivery.quality_decision === "approve";
 
   const panel = document.createElement("section");
@@ -45,7 +57,7 @@ export function productionDeliveryView(node, candidates) {
   head.append(heading, refresh);
   panel.appendChild(head);
 
-  panel.appendChild(identityView(selection, delivery));
+  panel.appendChild(identityView(selectionIdentity, delivery, exactDeliveryIdentity));
 
   const checklist = document.createElement("fieldset");
   checklist.className = "production-delivery-checklist";
@@ -77,7 +89,7 @@ export function productionDeliveryView(node, candidates) {
   exportButton.type = "button";
   exportButton.className = "production-export-action";
   exportButton.dataset.action = "production-export";
-  exportButton.textContent = delivery.status === "exported" ? "再次读取精确导出" : "导出已批准修订";
+  exportButton.textContent = exactDeliveryIdentity && delivery.status === "exported" ? "再次读取精确导出" : "导出已批准修订";
   exportButton.disabled = busy || !exactApproval;
   actions.append(approve, exportButton);
   panel.appendChild(actions);
@@ -85,7 +97,7 @@ export function productionDeliveryView(node, candidates) {
   const status = document.createElement("p");
   status.className = "production-delivery-status";
   status.dataset.productionDeliveryStatus = "true";
-  status.dataset.state = delivery.status || (selected ? "ready" : "selection_required");
+  status.dataset.state = (exactDeliveryIdentity && delivery.status) || (selected ? "ready" : "selection_required");
   status.setAttribute("aria-live", "polite");
   status.textContent = deliveryMessage(delivery, selected, exactDeliveryIdentity);
   panel.appendChild(status);
@@ -97,16 +109,18 @@ export function productionDeliveryView(node, candidates) {
   return panel;
 }
 
-function identityView(selection, delivery) {
+function identityView(selectionIdentity, delivery, exactDeliveryIdentity) {
   const summary = document.createElement("dl");
   summary.className = "production-delivery-identity";
   const fields = [
-    ["Candidate", selection.selected_candidate_id],
-    ["Revision", selection.selected_revision_id],
-    ["Lineage job", selection.selected_parent_job_id],
-    ["Quality review", delivery.quality_review_id],
-    ["Export", delivery.last_export_id],
-    ["SHA-256", delivery.delivery_sha256],
+    ["Candidate", selectionIdentity?.candidate_id],
+    ["Revision", selectionIdentity?.revision_id],
+    ["Lineage job", selectionIdentity?.parent_job_id],
+    ...(exactDeliveryIdentity ? [
+      ["Quality review", delivery.quality_review_id],
+      ["Export", delivery.last_export_id],
+      ["SHA-256", delivery.delivery_sha256],
+    ] : []),
   ].filter(([, value]) => String(value || "").trim());
   if (!fields.length) fields.push(["State", "先从上方候选中选择一个生产基线"]);
   for (const [label, value] of fields) {
@@ -129,6 +143,40 @@ function deliveryMessage(delivery, selected, exactDeliveryIdentity) {
 function selectionSummary(node) {
   const value = node?.params?.creatorSelection;
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function canonicalAuthorityTuple(value) {
+  const tuple = {
+    run_id: canonicalIdentifier(value?.run_id),
+    parent_job_id: canonicalIdentifier(value?.parent_job_id),
+    candidate_id: canonicalIdentifier(value?.candidate_id),
+    candidate_digest: canonicalDigest(value?.candidate_digest),
+    revision_id: canonicalIdentifier(value?.revision_id),
+    revision_digest: canonicalDigest(value?.revision_digest),
+  };
+  return Object.values(tuple).every(Boolean) ? tuple : null;
+}
+
+function authorityTuplesMatch(selection, delivery) {
+  if (!selection || !delivery) return false;
+  return selection.run_id === delivery.run_id
+    && selection.parent_job_id === delivery.parent_job_id
+    && selection.candidate_id === delivery.candidate_id
+    && selection.candidate_digest === delivery.candidate_digest
+    && selection.revision_id === delivery.revision_id
+    && selection.revision_digest === delivery.revision_digest;
+}
+
+function canonicalIdentifier(value) {
+  if (typeof value !== "string") return "";
+  const identifier = value.trim();
+  return SAFE_ID_RE.test(identifier) ? identifier : "";
+}
+
+function canonicalDigest(value) {
+  if (typeof value !== "string") return "";
+  const digest = value.trim().toLowerCase();
+  return SHA256_RE.test(digest) ? digest : "";
 }
 
 function compact(value) {

@@ -122,6 +122,179 @@ process.stdout.write(JSON.stringify({
     assert "质量门禁已通过" not in payload["text"]
 
 
+def test_delivery_approval_requires_a_complete_valid_canonical_authority_tuple() -> None:
+    payload = _node_json(
+        r'''
+import { productionDeliveryView } from "./apps/studio/src/production-delivery-view.js";
+
+function makeElement(tagName) {
+  const element = {
+    tagName: String(tagName || "").toUpperCase(),
+    children: [],
+    dataset: {},
+    attributes: {},
+    disabled: false,
+    checked: false,
+    textContent: "",
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    append(...children) {
+      children.forEach((child) => this.appendChild(child));
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    },
+  };
+  Object.defineProperty(element, "innerText", {
+    get() {
+      return [this.textContent, ...this.children.map((child) => child.innerText || child.textContent || "")]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    },
+  });
+  return element;
+}
+
+function findByAction(element, action) {
+  if (element?.dataset?.action === action) return element;
+  for (const child of element?.children || []) {
+    const found = findByAction(child, action);
+    if (found) return found;
+  }
+  return null;
+}
+
+globalThis.document = { createElement: makeElement };
+const digest = (char) => char.repeat(64);
+const baseNode = {
+  id: "node-001",
+  params: {
+    creatorSelection: {
+      run_id: "run-001",
+      selected_candidate_id: "candidate-002",
+      selected_candidate_digest: digest("c"),
+      selected_revision_id: "revision-002",
+      selected_revision_digest: digest("e"),
+      selected_parent_job_id: "job-001",
+    },
+    productionDelivery: {
+      status: "approved",
+      run_id: "run-001",
+      selected_candidate_id: "candidate-002",
+      selected_candidate_digest: digest("c"),
+      selected_revision_id: "revision-002",
+      selected_revision_digest: digest("e"),
+      parent_job_id: "job-001",
+      quality_decision: "approve",
+      quality_review_id: "quality-review-001",
+      last_export_id: "export-001",
+      delivery_sha256: digest("7"),
+      message: "质量门禁已通过",
+    },
+  },
+};
+const candidates = [{ candidate_id: "candidate-001" }, { candidate_id: "candidate-002" }];
+
+function inspect(node) {
+  const panel = productionDeliveryView(node, candidates);
+  return {
+    approveDisabled: findByAction(panel, "production-quality-approve")?.disabled,
+    exportDisabled: findByAction(panel, "production-export")?.disabled,
+    showsApproval: (panel?.innerText || "").includes("质量门禁已通过"),
+    showsDeliveryRecord: (panel?.innerText || "").includes("quality-review-001")
+      || (panel?.innerText || "").includes("export-001"),
+  };
+}
+
+const scenarios = {
+  missing_run_id(selection, delivery) {
+    delete selection.run_id;
+    delete delivery.run_id;
+  },
+  missing_parent_job_id(selection, delivery) {
+    delete selection.selected_parent_job_id;
+    delete delivery.parent_job_id;
+  },
+  missing_candidate_id(selection, delivery) {
+    delete selection.selected_candidate_id;
+    delete delivery.selected_candidate_id;
+  },
+  missing_candidate_digest(selection, delivery) {
+    delete selection.selected_candidate_digest;
+    delete delivery.selected_candidate_digest;
+  },
+  missing_revision_id(selection, delivery) {
+    delete selection.selected_revision_id;
+    delete delivery.selected_revision_id;
+  },
+  missing_revision_digest(selection, delivery) {
+    delete selection.selected_revision_digest;
+    delete delivery.selected_revision_digest;
+  },
+  blank_run_id(selection, delivery) {
+    selection.run_id = "   ";
+    delivery.run_id = "   ";
+  },
+  null_parent_job_id(selection, delivery) {
+    selection.selected_parent_job_id = null;
+    delivery.parent_job_id = null;
+  },
+  non_scalar_candidate_id(selection, delivery) {
+    selection.selected_candidate_id = { value: "candidate-002" };
+    delivery.selected_candidate_id = { value: "candidate-002" };
+  },
+  invalid_revision_id(selection, delivery) {
+    selection.selected_revision_id = "revision id with spaces";
+    delivery.selected_revision_id = "revision id with spaces";
+  },
+  invalid_candidate_digest(selection, delivery) {
+    selection.selected_candidate_digest = "not-a-sha256";
+    delivery.selected_candidate_digest = "not-a-sha256";
+  },
+};
+
+const results = {};
+for (const [name, mutate] of Object.entries(scenarios)) {
+  const node = structuredClone(baseNode);
+  mutate(node.params.creatorSelection, node.params.productionDelivery);
+  results[name] = inspect(node);
+}
+process.stdout.write(JSON.stringify({ baseline: inspect(baseNode), results }));
+'''
+    )
+
+    assert payload["baseline"] == {
+        "approveDisabled": True,
+        "exportDisabled": False,
+        "showsApproval": True,
+        "showsDeliveryRecord": True,
+    }
+    assert set(payload["results"]) == {
+        "missing_run_id",
+        "missing_parent_job_id",
+        "missing_candidate_id",
+        "missing_candidate_digest",
+        "missing_revision_id",
+        "missing_revision_digest",
+        "blank_run_id",
+        "null_parent_job_id",
+        "non_scalar_candidate_id",
+        "invalid_revision_id",
+        "invalid_candidate_digest",
+    }
+    for name, result in payload["results"].items():
+        assert result == {
+            "approveDisabled": True,
+            "exportDisabled": True,
+            "showsApproval": False,
+            "showsDeliveryRecord": False,
+        }, name
+
+
 def test_quality_approval_and_export_bind_exact_selected_revision_and_fail_closed() -> None:
     payload = _node_json(
         r'''
