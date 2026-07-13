@@ -75,6 +75,9 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     project_controller = (STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
     assert "syncCurrentProjectMetaFromSummaries" in project_controller
     assert "const currentId = runtime.projectId || store.get().meta.projectId;" in project_controller
+    assert "recoverProjectAccessDenied" in project_controller
+    assert "isProjectAccessDeniedError" in project_controller
+    assert "!projectSummaries.length && currentId" in project_controller
     assert 'input.type = "text";' in project_controller
     assert "createProjectController" in main_source
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
@@ -96,6 +99,8 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
 
     assert "AUTH_TOKEN_STORAGE_KEY" in runtime_client
     assert "Authorization" in runtime_client
+    assert "dispatchProjectAccessDenied" in runtime_client
+    assert "project_access_denied" in runtime_client
     assert "authStatus()" in runtime_client
     assert "login(payload)" in runtime_client
     assert "register(payload)" in runtime_client
@@ -104,6 +109,8 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "expected_version" in runtime_client
     assert "ensureAuthSession" in main
     assert "ensureAccessibleStartupProject" in main
+    assert "bindProjectAccessRecovery" in main
+    assert "afs:project-access-denied" in main
     assert "closeOnOutside: false" in auth_gate
     assert "options.closeOnOutside === false" in overlay
     assert "site-home-btn" in topbar
@@ -312,4 +319,5 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "上传/替换参考图" in node_menu
     assert "VIDEO_MODES" not in prompt_bar
     assert "VIDEO_COUNTS" not in prompt_bar
-    assert "mode-tabs" not in prompt_bar
+    assert "asset-reference-mode-tabs" in prompt_bar
+    assert "buildAssetReferenceModeTabs" in prompt_bar

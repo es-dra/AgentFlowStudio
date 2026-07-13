@@ -32,6 +32,12 @@ from apps.api.runtime_keyframe_generation_bridge import write_keyframe_generatio
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_state import load_creative_memory_state
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
+from apps.api.runtime_reference_intent import (
+    ORIGINALIZE_REFERENCE_MODE,
+    is_originalize_reference_request,
+    originalize_reference_policy,
+    reference_transform_mode_for_request,
+)
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -124,11 +130,13 @@ def build_keyframe_generation(
         image_reference_slots=effective_reference_slots,
     )
     is_asset_card_revision = _has_asset_card_revision(request)
+    is_originalize_reference = is_originalize_reference_request(request)
     if context_bundle:
         provider_prompt = _guarded_provider_keyframe_prompt(
             provider_prompt_from_bundle(context_bundle),
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     else:
@@ -136,6 +144,7 @@ def build_keyframe_generation(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     image_operation = _image_operation_for_request(
@@ -154,6 +163,7 @@ def build_keyframe_generation(
             prompt_with_references,
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
@@ -171,6 +181,7 @@ def build_keyframe_generation(
             "reference_image_slots": effective_reference_slots,
             "image_operation": image_operation,
             "image_input_fidelity": "high" if image_operation == "edit" else None,
+            "reference_transform_mode": reference_transform_mode_for_request(request) or None,
         },
     )
     model_request_plan = build_request_plan(
@@ -447,6 +458,9 @@ def build_keyframe_generation(
         KEYFRAME_NON_CLAIMS,
     )
     request_plan["image_operation"] = image_operation
+    reference_transform_mode = reference_transform_mode_for_request(request)
+    if reference_transform_mode:
+        request_plan["reference_transform_mode"] = reference_transform_mode
     if image_operation == "edit" and reference_images:
         request_plan["edit_source_asset_id"] = reference_images[0]["public"]["asset_id"]
         request_plan["image_input_fidelity"] = "high"
@@ -844,10 +858,13 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:
     animal_reference = _looks_like_animal_reference_request(request)
     revision = asset_card_revision_reference_instruction(request)
+    reference_mode = reference_transform_mode_for_request(request)
     lines = []
     if revision:
         lines.append(revision)
-    if revision:
+    if reference_mode == ORIGINALIZE_REFERENCE_MODE:
+        lines.append(originalize_reference_policy(reference_count))
+    elif revision:
         lines.append(
             (
                 f"Connected reference images: {reference_count}. For this asset-card revision, reference image #1 is the primary visual source of truth; "
@@ -862,7 +879,7 @@ def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_
                 "不要把无关背景、服装、图表、界面文字或旧失败风格带入结果。"
             )
         )
-    if animal_reference:
+    if animal_reference and reference_mode != ORIGINALIZE_REFERENCE_MODE:
         lines.append(
             "Animal subject reference: 如果参考主体是猫或动物，只保留同一动物主体的毛色、斑纹、眼睛、耳朵、尾巴和体型比例；"
             "未明确要求时不要添加人类头发、服装或拟人身份；不要把参考图当作脸部贴图素材，必须重绘为统一完整的动物主体。"
@@ -1039,9 +1056,14 @@ def _guarded_provider_keyframe_prompt(
     *,
     reference_count: int = 0,
     asset_card_revision: bool = False,
+    originalize_reference: bool = False,
     limit: int = DEFAULT_IMAGE_PROMPT_LIMIT,
 ) -> str:
-    guard = _image_generation_guard(reference_count=reference_count, asset_card_revision=asset_card_revision)
+    guard = _image_generation_guard(
+        reference_count=reference_count,
+        asset_card_revision=asset_card_revision,
+        originalize_reference=originalize_reference,
+    )
     reserve = len(guard) + 1
     base_limit = max(240, limit - reserve)
     prompt = provider_keyframe_prompt(value, limit=base_limit)
@@ -1052,13 +1074,24 @@ def _guarded_provider_keyframe_prompt(
     return provider_keyframe_prompt(f"{prompt} {guard}", limit=limit)
 
 
-def _image_generation_guard(*, reference_count: int = 0, asset_card_revision: bool = False) -> str:
+def _image_generation_guard(
+    *,
+    reference_count: int = 0,
+    asset_card_revision: bool = False,
+    originalize_reference: bool = False,
+) -> str:
     base = (
         "保真约束：按用户提示直接生成清晰自然的主体，主体身份、物种、材质和关键特征必须可读；"
         "不要改成图标、标志、吉祥物、矢量插画、抽象符号或无关场景，除非用户明确要求这种风格。"
     )
     if reference_count <= 0:
         return base
+    if originalize_reference:
+        return (
+            f"{base} 原创重生参考约束：本次携带 {reference_count} 张参考图；"
+            "参考图只能作为灵感、材质情绪、宽泛类别和功能方向证据，不能作为身份、比例、服装、logo、姿势、构图或未修改细节锁定项；"
+            "必须重新设计为降低可识别 IP 相似度的新资产。"
+        )
     if asset_card_revision:
         return (
             f"{base} 资产卡局部修订约束：本次携带 {reference_count} 张参考图；"
