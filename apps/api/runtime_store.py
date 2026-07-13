@@ -39,6 +39,15 @@ class RuntimeStore:
         safe = safe_id(project_id)
         return self.projects_dir / safe / "project_deleted.json"
 
+    def production_runs_dir(self, project_id: str) -> Path:
+        return self.projects_dir / safe_id(project_id) / "production_runs"
+
+    def production_run_path(self, project_id: str, run_id: str) -> Path:
+        return self.production_runs_dir(project_id) / safe_id(run_id) / "production_run.json"
+
+    def production_run_lock_path(self, project_id: str) -> Path:
+        return self.production_runs_dir(project_id) / "production_runs.lock"
+
     def is_project_deleted(self, project_id: str) -> bool:
         return self.project_deleted_marker_path(project_id).is_file()
 
@@ -151,6 +160,55 @@ class RuntimeStore:
     def add_content_card(self, project_id: str, content_card: dict[str, Any]) -> dict[str, Any]:
         reject_unsafe_payload(content_card)
         return self.update_project_manifest(project_id, {"content_cards": [content_card]}, status="in_progress")
+
+    def write_production_run(self, project_id: str, run: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_project_manifest(project_id)
+        if str(run.get("project_id") or "") != project_id:
+            raise ValueError("production run project id does not match storage scope")
+        run_id = str(run.get("run_id") or "")
+        if not run_id:
+            raise ValueError("production run requires run_id")
+        reject_unsafe_payload(run)
+        path = self.production_run_path(project_id, run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, run)
+        run_ref = {
+            "run_id": run_id,
+            "artifact_type": str(run.get("artifact_type") or "afs_runtime_production_run"),
+            "schema_version": str(run.get("schema_version") or ""),
+            "status": str(run.get("status") or ""),
+        }
+        manifest = self.ensure_project_manifest(project_id)
+        manifest["runs"] = [
+            item
+            for item in manifest.get("runs", [])
+            if not isinstance(item, dict) or str(item.get("run_id") or "") != run_id
+        ]
+        manifest["runs"].append(run_ref)
+        manifest["status"] = "in_progress"
+        validate_project_manifest(manifest)
+        write_json(self.project_manifest_path(project_id), manifest)
+        return run
+
+    def load_production_run(self, project_id: str, run_id: str) -> dict[str, Any]:
+        path = self.production_run_path(project_id, run_id)
+        if not path.exists():
+            raise KeyError(run_id)
+        run = read_json(path)
+        reject_unsafe_payload(run)
+        if str(run.get("project_id") or "") != project_id or str(run.get("run_id") or "") != run_id:
+            raise ValueError("production run storage identity mismatch")
+        return run
+
+    def list_production_runs(self, project_id: str) -> list[dict[str, Any]]:
+        self.ensure_project_manifest(project_id)
+        runs: list[dict[str, Any]] = []
+        for path in sorted(self.production_runs_dir(project_id).glob("*/production_run.json")):
+            run = read_json(path)
+            reject_unsafe_payload(run)
+            if str(run.get("project_id") or "") == project_id:
+                runs.append(run)
+        return runs
 
     def update_content_card(self, project_id: str, card_id: str, updates: dict[str, Any]) -> dict[str, Any]:
         manifest = self.ensure_project_manifest(project_id)

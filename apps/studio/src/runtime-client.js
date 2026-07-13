@@ -329,6 +329,10 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
+  if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
+  if (/\/creator-decisions$/.test(route) && method === "POST") return "submit_creator_decision";
+  if (/\/quality-reviews$/.test(route) && method === "POST") return "record_production_quality_review";
+  if (/\/exports$/.test(route) && method === "POST") return "export_selected_production_revision";
   if (/\/studio-state$/.test(route) && method === "PUT") return "save_studio_state";
   return "";
 }
@@ -524,6 +528,33 @@ export function createRuntimeClient(projectId = "studio-local-001") {
       return requestJson(`/projects/${encoded}/accepted-generation-plan-packets/preview`, {
         method: "POST",
         payload: { fixture_mode: "default_unconfirmed", ...payload },
+      });
+    },
+    createProductionRun(payload) {
+      return requestJson(`/projects/${encoded}/production-runs`, { method: "POST", payload });
+    },
+    listProductionRuns() {
+      return requestJson(`/projects/${encoded}/production-runs`);
+    },
+    getProductionRun(runId) {
+      return requestJson(`/projects/${encoded}/production-runs/${encodeURIComponent(runId)}`);
+    },
+    submitCreatorDecision(runId, payload) {
+      return requestJson(`/projects/${encoded}/production-runs/${encodeURIComponent(runId)}/creator-decisions`, {
+        method: "POST",
+        payload,
+      });
+    },
+    recordProductionQualityReview(runId, payload) {
+      return requestJson(`/projects/${encoded}/production-runs/${encodeURIComponent(runId)}/quality-reviews`, {
+        method: "POST",
+        payload,
+      });
+    },
+    exportProductionRun(runId, payload) {
+      return requestJson(`/projects/${encoded}/production-runs/${encodeURIComponent(runId)}/exports`, {
+        method: "POST",
+        payload,
       });
     },
     loadStudioState() {

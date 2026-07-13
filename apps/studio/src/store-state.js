@@ -49,6 +49,7 @@ export function initialState(projectId = "studio-local-001") {
     order: [],
     selection: { nodeIds: [], edgeId: null },
     assets: [],
+    production: {},
     ui: {
       drawerOpen: true,
       drawerWidth: 196,
@@ -74,6 +75,7 @@ export function snapshotStudioState(state) {
     edges: state.edges,
     order: state.order,
     assets: state.assets,
+    production: state.production,
   });
 }
 
@@ -97,6 +99,7 @@ export function normalizeSnapshot(snap) {
     edges: input.edges && typeof input.edges === "object" ? input.edges : {},
     order: Array.isArray(input.order) ? input.order : Object.keys(input.nodes || {}),
     assets: Array.isArray(input.assets) ? input.assets : base.assets,
+    production: sanitizeProductionBinding(input.production),
   };
   return sanitizeSnapshotForPersistence(normalized);
 }
@@ -108,6 +111,7 @@ export function replaceSerializable(state, snap) {
   state.edges = snap.edges;
   state.order = snap.order;
   state.assets = snap.assets;
+  state.production = sanitizeProductionBinding(snap.production);
   state.groups = state.groups || {};
   state.selection = { nodeIds: [], edgeId: null };
   state.ui = { ...initialState().ui, ...state.ui };
@@ -177,7 +181,34 @@ function sanitizeSnapshotForPersistence(snapshot) {
     ...snapshot,
     nodes,
     assets: sanitizeAssetsForPersistence(snapshot.assets || [], projectId),
+    production: sanitizeProductionBinding(snapshot.production),
   };
+}
+
+export function sanitizeProductionBinding(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const activeRunId = safeProjectId(value.active_run_id);
+  if (!activeRunId) return {};
+  const checkpointVersion = Math.max(0, Math.round(Number(value.checkpoint_version) || 0));
+  return stripEmpty({
+    schema_version: "afs_studio_production_binding.v0.1",
+    authoritative_source: "runtime_production_run",
+    compatibility_mode: "backend_authoritative_summary_only",
+    active_run_id: activeRunId,
+    checkpoint_version: checkpointVersion,
+    checkpoint_digest: safeSha256(value.checkpoint_digest),
+    subject_digest: safeSha256(value.subject_digest),
+    selected_candidate_id: safeProjectId(value.selected_candidate_id),
+    selected_candidate_digest: safeSha256(value.selected_candidate_digest),
+    selected_revision_id: safeProjectId(value.selected_revision_id),
+    selected_revision_digest: safeSha256(value.selected_revision_digest),
+    last_export_id: safeProjectId(value.last_export_id),
+  });
+}
+
+function safeSha256(value) {
+  const digest = String(value || "").trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(digest) ? digest : "";
 }
 
 function sanitizeNodeForPersistence(node, projectId) {
