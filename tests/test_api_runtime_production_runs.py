@@ -104,6 +104,57 @@ def _creator_decision(run: dict, **updates) -> dict:
     return {**payload, **updates}
 
 
+def _episode_binding_payload(run: dict, **updates) -> dict:
+    package_path = REPO_ROOT / "examples" / "representative_episode" / "episode_package.json"
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    arbitration = package["domain_crew_execution_plan"]["creator_arbitration"]
+    payload = {
+        "schema_version": "afs_representative_episode_binding.v0.1",
+        "idempotency_key": "bind-rainlight-episode-v1",
+        "expected_checkpoint_version": run["checkpoint"]["version"],
+        "expected_package_sha256": None,
+        "package_sha256": hashlib.sha256(package_path.read_bytes()).hexdigest(),
+        "package_project_id": package["project"]["project_id"],
+        "episode_id": package["project"]["episode_id"],
+        "episode_version_id": package["project"]["current_version_id"],
+        "character_refs": [
+            {
+                "entity_id": item["character_id"],
+                "current_approved_version_id": item["current_version_id"],
+            }
+            for item in package["characters"]
+        ],
+        "scene_refs": [
+            {
+                "entity_id": item["scene_id"],
+                "current_approved_version_id": item["current_version_id"],
+            }
+            for item in package["scenes"]
+        ],
+        "shot_refs": [
+            {
+                "entity_id": item["shot_id"],
+                "current_approved_version_id": item["current_version_id"],
+            }
+            for item in package["shots"]
+        ],
+        "asset_refs": [
+            {
+                "asset_id": item["asset_id"],
+                "current_revision_id": item["current_revision_id"],
+                "status": item["status"],
+                "provider_needed": item["provider_needed"],
+            }
+            for item in package["asset_manifest"]
+        ],
+        "pending_media_count": sum(item["status"] == "missing" for item in package["asset_manifest"]),
+        "creator_decision_ref": arbitration["creator_decision_ref"],
+        "authoritative_affected_task_refs": arbitration["authoritative_affected_task_refs"],
+        "downstream_reconfirmations": package["domain_crew_execution_plan"]["downstream_reconfirmations"],
+    }
+    return {**payload, **updates}
+
+
 def test_production_run_requires_authenticated_project_owner(tmp_path, monkeypatch) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post("/projects", json={"project_id": "local-project", "goal": "Local dev project"})
@@ -136,6 +187,177 @@ def test_production_run_requires_authenticated_project_owner(tmp_path, monkeypat
 
     assert created.status_code == 200, created.text
     assert denied.status_code == 403
+
+
+def test_representative_episode_package_binding_is_authenticated_persisted_and_studio_visible(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    project_id = "afs-rainlight-project"
+    created_project = client.post(
+        "/projects",
+        json={"project_id": project_id, "goal": "Representative episode production"},
+        headers=headers,
+    )
+    assert created_project.status_code == 200, created_project.text
+    created_run = client.post(
+        f"/projects/{project_id}/production-runs",
+        json=_create_payload(),
+        headers=headers,
+    )
+    assert created_run.status_code == 200, created_run.text
+    run = created_run.json()["production_run"]
+    route = f"/projects/{project_id}/production-runs/{run['run_id']}/representative-episode-binding"
+    payload = _episode_binding_payload(run)
+
+    bound = client.put(route, json=payload, headers=headers)
+    replayed = client.put(route, json=payload, headers=headers)
+    loaded = client.get(route, headers=headers)
+
+    assert bound.status_code == 200, bound.text
+    assert bound.json()["idempotent_replay"] is False
+    binding = bound.json()["production_run"]["representative_episode_binding"]
+    assert binding["package_sha256"] == payload["package_sha256"]
+    assert binding["episode_id"] == "ep-rainlight-001"
+    assert binding["episode_version_id"] == "ep-rainlight-001-v1"
+    assert binding["counts"] == {"characters": 3, "scenes": 3, "shots": 15, "assets": 25}
+    assert binding["asset_readiness"] == {
+        "ready_count": 0,
+        "pending_media_count": 25,
+        "provider_needed_count": 25,
+        "all_assets_ready": False,
+    }
+    assert len(binding["character_refs"]) == 3
+    assert len(binding["scene_refs"]) == 3
+    assert len(binding["shot_refs"]) == 15
+    assert all(ref["current_approved_version_id"].endswith("-v1") for ref in binding["shot_refs"])
+    assert binding["creator_decision_ref"] == "creator-decision-episode-v1"
+    assert len(binding["authoritative_affected_task_refs"]) == 8
+    assert len(binding["downstream_reconfirmations"]) == 8
+    assert binding["propagation_complete"] is False
+    assert len(binding["binding_digest"]) == 64
+    assert replayed.status_code == 200
+    assert replayed.json()["idempotent_replay"] is True
+    assert loaded.status_code == 200
+    assert loaded.json()["representative_episode_binding"] == binding
+    assert loaded.json()["checkpoint"] == bound.json()["production_run"]["checkpoint"]
+    studio_episode = bound.json()["studio_binding"]["representative_episode"]
+    assert studio_episode == {
+        "authoritative_source": "runtime_production_run_checkpoint",
+        "package_sha256": payload["package_sha256"],
+        "binding_digest": binding["binding_digest"],
+        "episode_id": "ep-rainlight-001",
+        "episode_version_id": "ep-rainlight-001-v1",
+        "character_count": 3,
+        "scene_count": 3,
+        "shot_count": 15,
+        "asset_count": 25,
+        "pending_media_count": 25,
+        "provider_needed_count": 25,
+        "all_assets_ready": False,
+        "creator_decision_ref": "creator-decision-episode-v1",
+        "propagation_complete": False,
+        "lineage": binding["lineage"],
+    }
+
+    reloaded_client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    reloaded = reloaded_client.get(route, headers=headers)
+    assert reloaded.status_code == 200, reloaded.text
+    assert reloaded.json()["representative_episode_binding"] == binding
+
+
+def test_representative_episode_binding_rejects_stale_checkpoint_digest_and_foreign_project(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    for project_id in ("afs-rainlight-project", "foreign-project"):
+        created = client.post(
+            "/projects",
+            json={"project_id": project_id, "goal": "Episode binding isolation"},
+            headers=headers,
+        )
+        assert created.status_code == 200, created.text
+        run_response = client.post(
+            f"/projects/{project_id}/production-runs",
+            json={**_create_payload(), "run_id": f"run-{project_id}", "idempotency_key": f"create-{project_id}"},
+            headers=headers,
+        )
+        assert run_response.status_code == 200, run_response.text
+
+    route = "/projects/afs-rainlight-project/production-runs/run-afs-rainlight-project/representative-episode-binding"
+    run = client.get(
+        "/projects/afs-rainlight-project/production-runs/run-afs-rainlight-project",
+        headers=headers,
+    ).json()["production_run"]
+    stale_checkpoint = client.put(
+        route,
+        json=_episode_binding_payload(run, expected_checkpoint_version=run["checkpoint"]["version"] + 1),
+        headers=headers,
+    )
+    assert stale_checkpoint.status_code == 409
+    assert stale_checkpoint.json()["detail"]["error"] == "stale_production_checkpoint"
+
+    bound = client.put(route, json=_episode_binding_payload(run), headers=headers)
+    assert bound.status_code == 200, bound.text
+    current = bound.json()["production_run"]
+    stale_package = client.put(
+        route,
+        json=_episode_binding_payload(
+            current,
+            idempotency_key="bind-rainlight-episode-v2",
+            expected_package_sha256=_digest("stale-package"),
+        ),
+        headers=headers,
+    )
+    assert stale_package.status_code == 409
+    assert stale_package.json()["detail"]["error"] == "stale_representative_episode_package"
+
+    foreign_route = "/projects/foreign-project/production-runs/run-foreign-project/representative-episode-binding"
+    foreign_run = client.get(
+        "/projects/foreign-project/production-runs/run-foreign-project",
+        headers=headers,
+    ).json()["production_run"]
+    foreign = client.put(foreign_route, json=_episode_binding_payload(foreign_run), headers=headers)
+    assert foreign.status_code == 409
+    assert "another project" in foreign.text
+
+    other = client.post(
+        "/auth/register",
+        json={"email": "episode-other@example.com", "password": "strong-password-789", "display_name": "Other"},
+    )
+    other_headers = {"Authorization": f"Bearer {other.json()['session_token']}"}
+    denied = client.get(route, headers=other_headers)
+    assert denied.status_code == 403
+
+
+def test_representative_episode_binding_rejects_incomplete_or_inconsistent_inventory(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    project_id = "afs-rainlight-project"
+    client.post("/projects", json={"project_id": project_id, "goal": "Inventory validation"}, headers=headers)
+    run = client.post(
+        f"/projects/{project_id}/production-runs",
+        json=_create_payload(),
+        headers=headers,
+    ).json()["production_run"]
+    route = f"/projects/{project_id}/production-runs/{run['run_id']}/representative-episode-binding"
+    incomplete = _episode_binding_payload(run)
+    incomplete["shot_refs"] = incomplete["shot_refs"][:-1]
+    mismatched = _episode_binding_payload(run, idempotency_key="bind-readiness-mismatch")
+    mismatched["pending_media_count"] = 24
+    missing_reconfirmation = _episode_binding_payload(run, idempotency_key="bind-reconfirmation-missing")
+    missing_reconfirmation["downstream_reconfirmations"] = missing_reconfirmation["downstream_reconfirmations"][:-1]
+    unsafe_task_ref = _episode_binding_payload(run, idempotency_key="bind-unsafe-task-ref")
+    unsafe_task_ref["authoritative_affected_task_refs"][0] = "../foreign-task"
+
+    assert client.put(route, json=incomplete, headers=headers).status_code == 422
+    assert client.put(route, json=mismatched, headers=headers).status_code == 422
+    assert client.put(route, json=missing_reconfirmation, headers=headers).status_code == 422
+    assert client.put(route, json=unsafe_task_ref, headers=headers).status_code == 422
 
 
 def test_create_list_get_and_idempotent_replay_persist_checkpoint(tmp_path, monkeypatch) -> None:

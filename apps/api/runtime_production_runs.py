@@ -13,12 +13,14 @@ from apps.api.runtime_production_models import (
     PRODUCTION_CHECKPOINT_SCHEMA_VERSION,
     PRODUCTION_EXPORT_SCHEMA_VERSION,
     PRODUCTION_RUN_SCHEMA_VERSION,
+    REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION,
     STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION,
     CreatorDecisionRequest,
     ProductionCheckpoint,
     ProductionExportRequest,
     ProductionQualityReviewRequest,
     ProductionRunCreateRequest,
+    RepresentativeEpisodeBindingRequest,
     canonical_json_digest,
     checkpoint_digest,
 )
@@ -69,6 +71,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                 "creator_decisions": [],
                 "quality_reviews": [],
                 "exports": [],
+                "representative_episode_binding": None,
                 "lineage": [
                     {
                         "source_ref": candidate.parent_job_id,
@@ -124,6 +127,122 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         _validate_checkpoint(run)
         _validate_export_artifacts(store, project_id, run)
         return _run_response(run)
+
+    @app.get("/projects/{project_id}/production-runs/{run_id}/representative-episode-binding")
+    def get_representative_episode_binding(
+        project_id: str,
+        run_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
+        binding = run.get("representative_episode_binding")
+        if not isinstance(binding, dict):
+            raise HTTPException(status_code=404, detail="representative episode binding not found")
+        return {
+            "project_id": project_id,
+            "run_id": run_id,
+            "representative_episode_binding": binding,
+            "checkpoint": dict(run["checkpoint"]),
+        }
+
+    @app.put("/projects/{project_id}/production-runs/{run_id}/representative-episode-binding")
+    def bind_representative_episode_package(
+        project_id: str,
+        run_id: str,
+        body: RepresentativeEpisodeBindingRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        request_payload = body.model_dump(mode="json")
+        request_digest = canonical_json_digest(request_payload)
+        with exclusive_file_lock(store.production_run_lock_path(project_id)):
+            run = _load_owned_run(store, project_id, run_id, owner_user_id)
+            if _mutation_is_replay(run, "representative_episode_binding", body.idempotency_key, request_digest):
+                return _run_response(run, idempotent_replay=True)
+            _require_checkpoint_version(run, body.expected_checkpoint_version)
+            if body.package_project_id != project_id:
+                raise HTTPException(status_code=409, detail="representative episode package belongs to another project")
+            current = run.get("representative_episode_binding")
+            current_digest = str(current.get("package_sha256") or "") if isinstance(current, dict) else ""
+            expected_digest = str(body.expected_package_sha256 or "")
+            if current_digest != expected_digest:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "stale_representative_episode_package",
+                        "expected_package_sha256": expected_digest or None,
+                        "actual_package_sha256": current_digest or None,
+                    },
+                )
+
+            timestamp = _now()
+            binding_core = {
+                "schema_version": REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION,
+                "package_sha256": body.package_sha256,
+                "package_project_id": body.package_project_id,
+                "episode_id": body.episode_id,
+                "episode_version_id": body.episode_version_id,
+                "character_refs": [item.model_dump(mode="json") for item in body.character_refs],
+                "scene_refs": [item.model_dump(mode="json") for item in body.scene_refs],
+                "shot_refs": [item.model_dump(mode="json") for item in body.shot_refs],
+                "asset_refs": [item.model_dump(mode="json") for item in body.asset_refs],
+                "counts": {
+                    "characters": len(body.character_refs),
+                    "scenes": len(body.scene_refs),
+                    "shots": len(body.shot_refs),
+                    "assets": len(body.asset_refs),
+                },
+                "asset_readiness": {
+                    "ready_count": sum(item.status == "ready" for item in body.asset_refs),
+                    "pending_media_count": body.pending_media_count,
+                    "provider_needed_count": sum(item.provider_needed for item in body.asset_refs),
+                    "all_assets_ready": body.pending_media_count == 0,
+                },
+                "creator_decision_ref": body.creator_decision_ref,
+                "authoritative_affected_task_refs": list(body.authoritative_affected_task_refs),
+                "downstream_reconfirmations": [
+                    item.model_dump(mode="json") for item in body.downstream_reconfirmations
+                ],
+                "propagation_complete": all(
+                    item.status == "reconfirmed" for item in body.downstream_reconfirmations
+                ),
+                "lineage": [
+                    {
+                        "source_ref": body.package_sha256,
+                        "target_ref": body.episode_version_id,
+                        "relation": "package_defined_episode_version",
+                    },
+                    {
+                        "source_ref": body.creator_decision_ref,
+                        "target_ref": body.episode_version_id,
+                        "relation": "creator_decision_approved_episode_version",
+                    },
+                ],
+            }
+            binding = {
+                **binding_core,
+                "binding_digest": canonical_json_digest(binding_core),
+                "bound_by_user_id": owner_user_id,
+                "bound_at": timestamp,
+            }
+            run["representative_episode_binding"] = binding
+            run.setdefault("lineage", []).append(
+                {
+                    "source_ref": body.package_sha256,
+                    "target_ref": binding["binding_digest"],
+                    "relation": "representative_episode_package_bound_to_production_run",
+                }
+            )
+            _record_mutation_idempotency(
+                run,
+                "representative_episode_binding",
+                body.idempotency_key,
+                request_digest,
+            )
+            _advance_checkpoint(run)
+            store.write_production_run(project_id, run)
+            return _run_response(run, idempotent_replay=False)
 
     @app.post("/projects/{project_id}/production-runs/{run_id}/creator-decisions")
     def submit_creator_decision(
@@ -545,6 +664,11 @@ def _studio_binding(run: dict[str, Any]) -> dict[str, Any]:
     checkpoint = run.get("checkpoint") if isinstance(run.get("checkpoint"), dict) else {}
     revision = run.get("selected_revision") if isinstance(run.get("selected_revision"), dict) else {}
     exports = [item for item in run.get("exports") or [] if isinstance(item, dict)]
+    episode = (
+        run.get("representative_episode_binding")
+        if isinstance(run.get("representative_episode_binding"), dict)
+        else {}
+    )
     binding = {
         "schema_version": STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION,
         "authoritative_source": "runtime_production_run",
@@ -558,8 +682,34 @@ def _studio_binding(run: dict[str, Any]) -> dict[str, Any]:
         "selected_revision_id": str(revision.get("revision_id") or ""),
         "selected_revision_digest": str(revision.get("canonical_digest") or ""),
         "last_export_id": str((exports[-1] if exports else {}).get("export_id") or ""),
+        "representative_episode": _episode_studio_summary(episode),
     }
-    return {key: value for key, value in binding.items() if value not in ("", 0)}
+    return {key: value for key, value in binding.items() if value not in ("", 0, {})}
+
+
+def _episode_studio_summary(binding: dict[str, Any]) -> dict[str, Any]:
+    if not binding:
+        return {}
+    counts = binding.get("counts") if isinstance(binding.get("counts"), dict) else {}
+    readiness = binding.get("asset_readiness") if isinstance(binding.get("asset_readiness"), dict) else {}
+    lineage = [item for item in binding.get("lineage") or [] if isinstance(item, dict)]
+    return {
+        "authoritative_source": "runtime_production_run_checkpoint",
+        "package_sha256": str(binding.get("package_sha256") or ""),
+        "binding_digest": str(binding.get("binding_digest") or ""),
+        "episode_id": str(binding.get("episode_id") or ""),
+        "episode_version_id": str(binding.get("episode_version_id") or ""),
+        "character_count": int(counts.get("characters") or 0),
+        "scene_count": int(counts.get("scenes") or 0),
+        "shot_count": int(counts.get("shots") or 0),
+        "asset_count": int(counts.get("assets") or 0),
+        "pending_media_count": int(readiness.get("pending_media_count") or 0),
+        "provider_needed_count": int(readiness.get("provider_needed_count") or 0),
+        "all_assets_ready": readiness.get("all_assets_ready") is True,
+        "creator_decision_ref": str(binding.get("creator_decision_ref") or ""),
+        "propagation_complete": binding.get("propagation_complete") is True,
+        "lineage": lineage,
+    }
 
 
 def resolve_project_studio_binding(

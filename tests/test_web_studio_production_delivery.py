@@ -35,6 +35,154 @@ def test_production_delivery_panel_is_wired_to_quality_and_exact_export_actions(
     assert "@media (max-width: 520px)" in styles
 
 
+def test_representative_episode_binding_summary_requires_exact_authoritative_inventory() -> None:
+    payload = _node_json(
+        r'''
+import { representativeEpisodeBindingSummary } from "./apps/studio/src/production-delivery-controller.js";
+
+const digest = (char) => char.repeat(64);
+const entityRefs = (prefix, count) => Array.from({ length: count }, (_, index) => ({
+  entity_id: `${prefix}-${String(index + 1).padStart(3, "0")}`,
+  current_approved_version_id: `${prefix}-${String(index + 1).padStart(3, "0")}-v1`,
+}));
+const assetRefs = Array.from({ length: 25 }, (_, index) => ({
+  asset_id: `asset-${String(index + 1).padStart(3, "0")}`,
+  current_revision_id: `asset-${String(index + 1).padStart(3, "0")}-rev-001`,
+  status: "missing",
+  provider_needed: true,
+}));
+const binding = {
+  package_sha256: digest("a"),
+  binding_digest: digest("b"),
+  episode_id: "ep-rainlight-001",
+  episode_version_id: "ep-rainlight-001-v1",
+  character_refs: entityRefs("character", 3),
+  scene_refs: entityRefs("scene", 3),
+  shot_refs: entityRefs("shot", 15),
+  asset_refs: assetRefs,
+  counts: { characters: 3, scenes: 3, shots: 15, assets: 25 },
+  asset_readiness: { ready_count: 0, pending_media_count: 25, provider_needed_count: 25, all_assets_ready: false },
+  creator_decision_ref: "creator-decision-episode-v1",
+  propagation_complete: false,
+  lineage: [
+    { source_ref: digest("a"), target_ref: "ep-rainlight-001-v1", relation: "package_defined_episode_version" },
+    { source_ref: "creator-decision-episode-v1", target_ref: "ep-rainlight-001-v1", relation: "creator_decision_approved_episode_version" },
+  ],
+};
+const summary = representativeEpisodeBindingSummary({ representative_episode_binding: binding });
+const failures = {};
+for (const [name, mutate] of Object.entries({
+  incompleteShots(value) { value.shot_refs.pop(); },
+  staleCounts(value) { value.counts.shots = 14; },
+  readinessDrift(value) { value.asset_readiness.pending_media_count = 24; },
+  missingProviderGate(value) { value.asset_refs[0].provider_needed = false; },
+})) {
+  const candidate = structuredClone(binding);
+  mutate(candidate);
+  try { representativeEpisodeBindingSummary({ representative_episode_binding: candidate }); }
+  catch (error) { failures[name] = error.code; }
+}
+process.stdout.write(JSON.stringify({ summary, failures }));
+'''
+    )
+
+    assert payload["summary"] == {
+        "authoritative_source": "runtime_production_run_checkpoint",
+        "package_sha256": "a" * 64,
+        "binding_digest": "b" * 64,
+        "episode_id": "ep-rainlight-001",
+        "episode_version_id": "ep-rainlight-001-v1",
+        "character_count": 3,
+        "scene_count": 3,
+        "shot_count": 15,
+        "asset_count": 25,
+        "pending_media_count": 25,
+        "provider_needed_count": 25,
+        "all_assets_ready": False,
+        "creator_decision_ref": "creator-decision-episode-v1",
+        "propagation_complete": False,
+        "lineage": [
+            {
+                "source_ref": "a" * 64,
+                "target_ref": "ep-rainlight-001-v1",
+                "relation": "package_defined_episode_version",
+            },
+            {
+                "source_ref": "creator-decision-episode-v1",
+                "target_ref": "ep-rainlight-001-v1",
+                "relation": "creator_decision_approved_episode_version",
+            },
+        ],
+    }
+    assert payload["failures"] == {
+        "incompleteShots": "delivery_episode_shot_refs_invalid",
+        "staleCounts": "delivery_episode_counts_invalid",
+        "readinessDrift": "delivery_episode_readiness_invalid",
+        "missingProviderGate": "delivery_episode_provider_gate_invalid",
+    }
+
+
+def test_studio_delivery_displays_exact_representative_episode_checkpoint_summary() -> None:
+    payload = _node_json(
+        r'''
+import { productionDeliveryView } from "./apps/studio/src/production-delivery-view.js";
+
+function makeElement(tagName) {
+  const element = {
+    tagName: String(tagName || "").toUpperCase(), children: [], dataset: {}, attributes: {}, className: "",
+    title: "", disabled: false, checked: false, textContent: "",
+    appendChild(child) { this.children.push(child); return child; },
+    append(...children) { children.forEach((child) => this.appendChild(child)); },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+  };
+  Object.defineProperty(element, "innerText", { get() {
+    return [this.textContent, ...this.children.map((child) => child.innerText || child.textContent || "")]
+      .filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  }});
+  return element;
+}
+function findBinding(element) {
+  if (element?.dataset?.representativeEpisodeBinding === "true") return element;
+  for (const child of element?.children || []) { const found = findBinding(child); if (found) return found; }
+  return null;
+}
+globalThis.document = { createElement: makeElement };
+const digest = (char) => char.repeat(64);
+const authority = {
+  run_id: "production-run-001", selected_candidate_id: "candidate-001", selected_candidate_digest: digest("c"),
+  selected_revision_id: "revision-001", selected_revision_digest: digest("d"), selected_parent_job_id: "job-001",
+};
+const node = { id: "node-001", params: {
+  creatorSelection: authority,
+  productionDelivery: {
+    status: "ready", run_id: authority.run_id, selected_candidate_id: authority.selected_candidate_id,
+    selected_candidate_digest: authority.selected_candidate_digest, selected_revision_id: authority.selected_revision_id,
+    selected_revision_digest: authority.selected_revision_digest, parent_job_id: authority.selected_parent_job_id,
+    representative_episode: {
+      authoritative_source: "runtime_production_run_checkpoint", package_sha256: digest("a"), binding_digest: digest("b"),
+      episode_id: "ep-rainlight-001", episode_version_id: "ep-rainlight-001-v1", character_count: 3,
+      scene_count: 3, shot_count: 15, asset_count: 25, pending_media_count: 25, provider_needed_count: 25,
+      all_assets_ready: false, creator_decision_ref: "creator-decision-episode-v1", propagation_complete: false,
+      lineage: [{}, {}],
+    },
+  },
+}};
+const panel = productionDeliveryView(node, [{ candidate_id: "candidate-001" }, { candidate_id: "candidate-002" }]);
+const binding = findBinding(panel);
+process.stdout.write(JSON.stringify({ text: binding?.innerText || "", titles: (binding?.children || []).map((item) => item.title).filter(Boolean) }));
+'''
+    )
+
+    assert "ep-rainlight-001" in payload["text"]
+    assert "ep-rainlight-001-v1" in payload["text"]
+    assert "3 characters / 3 scenes / 15 shots / 25 assets" in payload["text"]
+    assert "25" in payload["text"]
+    assert "pending reconfirmation" in payload["text"]
+    assert "2 authoritative refs" in payload["text"]
+    assert "a" * 64 in payload["titles"]
+    assert "b" * 64 in payload["titles"]
+
+
 def test_stale_delivery_authority_cannot_render_current_approval_or_enable_export() -> None:
     payload = _node_json(
         r'''
