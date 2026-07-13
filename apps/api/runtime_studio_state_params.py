@@ -29,13 +29,14 @@ SAFE_NODE_PARAM_KEYS = (
     "model", "spec", "camera", "motion", "styleRef", "attachments", "directorSetup", "directorRef",
     "isReference", "intent", "uploads", "previewAspectRatio", "visualAssets", "visual_asset_ids",
     "firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastVideoPreviewUrl",
+    "assetReferenceMode", "referenceTransformMode",
     "videoInputSource",
     *SAFE_GENERATION_PARAM_KEYS,
     "quotaOverrideConfirmed", "lastContextBundle", "nodeRole", "sourceTextNodeId", "scriptSegmentIndex",
     "structuredShot", "shotAssetRefs", "assetPrepState", "asset_prep", "assetCardDraft",
     "assetCardRevision",
     "assetAutoBindingGraph", "asset_auto_binding_graph", "nodeReferenceStack", "node_reference_stack",
-    "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
+    "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "scriptExpansionSourceIdea", "keyframeLayer",
     "keyframeConstraints", "keyframeLocalEditDraft", "local_edit_availability",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
     "lastModelCallContextId", "lastModelCallContextSummary",
@@ -88,6 +89,9 @@ def _sanitize_param(
         return safe_id(text(value, "", 120))
     if key == "lastVideoPreviewUrl":
         return preview_url(value, project_id=project_id)
+    if key in {"assetReferenceMode", "referenceTransformMode"}:
+        mode = text(value, "", 80)
+        return mode if mode in {"localized_edit", "originalize_ip_safe"} else ""
     if key == "videoInputSource":
         return _video_input_source(value, text=text)
     if key in SAFE_GENERATION_PARAM_KEYS:
@@ -149,6 +153,8 @@ def _sanitize_param(
         return int(max(0, min(9999, number(value, 0))))
     if key in {"nodeRole", "sourceTextNodeId", "directorRef"}:
         return text(value, "", 120)
+    if key == "scriptExpansionSourceIdea":
+        return text(value, "", 600)
     if key == "lastOptimizedPromptPlain":
         return text(value, "", 4000)
     return value

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from apps.api.runtime_keyframes import _reference_images
+from apps.api.runtime_keyframes import _reference_images, _reference_prompt_instruction
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_service import create_runtime_app
@@ -366,6 +366,42 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
     assert "Do not turn the subject into a toy, chibi, mascot" in str(captured["prompt"])
     assert "外形辨识: 毛绒机身" in str(captured["prompt"])
     assert "服装/外观: 穿着传统服装" in str(captured["prompt"])
+
+
+def test_originalize_asset_card_reference_instruction_uses_inspiration_not_identity_anchor() -> None:
+    request = KeyframeGenerationRequest(
+        node_id="asset-card-originalize-node",
+        prompt_text="参考这张图的气质，重新设计成原创角色",
+        optimized_prompt="参考这张图的气质，重新设计成原创角色",
+        target_platform="short_video",
+        style="cinematic",
+        aspect_ratio="16:9",
+        candidate_count=1,
+        asset_refs=["img_reference_ip_risk"],
+        node_parameters={
+            "node_role": "asset_card_draft",
+            "reference_transform_mode": "originalize_ip_safe",
+            "asset_card_revision": {
+                "mode": "originalize_ip_safe",
+                "reference_assets": [
+                    {"asset_id": "img_reference_ip_risk", "role": "inspiration_reference", "priority": 1},
+                ],
+                "changed_fields": [
+                    {"field": "user_instruction", "label": "用户调整要求", "from": "", "to": "重新设计成原创角色"},
+                ],
+                "preserve_locks": ["保持高层气质，不复制 IP"],
+            },
+        },
+        generated_at="2026-07-12T10:00:00+08:00",
+    )
+
+    instruction = _reference_prompt_instruction(request, 1)
+
+    assert "Originality-safe reference transformation" in instruction
+    assert "inspiration and visual evidence only" in instruction
+    assert "originalize / IP-risk reduction" in instruction
+    assert "primary visual source of truth" not in instruction
+    assert "Preserve original identity" not in instruction
 
 
 def test_image_relay_openai_route_uses_edit_for_reference_asset_even_with_legacy_zero_slots(tmp_path, monkeypatch) -> None:

@@ -93,6 +93,7 @@ async function bootstrap() {
   bindStudioWorkflowEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
+  bindProjectAccessRecovery();
 
   store.subscribe(renderAll);
   renderAll(store.get());
@@ -192,6 +193,12 @@ async function recoverSaveAuthBoundary(status) {
     await store.flushRuntimeSave();
   }
   renderAll(store.get());
+}
+
+function bindProjectAccessRecovery() {
+  window.addEventListener("afs:project-access-denied", () => {
+    void projectController.recoverProjectAccessDenied();
+  });
 }
 
 function openGenerationForNode(inputNode) {
