@@ -10,6 +10,7 @@ const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保�
 const SCRIPT_OPTIMIZER_LABEL_RE = /^\s*(意图|角色\/主体|人物\/主体|主体|场景\/美术|动作\/情节|镜头\/构图|灯光|运动\/时间推进|连续性|负面约束|Intent|Subject\/Character|Scene\/Production Design|Action\/Beat|Camera\/Framing|Lighting|Motion\/Temporal Progression|Continuity|Negative Constraints)\s*[：:]/i;
 const SCRIPT_WRAPPER_RE = /(请把下面的一句话扩写成正式短视频剧本正文|输出要求|原始想法|script_expansion_contract|formal_script_before_storyboard_breakdown|storyboard_placeholder_outline|source_idea)/i;
 const SCRIPT_TEMPLATE_FILLER_RE = /(推进主体|展示变化|收束结果|主角或核心物体|核心物体|保留下一步拆分分镜|Primary character|Primary scene)/;
+const EXPANDED_SCRIPT_MODES = new Set(["idea_expanded_script", "idea_expanded_script_fallback"]);
 
 export function importScriptFileIntoTextNode(store, node, textarea = null) {
   const input = document.createElement("input");
@@ -40,7 +41,7 @@ export function importScriptFileIntoTextNode(store, node, textarea = null) {
 
 export async function expandTextIdeaToScript(store, runtime, node, textarea = null) {
   const fresh = store.get().nodes[node.id] || node;
-  const idea = String(fresh.prompt || fresh.content || "").trim();
+  const idea = scriptExpansionSourceIdea(fresh);
   if (!idea) return;
   setScriptExpansionState(store, fresh.id, "running", idea);
   textarea?.classList?.add("prompt-shimmer");
@@ -67,6 +68,7 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     const script = normalizeExpandedScript(outcome?.plain || outcome?.optimized, idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script",
+      scriptExpansionSourceIdea: idea.slice(0, 600),
       scriptExpansionState: { status: "complete", percent: 100, completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
@@ -78,6 +80,7 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     const script = draftScriptFromIdea(idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script_fallback",
+      scriptExpansionSourceIdea: idea.slice(0, 600),
       scriptExpansionState: { status: "fallback", percent: 100, completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
@@ -194,6 +197,13 @@ function balancedSentenceChunks(sentences, targetCount) {
     if (chunk) chunks.push(chunk);
   }
   return chunks;
+}
+
+function scriptExpansionSourceIdea(node) {
+  const current = String(node?.prompt || node?.content || "").trim();
+  const stored = String(node?.params?.scriptExpansionSourceIdea || "").trim();
+  if (stored && EXPANDED_SCRIPT_MODES.has(node?.params?.scriptInputMode)) return stored;
+  return current;
 }
 
 function normalizeExpandedScript(value, idea) {
