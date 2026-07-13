@@ -3,7 +3,11 @@ import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
 import { providerServiceForImageModel } from "./presets/models.js";
 import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generation-prompt.js";
-import { assetReuseLocalContract } from "./asset-reuse-contract.js";
+import {
+  ASSET_REUSE_CONTRACT_VERSION,
+  ASSET_REUSE_STATES,
+  assetReuseSummariesForNode,
+} from "./asset-reuse-contract.js";
 import { containsUnsafeText, redactUnsafeText } from "./safe-text-redaction.js";
 import {
   appendKeyframeConstraintPrompt,
@@ -43,6 +47,24 @@ const SCRIPT_SURFACE_MARKERS = [
   "旁白",
   "音效",
   "资产",
+];
+
+const RUNTIME_FORBIDDEN_REQUEST_FRAGMENTS = [
+  "D:\\",
+  "C:\\",
+  "data/processed/runs",
+  "data/raw/",
+  ".mp4",
+  ".mov",
+  "api_key",
+  "access_token",
+  "refresh_token",
+  "secret_key",
+  "client_secret",
+  "authorization:",
+  "bearer ",
+  "cookie=",
+  "signed_url",
 ];
 
 export function buildOptimizationRequest(state, node) {
@@ -135,7 +157,7 @@ function nodeParameterSnapshot(node, state = null) {
   }
   const uploadedImages = uploadReferenceSummaries(node);
   if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
-  const assetReuse = assetReuseLocalContract(state || { nodes: { [node.id]: node }, edges: {}, assets: [] }, node);
+  const assetReuse = assetReusePromptOptimizerSnapshot(state || { nodes: { [node.id]: node }, edges: {}, assets: [] }, node);
   if (assetReuse.items.length) snapshot.asset_reuse = assetReuse;
   return snapshot;
 }
@@ -409,7 +431,7 @@ function uploadReferenceSummaries(node) {
   const uploads = Array.isArray(node?.params?.uploads) ? node.params.uploads : [];
   return uploads.map((item) => ({
     asset_id: safeUploadToken(item?.asset_id || item?.assetId, 80),
-    filename: safeUploadText(item?.filename || item?.label, 120).replace(/[\\/]/g, ""),
+    filename: safeUploadFilename(item?.filename || item?.label, 120),
     role: safeUploadToken(item?.role, 60),
     reference_target: safeUploadToken(item?.reference_target, 80),
     user_intent: safeUploadText(item?.user_intent, 240),
@@ -418,19 +440,132 @@ function uploadReferenceSummaries(node) {
   })).filter((item) => item.asset_id || item.filename).slice(-4);
 }
 
+function assetReusePromptOptimizerSnapshot(state, node) {
+  const items = assetReuseSummariesForNode(state, node)
+    .map(assetReusePromptOptimizerItem)
+    .filter(Boolean)
+    .slice(0, 16);
+  return {
+    artifact_type: "studio_asset_reuse_prompt_optimizer_summary",
+    contract_version: ASSET_REUSE_CONTRACT_VERSION,
+    node_id: safeUploadToken(node?.id, 120),
+    states: [...ASSET_REUSE_STATES],
+    summary: assetReusePromptOptimizerSummary(items),
+    items,
+    non_claims: [
+      "not provider smoke",
+      "not generated media QA",
+      "not human acceptance",
+      "not fixed asset promotion",
+      "not durable memory promotion",
+      "not business validation",
+      "not legal readiness",
+    ],
+  };
+}
+
+function assetReusePromptOptimizerSummary(items) {
+  return {
+    item_count: items.length,
+    recognized_count: items.filter((item) => item.state === "recognized").length,
+    reused_count: items.filter((item) => item.state === "reused").length,
+    graph_bound_count: items.filter((item) => item.state === "graph-bound").length,
+    blocked_count: items.filter((item) => item.state === "blocked").length,
+    conflicted_count: items.filter((item) => item.state === "conflicted").length,
+    reversed_unbound_count: items.filter((item) => item.state === "reversed/unbound").length,
+  };
+}
+
+function assetReusePromptOptimizerItem(item) {
+  if (!item || typeof item !== "object") return null;
+  return {
+    reuse_id: safeUploadToken(item.reuse_id, 140),
+    state: safeUploadText(item.state, 40),
+    studio_entity_id: safeUploadToken(item.studio_entity_id, 80),
+    selected_state: safeUploadToken(item.selected_state, 80),
+    target_ref: safeUploadToken(item.target_ref, 120),
+    target: {
+      node_id: safeUploadToken(item.target?.node_id, 120),
+      slot: safeUploadToken(item.target?.slot, 120),
+    },
+    asset: {
+      asset_id: safeUploadToken(item.asset?.asset_id, 120),
+      visual_asset_id: safeUploadToken(item.asset?.visual_asset_id, 120),
+      label: safeUploadText(item.asset?.label, 80),
+      asset_type: safeUploadToken(item.asset?.asset_type, 40),
+      media_kind: safeUploadToken(item.asset?.media_kind, 40),
+      mime_type: safeUploadMime(item.asset?.mime_type),
+      role: safeUploadToken(item.asset?.role, 60),
+      reference_target: safeUploadToken(item.asset?.reference_target, 80),
+    },
+    source_evidence: {
+      source_mode: safeUploadToken(item.source_evidence?.source_mode, 80),
+      source_asset_id: safeUploadToken(item.source_evidence?.source_asset_id, 120),
+      source_node_id: safeUploadToken(item.source_evidence?.source_node_id, 120),
+      artifact_id: safeUploadToken(item.source_evidence?.artifact_id, 120),
+      source_contract: safeUploadToken(item.source_evidence?.source_contract, 120),
+      source_stage: safeUploadToken(item.source_evidence?.source_stage, 80),
+      source_algorithm_id: safeUploadToken(item.source_evidence?.source_algorithm_id, 120),
+      source_relationship_type: safeUploadToken(item.source_evidence?.source_relationship_type, 120),
+      source_asset_card_candidate_id: safeUploadToken(item.source_evidence?.source_asset_card_candidate_id, 120),
+      source_human_gate_id: safeUploadToken(item.source_evidence?.source_human_gate_id, 120),
+      user_intent: safeUploadText(item.source_evidence?.user_intent, 180),
+    },
+    confidence: Number.isFinite(Number(item.confidence)) ? Math.max(0, Math.min(Number(item.confidence), 1)) : null,
+    lock_state: safeUploadToken(item.lock_state, 80),
+    review_state: safeUploadToken(item.review_state, 80),
+    block_reasons: (Array.isArray(item.block_reasons) ? item.block_reasons : [])
+      .map((reason) => safeUploadToken(reason, 80))
+      .filter(Boolean)
+      .slice(0, 8),
+    next_action: safeUploadToken(item.next_action, 80),
+    draft_candidate: Boolean(item.draft_candidate),
+    confirmed_fixed_asset: Boolean(item.confirmed_fixed_asset),
+  };
+}
+
 function safeUploadToken(value, limit) {
-  const text = String(value || "").trim();
-  if (containsUnsafeText(text)) return "";
+  const text = safeUploadText(value, Math.max(limit, 160));
+  if (!text || containsUnsafeText(text) || containsRuntimeForbiddenRequestText(text)) return "";
   return text.replace(/[^0-9A-Za-z_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, limit);
 }
 
 function safeUploadText(value, limit) {
-  return redactUnsafeText(value, limit);
+  const original = String(value || "");
+  return runtimeSafeRequestText(redactUnsafeText(original, Math.max(limit, original.length + 128)), limit);
+}
+
+function safeUploadFilename(value, limit) {
+  return safeUploadText(value, limit)
+    .replace(/[\\/]/g, "")
+    .replace(/\.(?:mp4|mov)\b/gi, "_media")
+    .slice(0, limit);
 }
 
 function safeUploadMime(value) {
   const text = String(value || "").toLowerCase();
   return /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(text) ? text.slice(0, 80) : "";
+}
+
+function runtimeSafeRequestText(value, limit) {
+  const text = String(value || "")
+    .replace(/\.(?:mp4|mov)\b/gi, "_media")
+    .replace(/data\/processed\/runs/gi, "runtime-runs")
+    .replace(/data\/raw\//gi, "runtime-raw/")
+    .replace(/authorization:/gi, "authorization ")
+    .replace(/\bbearer\s+/gi, "credential ")
+    .replace(/cookie=/gi, "cookie ")
+    .replace(/signed_url/gi, "signed-url")
+    .replace(/api_key|access_token|refresh_token|secret_key|client_secret/gi, "credential")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+  return containsRuntimeForbiddenRequestText(text) ? "" : text;
+}
+
+function containsRuntimeForbiddenRequestText(value) {
+  const text = String(value || "").toLowerCase();
+  return RUNTIME_FORBIDDEN_REQUEST_FRAGMENTS.some((fragment) => text.includes(fragment.toLowerCase()));
 }
 
 function nodeVisualAssetIds(node) {
