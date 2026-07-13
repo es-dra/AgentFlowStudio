@@ -58,6 +58,8 @@ export function productionDeliveryView(node, candidates) {
   panel.appendChild(head);
 
   panel.appendChild(identityView(selectionIdentity, delivery, exactDeliveryIdentity));
+  const episodeBinding = episodeBindingView(delivery.representative_episode);
+  if (episodeBinding) panel.appendChild(episodeBinding);
 
   const checklist = document.createElement("fieldset");
   checklist.className = "production-delivery-checklist";
@@ -129,6 +131,46 @@ function identityView(selectionIdentity, delivery, exactDeliveryIdentity) {
     const detail = document.createElement("dd");
     detail.textContent = compact(value);
     detail.title = String(value);
+    summary.append(term, detail);
+  }
+  return summary;
+}
+
+function episodeBindingView(value) {
+  const binding = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const packageSha256 = canonicalDigest(binding.package_sha256);
+  const bindingDigest = canonicalDigest(binding.binding_digest);
+  const episodeId = canonicalIdentifier(binding.episode_id);
+  const episodeVersionId = canonicalIdentifier(binding.episode_version_id);
+  if (!packageSha256 || !bindingDigest || !episodeId || !episodeVersionId) return null;
+  const counts = [
+    Number(binding.character_count),
+    Number(binding.scene_count),
+    Number(binding.shot_count),
+    Number(binding.asset_count),
+  ];
+  if (counts.some((count) => !Number.isInteger(count) || count < 0)) return null;
+  const summary = document.createElement("dl");
+  summary.className = "production-delivery-identity representative-episode-binding";
+  summary.dataset.representativeEpisodeBinding = "true";
+  const fields = [
+    ["Episode", episodeId],
+    ["Episode version", episodeVersionId],
+    ["Package SHA-256", packageSha256],
+    ["Binding digest", bindingDigest],
+    ["Inventory", `${counts[0]} characters / ${counts[1]} scenes / ${counts[2]} shots / ${counts[3]} assets`],
+    ["Pending media", String(Number(binding.pending_media_count) || 0)],
+    ["Provider-needed assets", String(Number(binding.provider_needed_count) || 0)],
+    ["Creator decision", canonicalIdentifier(binding.creator_decision_ref)],
+    ["Propagation", binding.propagation_complete === true ? "complete" : "pending reconfirmation"],
+    ["Lineage", `${Array.isArray(binding.lineage) ? binding.lineage.length : 0} authoritative refs`],
+  ];
+  for (const [label, valueText] of fields) {
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.textContent = label === "Inventory" ? String(valueText) : compact(valueText);
+    detail.title = String(valueText);
     summary.append(term, detail);
   }
   return summary;

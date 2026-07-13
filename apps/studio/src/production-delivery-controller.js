@@ -14,6 +14,55 @@ export function productionDeliverySummary(node) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+export function representativeEpisodeBindingSummary(run) {
+  const binding = objectValue(run?.representative_episode_binding);
+  if (!Object.keys(binding).length) return {};
+  const characterRefs = exactEntityRefs(binding.character_refs, 3, "character");
+  const sceneRefs = exactEntityRefs(binding.scene_refs, 3, "scene");
+  const shotRefs = exactEntityRefs(binding.shot_refs, 15, "shot");
+  const assetRefs = exactAssetRefs(binding.asset_refs);
+  const counts = objectValue(binding.counts);
+  if (Number(counts.characters) !== characterRefs.length
+    || Number(counts.scenes) !== sceneRefs.length
+    || Number(counts.shots) !== shotRefs.length
+    || Number(counts.assets) !== assetRefs.length) {
+    throw deliveryError("delivery_episode_counts_invalid", "Representative episode inventory counts are not authoritative.");
+  }
+  const readiness = objectValue(binding.asset_readiness);
+  const pendingMediaCount = assetRefs.filter((item) => item.status === "missing").length;
+  const providerNeededCount = assetRefs.filter((item) => item.provider_needed).length;
+  if (Number(readiness.pending_media_count) !== pendingMediaCount
+    || Number(readiness.provider_needed_count) !== providerNeededCount
+    || Boolean(readiness.all_assets_ready) !== (pendingMediaCount === 0)) {
+    throw deliveryError("delivery_episode_readiness_invalid", "Representative episode asset readiness is inconsistent.");
+  }
+  const lineage = Array.isArray(binding.lineage) ? binding.lineage.map((item) => ({
+    source_ref: safeLineageRef(item?.source_ref, "source_ref"),
+    target_ref: safeLineageRef(item?.target_ref, "target_ref"),
+    relation: safeIdentifier(item?.relation, "lineage_relation"),
+  })) : [];
+  if (lineage.length < 2) {
+    throw deliveryError("delivery_episode_lineage_invalid", "Representative episode lineage is incomplete.");
+  }
+  return {
+    authoritative_source: "runtime_production_run_checkpoint",
+    package_sha256: safeDigest(binding.package_sha256, "episode_package_sha256"),
+    binding_digest: safeDigest(binding.binding_digest, "episode_binding_digest"),
+    episode_id: safeIdentifier(binding.episode_id, "episode_id"),
+    episode_version_id: safeIdentifier(binding.episode_version_id, "episode_version_id"),
+    character_count: characterRefs.length,
+    scene_count: sceneRefs.length,
+    shot_count: shotRefs.length,
+    asset_count: assetRefs.length,
+    pending_media_count: pendingMediaCount,
+    provider_needed_count: providerNeededCount,
+    all_assets_ready: pendingMediaCount === 0,
+    creator_decision_ref: safeIdentifier(binding.creator_decision_ref, "creator_decision_ref"),
+    propagation_complete: binding.propagation_complete === true,
+    lineage,
+  };
+}
+
 export function productionDeliveryAuthority(run, node) {
   const selection = candidateSelectionSummary(node);
   const selectedCandidateId = optionalIdentifier(selection.selected_candidate_id);
@@ -234,6 +283,7 @@ function deliveryStateFromRun(run, authority, fallbackStatus, overrides = {}) {
     quality_decision: review ? "approve" : "",
     last_export_id: optionalIdentifier(exactExport?.export_id),
     delivery_sha256: optionalDigest(exactExport?.delivery_sha256),
+    representative_episode: representativeEpisodeBindingSummary(run),
     message: exactExport ? "Exact approved revision exported." : review ? "Exact revision approved for production export." : "Ready for quality approval.",
     ...overrides,
   };
@@ -353,6 +403,51 @@ function safeDigest(value, field) {
 function optionalDigest(value) {
   const digest = String(value || "").trim().toLowerCase();
   return SHA256_RE.test(digest) ? digest : "";
+}
+
+function exactEntityRefs(value, expectedCount, label) {
+  if (!Array.isArray(value) || value.length !== expectedCount) {
+    throw deliveryError(`delivery_episode_${label}_refs_invalid`, `Representative episode ${label} refs are incomplete.`);
+  }
+  const refs = value.map((item) => ({
+    entity_id: safeIdentifier(item?.entity_id, `${label}_id`),
+    current_approved_version_id: safeIdentifier(item?.current_approved_version_id, `${label}_version_id`),
+  }));
+  if (new Set(refs.map((item) => item.entity_id)).size !== refs.length) {
+    throw deliveryError(`delivery_episode_${label}_refs_invalid`, `Representative episode ${label} refs are duplicated.`);
+  }
+  return refs;
+}
+
+function exactAssetRefs(value) {
+  if (!Array.isArray(value) || value.length !== 25) {
+    throw deliveryError("delivery_episode_asset_refs_invalid", "Representative episode asset refs are incomplete.");
+  }
+  const refs = value.map((item) => {
+    const status = String(item?.status || "");
+    if (!new Set(["missing", "ready"]).has(status)) {
+      throw deliveryError("delivery_episode_asset_status_invalid", "Representative episode asset readiness is invalid.");
+    }
+    if (typeof item?.provider_needed !== "boolean" || (status === "missing" && !item.provider_needed)) {
+      throw deliveryError("delivery_episode_provider_gate_invalid", "Missing representative episode assets must retain the provider gate.");
+    }
+    return {
+      asset_id: safeIdentifier(item?.asset_id, "asset_id"),
+      current_revision_id: safeIdentifier(item?.current_revision_id, "asset_revision_id"),
+      status,
+      provider_needed: item.provider_needed,
+    };
+  });
+  if (new Set(refs.map((item) => item.asset_id)).size !== refs.length) {
+    throw deliveryError("delivery_episode_asset_refs_invalid", "Representative episode asset refs are duplicated.");
+  }
+  return refs;
+}
+
+function safeLineageRef(value, field) {
+  const identifier = optionalIdentifier(value);
+  if (identifier) return identifier;
+  return safeDigest(value, field);
 }
 
 function objectValue(value) {

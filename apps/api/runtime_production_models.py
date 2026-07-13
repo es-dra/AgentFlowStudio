@@ -16,6 +16,7 @@ STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION = "afs_studio_production_binding.v0.1"
 CREATOR_DECISION_SCHEMA_VERSION = "afs_creator_decision.v0.1"
 QUALITY_REVIEW_SCHEMA_VERSION = "afs_production_quality_review.v0.1"
 PRODUCTION_EXPORT_SCHEMA_VERSION = "afs_production_export.v0.1"
+REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION = "afs_representative_episode_binding.v0.1"
 
 SAFE_IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
@@ -153,6 +154,69 @@ class ProductionExportRequest(ProductionContractModel):
     selected_revision_digest: str = Field(pattern=SHA256_PATTERN)
 
 
+class EpisodeEntityVersionRef(ProductionContractModel):
+    entity_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    current_approved_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+
+
+class EpisodeAssetReadinessRef(ProductionContractModel):
+    asset_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    current_revision_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    status: Literal["missing", "ready"]
+    provider_needed: bool
+
+    @model_validator(mode="after")
+    def missing_assets_require_a_provider_gate(self) -> "EpisodeAssetReadinessRef":
+        if self.status == "missing" and not self.provider_needed:
+            raise ValueError("missing episode asset must retain provider_needed gate")
+        return self
+
+
+class EpisodeReconfirmationEvidenceRef(ProductionContractModel):
+    task_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    approved_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    status: Literal["required_pending", "reconfirmed"]
+
+
+class RepresentativeEpisodeBindingRequest(ProductionContractModel):
+    schema_version: Literal["afs_representative_episode_binding.v0.1"] = (
+        REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION
+    )
+    idempotency_key: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    expected_checkpoint_version: int = Field(ge=1, strict=True)
+    expected_package_sha256: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    package_sha256: str = Field(pattern=SHA256_PATTERN)
+    package_project_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    episode_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    episode_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    character_refs: list[EpisodeEntityVersionRef] = Field(min_length=3, max_length=3)
+    scene_refs: list[EpisodeEntityVersionRef] = Field(min_length=3, max_length=3)
+    shot_refs: list[EpisodeEntityVersionRef] = Field(min_length=15, max_length=15)
+    asset_refs: list[EpisodeAssetReadinessRef] = Field(min_length=25, max_length=25)
+    pending_media_count: int = Field(ge=0, le=25, strict=True)
+    creator_decision_ref: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    authoritative_affected_task_refs: list[str] = Field(min_length=1, max_length=32)
+    downstream_reconfirmations: list[EpisodeReconfirmationEvidenceRef] = Field(min_length=1, max_length=32)
+
+    @model_validator(mode="after")
+    def exact_episode_inventory_is_consistent(self) -> "RepresentativeEpisodeBindingRequest":
+        _require_unique_refs(self.character_refs, "entity_id", "character")
+        _require_unique_refs(self.scene_refs, "entity_id", "scene")
+        _require_unique_refs(self.shot_refs, "entity_id", "shot")
+        _require_unique_refs(self.asset_refs, "asset_id", "asset")
+        _require_unique_strings(self.authoritative_affected_task_refs, "affected task")
+        _require_unique_refs(self.downstream_reconfirmations, "task_id", "reconfirmation task")
+        missing_count = sum(item.status == "missing" for item in self.asset_refs)
+        if self.pending_media_count != missing_count:
+            raise ValueError("pending_media_count must equal the missing asset inventory")
+        reconfirmation_task_ids = {item.task_id for item in self.downstream_reconfirmations}
+        if reconfirmation_task_ids != set(self.authoritative_affected_task_refs):
+            raise ValueError("downstream reconfirmation evidence must cover every authoritative affected task")
+        if any(item.approved_version_id != self.episode_version_id for item in self.downstream_reconfirmations):
+            raise ValueError("downstream reconfirmation evidence must target the exact episode version")
+        return self
+
+
 def canonical_json_digest(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -178,12 +242,26 @@ def _safe_public_text(value: str) -> str:
     return str(value)
 
 
+def _require_unique_refs(records: list[Any], field: str, label: str) -> None:
+    values = [str(getattr(item, field, "") or "") for item in records]
+    if len(values) != len(set(values)):
+        raise ValueError(f"{label} refs must be unique")
+
+
+def _require_unique_strings(values: list[str], label: str) -> None:
+    if len(values) != len(set(values)):
+        raise ValueError(f"{label} refs must be unique")
+    if any(not re.fullmatch(SAFE_IDENTIFIER_PATTERN, str(value or "")) for value in values):
+        raise ValueError(f"{label} refs must use safe identifiers")
+
+
 __all__ = (
     "CREATOR_DECISION_SCHEMA_VERSION",
     "PRODUCTION_CHECKPOINT_SCHEMA_VERSION",
     "PRODUCTION_EXPORT_SCHEMA_VERSION",
     "PRODUCTION_RUN_SCHEMA_VERSION",
     "QUALITY_REVIEW_SCHEMA_VERSION",
+    "REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION",
     "STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION",
     "CreatorDecisionRequest",
     "ProductionCandidate",
@@ -192,6 +270,10 @@ __all__ = (
     "ProductionQualityChecklist",
     "ProductionQualityReviewRequest",
     "ProductionRunCreateRequest",
+    "EpisodeAssetReadinessRef",
+    "EpisodeEntityVersionRef",
+    "EpisodeReconfirmationEvidenceRef",
+    "RepresentativeEpisodeBindingRequest",
     "SafeArtifactRef",
     "canonical_json_digest",
     "checkpoint_digest",
