@@ -121,10 +121,27 @@ def test_studio_state_uses_expected_version_to_prevent_stale_overwrite(tmp_path)
     assert response_contains_unsafe_marker(stale.json()) is False
 
 
-def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path) -> None:
+def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_AUTH_ALLOW_OPEN_SIGNUP", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "studio-progress-demo"
-    client.post("/projects", json={"project_id": project_id, "goal": "Studio progress state test"})
+    candidate_digest = "a" * 64
+    registered = client.post(
+        "/auth/register",
+        json={
+            "email": "studio-projection@example.com",
+            "password": "strong-password-123",
+            "display_name": "Studio Projection",
+        },
+    )
+    assert registered.status_code == 200
+    headers = {"Authorization": f"Bearer {registered.json()['session_token']}"}
+    client.post(
+        "/projects",
+        json={"project_id": project_id, "goal": "Studio progress state test"},
+        headers=headers,
+    )
     candidate_url = (
         "/projects/studio-progress-demo/keyframe-generations/"
         "job_keyframe_001/candidates/candidate_001/preview"
@@ -149,6 +166,22 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
                     "candidatePreviewUrls": [
                         {
                             "url": candidate_url,
+                            "candidate_id": "candidate_001",
+                            "canonical_digest": candidate_digest,
+                            "parent_job_id": "job_keyframe_001",
+                            "project_id": project_id,
+                            "reusable_asset_authority": {
+                                "schema_version": "afs_studio_reusable_asset_authority.v0.1",
+                                "asset_id": "asset_safe_001",
+                                "role": "generated_keyframe_reference",
+                                "source_kind": "keyframe_candidate",
+                                "status": "succeeded",
+                                "source_job_id": "job_keyframe_001",
+                                "source_candidate_id": "candidate_001",
+                                "source_candidate_digest": candidate_digest,
+                                "sha256": candidate_digest,
+                                "internal_note": "must not cross the projection boundary",
+                            },
                             "width": 1536,
                             "height": 864,
                             "aspect_ratio": "16:9",
@@ -161,9 +194,9 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
         "order": ["image_1"],
     }
 
-    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state}, headers=headers)
     assert saved.status_code == 200
-    restored = client.get(f"/projects/{project_id}/studio-state").json()["state"]
+    restored = client.get(f"/projects/{project_id}/studio-state", headers=headers).json()["state"]
     params = restored["nodes"]["image_1"]["params"]
     assert params["progressPercent"] == 42
     assert params["jobProgress"]["label"] == "图片生成进行中"
@@ -171,6 +204,119 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
     assert params["candidatePreviewUrls"][0]["url"] == candidate_url
     assert params["candidatePreviewUrls"][0]["preview_url"] == candidate_url
     assert params["candidatePreviewUrls"][0]["artifact_id"] == "artifact_safe_001"
+    assert params["candidatePreviewUrls"][0]["candidate_id"] == "candidate_001"
+    assert params["candidatePreviewUrls"][0]["canonical_digest"] == candidate_digest
+    assert params["candidatePreviewUrls"][0]["parent_job_id"] == "job_keyframe_001"
+    assert params["candidatePreviewUrls"][0]["project_id"] == project_id
+    assert params["candidatePreviewUrls"][0]["reusable_asset_authority"] == {
+        "schema_version": "afs_studio_reusable_asset_authority.v0.1",
+        "asset_id": "asset_safe_001",
+        "role": "generated_keyframe_reference",
+        "source_kind": "keyframe_candidate",
+        "status": "succeeded",
+        "source_job_id": "job_keyframe_001",
+        "source_candidate_id": "candidate_001",
+        "source_candidate_digest": candidate_digest,
+        "sha256": candidate_digest,
+    }
+    assert "internal_note" not in params["candidatePreviewUrls"][0]["reusable_asset_authority"]
+
+
+def test_studio_state_candidate_authority_mismatches_fail_closed(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-authority-mismatch"
+    job_id = "job_keyframe_001"
+    candidate_id = "candidate_001"
+    candidate_digest = "a" * 64
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio authority mismatch test"})
+    candidate_url = (
+        f"/projects/{project_id}/keyframe-generations/{job_id}/"
+        f"candidates/{candidate_id}/preview"
+    )
+    authority = {
+        "schema_version": "afs_studio_reusable_asset_authority.v0.1",
+        "asset_id": "asset_safe_001",
+        "role": "generated_keyframe_reference",
+        "source_kind": "keyframe_candidate",
+        "status": "succeeded",
+        "source_job_id": job_id,
+        "source_candidate_id": candidate_id,
+        "source_candidate_digest": candidate_digest,
+        "sha256": candidate_digest,
+    }
+    candidate = {
+        "url": candidate_url,
+        "candidate_id": candidate_id,
+        "canonical_digest": candidate_digest,
+        "parent_job_id": job_id,
+        "project_id": project_id,
+        "reusable_asset_authority": authority,
+    }
+    variants = {
+        "candidate_id": {**candidate, "candidate_id": "candidate_002"},
+        "parent_job_id": {**candidate, "parent_job_id": "job_keyframe_002"},
+        "project_id": {**candidate, "project_id": "another-project"},
+        "canonical_digest": {**candidate, "canonical_digest": "b" * 64},
+        "schema_version": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "schema_version": "afs_studio_reusable_asset_authority.v9"},
+        },
+        "asset_id": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "asset_id": "unsafe asset id"},
+        },
+        "role": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "role": "unreviewed_reference"},
+        },
+        "source_kind": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "source_kind": "uploaded_asset"},
+        },
+        "status": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "status": "retryable"},
+        },
+        "source_job_id": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "source_job_id": "job_keyframe_002"},
+        },
+        "source_candidate_id": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "source_candidate_id": "candidate_002"},
+        },
+        "source_candidate_digest": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "source_candidate_digest": "b" * 64},
+        },
+        "sha256": {
+            **candidate,
+            "reusable_asset_authority": {**authority, "sha256": "b" * 64},
+        },
+    }
+
+    protected_keys = {
+        "candidate_id",
+        "canonical_digest",
+        "parent_job_id",
+        "project_id",
+        "reusable_asset_authority",
+    }
+    for field, variant in variants.items():
+        state = {
+            "nodes": {
+                "image_1": {
+                    "id": "image_1",
+                    "type": "image",
+                    "params": {"candidatePreviewUrls": [variant]},
+                }
+            }
+        }
+        saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+        assert saved.status_code == 200, field
+        projected = saved.json()["state"]["nodes"]["image_1"]["params"]["candidatePreviewUrls"][0]
+        assert projected["url"] == candidate_url, field
+        assert protected_keys.isdisjoint(projected), field
 
 
 def test_studio_state_preserves_public_generation_and_model_context_summaries(tmp_path) -> None:
