@@ -43,3 +43,19 @@ export function syncProjectUrl(projectId) {
   url.searchParams.set("project", safeProjectId(projectId) || "studio-local-001");
   window.history.replaceState({}, "", url);
 }
+
+export function clearProjectSession() {
+  try {
+    localStorage.removeItem(ACTIVE_PROJECT_KEY);
+    localStorage.removeItem(RECENT_PROJECTS_KEY);
+  } catch {
+    // Runtime ownership remains authoritative when local storage is blocked.
+  }
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("project");
+    window.history.replaceState({}, "", url);
+  } catch {
+    // URL cleanup is best-effort during identity teardown.
+  }
+}

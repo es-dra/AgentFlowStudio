@@ -4,6 +4,41 @@ const STORAGE_KEY_PREFIX = "afs_studio_canvas_v2:";
 const STORAGE_KEY = "afs_studio_canvas_v2";
 const LEGACY_STORAGE_KEY = "afs_studio_canvas_v1";
 const LEGACY_MIGRATION_MARKER = "afs_studio_canvas_v2:legacy_migrated";
+const IDENTITY_MARKER_KEY = "afs_studio_identity_marker";
+
+export function prepareIdentityStorage(userId) {
+  const nextIdentity = String(userId || "").trim();
+  if (!nextIdentity) {
+    clearIdentityScopedStudioState();
+    return { changed: true, identity: "" };
+  }
+  let previous = "";
+  try {
+    previous = String(localStorage.getItem(IDENTITY_MARKER_KEY) || "").trim();
+  } catch {
+    return { changed: true, identity: nextIdentity };
+  }
+  if (previous !== nextIdentity) clearIdentityScopedStudioState();
+  try {
+    localStorage.setItem(IDENTITY_MARKER_KEY, nextIdentity);
+  } catch {
+    // Browser storage may be blocked; runtime ownership remains authoritative.
+  }
+  return { changed: previous !== nextIdentity, identity: nextIdentity };
+}
+
+export function clearIdentityScopedStudioState() {
+  try {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key && key.startsWith("afs_studio_")) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    // Runtime ownership still prevents foreign reads when storage is unavailable.
+  }
+}
 
 export function persist(state) {
   try {

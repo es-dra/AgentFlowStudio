@@ -144,6 +144,7 @@ export function createStore(projectId = "studio-local-001") {
     return hydrateRuntime(runtime);
   }
 
+  function resetIdentityState() { clearTimeout(saveTimer); saveTimer = null; runtimeClient = null; runtimeStateVersion = ""; lastRuntimeSavedSnapshot = ""; saveInFlight = false; saveQueuedAfterSuccess = false; state = initialState("studio-empty"); state.meta.projectName = ""; state.meta.canvasName = ""; state.nodes = {}; state.edges = {}; state.order = []; state.assets = []; state.selection = { nodeIds: [], edgeId: null }; history.past = []; history.future = []; notifySoon(); }
   function scheduleRuntimeSave() {
     if (!runtimeClient?.saveStudioState) return;
     if (saveInFlight) {
@@ -158,7 +159,6 @@ export function createStore(projectId = "studio-local-001") {
       await flushRuntimeSave();
     }, SAVE_DEBOUNCE_MS);
   }
-
   async function flushRuntimeSave() {
     if (!runtimeClient?.saveStudioState) return;
     clearTimeout(saveTimer);
@@ -216,5 +216,5 @@ export function createStore(projectId = "studio-local-001") {
     });
   }
 
-  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, flushRuntimeSave, undo, redo };
+  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, resetIdentityState, flushRuntimeSave, undo, redo };
 }

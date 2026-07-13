@@ -20,6 +20,34 @@ html, body {
   user-select: none;
 }
 
+#studio-editor-shell {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+#secure-entry {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  background: #071018;
+  color: #91a6b4;
+  text-align: center;
+}
+
+.secure-brand {
+  color: #eef6fa;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+#secure-entry p { max-width: 480px; line-height: 1.6; }
+#secure-entry.error p { color: #f2b7be; }
+
 input, textarea, select, [contenteditable="true"], .selectable-text {
   user-select: text;
 }

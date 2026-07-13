@@ -34,35 +34,14 @@
     <link rel="stylesheet" href="./styles/studio-media-experience.css" />
     <link rel="stylesheet" href="./styles/studio-sprite.css" />
     <link rel="stylesheet" href="./styles/domain-crew.css" />
+    <link rel="stylesheet" href="./styles/product-shell.css" />
   </head>
   <body>
     <div id="app">
-      <header id="topbar"></header>
-      <aside id="drawer"></aside>
-      <main id="canvas-root">
-        <div id="canvas-viewport">
-          <div id="world">
-            <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
-            <div id="node-layer"></div>
-          </div>
-        </div>
-        <div id="canvas-empty-hint" hidden>
-          <div class="empty-kicker">AFS Studio</div>
-          <div class="canvas-empty-title">开始创作一个视频项目</div>
-          <div class="canvas-empty-copy">选择下方模板，或双击任意位置创建文本、图片、视频、脚本和导演台节点。</div>
-          <div class="canvas-empty-shortcuts">
-            <span class="hint-chip">双击画布</span>
-            <span class="hint-chip">Tab 添加节点</span>
-            <span class="hint-dim">拖动节点连线组织流程</span>
-          </div>
-        </div>
-        <div id="starter-row" hidden></div>
-        <div id="prompt-bar-layer"></div>
-      </main>
-      <aside id="inspector"></aside>
-      <footer id="dock"></footer>
-      <div id="corner-controls"></div>
-      <div id="sprite-root"></div>
+      <section id="secure-entry" aria-live="polite">
+        <span class="secure-brand">AgentFlow Studio</span>
+        <p>正在确认账户状态…</p>
+      </section>
       <div id="overlay-root"></div>
     </div>
     <script type="module" src="./src/main.js"></script>

@@ -95,8 +95,9 @@ function siteHomeLink(onBeforeSiteHome) {
 
 function studioHomeButton(onOpenHome) {
   const home = el("button", "icon-btn studio-home-btn");
-  home.innerHTML = `${icon("grid", 14)}<span>项目</span>`;
-  home.title = "打开项目菜单";
+  home.innerHTML = `${icon("grid", 14)}<span>制作总览</span>`;
+  home.title = "返回制作总览";
+  home.setAttribute("aria-label", "返回制作总览");
   home.addEventListener("click", onOpenHome);
   return home;
 }
