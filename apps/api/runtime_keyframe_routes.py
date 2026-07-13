@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 
+from agentflow_studio.model_gateway.image_utils import image_dimensions
 from apps.api.runtime_artifacts import keyframe_generation_artifacts
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
@@ -29,7 +31,7 @@ from apps.api.runtime_logging import (
     studio_node_type_from_request,
     user_action_from_request,
 )
-from apps.api.runtime_models import KeyframeGenerationRequest
+from apps.api.runtime_models import KeyframeGenerationRequest, KeyframeGenerationResponse
 from apps.api.runtime_recovery_contract import runtime_recovery_envelope
 from apps.api.runtime_store import safe_id
 from apps.api.runtime_store import RuntimeStore
@@ -93,7 +95,11 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             _log_keyframe_rejected(http_request, detail, elapsed_ms=_elapsed_ms(started))
             raise HTTPException(status_code=422, detail=detail) from exc
 
-    @app.post("/projects/{project_id}/keyframe-generations")
+    @app.post(
+        "/projects/{project_id}/keyframe-generations",
+        response_model=KeyframeGenerationResponse,
+        response_model_exclude_unset=True,
+    )
     def keyframe_generation(project_id: str, request: KeyframeGenerationRequest, http_request: Request) -> dict[str, Any]:
         started = time.perf_counter()
         store.ensure_project_manifest(project_id)
@@ -170,7 +176,12 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             client_request_id=client_request_id,
         )
         if idempotency.state == "replay":
-            return idempotency.response or {}
+            return _rebind_replay_candidate_authority(
+                store,
+                project_id,
+                source_node_id=request.node_id,
+                response=idempotency.response or {},
+            )
         if idempotency.state in {"conflict", "pending"}:
             detail = submit_idempotency_error_detail(
                 idempotency,
@@ -256,18 +267,14 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             }
         }
         public_job = store.write_job(job)
-        candidate_previews = _candidate_previews(
-            project_id,
-            job_id,
-            result.get("provider_outputs") or [],
-        )
+        candidate_records = _candidate_records(output_dir, result.get("provider_outputs") or [])
+        candidate_previews = _candidate_previews(project_id, job_id, candidate_records)
         reusable_image_assets = _reusable_image_assets(
             store,
             project_id,
             source_node_id=request.node_id,
             job_id=job_id,
-            output_dir=output_dir,
-            outputs=result.get("provider_outputs") or [],
+            records=candidate_records,
         )
         runtime_recovery = runtime_recovery_envelope(
             project_id=project_id,
@@ -323,7 +330,11 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
         )
         return response_payload
 
-    @app.post("/projects/{project_id}/keyframe-generations/{job_id}/poll")
+    @app.post(
+        "/projects/{project_id}/keyframe-generations/{job_id}/poll",
+        response_model=KeyframeGenerationResponse,
+        response_model_exclude_unset=True,
+    )
     def poll_keyframe_generation_route(project_id: str, job_id: str, http_request: Request) -> dict[str, Any]:
         started = time.perf_counter()
         request_id = request_id_from_request(http_request)
@@ -397,14 +408,14 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
         }
         public_job = store.write_job(job)
         provider_outputs = result.get("provider_outputs") or []
-        candidate_previews = _candidate_previews(project_id, job_id, provider_outputs)
+        candidate_records = _candidate_records(output_dir, provider_outputs)
+        candidate_previews = _candidate_previews(project_id, job_id, candidate_records)
         reusable_image_assets = _reusable_image_assets(
             store,
             project_id,
             source_node_id=safe_manifest.get("node_id"),
             job_id=job_id,
-            output_dir=output_dir,
-            outputs=provider_outputs,
+            records=candidate_records,
         )
         requested_count = int((safe_manifest.get("batch_summary") or {}).get("requested_count") or len(provider_outputs) or 1)
         runtime_recovery = runtime_recovery_envelope(
@@ -472,12 +483,77 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
         )
 
 
-def _candidate_previews(project_id: str, job_id: str, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    previews: list[dict[str, Any]] = []
+def _candidate_records(output_dir: Path, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
     for item in outputs:
-        candidate_id = str(item.get("candidate_id") or "")
-        if not SAFE_CANDIDATE_ID.match(candidate_id):
+        status = str(item.get("status") or "succeeded").strip().lower().replace("-", "_")
+        if status not in {"succeeded", "success", "completed"}:
             continue
+        candidate_id = item.get("candidate_id")
+        if not isinstance(candidate_id, str) or not SAFE_CANDIDATE_ID.fullmatch(candidate_id):
+            continue
+        path = _candidate_file(output_dir, candidate_id)
+        if path is None:
+            continue
+        image_bytes = path.read_bytes()
+        dimensions = image_dimensions(image_bytes)
+        if not dimensions:
+            continue
+        records.append(
+            {
+                "candidate_id": candidate_id,
+                "path": path,
+                "status": "succeeded",
+                "byte_count": len(image_bytes),
+                "sha256": hashlib.sha256(image_bytes).hexdigest(),
+                "width": dimensions["width"],
+                "height": dimensions["height"],
+                "aspect_ratio": dimensions["aspect_ratio"],
+            }
+        )
+    return records
+
+
+def _rebind_replay_candidate_authority(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    source_node_id: str | None,
+    response: dict[str, Any],
+) -> dict[str, Any]:
+    payload = dict(response)
+    job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+    job_id = str(job.get("job_id") or "")
+    candidate_ids: list[str] = []
+    for collection, field in (
+        (payload.get("candidate_previews"), "candidate_id"),
+        (payload.get("reusable_image_assets"), "source_candidate_id"),
+    ):
+        if not isinstance(collection, list):
+            continue
+        for item in collection:
+            candidate_id = item.get(field) if isinstance(item, dict) else None
+            if isinstance(candidate_id, str) and candidate_id not in candidate_ids:
+                candidate_ids.append(candidate_id)
+    records = _candidate_records(
+        store.run_dir(project_id, job_id),
+        [{"candidate_id": candidate_id, "status": "succeeded"} for candidate_id in candidate_ids],
+    )
+    payload["candidate_previews"] = _candidate_previews(project_id, job_id, records)
+    payload["reusable_image_assets"] = _reusable_image_assets(
+        store,
+        project_id,
+        source_node_id=source_node_id,
+        job_id=job_id,
+        records=records,
+    )
+    return payload
+
+
+def _candidate_previews(project_id: str, job_id: str, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    previews: list[dict[str, Any]] = []
+    for item in records:
+        candidate_id = item["candidate_id"]
         previews.append(
             {
                 "candidate_id": candidate_id,
@@ -501,17 +577,11 @@ def _reusable_image_assets(
     *,
     source_node_id: str | None,
     job_id: str,
-    output_dir: Path,
-    outputs: list[dict[str, Any]],
+    records: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     assets: list[dict[str, Any]] = []
-    for item in outputs:
-        candidate_id = str(item.get("candidate_id") or "")
-        if not SAFE_CANDIDATE_ID.match(candidate_id):
-            continue
-        path = _candidate_file(output_dir, candidate_id)
-        if path is None:
-            continue
+    for item in records:
+        candidate_id = item["candidate_id"]
         try:
             registered = register_generated_image_asset(
                 store,
@@ -519,7 +589,9 @@ def _reusable_image_assets(
                 source_node_id=source_node_id,
                 source_job_id=job_id,
                 source_candidate_id=candidate_id,
-                image_path=path,
+                image_path=item["path"],
+                source_candidate_digest=item["sha256"],
+                source_candidate_status=item["status"],
             )
         except ValueError:
             continue
