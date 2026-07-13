@@ -175,6 +175,57 @@ class KeyframeGenerationRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class KeyframeCandidatePreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str = Field(pattern=r"^candidate_\d{3}$")
+    preview_url: str = Field(pattern=r"^/projects/")
+    byte_count: int = Field(gt=0)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    aspect_ratio: str = Field(min_length=1)
+
+
+class ReusableImageAsset(BaseModel):
+    """Additive public authority contract for generated reusable image assets."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    source_node_id: str | None = None
+    role: Literal["generated_keyframe_reference"]
+    filename: str = Field(min_length=1)
+    mime_type: Literal["image/png", "image/jpeg"]
+    byte_count: int = Field(gt=0)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    source_candidate_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    status: Literal["succeeded", "failed", "retryable"]
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    aspect_ratio: str = Field(min_length=1)
+    preview_url: str = Field(pattern=r"^/projects/")
+    source_kind: Literal["keyframe_candidate"]
+    source_job_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    source_candidate_id: str = Field(pattern=r"^candidate_\d{3}$")
+    created_at: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_succeeded_digest_authority(self) -> ReusableImageAsset:
+        if self.status == "succeeded" and self.sha256 != self.source_candidate_digest:
+            raise ValueError("succeeded reusable asset must preserve the source candidate digest")
+        return self
+
+
+class KeyframeGenerationResponse(BaseModel):
+    """Typed response slice while preserving the existing additive payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    candidate_previews: list[KeyframeCandidatePreview]
+    reusable_image_assets: list[ReusableImageAsset]
+
+
 class VideoInputSource(BaseModel):
     source_mode: Literal[
         "text_prompt",
@@ -393,13 +444,16 @@ __all__ = (
     "GenerationComparisonRequest",
     "HumanGateDecisionRequest",
     "ImageAssetUploadRequest",
+    "KeyframeCandidatePreview",
     "KeyframeGenerationRequest",
+    "KeyframeGenerationResponse",
     "PromptOptimizationRequest",
     "ProjectCreateRequest",
     "ProjectImportRequest",
     "ProviderScriptDraftPlanRequest",
     "ProjectStatus",
     "ReviewDecisionRecordRequest",
+    "ReusableImageAsset",
     "SceneInspectorUpdateRequest",
     "ShotAssetPlanRequest",
     "SourceAssetRegisterRequest",

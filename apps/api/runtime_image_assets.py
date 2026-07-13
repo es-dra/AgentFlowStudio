@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.image_utils import image_dimensions
 from apps.api.runtime_errors import safe_error_detail
-from apps.api.runtime_models import ImageAssetUploadRequest
+from apps.api.runtime_models import ImageAssetUploadRequest, ReusableImageAsset
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -165,9 +165,21 @@ def public_image_asset(metadata: dict[str, Any]) -> dict[str, Any]:
         payload["source_job_id"] = metadata.get("source_job_id")
     if metadata.get("source_candidate_id"):
         payload["source_candidate_id"] = metadata.get("source_candidate_id")
+    if metadata.get("source_candidate_digest"):
+        payload["source_candidate_digest"] = metadata.get("source_candidate_digest")
+    if metadata.get("status"):
+        payload["status"] = metadata.get("status")
     if metadata.get("created_at"):
         payload["created_at"] = metadata.get("created_at")
     return payload
+
+
+def public_reusable_image_asset(metadata: dict[str, Any]) -> dict[str, Any]:
+    payload = public_image_asset(metadata)
+    asset = ReusableImageAsset.model_validate(payload)
+    if asset.status != "succeeded":
+        raise ValueError("only succeeded generated image assets are reusable")
+    return asset.model_dump(mode="json")
 
 
 def safe_reference_image(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -310,6 +322,7 @@ __all__ = (
     "image_asset_metadata",
     "list_image_assets",
     "public_image_asset",
+    "public_reusable_image_asset",
     "register_runtime_image_asset_routes",
     "resolve_reference_images",
     "safe_reference_image",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import threading
 import time
@@ -251,6 +252,11 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     assert previews[0]["height"] == 1
     assert previews[0]["aspect_ratio"] == "1:1"
     assert reusable_assets[0]["role"] == "generated_keyframe_reference"
+    expected_candidate_digest = hashlib.sha256(PNG_BYTES).hexdigest()
+    assert previews[0]["sha256"] == expected_candidate_digest
+    assert reusable_assets[0]["status"] == "succeeded"
+    assert reusable_assets[0]["source_candidate_digest"] == expected_candidate_digest
+    assert reusable_assets[0]["sha256"] == expected_candidate_digest
     assert reusable_assets[0]["source_job_id"] == payload["job"]["job_id"]
     assert reusable_assets[0]["source_candidate_id"] == "candidate_001"
     assert reusable_assets[0]["preview_url"].endswith(
@@ -824,10 +830,24 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
     schema = json.loads(exported_path.read_text(encoding="utf-8"))
     keyframe_schema = schema["components"]["schemas"]["KeyframeGenerationRequest"]
+    keyframe_response_schema = schema["components"]["schemas"]["KeyframeGenerationResponse"]
+    reusable_asset_schema = schema["components"]["schemas"]["ReusableImageAsset"]
     serialized = json.dumps(keyframe_schema, ensure_ascii=False).lower()
 
     assert "/projects/{project_id}/keyframe-generations" in schema["paths"]
     assert "keyframegenerationrequest" in serialized
+    assert (
+        schema["paths"]["/projects/{project_id}/keyframe-generations"]["post"]["responses"]["200"]
+        ["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/KeyframeGenerationResponse"
+    )
+    assert keyframe_response_schema["properties"]["reusable_image_assets"]["items"]["$ref"].endswith(
+        "/ReusableImageAsset"
+    )
+    assert reusable_asset_schema["properties"]["status"]["enum"] == ["succeeded", "failed", "retryable"]
+    assert reusable_asset_schema["properties"]["source_candidate_digest"]["pattern"] == "^[a-f0-9]{64}$"
+    assert reusable_asset_schema["properties"]["source_candidate_id"]["pattern"] == r"^candidate_\d{3}$"
+    assert reusable_asset_schema["properties"]["source_job_id"]["pattern"].startswith("^[A-Za-z0-9]")
     assert "provider_config" not in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
