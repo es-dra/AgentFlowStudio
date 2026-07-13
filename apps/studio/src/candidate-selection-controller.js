@@ -148,14 +148,18 @@ export async function restoreCandidateSelectionsAfterLoad(store, runtime) {
 }
 
 export async function ensureProductionRunForCandidateSelection(store, runtime, node) {
-  const currentRunId = optionalIdentifier(store?.get?.()?.production?.active_run_id);
-  if (currentRunId) return { ok: true, run_id: currentRunId, created: false };
+  const state = store?.get?.() || {};
+  const currentNode = state.nodes?.[node?.id] || node;
+  const currentRunId = optionalIdentifier(state.production?.active_run_id);
+  if (currentRunId && productionRunBelongsToCandidateSelection(currentNode, currentRunId)) {
+    return { ok: true, run_id: currentRunId, created: false };
+  }
   if (!runtime?.createProductionRun) {
     throw selectionError("client_contract_missing", "Authenticated production run creation is unavailable.");
   }
   const existing = PRODUCTION_CREATE_IN_FLIGHT.get(store);
   if (existing) return existing;
-  const pending = createAndBindProductionRun(store, runtime, node);
+  const pending = createAndBindProductionRun(store, runtime, currentNode);
   PRODUCTION_CREATE_IN_FLIGHT.set(store, pending);
   try {
     return await pending;
@@ -406,6 +410,16 @@ async function createAndBindProductionRun(store, runtime, node) {
   const binding = validatedStudioBinding(payload?.studio_binding, productionBindingFromRun(run));
   store.set((state) => {
     state.production = binding;
+    const currentNode = state.nodes?.[node.id];
+    if (currentNode) {
+      currentNode.params = currentNode.params || {};
+      currentNode.params.creatorSelection = {
+        ...candidateSelectionSummary(currentNode),
+        status: "run_bound",
+        run_id: binding.active_run_id,
+        selected_parent_job_id: request.candidates[0].parent_job_id,
+      };
+    }
   }, { history: false, persist: false });
   return {
     ok: true,
@@ -577,6 +591,28 @@ function validatedStudioBinding(value, fallback) {
 function activeRunId(store, node) {
   const value = store?.get?.()?.production?.active_run_id || candidateSelectionSummary(node).run_id;
   return safeIdentifier(value, "active_run_id");
+}
+
+function productionRunBelongsToCandidateSelection(node, runId) {
+  const summary = candidateSelectionSummary(node);
+  const parentJobId = currentCandidateSelectionParentJobId(node);
+  return Boolean(
+    parentJobId
+    && optionalIdentifier(summary.run_id) === runId
+    && optionalIdentifier(summary.selected_parent_job_id) === parentJobId
+  );
+}
+
+function currentCandidateSelectionParentJobId(node) {
+  const nodeJobId = optionalIdentifier(node?.params?.lastKeyframeJobId || node?.params?.lastVideoJobId);
+  if (!nodeJobId) return "";
+  const candidateJobIds = new Set(
+    candidatePreviewsFromNode(node)
+      .filter(isCandidateSelectable)
+      .map((candidate) => optionalIdentifier(candidate?.parent_job_id))
+      .filter(Boolean),
+  );
+  return candidateJobIds.size === 1 && candidateJobIds.has(nodeJobId) ? nodeJobId : "";
 }
 
 function recordPending(store, nodeId, action) {
