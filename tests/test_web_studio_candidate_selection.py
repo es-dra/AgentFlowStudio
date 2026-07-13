@@ -1229,11 +1229,27 @@ const otherNode = node("node-other", "job-shared", {
   run_id: "run-other-node",
   selected_parent_job_id: "job-shared",
 });
-const currentNode = node("node-current", "job-shared");
+const staleSelection = {
+  status: "persisted",
+  authoritative_source: "runtime_production_run",
+  run_id: "run-prior-current",
+  selected_candidate_id: "candidate_stale",
+  selected_candidate_digest: digest("b"),
+  selected_revision_id: "revision-stale",
+  selected_revision_digest: digest("c"),
+  checkpoint_version: 9,
+  checkpoint_digest: digest("d"),
+  selected_parent_job_id: "job-prior-current",
+  selected_parent_candidate_id: "candidate-parent-stale",
+  selected_asset_id: "asset-stale",
+  message: "Stale selection evidence",
+};
+const currentNode = node("node-current", "job-shared", staleSelection);
 const staleNode = storeFor({ "node-other": otherNode, "node-current": currentNode }, "run-other-node");
 const staleNodeResult = await ensureProductionRunForCandidateSelection(staleNode.store, runtime, currentNode);
 
 const rerunNode = node("node-current", "job-new", {
+  ...staleSelection,
   run_id: "run-old-job",
   selected_parent_job_id: "job-old",
 });
@@ -1259,12 +1275,18 @@ process.stdout.write(JSON.stringify({
     assert payload["validProduction"] == {"active_run_id": "run-current"}
     assert payload["staleNodeResult"]["created"] is True
     assert payload["staleNodeProduction"]["active_run_id"] == "production-job-shared"
-    assert payload["staleNodeOwner"]["run_id"] == "production-job-shared"
-    assert payload["staleNodeOwner"]["selected_parent_job_id"] == "job-shared"
+    assert payload["staleNodeOwner"] == {
+        "status": "run_bound",
+        "run_id": "production-job-shared",
+        "selected_parent_job_id": "job-shared",
+    }
     assert payload["staleParentResult"]["created"] is True
     assert payload["staleParentProduction"]["active_run_id"] == "production-job-new"
-    assert payload["staleParentOwner"]["run_id"] == "production-job-new"
-    assert payload["staleParentOwner"]["selected_parent_job_id"] == "job-new"
+    assert payload["staleParentOwner"] == {
+        "status": "run_bound",
+        "run_id": "production-job-new",
+        "selected_parent_job_id": "job-new",
+    }
 
 
 def test_candidate_digest_and_job_lineage_survive_preview_normalization_and_persistence() -> None:
