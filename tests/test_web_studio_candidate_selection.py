@@ -184,7 +184,11 @@ const node = {
   id: "node-001",
   type: "image",
   status: "generating",
-  params: { lastKeyframeJobId: "job-001", uploads: [] },
+  params: {
+    lastKeyframeJobId: "job-001",
+    uploads: [],
+    creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" },
+  },
 };
 const state = { production: { active_run_id: "run-001" }, nodes: { "node-001": node }, assets: [] };
 const store = { get: () => state, set: (mutator) => mutator(state), nextId: () => "visible-001", flushRuntimeSave: async () => {} };
@@ -259,6 +263,7 @@ const node = {
   params: {
     lastKeyframeJobId: "job-001",
     uploads: [],
+    creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" },
     candidatePreviewUrls: [
       {
         candidate_id: "candidate_001",
@@ -465,6 +470,7 @@ function setup() {
     params: {
       lastKeyframeJobId: "job-001",
       uploads: [],
+      creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" },
       candidatePreviewUrls: [{
         candidate_id: "candidate_002",
         canonical_digest: digest("c"),
@@ -562,7 +568,12 @@ async function attempt(overrides, studioBinding = null) {
   const node = {
     id: "node-001",
     previewUrl: "/projects/project-001/keyframe-generations/job-old/candidates/old/preview",
-    params: { lastKeyframeJobId: "job-001", uploads: [{ asset_id: "asset-old" }], candidatePreviewUrls: [visible] },
+    params: {
+      lastKeyframeJobId: "job-001",
+      uploads: [{ asset_id: "asset-old" }],
+      creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" },
+      candidatePreviewUrls: [visible],
+    },
   };
   const state = { production: { active_run_id: "run-001" }, nodes: { "node-001": node } };
   const before = JSON.stringify(state);
@@ -873,7 +884,7 @@ const proof = (candidateId, char, assetId) => ({
 const candidate = { candidate_id: "candidate_002", canonical_digest: digest("c"), parent_job_id: "job-001" };
 const before = { run_id: "run-001", subject_digest: digest("a"), candidates: [candidate], selected_revision: null, creator_decisions: [], exports: [], checkpoint: { version: 1, state_digest: digest("d") } };
 const after = { ...before, selected_revision: { revision_id: "revision-001", revision_digest: digest("e"), candidate_id: "candidate_002", candidate_digest: digest("c") }, creator_decisions: [{ decision: "select", candidate_id: "candidate_002", candidate_digest: digest("c") }], checkpoint: { version: 2, state_digest: digest("f") } };
-const node = { id: "node-001", params: { lastKeyframeJobId: "job-001", uploads: [], candidatePreviewUrls: [{ candidate_id: "candidate_002", canonical_digest: digest("c"), parent_job_id: "job-001", project_id: "project-001", reusable_asset_authority: proof("candidate_002", "c", "asset-002"), preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/candidate_002/preview", status: "succeeded" }] } };
+const node = { id: "node-001", params: { lastKeyframeJobId: "job-001", uploads: [], creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" }, candidatePreviewUrls: [{ candidate_id: "candidate_002", canonical_digest: digest("c"), parent_job_id: "job-001", project_id: "project-001", reusable_asset_authority: proof("candidate_002", "c", "asset-002"), preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/candidate_002/preview", status: "succeeded" }] } };
 const state = { production: { active_run_id: "run-001" }, nodes: { "node-001": node } };
 const store = { get: () => state, set: (mutator) => mutator(state), flushRuntimeSave: async () => {} };
 let releaseRead;
@@ -1134,6 +1145,126 @@ process.stdout.write(JSON.stringify({ result, createRequest, state }));
         "selected_revision_digest": "e" * 64,
         "last_export_id": "",
     }
+
+
+def test_active_production_run_reuse_requires_current_node_and_parent_job_ownership() -> None:
+    payload = _node_json(
+        r'''
+import { ensureProductionRunForCandidateSelection } from "./apps/studio/src/candidate-selection-controller.js";
+const digest = (char) => char.repeat(64);
+const proof = (candidateId, jobId) => ({
+  schema_version: "afs_studio_reusable_asset_authority.v0.1",
+  asset_id: `asset-${jobId}`,
+  role: "generated_keyframe_reference",
+  source_kind: "keyframe_candidate",
+  status: "succeeded",
+  source_job_id: jobId,
+  source_candidate_id: candidateId,
+  source_candidate_digest: digest("a"),
+  sha256: digest("a"),
+});
+function node(nodeId, jobId, owner = null) {
+  return {
+    id: nodeId,
+    params: {
+      lastKeyframeJobId: jobId,
+      uploads: [],
+      candidatePreviewUrls: [{
+        candidate_id: "candidate_001",
+        canonical_digest: digest("a"),
+        parent_job_id: jobId,
+        project_id: "project-001",
+        reusable_asset_authority: proof("candidate_001", jobId),
+        preview_url: `/projects/project-001/keyframe-generations/${jobId}/candidates/candidate_001/preview`,
+        status: "succeeded",
+      }],
+      ...(owner ? { creatorSelection: owner } : {}),
+    },
+  };
+}
+function storeFor(nodes, activeRunId) {
+  const state = { meta: { projectId: "project-001" }, production: { active_run_id: activeRunId }, nodes };
+  return {
+    state,
+    store: { get: () => state, set: (mutator) => mutator(state) },
+  };
+}
+let creates = 0;
+const runtime = {
+  projectId: "project-001",
+  createProductionRun: async (request) => {
+    creates += 1;
+    const checkpointDigest = digest(String(creates + 1));
+    return {
+      production_run: {
+        run_id: request.run_id,
+        subject_digest: request.subject_digest,
+        candidates: request.candidates,
+        selected_revision: null,
+        creator_decisions: [],
+        exports: [],
+        checkpoint: { version: 1, state_digest: checkpointDigest },
+      },
+      studio_binding: {
+        schema_version: "afs_studio_production_binding.v0.1",
+        authoritative_source: "runtime_production_run",
+        compatibility_mode: "backend_authoritative_summary_only",
+        active_run_id: request.run_id,
+        checkpoint_version: 1,
+        checkpoint_digest: checkpointDigest,
+        subject_digest: request.subject_digest,
+      },
+    };
+  },
+};
+
+const validNode = node("node-current", "job-current", {
+  run_id: "run-current",
+  selected_parent_job_id: "job-current",
+});
+const valid = storeFor({ "node-current": validNode }, "run-current");
+const validResult = await ensureProductionRunForCandidateSelection(valid.store, runtime, validNode);
+
+const otherNode = node("node-other", "job-shared", {
+  run_id: "run-other-node",
+  selected_parent_job_id: "job-shared",
+});
+const currentNode = node("node-current", "job-shared");
+const staleNode = storeFor({ "node-other": otherNode, "node-current": currentNode }, "run-other-node");
+const staleNodeResult = await ensureProductionRunForCandidateSelection(staleNode.store, runtime, currentNode);
+
+const rerunNode = node("node-current", "job-new", {
+  run_id: "run-old-job",
+  selected_parent_job_id: "job-old",
+});
+const staleParent = storeFor({ "node-current": rerunNode }, "run-old-job");
+const staleParentResult = await ensureProductionRunForCandidateSelection(staleParent.store, runtime, rerunNode);
+
+process.stdout.write(JSON.stringify({
+  creates,
+  validResult,
+  validProduction: valid.state.production,
+  staleNodeResult,
+  staleNodeProduction: staleNode.state.production,
+  staleNodeOwner: staleNode.state.nodes["node-current"].params.creatorSelection,
+  staleParentResult,
+  staleParentProduction: staleParent.state.production,
+  staleParentOwner: staleParent.state.nodes["node-current"].params.creatorSelection,
+}));
+'''
+    )
+
+    assert payload["creates"] == 2
+    assert payload["validResult"] == {"ok": True, "run_id": "run-current", "created": False}
+    assert payload["validProduction"] == {"active_run_id": "run-current"}
+    assert payload["staleNodeResult"]["created"] is True
+    assert payload["staleNodeProduction"]["active_run_id"] == "production-job-shared"
+    assert payload["staleNodeOwner"]["run_id"] == "production-job-shared"
+    assert payload["staleNodeOwner"]["selected_parent_job_id"] == "job-shared"
+    assert payload["staleParentResult"]["created"] is True
+    assert payload["staleParentProduction"]["active_run_id"] == "production-job-new"
+    assert payload["staleParentOwner"]["run_id"] == "production-job-new"
+    assert payload["staleParentOwner"]["selected_parent_job_id"] == "job-new"
 
 
 def test_candidate_digest_and_job_lineage_survive_preview_normalization_and_persistence() -> None:
@@ -1444,6 +1575,7 @@ function validNode() {
     params: {
       lastKeyframeJobId: "job-001",
       uploads: [],
+      creatorSelection: { run_id: "run-001", selected_parent_job_id: "job-001" },
       candidatePreviewUrls: [{ ...candidate, reusable_asset_authority: { ...authority } }],
     },
   };
