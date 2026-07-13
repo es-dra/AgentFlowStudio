@@ -7,12 +7,17 @@
     "selected_count": 3
   },
   "delivery_ref": "production_delivery.json",
-  "delivery_sha256": "084151450b146fa1d48635f6ed1fd9ad418a7696013a1dfa4bdc1efa20a82781",
+  "delivery_sha256": "9b23f3ec3ccd7964e80d7d59fc17176d3768fcd555a8892a3ea7f2e926c2d75e",
   "lineage": [
     {
       "relation": "project_to_script",
       "source_ref": "project_lighthouse_choice",
       "target_ref": "script_21cda20ba542"
+    },
+    {
+      "relation": "project_to_character_asset",
+      "source_ref": "project_lighthouse_choice",
+      "target_ref": "character_asset_626d4bbf9d26"
     },
     {
       "relation": "beat_to_shot",
@@ -27,6 +32,26 @@
     {
       "relation": "beat_to_shot",
       "source_ref": "beat_003",
+      "target_ref": "shot_003"
+    },
+    {
+      "relation": "script_to_storyboard",
+      "source_ref": "script_21cda20ba542",
+      "target_ref": "storyboard_1757d85a09f2"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
+      "target_ref": "shot_001"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
+      "target_ref": "shot_002"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
       "target_ref": "shot_003"
     },
     {
@@ -73,6 +98,31 @@
       "relation": "creator_selected_and_revised",
       "source_ref": "candidate_44a968fd4300",
       "target_ref": "revision_da4fd1c9ad99"
+    },
+    {
+      "relation": "creator_decision_reviewed",
+      "source_ref": "fixture_creator_decision_001",
+      "target_ref": "fixture_quality_review_001"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_3c5b2d404dec",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_28727b2bfe65",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_da4fd1c9ad99",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "quality_review_approved_delivery",
+      "source_ref": "fixture_quality_review_001",
+      "target_ref": "delivery_72fe29e5fc61"
     }
   ],
   "non_claims": {
@@ -93,18 +143,23 @@
     "decision": "approve",
     "human_acceptance_claimed": false,
     "notes": "Deterministic fixture approval permits export testing only; it is not human creative acceptance.",
+    "project_fingerprint": "4e105edae3730c4359e4f8cf921ff18d2a18668da3d1f3d984076186d6c04b04",
     "review_id": "fixture_quality_review_001",
     "review_mode": "fixture",
+    "reviewed_subject_digest": "c14e769698c2d2c5a8eb5c6eac874e8b3f30f1a794ea251664d601224379b137",
     "reviewer_id": "fixture_reviewer",
-    "schema_version": "0.1.0"
+    "schema_version": "0.1.0",
+    "verified_acceptance_artifact": null
   },
   "recovery": {
     "checkpointed": true,
     "last_checkpoint": "quality_gate",
     "recovery_count": 0
   },
+  "reviewed_subject_digest": "c14e769698c2d2c5a8eb5c6eac874e8b3f30f1a794ea251664d601224379b137",
   "run_id": "run_49984c39f947",
   "schema_version": "0.1.0",
+  "source_state_chain_digest": "71753ed936298a441f4bff2e8bb6dcf4f3be7e195a743a38151cc22340af547f",
   "stage": "exported",
   "state_ref": "production_state.json"
 }

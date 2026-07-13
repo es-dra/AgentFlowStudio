@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 SCHEMA_VERSION = "0.1.0"
+CHECKPOINT_MODEL_VERSION = "1.0.0"
 STAGES = ("initialized", "script_assets", "storyboard", "candidates", "creator_review", "quality_gate", "exported")
 PROTECTED_NON_CLAIMS = {
     "provider_smoke": False,
@@ -62,6 +63,8 @@ class QualityReview(ContractModel):
     review_id: str
     reviewer_id: str
     review_mode: Literal["fixture", "human"]
+    project_fingerprint: str
+    reviewed_subject_digest: str
     decision: Literal["approve", "reject"]
     checklist: QualityChecklist
     notes: str
@@ -163,7 +166,19 @@ class DeterministicProductionSlice:
             if existing != review.model_dump(mode="json"):
                 raise ValueError("checkpoint already contains a different quality review")
             return
+        if review.project_fingerprint != self.state["project_fingerprint"]:
+            raise ValueError("quality review project fingerprint does not match this run")
+        expected_subject_digest = self._review_subject_digest()
+        if review.reviewed_subject_digest != expected_subject_digest:
+            raise ValueError("quality review subject digest does not match creator decision and revisions")
         self.state["artifacts"]["quality_review"] = review.model_dump(mode="json")
+        self.state["lineage"].append(
+            {
+                "source_ref": self.state["artifacts"]["creator_decision"]["decision_id"],
+                "target_ref": review.review_id,
+                "relation": "creator_decision_reviewed",
+            }
+        )
         self.state["stage"] = "quality_gate"
         self._write_state()
 
@@ -174,10 +189,31 @@ class DeterministicProductionSlice:
         if review.decision != "approve":
             raise ValueError("quality review rejected export")
 
+        source_state_integrity = self.state["checkpoint_integrity"]["chain_digest"]
+        delivery_id = _stable_id("delivery", self.project.project_id, review.review_id)
+        export_lineage = list(self.state["lineage"])
+        delivery_edges = [
+            *(
+                {
+                    "source_ref": revision["revision_id"],
+                    "target_ref": delivery_id,
+                    "relation": "revision_included_in_delivery",
+                }
+                for revision in self.state["artifacts"]["selected_revisions"]
+            ),
+            {
+                "source_ref": review.review_id,
+                "target_ref": delivery_id,
+                "relation": "quality_review_approved_delivery",
+            },
+        ]
+        for edge in delivery_edges:
+            if edge not in export_lineage:
+                export_lineage.append(edge)
         delivery = {
             "schema_version": SCHEMA_VERSION,
             "artifact_type": "deterministic_storyboard_delivery",
-            "delivery_id": _stable_id("delivery", self.project.project_id, review.review_id),
+            "delivery_id": delivery_id,
             "project": self.project.model_dump(mode="json"),
             "script": self.state["artifacts"]["script"],
             "character_assets": self.state["artifacts"]["character_assets"],
@@ -186,10 +222,14 @@ class DeterministicProductionSlice:
             "selected_revisions": self.state["artifacts"]["selected_revisions"],
             "creator_decision_ref": self.state["artifacts"]["creator_decision"]["decision_id"],
             "quality_review_ref": review.review_id,
+            "reviewed_subject_digest": review.reviewed_subject_digest,
+            "source_state_chain_digest": source_state_integrity,
+            "lineage": export_lineage,
             "export_scope": "script_character_storyboard_candidate_package",
         }
         delivery_path = self.output_dir / "production_delivery.json"
         _write_json(delivery_path, delivery)
+        delivery_sha256 = hashlib.sha256(delivery_path.read_bytes()).hexdigest()
 
         evidence = {
             "schema_version": SCHEMA_VERSION,
@@ -199,7 +239,9 @@ class DeterministicProductionSlice:
             "stage": "exported",
             "state_ref": self.state_name,
             "delivery_ref": delivery_path.name,
-            "delivery_sha256": hashlib.sha256(delivery_path.read_bytes()).hexdigest(),
+            "delivery_sha256": delivery_sha256,
+            "source_state_chain_digest": source_state_integrity,
+            "reviewed_subject_digest": review.reviewed_subject_digest,
             "creator_in_loop": {
                 "decision_ref": self.state["artifacts"]["creator_decision"]["decision_id"],
                 "selected_count": len(self.state["artifacts"]["selected_revisions"]),
@@ -209,25 +251,31 @@ class DeterministicProductionSlice:
             },
             "quality_gate": {
                 **review.model_dump(mode="json"),
-                "human_acceptance_claimed": review.review_mode == "human",
+                "human_acceptance_claimed": False,
+                "verified_acceptance_artifact": None,
             },
             "recovery": {
                 "checkpointed": True,
                 "recovery_count": self.state["recovery_count"],
                 "last_checkpoint": self.state["stage"],
             },
-            "lineage": self.state["lineage"],
+            "lineage": export_lineage,
             "non_claims": {
                 **PROTECTED_NON_CLAIMS,
-                "human_acceptance": review.review_mode == "human",
+                "human_acceptance": False,
             },
         }
         evidence_path = self.output_dir / "evidence.json"
         _write_json(evidence_path, evidence)
+        evidence_sha256 = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
         self.state["artifacts"]["export"] = {
             "delivery_ref": delivery_path.name,
+            "delivery_sha256": delivery_sha256,
             "evidence_ref": evidence_path.name,
+            "evidence_sha256": evidence_sha256,
+            "source_state_chain_digest": source_state_integrity,
         }
+        self.state["lineage"] = export_lineage
         self.state["stage"] = "exported"
         self._write_state()
         return {"delivery": delivery_path, "evidence": evidence_path, "state": self.state_path}
@@ -236,6 +284,7 @@ class DeterministicProductionSlice:
         fingerprint = _digest(self.project.model_dump(mode="json"))
         if self.state_path.exists():
             state = _read_json(self.state_path)
+            self._validate_checkpoint(state)
             if state.get("project_fingerprint") != fingerprint:
                 raise ValueError("existing checkpoint belongs to a different project input")
             state["recovery_count"] += 1
@@ -243,6 +292,7 @@ class DeterministicProductionSlice:
             return state
         state = {
             "schema_version": SCHEMA_VERSION,
+            "checkpoint_model_version": CHECKPOINT_MODEL_VERSION,
             "run_id": _stable_id("run", self.project.project_id, fingerprint),
             "project_fingerprint": fingerprint,
             "stage": "initialized",
@@ -280,6 +330,14 @@ class DeterministicProductionSlice:
         self.state["lineage"].append(
             {"source_ref": self.project.project_id, "target_ref": script_id, "relation": "project_to_script"}
         )
+        self.state["lineage"].extend(
+            {
+                "source_ref": self.project.project_id,
+                "target_ref": asset["asset_id"],
+                "relation": "project_to_character_asset",
+            }
+            for asset in self.state["artifacts"]["character_assets"]
+        )
 
     def _build_storyboard(self) -> None:
         script = self.state["artifacts"]["script"]
@@ -304,6 +362,22 @@ class DeterministicProductionSlice:
             "source_script_id": script["script_id"],
             "shot_refs": [item["shot_id"] for item in shots],
         }
+        self.state["lineage"].append(
+            {
+                "source_ref": script["script_id"],
+                "target_ref": storyboard_id,
+                "relation": "script_to_storyboard",
+            }
+        )
+        self.state["lineage"].extend(
+            {
+                "source_ref": asset_ref,
+                "target_ref": shot["shot_id"],
+                "relation": "character_asset_to_shot",
+            }
+            for shot in shots
+            for asset_ref in shot["character_asset_refs"]
+        )
         self.state["artifacts"]["shots"] = shots
 
     def _build_candidates(self) -> None:
@@ -330,7 +404,48 @@ class DeterministicProductionSlice:
         return STAGES.index(self.state["stage"])
 
     def _write_state(self) -> None:
+        previous = self.state.get("checkpoint_integrity", {})
+        unsigned_state = {key: value for key, value in self.state.items() if key != "checkpoint_integrity"}
+        state_digest = _digest(unsigned_state)
+        previous_chain_digest = previous.get("chain_digest")
+        self.state["checkpoint_integrity"] = {
+            "algorithm": "sha256",
+            "sequence": int(previous.get("sequence", -1)) + 1,
+            "previous_chain_digest": previous_chain_digest,
+            "state_digest": state_digest,
+            "chain_digest": _digest(
+                {"previous_chain_digest": previous_chain_digest, "state_digest": state_digest}
+            ),
+        }
         _write_json(self.state_path, self.state)
+
+    def _validate_checkpoint(self, state: dict[str, Any]) -> None:
+        if state.get("checkpoint_model_version") != CHECKPOINT_MODEL_VERSION:
+            raise ValueError("unsupported checkpoint model version")
+        integrity = state.get("checkpoint_integrity")
+        if not isinstance(integrity, dict) or integrity.get("algorithm") != "sha256":
+            raise ValueError("checkpoint integrity metadata is missing or unsupported")
+        unsigned_state = {key: value for key, value in state.items() if key != "checkpoint_integrity"}
+        actual_state_digest = _digest(unsigned_state)
+        if integrity.get("state_digest") != actual_state_digest:
+            raise ValueError("checkpoint state integrity validation failed")
+        actual_chain_digest = _digest(
+            {
+                "previous_chain_digest": integrity.get("previous_chain_digest"),
+                "state_digest": actual_state_digest,
+            }
+        )
+        if integrity.get("chain_digest") != actual_chain_digest:
+            raise ValueError("checkpoint chain integrity validation failed")
+
+    def _review_subject_digest(self) -> str:
+        return _digest(
+            {
+                "project_fingerprint": self.state["project_fingerprint"],
+                "creator_decision": self.state["artifacts"]["creator_decision"],
+                "selected_revisions": self.state["artifacts"]["selected_revisions"],
+            }
+        )
 
 
 def _stable_id(prefix: str, *parts: str) -> str:

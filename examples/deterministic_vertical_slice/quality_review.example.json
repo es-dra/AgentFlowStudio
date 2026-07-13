@@ -3,6 +3,8 @@
   "review_id": "fixture_quality_review_001",
   "reviewer_id": "fixture_reviewer",
   "review_mode": "fixture",
+  "project_fingerprint": "4e105edae3730c4359e4f8cf921ff18d2a18668da3d1f3d984076186d6c04b04",
+  "reviewed_subject_digest": "c14e769698c2d2c5a8eb5c6eac874e8b3f30f1a794ea251664d601224379b137",
   "decision": "approve",
   "checklist": {
     "story_intent_preserved": true,
