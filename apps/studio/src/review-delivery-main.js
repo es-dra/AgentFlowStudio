@@ -1,5 +1,5 @@
 import { ensureAuthSession, signOut } from "./auth-gate.js";
-import { authToken, createRuntimeClient } from "./runtime-client.js";
+import { authToken, createRuntimeClient, saveAuthToken } from "./runtime-client.js";
 import { clearProjectSession, safeProjectId } from "./studio-project-session.js";
 import { clearIdentityScopedStudioState } from "./store-persistence.js";
 import {
@@ -13,6 +13,8 @@ import {
   composeReviewDeliveryState,
   createReviewDeliveryState,
   focusReviewCandidate,
+  protectedPreviewDisposition,
+  selectedDeliverySubmission,
 } from "./review-delivery-state.js";
 import { renderReviewDeliveryWorkspace } from "./review-delivery-workspace.js";
 
@@ -114,6 +116,7 @@ async function handleAction(action) {
   const note = String(mountedRoot?.querySelector("[data-revision-note]")?.value || "").trim();
   const checklist = Object.fromEntries([...mountedRoot?.querySelectorAll("[data-quality-check]") || []]
     .map((input) => [input.dataset.qualityCheck, input.checked === true]));
+  const selectedDelivery = selectedDeliverySubmission(state);
   if (["revise", "reject"].includes(action) && !note) {
     reviewState.publish({ writeError: "请先写明修改原因，再提交这次主创决定。", notice: "" });
     mountedRoot?.querySelector("[data-revision-note]")?.focus();
@@ -124,6 +127,17 @@ async function handleAction(action) {
     mountedRoot?.querySelector("[data-quality-check]:not(:checked)")?.focus();
     return;
   }
+  if (["approve", "export"].includes(action) && !selectedDelivery) {
+    reviewState.publish({
+      stale: true,
+      deliverySnapshot: null,
+      writeError: "",
+      notice: "",
+      error: "当前交付版本与权威选择不一致，请读取最新状态。",
+    });
+    focusMain();
+    return;
+  }
 
   const token = reviewState.beginAction(action);
   if (!token) return;
@@ -132,9 +146,9 @@ async function handleAction(action) {
     const intent = action === "select" ? "将当前方案设为制作基准。" : note;
     result = await submitDedicatedReviewDecision(runtime, state.reviewSnapshot, action, intent);
   } else if (action === "approve") {
-    result = await submitDedicatedQualityApproval(runtime, state.deliverySnapshot, state.node, checklist);
+    result = await submitDedicatedQualityApproval(runtime, selectedDelivery.snapshot, selectedDelivery.node, checklist);
   } else if (action === "export") {
-    result = await submitDedicatedProductionExport(runtime, state.deliverySnapshot, state.node);
+    result = await submitDedicatedProductionExport(runtime, selectedDelivery.snapshot, selectedDelivery.node);
   } else {
     reviewState.finishAction(token);
     return;
@@ -211,7 +225,16 @@ async function hydrateCandidateMedia(candidates, token) {
         headers: { Authorization: `Bearer ${sessionToken}` },
         cache: "no-store",
       });
-      if (!response.ok) throw new Error("preview_unavailable");
+      if (!response.ok) {
+        if (protectedPreviewDisposition(response.status) === "session_expired") {
+          saveAuthToken("");
+          window.dispatchEvent(new CustomEvent("afs:auth-session-expired", {
+            detail: { route: item.preview_url, status: response.status },
+          }));
+          return { ...item, available: false, preview_url: "" };
+        }
+        throw new Error("preview_unavailable");
+      }
       const contentType = String(response.headers.get("content-type") || "").toLowerCase();
       if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) throw new Error("preview_type_invalid");
       const blob = await response.blob();
