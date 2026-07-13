@@ -302,8 +302,9 @@ class DeterministicProductionSlice:
             "artifacts": {},
             "lineage": [],
         }
-        _write_json(self.state_path, state)
-        return state
+        self.state = state
+        self._write_state()
+        return self.state
 
     def _build_script_assets(self) -> None:
         beats = [
