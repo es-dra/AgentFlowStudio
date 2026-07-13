@@ -3,6 +3,7 @@ const EMPTY_STATE = Object.freeze({
   projectId: "",
   userId: "",
   crew: null,
+  authorityValid: false,
   error: "",
   busyAction: "",
 });
@@ -38,7 +39,7 @@ export function createDomainCrewController({ getRuntime, onNavigateNode } = {}) 
     const runtime = requireRuntime();
     const activeKey = contextKey;
     const sequence = ++requestSequence;
-    patch({ status: "loading", error: "" });
+    patch({ status: "loading", authorityValid: false, error: "" });
     try {
       const payload = await runtime.getDomainCrew();
       if (!isCurrent(activeKey, sequence)) return state;
@@ -47,16 +48,17 @@ export function createDomainCrewController({ getRuntime, onNavigateNode } = {}) 
     } catch (error) {
       if (!isCurrent(activeKey, sequence)) return state;
       if (allowMissing && Number(error?.status) === 404) {
-        replace({ ...state, status: "missing", crew: null, error: "", busyAction: "" });
+        replace({ ...state, status: "missing", crew: null, authorityValid: true, error: "", busyAction: "" });
         return state;
       }
-      replace({ ...state, status: "error", error: safeError(error), busyAction: "" });
+      replace({ ...state, status: "error", authorityValid: false, error: safeError(error), busyAction: "" });
       throw error;
     }
   }
 
   async function createCrew(crewId) {
     const runtime = requireRuntime();
+    requireMutationAuthority();
     const activeKey = contextKey;
     patch({ busyAction: "create_crew", error: "" });
     try {
@@ -104,11 +106,20 @@ export function createDomainCrewController({ getRuntime, onNavigateNode } = {}) 
     if (Number(error?.status) === 409) {
       try {
         await load({ allowMissing: false });
-      } catch {
-        // Preserve the authoritative reload error when the recovery read itself fails.
+      } catch (reloadError) {
+        // load() already invalidated stale authority and recorded the read failure.
+        throw reloadError;
       }
     }
-    if (activeKey === contextKey) patch({ busyAction: "", error: safeError(error) });
+    if (activeKey === contextKey) {
+      const status = Number(error?.status);
+      const authorityAmbiguous = !status || status >= 500;
+      patch({
+        busyAction: "",
+        authorityValid: authorityAmbiguous ? false : state.authorityValid,
+        error: safeError(error),
+      });
+    }
     throw error;
   }
 
@@ -118,11 +129,18 @@ export function createDomainCrewController({ getRuntime, onNavigateNode } = {}) 
   }
 
   function stateVersion() {
+    requireMutationAuthority();
     const version = Number(state.crew?.state_version);
     if (!Number.isInteger(version) || version < 1) {
       throw new Error("Domain crew must be loaded before mutation");
     }
     return version;
+  }
+
+  function requireMutationAuthority() {
+    if (!state.authorityValid) {
+      throw new Error("Domain crew authority is unavailable; reload required before mutation");
+    }
   }
 
   function requireRuntime() {
@@ -137,7 +155,7 @@ export function createDomainCrewController({ getRuntime, onNavigateNode } = {}) 
     if (!crew || crew.project_id !== state.projectId) {
       throw new Error("Domain crew response does not match the active project");
     }
-    replace({ ...state, status: "ready", crew, error: "", busyAction: "" });
+    replace({ ...state, status: "ready", crew, authorityValid: true, error: "", busyAction: "" });
   }
 
   function isCurrent(activeKey, sequence) {

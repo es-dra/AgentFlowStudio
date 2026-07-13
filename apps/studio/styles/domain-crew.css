@@ -62,6 +62,7 @@
 .domain-crew-boundary { color: var(--text-secondary); background: rgba(245, 196, 81, 0.08); border: 1px solid rgba(245, 196, 81, 0.28); }
 .domain-crew-boundary strong { color: var(--energy); flex: 0 0 auto; }
 .domain-crew-busy { margin-left: auto; color: var(--accent); white-space: nowrap; }
+.domain-crew-authority-locked { color: #ffb1ab; }
 .domain-crew-error { justify-content: space-between; color: #ffb1ab; background: rgba(255, 95, 87, 0.1); border: 1px solid rgba(255, 95, 87, 0.32); }
 .domain-crew-summary { display: grid; grid-template-columns: repeat(6, minmax(100px, 1fr)) auto; gap: 8px; }
 .domain-crew-stat { display: grid; gap: 3px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border-soft); border-radius: var(--radius-chip); background: var(--bg-card-soft); }
