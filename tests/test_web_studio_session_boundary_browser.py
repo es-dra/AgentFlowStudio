@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 
@@ -37,3 +38,24 @@ def test_identity_change_logout_and_session_expiry_clear_every_project_surface()
     assert 'new CustomEvent("afs:auth-session-expired"' in runtime
     assert "clearIdentityScopedStudioState();" in main
     assert "app.replaceChildren();" in main
+
+
+def test_teardown_disables_editor_rendering_before_store_notification_and_topbar_is_null_safe() -> None:
+    main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    for start, end in (("async function handleSignOut()", "async function recoverExpiredSession()"), ("async function recoverExpiredSession()", "async function refreshRuntimeSurfaceStatus")):
+        segment = main[main.index(start):main.index(end)]
+        assert segment.index("editorMounted = false;") < segment.index("store?.resetIdentityState?.();")
+    assert "if (!editorMounted) return;" in main
+
+    script = """
+globalThis.document = { getElementById: () => null };
+const { renderTopbar } = await import('./apps/studio/src/studio-topbar.js');
+renderTopbar({});
+"""
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+    )
