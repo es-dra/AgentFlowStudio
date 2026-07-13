@@ -202,6 +202,102 @@ process.stdout.write(JSON.stringify({
     assert payload["signatureChanged"] is True
 
 
+def test_asset_card_prompt_optimization_syncs_mode_input_and_visible_revision() -> None:
+    script = r'''
+import { openOptimizer } from "./apps/studio/src/optimizer.js";
+import { ASSET_REFERENCE_MODES } from "./apps/studio/src/asset-revision-references.js";
+
+const draft = {
+  asset_type: "character",
+  label: "Test character",
+  status: "draft",
+  signature: "Reference-inspired character",
+  feature_card: {
+    identity: "Reference-inspired identity",
+    appearance: "Long coat and dark legwear",
+  },
+};
+const state = {
+  nodes: {
+    image_1: {
+      id: "image_1",
+      type: "image",
+      prompt: "stale instruction",
+      content: "",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetReferenceMode: ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE,
+        assetCardDraft: { ...draft, user_edited_text: "stale instruction" },
+        uploads: [{ asset_id: "img_ref_001", filename: "reference.png", role: "reference_image" }],
+        spec: { ratio: "16:9", count: 1 },
+      },
+      status: "complete",
+    },
+  },
+  edges: {},
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["image_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const textarea = {
+  value: "remove the black stockings",
+  classList: { add() {}, remove() {} },
+};
+const button = {
+  disabled: false,
+  classList: { toggle() {} },
+  querySelector() { return { textContent: "" }; },
+};
+let captured = null;
+await openOptimizer(store, {
+  async optimizePrompt(payload) {
+    captured = payload;
+    return {
+      user_prompt: "Intent: localized edit template\nSubject/Character: remove only the black stockings and keep identity stable.",
+      user_prompt_plain: "remove only the black stockings and keep identity stable",
+      optimization_mode: "i2i",
+      context_bundle: { warnings: [] },
+    };
+  },
+}, "image_1", button, textarea);
+const node = state.nodes.image_1;
+process.stdout.write(JSON.stringify({
+  requestPrompt: captured.prompt_text,
+  requestMode: captured.node_parameters.reference_transform_mode,
+  requestRevision: captured.node_parameters.asset_card_revision.changed_fields[0].to,
+  visibleDraftText: node.params.assetCardDraft.user_edited_text,
+  visiblePrompt: node.prompt,
+  visibleRevision: node.params.assetCardRevision.changed_fields[0].to,
+  visibleMode: node.params.assetCardRevision.mode,
+  textarea: textarea.value,
+  status: node.params.promptOptimizationState.status,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["requestPrompt"] == "remove the black stockings"
+    assert payload["requestMode"] == "originalize_ip_safe"
+    assert payload["requestRevision"] == "remove the black stockings"
+    assert payload["visibleDraftText"].startswith("Intent: localized edit template")
+    assert payload["visiblePrompt"] == payload["visibleDraftText"]
+    assert " ".join(payload["visibleRevision"].split()) == " ".join(payload["visibleDraftText"].split())
+    assert payload["visibleMode"] == "originalize_ip_safe"
+    assert payload["textarea"] == payload["visibleDraftText"]
+    assert payload["status"] == "complete"
+
+
 def test_script_like_text_node_optimization_uses_script_surface_contract() -> None:
     script = r'''
 import { buildOptimizationRequest } from "./apps/studio/src/optimizer-contract.js";

@@ -318,4 +318,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "上传/替换参考图" in node_menu
     assert "VIDEO_MODES" not in prompt_bar
     assert "VIDEO_COUNTS" not in prompt_bar
-    assert "mode-tabs" not in prompt_bar
+    assert "asset-reference-mode-tabs" in prompt_bar
+    assert "buildAssetReferenceModeTabs" in prompt_bar
+    assert "syncAssetReferenceModeTabs(wrap, mode)" in prompt_bar
+    assert "syncAssetReferenceModeTabs(bar, assetReferenceMode(node))" in prompt_bar
+    assert 'tab.setAttribute("aria-pressed"' in prompt_bar
