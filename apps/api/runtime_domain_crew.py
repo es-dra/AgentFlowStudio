@@ -60,7 +60,7 @@ def register_runtime_domain_crew_routes(app: FastAPI, store: RuntimeStore, auth:
         owner_id = _require_owner(store, auth, request, project_id)
         with exclusive_file_lock(store.domain_crew_lock_path(project_id)):
             crew = _mutable(store, project_id, owner_id, body.expected_state_version)
-            if _find(crew["tasks"], "task_id", body.task_id):
+            if _task_id_reserved(crew, body.task_id):
                 raise HTTPException(status_code=409, detail="domain task id already exists")
             agent = _agent(crew, body.assigned_agent_id)
             _require_capability(agent, body.action)
@@ -90,8 +90,9 @@ def register_runtime_domain_crew_routes(app: FastAPI, store: RuntimeStore, auth:
             task = _task(crew, body.task_id)
             sender, receiver = _agent(crew, body.from_agent_id), _agent(crew, body.to_agent_id)
             _same_ref(task, body)
-            if task["claimed_by_agent_id"] != sender["agent_id"] or sender == receiver:
-                raise HTTPException(status_code=409, detail="message sender does not own the claimed task")
+            if (_find(crew["messages"], "message_id", body.message_id)
+                    or task["claimed_by_agent_id"] != sender["agent_id"] or sender == receiver):
+                raise HTTPException(status_code=409, detail="message identity or sender ownership is invalid")
             message = {**_dump(body, "expected_state_version"), "project_id": project_id,
                        "owner_user_id": owner_id, "sent_at": _now()}
             crew["messages"].append(message)
@@ -108,7 +109,7 @@ def register_runtime_domain_crew_routes(app: FastAPI, store: RuntimeStore, auth:
             _same_ref(task, body)
             if task["claimed_by_agent_id"] != sender["agent_id"]:
                 raise HTTPException(status_code=409, detail="handoff sender does not own the claimed task")
-            if _find(crew["handoffs"], "handoff_id", body.handoff_id) or _find(crew["tasks"], "task_id", body.target_task_id):
+            if _find(crew["handoffs"], "handoff_id", body.handoff_id) or _task_id_reserved(crew, body.target_task_id):
                 raise HTTPException(status_code=409, detail="handoff or target task id already exists")
             _require_capability(receiver, body.next_action)
             handoff = {**_dump(body, "expected_state_version"), "project_id": project_id,
@@ -125,6 +126,8 @@ def register_runtime_domain_crew_routes(app: FastAPI, store: RuntimeStore, auth:
             handoff, receiver = _required(crew["handoffs"], "handoff_id", handoff_id, "handoff"), _agent(crew, body.receiver_agent_id)
             if handoff["status"] != "pending_receiver" or handoff["to_agent_id"] != receiver["agent_id"]:
                 raise HTTPException(status_code=409, detail="handoff is not decidable by this receiver")
+            if _task_id_reserved(crew, handoff["target_task_id"], exclude_handoff_id=handoff_id):
+                raise HTTPException(status_code=409, detail="handoff target task id is no longer unique")
             source = _task(crew, handoff["task_id"])
             handoff.update(status="accepted" if body.decision == "accept" else "rejected", decision_note=body.note, decided_at=_now())
             if body.decision == "accept":
@@ -260,43 +263,42 @@ def _load(store: RuntimeStore, project_id: str) -> dict[str, Any]:
 def _mutable(store: RuntimeStore, project_id: str, owner_id: str, expected: int) -> dict[str, Any]:
     crew = _load(store, project_id)
     _require_crew_owner(crew, owner_id)
-    if crew["state_version"] != expected:
-        raise HTTPException(status_code=409, detail="domain crew state version changed")
+    if crew["state_version"] != expected: raise HTTPException(409, "domain crew state version changed")
     return crew
 
 
 def _require_crew_owner(crew: dict[str, Any], owner_id: str) -> None:
-    if crew.get("owner_user_id") != owner_id:
-        raise HTTPException(status_code=403, detail="domain crew access denied")
+    if crew.get("owner_user_id") != owner_id: raise HTTPException(403, "domain crew access denied")
 
 
 def _find(items: list[dict[str, Any]], key: str, value: str) -> dict[str, Any] | None:
     return next((item for item in items if item.get(key) == value), None)
 
 
+def _task_id_reserved(crew: dict[str, Any], task_id: str, exclude_handoff_id: str = "") -> bool:
+    return bool(_find(crew["tasks"], "task_id", task_id)) or any(
+        item["target_task_id"] == task_id and item["handoff_id"] != exclude_handoff_id
+        and item["status"] in {"pending_receiver", "accepted"} for item in crew["handoffs"])
+
+
 def _required(items: list[dict[str, Any]], key: str, value: str, label: str) -> dict[str, Any]:
     item = _find(items, key, value)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"{label} not found")
+    if not item: raise HTTPException(404, f"{label} not found")
     return item
 
 
-def _agent(crew: dict[str, Any], agent_id: str) -> dict[str, Any]:
-    return _required(crew["agents"], "agent_id", agent_id, "domain agent")
+def _agent(crew: dict[str, Any], agent_id: str) -> dict[str, Any]: return _required(crew["agents"], "agent_id", agent_id, "domain agent")
 
 
-def _task(crew: dict[str, Any], task_id: str) -> dict[str, Any]:
-    return _required(crew["tasks"], "task_id", task_id, "domain task")
+def _task(crew: dict[str, Any], task_id: str) -> dict[str, Any]: return _required(crew["tasks"], "task_id", task_id, "domain task")
 
 
 def _require_capability(agent: dict[str, Any], action: str) -> None:
-    if action not in agent["capabilities"]:
-        raise HTTPException(status_code=409, detail="agent capability does not authorize task action")
+    if action not in agent["capabilities"]: raise HTTPException(409, "agent capability does not authorize task action")
 
 
 def _same_ref(record: dict[str, Any], body: Any) -> None:
-    if any(record[key] != getattr(body, key) for key in ("entity_type", "entity_id", "version_id")):
-        raise HTTPException(status_code=409, detail="entity version reference changed")
+    if any(record[key] != getattr(body, key) for key in ("entity_type", "entity_id", "version_id")): raise HTTPException(409, "entity version reference changed")
 
 
 def _same_arbitration_ref(conflict: dict[str, Any], body: ArbitrationRequest) -> None:

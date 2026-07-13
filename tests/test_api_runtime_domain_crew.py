@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 def _client(tmp_path, monkeypatch) -> tuple[TestClient, dict[str, str], dict[str, str]]:
@@ -249,3 +252,67 @@ def test_receiver_reject_and_identity_ref_authorization_fail_closed(tmp_path, mo
     missing = client.get("/projects/missing/domain-crew", headers=headers)
     assert hidden.status_code == 403 and "crew-001" not in hidden.text
     assert missing.status_code in {403, 404} and "crew-001" not in missing.text
+
+
+def test_message_and_handoff_target_identities_are_unique_under_current_and_concurrent_state(tmp_path, monkeypatch) -> None:
+    client, headers, _ = _client(tmp_path, monkeypatch)
+    _bootstrap(client, headers)
+    writer, storyboard = "crew-001-screenwriter", "crew-001-storyboard"
+    crew = _create_task(client, headers, version=1, task_id="task-script", agent=writer, action="script.write")
+    crew = _claim(client, headers, task_id="task-script", agent=writer, version=crew["state_version"])
+    message_payload = {**_ref(), "message_id": "message-unique", "expected_state_version": crew["state_version"],
+        "task_id": "task-script", "from_agent_id": writer, "to_agent_id": storyboard,
+        "message_type": "request", "content": "Concurrency-safe message identity."}
+    clients = [TestClient(create_runtime_app(runtime_root=tmp_path)) for _ in range(2)]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        message_statuses = list(pool.map(
+            lambda concurrent_client: concurrent_client.post(
+                "/projects/episode-001/domain-crew/messages", headers=headers, json=message_payload).status_code,
+            clients,
+        ))
+    assert sorted(message_statuses) == [200, 409]
+    crew = client.get("/projects/episode-001/domain-crew", headers=headers).json()["crew"]
+    assert [item["message_id"] for item in crew["messages"]] == ["message-unique"]
+
+    current_duplicate = client.post("/projects/episode-001/domain-crew/messages", headers=headers,
+        json={**message_payload, "expected_state_version": crew["state_version"]})
+    assert current_duplicate.status_code == 409
+    assert len(client.get("/projects/episode-001/domain-crew", headers=headers).json()["crew"]["messages"]) == 1
+
+    handoff_payload = {**_ref(), "expected_state_version": crew["state_version"], "task_id": "task-script",
+        "target_task_id": "task-storyboard", "target_node_id": "node-task-storyboard", "from_agent_id": writer,
+        "to_agent_id": storyboard, "next_action": "storyboard.compose", "objective": "Compose storyboard."}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        handoff_statuses = list(pool.map(
+            lambda pair: pair[0].post("/projects/episode-001/domain-crew/handoffs", headers=headers,
+                json={**handoff_payload, "handoff_id": pair[1]}).status_code,
+            zip(clients, ("handoff-a", "handoff-b")),
+        ))
+    assert sorted(handoff_statuses) == [200, 409]
+    crew = client.get("/projects/episode-001/domain-crew", headers=headers).json()["crew"]
+    assert len(crew["handoffs"]) == 1
+    winning_handoff_id = crew["handoffs"][0]["handoff_id"]
+
+    current_handoff_duplicate = client.post("/projects/episode-001/domain-crew/handoffs", headers=headers,
+        json={**handoff_payload, "handoff_id": "handoff-current", "expected_state_version": crew["state_version"]})
+    assert current_handoff_duplicate.status_code == 409
+    reserved_task = client.post("/projects/episode-001/domain-crew/tasks", headers=headers, json={**_ref(),
+        "task_id": "task-storyboard", "node_id": "node-reserved", "expected_state_version": crew["state_version"],
+        "assigned_agent_id": storyboard, "action": "storyboard.compose", "objective": "Must remain reserved."})
+    assert reserved_task.status_code == 409
+
+    store = RuntimeStore(tmp_path)
+    collision = store.load_domain_crew("episode-001")
+    collision["tasks"].append({"task_id": "task-storyboard", "node_id": "node-collision",
+        "project_id": "episode-001", "owner_user_id": collision["owner_user_id"],
+        "assigned_agent_id": storyboard, "action": "storyboard.compose", "objective": "Concurrent collision",
+        **_ref(), "status": "ready", "claimed_by_agent_id": ""})
+    store.write_domain_crew("episode-001", collision)
+    raced_decision = client.post(
+        f"/projects/episode-001/domain-crew/handoffs/{winning_handoff_id}/decisions", headers=headers,
+        json={"expected_state_version": collision["state_version"], "receiver_agent_id": storyboard,
+              "decision": "accept", "note": "Must revalidate target uniqueness."})
+    assert raced_decision.status_code == 409
+    reloaded = RuntimeStore(tmp_path).load_domain_crew("episode-001")
+    assert [item["task_id"] for item in reloaded["tasks"]].count("task-storyboard") == 1
+    assert len({item["message_id"] for item in reloaded["messages"]}) == len(reloaded["messages"])
