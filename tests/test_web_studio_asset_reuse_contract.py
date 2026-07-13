@@ -38,10 +38,10 @@ def test_asset_reuse_local_contract_models_states_explanations_and_reversal() ->
                 uploads: [
                   {
                     asset_id: "img_reference_1",
-                    filename: "reference.png",
+                    filename: "C:\\private\\reference.mov",
                     role: "reference_image",
                     reference_target: "keyframe_generation",
-                    user_intent: `Use as pose ref while stripping raw_provider_response data_base64 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA token=abc Bearer secret /home/owner/private.png C:\\private\\pose.png https://signed.example/private ${longBase64Payload}`,
+                    user_intent: `Use as pose ref while stripping raw_provider_response data_base64 data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA token=abc Bearer secret authorization: cookie=session clip.mp4 data/processed/runs data/raw/source /home/owner/private.png C:\\private\\pose.png https://signed.example/private ${longBase64Payload}`,
                     media_kind: "image",
                     mime_type: "image/png",
                     preview_url: "https://signed.example/private",
@@ -207,6 +207,21 @@ def test_asset_reuse_local_contract_models_states_explanations_and_reversal() ->
     asset_reuse = payload["optimization"]["node_parameters"]["asset_reuse"]
     assert asset_reuse["summary"]["graph_bound_count"] == 1
     assert "not human acceptance" in asset_reuse["non_claims"]
+    optimization_serialized = json.dumps(payload["optimization"], ensure_ascii=False).lower()
+    for fragment in (
+        "signed_url",
+        "bearer ",
+        "authorization:",
+        "cookie=",
+        "c:\\",
+        "d:\\",
+        "data/processed/runs",
+        "data/raw/",
+        ".mp4",
+        ".mov",
+    ):
+        assert fragment not in optimization_serialized
+    assert "safety_boundary" not in optimization_serialized
 
 
 def test_storyboard_graph_bound_asset_flows_to_asset_cards_keyframes_and_contract() -> None:
