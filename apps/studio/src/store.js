@@ -80,23 +80,16 @@ export function createStore(projectId = "studio-local-001") {
         return { source: "stale", projectId: targetProjectId };
       }
       const remoteState = payload?.state;
-      const remoteInput = targetProjectId
-        ? {
-            ...(remoteState && typeof remoteState === "object" ? remoteState : {}),
-            meta: {
-              ...(remoteState?.meta && typeof remoteState.meta === "object" ? remoteState.meta : {}),
-              projectId: targetProjectId,
-            },
-          }
-        : remoteState;
-      const remote = normalizeSnapshot(remoteInput);
+      const remote = normalizeSnapshot(targetProjectId ? {
+        ...(remoteState && typeof remoteState === "object" ? remoteState : {}),
+        meta: { ...(remoteState?.meta && typeof remoteState.meta === "object" ? remoteState.meta : {}), projectId: targetProjectId },
+      } : remoteState);
       runtimeStateVersion = String(payload?.state_version || "");
       if (shouldKeepLocalOverRemote(state, remote, payload)) {
         await flushRuntimeSave();
         return { source: "local_newer" };
       }
       if (payload?.source === "runtime" && (hasStudioContent(remote) || hasStudioMeta(remoteState))) {
-        remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
         persist(state);
         lastRuntimeSavedSnapshot = snapshotKey(snapshotStudioState(state));
