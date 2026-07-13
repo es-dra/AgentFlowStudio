@@ -1,4 +1,5 @@
 import { assetIdFromRef } from "./asset-reference-summary.js";
+import { handleCandidateCreatorAction } from "./candidate-selection-controller.js";
 import { duplicateNode } from "./nodes.js";
 import { fixNodeVisualAsset, handleNodeIntent, pollNodeVideoGeneration, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
 import { importScriptFileIntoTextNode } from "./script-breakdown.js";
@@ -16,7 +17,9 @@ export function handleCanvasNodeClick(store, runtime, e) {
   const action = actionEl?.dataset.action;
   if (!action) return;
 
-  if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
+  if (["candidate-select", "candidate-revise", "candidate-refresh"].includes(action)) {
+    void handleCandidateCreatorAction(store, runtime, node, actionEl);
+  } else if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
   else if (action === "open-director") openDirectorShell(store, node);
   else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
   else if (["text", "script"].includes(node.type) && action === "upload") importScriptFileIntoTextNode(store, node);

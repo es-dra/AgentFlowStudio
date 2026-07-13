@@ -1,4 +1,5 @@
 import { redactUnsafeText } from "./safe-text-redaction.js";
+import { selectReusableAssetAuthority, validatedCandidatePreviewRoute } from "./reusable-asset-authority.js";
 
 const HISTORY_LIMIT = 80;
 const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/([a-zA-Z0-9_.-]+)\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
@@ -157,10 +158,6 @@ function hydrateNodePreviews(nodes) {
     const next = { ...node, params: { ...(node.params || {}) } };
     if (!next.previewUrl && next.type === "video" && next.params.lastVideoPreviewUrl) {
       next.previewUrl = next.params.lastVideoPreviewUrl;
-    } else if (!next.previewUrl && next.type !== "video") {
-      const uploads = Array.isArray(next.params.uploads) ? next.params.uploads : [];
-      const last = uploads[uploads.length - 1] || null;
-      if (last?.preview_url) next.previewUrl = last.preview_url;
     }
     if (next.type === "video" && next.previewUrl && !String(next.previewUrl).includes("/video-generations/")) {
       delete next.previewUrl;
@@ -292,13 +289,30 @@ function sanitizeCandidatePreview(item, projectId) {
   }
   if (!item || typeof item !== "object") return null;
   const source = stripForbiddenRawProviderFields(item);
-  const previewUrl = safeRuntimePreviewUrl(source.preview_url || source.url, projectId);
-  const candidate = stripEmpty({
+  const route = validatedCandidatePreviewRoute({
     candidate_id: safeToken(source.candidate_id || source.item_id || source.id, 40),
+    parent_job_id: safeToken(source.parent_job_id, 160),
+    project_id: safeToken(projectId, 160),
+    preview_url: source.preview_url,
+    url: source.url,
+    previewUrl: source.previewUrl,
+    image_asset_preview_url: source.image_asset_preview_url,
+    imageAssetPreviewUrl: source.imageAssetPreviewUrl,
+  });
+  const previewUrl = safeRuntimePreviewUrl(route?.preview_url, projectId);
+  const sourceCandidateId = safeToken(source.candidate_id || source.item_id || source.id, 40);
+  const sourceParentJobId = safeToken(source.parent_job_id, 160);
+  const legacyRouteOnly = !sourceCandidateId && !sourceParentJobId;
+  let candidate = stripEmpty({
+    candidate_id: sourceCandidateId || (legacyRouteOnly ? safeToken(route?.candidate_id, 40) : ""),
+    canonical_digest: safeSha256(source.canonical_digest || source.sha256),
+    parent_job_id: sourceParentJobId || (legacyRouteOnly ? safeToken(route?.job_id, 160) : ""),
+    project_id: safeToken(projectId, 160),
+    parent_candidate_id: safeToken(source.parent_candidate_id, 160),
+    shot_id: safeToken(source.shot_id, 160),
     status: safeCandidateStatus(source.status || source.state),
     state: safeCandidateState(source.state),
     artifact_id: safeToken(source.artifact_id, 160),
-    image_asset_id: safeToken(source.image_asset_id || source.asset_id, 160),
     failure_class: safeToken(source.failure_class || source.block_id, 80),
     reason: safePublicStatusText(source.reason || source.message || source.error, 180),
     width: safeOptionalCount(source.width),
@@ -313,6 +327,22 @@ function sanitizeCandidatePreview(item, projectId) {
     if (!candidate.status) candidate.status = "succeeded";
     if (!candidate.state) candidate.state = "complete";
     candidate.preserved = true;
+  }
+  const authority = selectReusableAssetAuthority({
+    ...candidate,
+    project_id: projectId,
+    preview_url: source.preview_url,
+    url: source.url,
+    previewUrl: source.previewUrl,
+    image_asset_preview_url: source.image_asset_preview_url,
+    imageAssetPreviewUrl: source.imageAssetPreviewUrl,
+  }, [source.reusable_asset_authority]);
+  if (authority) {
+    candidate = {
+      ...candidate,
+      reusable_asset_authority: authority,
+      image_asset_id: authority.asset_id,
+    };
   }
   if (!candidate.preview_url && !candidate.candidate_id && !candidate.status) return null;
   return candidate;

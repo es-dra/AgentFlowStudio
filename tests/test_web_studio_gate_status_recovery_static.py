@@ -271,8 +271,8 @@ def test_studio_preserves_multi_image_candidate_lists_across_result_and_restore(
 
         const successNode = makeNode();
         applyKeyframeResponse(makeStore(successNode), "node_1", twoSuccess, { aspect_ratio: "16:9" });
-        if (successNode.status !== "complete" || successNode.previewUrl !== firstUrl) {
-          throw new Error(`two-success response did not keep primary preview/status: ${JSON.stringify(successNode)}`);
+        if (successNode.status !== "complete" || successNode.previewUrl) {
+          throw new Error(`two-success response implicitly selected a primary preview: ${JSON.stringify(successNode)}`);
         }
         if (successNode.params.candidatePreviewUrls?.length !== 2) {
           throw new Error(`two-success node degraded candidate list: ${JSON.stringify(successNode.params.candidatePreviewUrls)}`);
@@ -689,6 +689,108 @@ def test_candidate_preview_items_sanitize_adversarial_immediate_state() -> None:
     )
 
     subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
+def test_reusable_asset_authority_has_one_validator_and_a_frozen_consumer_inventory() -> None:
+    helper = _read("src/reusable-asset-authority.js")
+    progress = _read("src/node-generation-progress.js")
+    response = _read("src/node-keyframe-response.js")
+    previews = _read("src/node-candidate-previews.js")
+    controller = _read("src/candidate-selection-controller.js")
+    store = _read("src/store-state.js")
+
+    assert helper.count("export function selectReusableAssetAuthority") == 1
+    for marker in (
+        'asset.status !== "succeeded"',
+        'asset.role !== "generated_keyframe_reference"',
+        'asset.source_kind !== "keyframe_candidate"',
+        "matching.length !== 1",
+        "sourceJobId !== candidate.parentJobId",
+        "sourceCandidateId !== candidate.candidateId",
+        "sourceCandidateDigest !== candidate.canonicalDigest",
+        "sha256 !== sourceCandidateDigest",
+        "validatedCandidatePreviewRoute(candidate)",
+        "CANDIDATE_PREVIEW_ROUTE_RE",
+        "parentJobId && first.job_id !== parentJobId",
+        "candidateId && first.candidate_id !== candidateId",
+        "projectId !== first.project_id",
+        "item.route !== first.route",
+    ):
+        assert marker in helper
+
+    consumers = {
+        "node-generation-progress.js": progress,
+        "node-keyframe-response.js": response,
+        "node-candidate-previews.js": previews,
+        "candidate-selection-controller.js": controller,
+        "store-state.js": store,
+    }
+    for name, source in consumers.items():
+        assert 'from "./reusable-asset-authority.js"' in source, name
+        assert "selectReusableAssetAuthority(" in source, name
+
+    raw_authority_readers = {
+        path.name
+        for path in (STUDIO_ROOT / "src").glob("*.js")
+        if "reusable_image_assets" in path.read_text(encoding="utf-8")
+    }
+    assert raw_authority_readers == {
+        "generation-status-policy.js",  # availability signal only
+        "node-generation-progress.js",  # sole authority binding handoff
+        "node-generation-results.js",  # informational asset id text only
+        "node-keyframe-response.js",  # compatibility marker; no raw payload access
+    }
+    assert progress.count("response?.reusable_image_assets") == 1
+    assert "response?.reusable_image_assets" not in response
+    assert "reusable_image_assets" not in previews + controller + store
+
+    for source in (progress, response, previews, controller, store):
+        assert "source_candidate_id ||" not in source
+        assert "image_asset_id || item.asset_id" not in source
+        assert "image_asset_id || asset_id" not in source
+
+    submit_start = controller.index("async function submitCreatorDecision")
+    submit_end = controller.index("function assertVisibleCandidateAuthority", submit_start)
+    submit_body = controller[submit_start:submit_end]
+    assert submit_body.index("requireReusableAssetAuthority(preflightCandidate)") < submit_body.index(
+        "ensureProductionRunForCandidateSelection"
+    )
+    assert submit_body.index("requireReusableAssetAuthority(preflightCandidate)") < submit_body.index(
+        "runtime.submitCreatorDecision"
+    )
+    assert submit_body.index("requireReusableAssetAuthority(preflightCandidate)") < submit_body.index(
+        "runtime.getProductionRun"
+    )
+
+    restore_start = controller.index("export async function restoreCandidateSelection")
+    restore_end = controller.index("function preflightRestorableCandidate", restore_start)
+    restore_body = controller[restore_start:restore_end]
+    assert restore_body.index("requireReusableAssetAuthority(preflightRestorableCandidate") < restore_body.index(
+        "runtime.getProductionRun"
+    )
+
+    assert "item.parent_job_id || parentJobId" not in progress
+    assert "itemJobMatchesEnvelope" in progress
+    assert "normalizedParentJobId" in progress
+    assert "validatedCandidatePreviewRoute" in progress
+    assert "trustedEnvelopeProjectId(response)" in progress
+    assert "response?.job?.project_id" in progress
+    assert "projectId && jobProjectId && projectId !== jobProjectId" in progress
+    assert "projectId: envelopeProjectId" in progress
+    assert "project_id: safeToken(projectId, 160)" in store
+
+    url_aliases = (
+        "preview_url",
+        "url",
+        "previewUrl",
+        "image_asset_preview_url",
+        "imageAssetPreviewUrl",
+    )
+    for alias in url_aliases:
+        assert f"candidate.{alias}" in helper
+        assert f"item.{alias}" in progress
+        assert f"item.{alias}" in previews
+        assert f"source.{alias}" in store
 
 
 def test_partial_outputs_are_preserved_and_retry_targets_failed_items_only() -> None:
