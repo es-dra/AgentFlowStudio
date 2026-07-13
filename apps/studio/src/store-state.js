@@ -29,9 +29,38 @@ const FORBIDDEN_RAW_PROVIDER_KEYS = new Set([
   "provider_output_raw",
   "provideroutputraw",
 ]);
+const FORBIDDEN_STUDIO_PERSISTENCE_KEYS = new Set([
+  ...FORBIDDEN_RAW_PROVIDER_KEYS,
+  "api_key",
+  "apikey",
+  "secret",
+  "token",
+  "cookie",
+  "authorization",
+  "provider_config",
+  "providerconfig",
+  "signed_url",
+  "signedurl",
+  "media_bytes",
+  "mediabytes",
+  "knowledge_weights",
+  "knowledgeweights",
+  "hidden_memory",
+  "hiddenmemory",
+]);
 const SAFE_PUBLIC_PROVIDER_KEYS = new Set([
+  "no_credentialed_url",
+  "nocredentialedurl",
+  "no_local_path",
+  "nolocalpath",
+  "no_media_bytes",
+  "nomediabytes",
   "no_provider_raw",
   "noproviderraw",
+  "no_secrets",
+  "nosecrets",
+  "trace_summary",
+  "tracesummary",
 ]);
 
 export function initialState(projectId = "studio-local-001") {
@@ -364,6 +393,7 @@ function sanitizePreviewObject(item, projectId) {
 }
 
 function stripForbiddenRawProviderFields(value, seen = new WeakSet()) {
+  if (typeof value === "string") return safePersistentString(value);
   if (!value || typeof value !== "object") return value;
   if (seen.has(value)) return null;
   seen.add(value);
@@ -386,12 +416,31 @@ function isForbiddenRawProviderKey(key) {
   const lowered = String(key || "").toLowerCase();
   const normalized = lowered.replace(/[^a-zA-Z0-9]+/g, "");
   if (SAFE_PUBLIC_PROVIDER_KEYS.has(lowered) || SAFE_PUBLIC_PROVIDER_KEYS.has(normalized)) return false;
-  for (const forbidden of FORBIDDEN_RAW_PROVIDER_KEYS) {
+  for (const forbidden of FORBIDDEN_STUDIO_PERSISTENCE_KEYS) {
     const forbiddenNorm = forbidden.replace(/[^a-zA-Z0-9]+/g, "");
     if (lowered === forbidden || normalized === forbiddenNorm) return true;
     if (lowered.includes(forbidden) || normalized.includes(forbiddenNorm)) return true;
   }
   return false;
+}
+
+function safePersistentString(value) {
+  const original = String(value || "");
+  return redactUnsafeText(original, Math.max(160, original.length + 128))
+    .replace(/api[_-]?key/gi, "<credential-redacted>")
+    .replace(/access[_-]?token|refresh[_-]?token|\btoken\b/gi, "<credential-redacted>")
+    .replace(/client[_-]?secret|secret[_-]?key|\bsecret\b/gi, "<credential-redacted>")
+    .replace(/authorization/gi, "<credential-redacted>")
+    .replace(/cookie/gi, "<credential-redacted>")
+    .replace(/provider[_-]?config/gi, "<provider-config-redacted>")
+    .replace(/signed[_-]?url/gi, "<signed-url-redacted>")
+    .replace(/provider[_-]?raw/gi, "<provider-redacted>")
+    .replace(/provider[_-]?response/gi, "<provider-redacted>")
+    .replace(/raw[_-]?response/gi, "<provider-redacted>")
+    .replace(/media[_-]?bytes/gi, "<media-bytes-redacted>")
+    .replace(/knowledge[_-]?weights/gi, "<knowledge-redacted>")
+    .replace(/hidden[_-]?memory/gi, "<memory-redacted>")
+    .replace(/\btrace\b/gi, "<trace-redacted>");
 }
 
 function sanitizeGenerationManifestSummary(value) {
