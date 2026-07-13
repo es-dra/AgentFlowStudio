@@ -134,19 +134,7 @@ const base = {
   creator_decisions: [{ decision: "select" }], quality_reviews: [], exports: [],
   checkpoint: { version: 2, state_digest: digest("f") },
 };
-const node = { id: "review-delivery", params: {
-  lastKeyframeJobId: "job-001",
-  creatorSelection: {
-    run_id: "run-001", selected_candidate_id: "candidate-001", selected_candidate_digest: digest("a"),
-    selected_revision_id: "revision-001", selected_revision_digest: digest("c"), selected_parent_job_id: "job-001",
-  },
-  reviewDeliveryCandidates: [candidate, other],
-  candidatePreviewUrls: [candidate, other].map((item) => ({
-    ...item, project_id: "project-001", status: "succeeded",
-    preview_url: `/projects/project-001/keyframe-generations/job-001/candidates/${item.candidate_id}/preview`,
-  })),
-} };
-const snapshot = dedicatedDeliveryActionSnapshot(base, node);
+const snapshot = dedicatedDeliveryActionSnapshot(base);
 const changed = { ...base, checkpoint: { version: 3, state_digest: digest("9") } };
 let qualityPosts = 0;
 let exportPosts = 0;
@@ -162,8 +150,8 @@ const checklist = {
   shot_coverage_checked: true,
   revision_addressed: true,
 };
-const quality = await submitDedicatedQualityApproval(runtime, snapshot, node, checklist);
-const exported = await submitDedicatedProductionExport(runtime, snapshot, node);
+const quality = await submitDedicatedQualityApproval(runtime, snapshot, checklist);
+const exported = await submitDedicatedProductionExport(runtime, snapshot);
 process.stdout.write(JSON.stringify({ quality, exported, qualityPosts, exportPosts, reads }));
 '''
     )
@@ -200,6 +188,8 @@ process.stdout.write(JSON.stringify({
     assert 'saveAuthToken("");' in hydrate
     assert 'new CustomEvent("afs:auth-session-expired"' in hydrate
     assert hydrate.index('protectedPreviewDisposition(response.status) === "session_expired"') < hydrate.index('throw new Error("preview_unavailable")')
+    assert 'item.media_kind === "video" ? "video/" : "image/"' in hydrate
+    assert 'media_kind: contentType' not in hydrate
     for marker in (
         "reviewState.clearIdentity();",
         "revokePreviewMedia();",
@@ -242,12 +232,6 @@ function stateFor({ selected, focused, selectedAvailable, focusedAvailable, snap
         canonical_digest: revisionDigest,
       },
     },
-    node: { params: { creatorSelection: {
-      selected_candidate_id: selected,
-      selected_candidate_digest: selectedItem.canonical_digest,
-      selected_revision_id: revisionId,
-      selected_revision_digest: revisionDigest,
-    } } },
     deliverySnapshot: {
       candidate_id: snapshotCandidate,
       candidate_digest: snapshotItem.canonical_digest,

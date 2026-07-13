@@ -81,17 +81,15 @@ async function loadReviewWorkspace(requestedId = "") {
       ? safeRequested
       : projects[0].project_id;
     runtime = createRuntimeClient(projectId);
-    const [projectPayload, runsPayload, studioPayload] = await Promise.all([
+    const [projectPayload, runsPayload] = await Promise.all([
       runtime.projectOverview(),
       runtime.listProductionRuns(),
-      runtime.loadStudioState(),
     ]);
     if (!reviewState.isCurrent(token)) return;
     const next = composeReviewDeliveryState({
       workspace,
       project: projectPayload?.project || null,
       runsPayload,
-      studioPayload,
       projectId,
     });
     next.candidates = await hydrateCandidateMedia(next.candidates, token);
@@ -146,9 +144,9 @@ async function handleAction(action) {
     const intent = action === "select" ? "将当前方案设为制作基准。" : note;
     result = await submitDedicatedReviewDecision(runtime, state.reviewSnapshot, action, intent);
   } else if (action === "approve") {
-    result = await submitDedicatedQualityApproval(runtime, selectedDelivery.snapshot, selectedDelivery.node, checklist);
+    result = await submitDedicatedQualityApproval(runtime, selectedDelivery.snapshot, checklist);
   } else if (action === "export") {
-    result = await submitDedicatedProductionExport(runtime, selectedDelivery.snapshot, selectedDelivery.node);
+    result = await submitDedicatedProductionExport(runtime, selectedDelivery.snapshot);
   } else {
     reviewState.finishAction(token);
     return;
@@ -236,7 +234,8 @@ async function hydrateCandidateMedia(candidates, token) {
         throw new Error("preview_unavailable");
       }
       const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.startsWith("image/") && !contentType.startsWith("video/")) throw new Error("preview_type_invalid");
+      const expectedContentType = item.media_kind === "video" ? "video/" : "image/";
+      if (!contentType.startsWith(expectedContentType)) throw new Error("preview_type_invalid");
       const blob = await response.blob();
       if (!reviewState.isCurrent(token)) return { ...item, available: false, preview_url: "" };
       const objectUrl = URL.createObjectURL(blob);
@@ -244,7 +243,6 @@ async function hydrateCandidateMedia(candidates, token) {
       return {
         ...item,
         available: true,
-        media_kind: contentType.startsWith("video/") ? "video" : "image",
         preview_url: objectUrl,
       };
     } catch {

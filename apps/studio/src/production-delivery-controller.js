@@ -139,6 +139,10 @@ export function productionDeliveryAuthority(run, node) {
 
 export function buildQualityApprovalRequest(run, node, options = {}) {
   const authority = productionDeliveryAuthority(run, node);
+  return qualityApprovalRequest(run, authority, options);
+}
+
+function qualityApprovalRequest(run, authority, options = {}) {
   const revision = objectValue(run?.selected_revision);
   const checklist = normalizedChecklist(options.checklist);
   if (Object.values(checklist).some((checked) => checked !== true)) {
@@ -162,6 +166,10 @@ export function buildQualityApprovalRequest(run, node, options = {}) {
 
 export function buildProductionExportRequest(run, node, options = {}) {
   const authority = productionDeliveryAuthority(run, node);
+  return productionExportRequest(run, authority, options);
+}
+
+function productionExportRequest(run, authority, options = {}) {
   if (!approvedReviewForAuthority(run, authority)) {
     throw deliveryError("delivery_quality_required", "Approve the exact selected revision before export.");
   }
@@ -177,23 +185,71 @@ export function buildProductionExportRequest(run, node, options = {}) {
   };
 }
 
-export function dedicatedDeliveryActionSnapshot(run, node) {
-  const authority = productionDeliveryAuthority(run, node);
+function dedicatedProductionDeliveryAuthority(run) {
+  const latestDecision = Array.isArray(run?.creator_decisions) ? run.creator_decisions.at(-1) : null;
+  if (String(run?.status || "") === "creator_revision_required" || String(latestDecision?.decision || "") === "reject") {
+    throw deliveryError("delivery_creator_rejected", "The current revision was rejected and must be selected or revised again.");
+  }
+  const runId = safeIdentifier(run?.run_id, "run_id");
+  const candidates = Array.isArray(run?.candidates) ? run.candidates : [];
+  if (candidates.length < 2) {
+    throw deliveryError("delivery_candidate_inventory_incomplete", "At least two production candidates are required for this delivery gate.");
+  }
+  const revision = objectValue(run?.selected_revision);
+  const candidateId = safeIdentifier(revision.candidate_id || revision.selected_candidate_id, "selected_candidate_id");
+  const candidate = candidates.find((item) => optionalIdentifier(item?.candidate_id) === candidateId);
+  if (!candidate) {
+    throw deliveryError("delivery_candidate_stale", "The selected candidate is no longer present in production authority.");
+  }
+  const candidateDigest = safeDigest(candidate.canonical_digest, "candidate_digest");
+  const revisionCandidateDigest = safeDigest(
+    revision.candidate_digest || revision.selected_candidate_digest,
+    "revision_candidate_digest",
+  );
+  if (revisionCandidateDigest !== candidateDigest) {
+    throw deliveryError("delivery_candidate_stale", "The selected candidate integrity no longer matches production authority.");
+  }
+  const revisionId = safeIdentifier(revision.revision_id || revision.selected_revision_id, "revision_id");
+  const revisionDigest = safeDigest(
+    revision.canonical_digest || revision.revision_digest || revision.selected_revision_digest,
+    "revision_digest",
+  );
+  const parentJobId = safeIdentifier(candidate.parent_job_id, "parent_job_id");
+  if (optionalIdentifier(revision.parent_job_id) !== parentJobId) {
+    throw deliveryError("delivery_lineage_stale", "The selected revision lineage no longer matches its production candidate.");
+  }
+  const checkpointVersion = Number(run?.checkpoint?.version || 0);
+  if (!Number.isInteger(checkpointVersion) || checkpointVersion < 1) {
+    throw deliveryError("delivery_checkpoint_invalid", "Production checkpoint is unavailable.");
+  }
+  return {
+    run_id: runId,
+    candidate_id: candidateId,
+    candidate_digest: candidateDigest,
+    revision_id: revisionId,
+    revision_digest: revisionDigest,
+    parent_job_id: parentJobId,
+    checkpoint_version: checkpointVersion,
+  };
+}
+
+export function dedicatedDeliveryActionSnapshot(run) {
+  const authority = dedicatedProductionDeliveryAuthority(run);
   return {
     ...authority,
     checkpoint_digest: safeDigest(run?.checkpoint?.state_digest, "checkpoint_digest"),
   };
 }
 
-export async function submitDedicatedQualityApproval(runtime, snapshot, node, checklist, options = {}) {
-  return submitDedicatedDeliveryMutation(runtime, snapshot, node, "quality", checklist, options);
+export async function submitDedicatedQualityApproval(runtime, snapshot, checklist, options = {}) {
+  return submitDedicatedDeliveryMutation(runtime, snapshot, "quality", checklist, options);
 }
 
-export async function submitDedicatedProductionExport(runtime, snapshot, node, options = {}) {
-  return submitDedicatedDeliveryMutation(runtime, snapshot, node, "export", null, options);
+export async function submitDedicatedProductionExport(runtime, snapshot, options = {}) {
+  return submitDedicatedDeliveryMutation(runtime, snapshot, "export", null, options);
 }
 
-async function submitDedicatedDeliveryMutation(runtime, snapshot, node, action, checklist, options) {
+async function submitDedicatedDeliveryMutation(runtime, snapshot, action, checklist, options) {
   const runId = optionalIdentifier(snapshot?.run_id);
   const writer = action === "quality" ? runtime?.recordProductionQualityReview : runtime?.exportProductionRun;
   if (!runId || !runtime?.getProductionRun || !writer) {
@@ -203,21 +259,22 @@ async function submitDedicatedDeliveryMutation(runtime, snapshot, node, action, 
   try {
     const before = authoritativeRun(await runtime.getProductionRun(runId));
     lastAuthoritativeRun = before;
-    assertDedicatedDeliverySnapshot(snapshot, dedicatedDeliveryActionSnapshot(before, node));
+    assertDedicatedDeliverySnapshot(snapshot, dedicatedDeliveryActionSnapshot(before));
+    const authority = dedicatedProductionDeliveryAuthority(before);
     const request = action === "quality"
-      ? buildQualityApprovalRequest(before, node, { checklist, ...options })
-      : buildProductionExportRequest(before, node, options);
+      ? qualityApprovalRequest(before, authority, { checklist, ...options })
+      : productionExportRequest(before, authority, options);
     const submitted = await writer.call(runtime, runId, request);
     const after = authoritativeRun(await runtime.getProductionRun(runId));
     lastAuthoritativeRun = after;
-    const authority = productionDeliveryAuthority(after, node);
-    if (action === "quality" && !approvedReviewForAuthority(after, authority)) {
+    const readbackAuthority = dedicatedProductionDeliveryAuthority(after);
+    if (action === "quality" && !approvedReviewForAuthority(after, readbackAuthority)) {
       throw deliveryError("delivery_quality_readback_missing", "Quality approval was not present in authoritative readback.");
     }
     if (action === "export") {
       const exported = objectValue(submitted?.export || latestExport(after));
-      if (optionalIdentifier(exported.selected_revision_id) !== authority.revision_id
-        || safeDigest(exported.selected_revision_digest, "export_revision_digest") !== authority.revision_digest) {
+      if (optionalIdentifier(exported.selected_revision_id) !== readbackAuthority.revision_id
+        || safeDigest(exported.selected_revision_digest, "export_revision_digest") !== readbackAuthority.revision_digest) {
         throw deliveryError("delivery_export_readback_mismatch", "Export readback does not match the exact selected revision.");
       }
     }
