@@ -23,8 +23,10 @@ import { handleQualityFeedbackRuntime } from "./quality-feedback-runtime-flow.js
 import { HUMAN_GATE_DECISION_EVENT, HUMAN_GATE_DECISION_RESULT_EVENT } from "./human-gate.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
-import { initialProjectId } from "./studio-project-session.js";
+import { clearProjectSession, initialProjectId } from "./studio-project-session.js";
+import { clearIdentityScopedStudioState, prepareIdentityStorage } from "./store-persistence.js";
 import { createProjectController } from "./studio-project-controller.js";
+import { createProductShell, showSecureEntry } from "./product-shell.js";
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
@@ -34,39 +36,16 @@ import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
-let runtime = createRuntimeClient(initialProjectId());
+let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
 let runtimeSurfaceStatusSequence = 0;
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
-const store = createStore(runtime.projectId);
-store.attachRuntime(runtime);
-const domainCrewController = createDomainCrewController({
-  getRuntime: () => runtime,
-  onNavigateNode: (nodeId) => window.dispatchEvent(new CustomEvent("afs:studio-select-node", { detail: { node_id: nodeId } })),
-});
-installClientErrorReporter({
-  getRuntime: () => runtime,
-  getProjectId: () => runtime?.projectId || store.get().meta?.projectId || "",
-});
-
-const projectController = createProjectController({
-  store,
-  getRuntime: () => runtime,
-  setRuntime: (nextRuntime) => {
-    runtime = nextRuntime;
-    store.attachRuntime(runtime);
-    domainCrewController.setContext({
-      runtime,
-      userId: projectController.authUser?.user_id || "",
-    });
-    void refreshRuntimeSurfaceStatus();
-  },
-  onProjectReady: async (runtimeClient) => {
-    await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
-    await refreshPendingKeyframeGenerations(store, runtimeClient);
-  },
-  render: () => renderAll(store.get()),
-});
+let store = null;
+let domainCrewController = null;
+let projectController = null;
+let productShell = null;
+let editorMounted = false;
+let identityBoundaryInFlight = false;
 
 bootstrap().catch((error) => {
   reportClientError({
@@ -75,18 +54,27 @@ bootstrap().catch((error) => {
     message: safeError(error),
     error,
     getRuntime: () => runtime,
-    getProjectId: () => runtime?.projectId || store.get().meta?.projectId || "",
+    getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
   });
-  renderAll(store.get());
+  showSecureEntry("暂时无法打开工作空间，请检查连接后重试。", { error: true });
 });
-
 async function bootstrap() {
+  showSecureEntry("正在确认账户状态…");
+  const authRuntime = createRuntimeClient("studio-pending");
+  const authState = await ensureAuthSession(authRuntime);
+  if (authState?.auth_status_unknown || authState?.blocked) return;
+  if (authState?.auth_required && !authState?.authenticated) return;
+  prepareIdentityStorage(authState?.user?.user_id || "local-runtime-user");
+  mountStudioDom();
+  initializeStudio(authState?.user || null);
   projectController.rememberStartupProject(runtime.projectId);
-  renderStarters();
-  renderDock(store, runtimeRef);
-  bindCanvasInput(store, runtimeRef);
-  bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
-  bindStudioKeyboard({ store, runtime: runtimeRef });
+  if (editorMounted) {
+    renderStarters();
+    renderDock(store, runtimeRef);
+    bindCanvasInput(store, runtimeRef);
+    bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
+    bindStudioKeyboard({ store, runtime: runtimeRef });
+  }
   bindQualityFeedback();
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
@@ -94,21 +82,13 @@ async function bootstrap() {
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
   bindProjectAccessRecovery();
+  bindSessionExpiryBoundary();
 
   store.subscribe(renderAll);
   renderAll(store.get());
   void refreshRuntimeSurfaceStatus();
-
-  const authState = await ensureAuthSession(runtime, {
-    onAuthenticated: (user) => {
-      projectController.setAuthUser(user);
-      renderAll(store.get());
-    },
-  });
   projectController.setAuthUser(authState?.user);
   await refreshRuntimeSurfaceStatus({ authState });
-  if (authState?.auth_status_unknown || authState?.blocked) return;
-  if (authState?.auth_required && !authState?.authenticated) return;
 
   await projectController.ensureAccessibleStartupProject();
   await store.hydrateRuntime(runtime);
@@ -116,33 +96,83 @@ async function bootstrap() {
   await restoreCandidateSelectionsAfterLoad(store, runtime);
   await refreshPendingKeyframeGenerations(store, runtime);
   await projectController.refreshProjectSummaries();
+  await refreshProductOverview();
 }
-
+function initializeStudio(authUser) {
+  runtime = createRuntimeClient(initialProjectId());
+  store = createStore(runtime.projectId);
+  store.attachRuntime(runtime);
+  domainCrewController = createDomainCrewController({
+    getRuntime: () => runtime,
+    onNavigateNode: (nodeId) => window.dispatchEvent(new CustomEvent("afs:studio-select-node", { detail: { node_id: nodeId } })),
+  });
+  productShell = createProductShell({
+    onOpenCanvas: openCanvasWorkspace,
+    onSignOut: handleSignOut,
+    onSwitchProject: async (projectId) => {
+      await projectController.switchProject(projectId);
+      await refreshProductOverview();
+    },
+    onRetry: refreshProductOverview,
+    createRuntime: createRuntimeClient,
+    isRuntimeCurrent: (candidate) => candidate === runtime,
+    formatError: safeError,
+  });
+  productShell.render({ authUser });
+  installClientErrorReporter({
+    getRuntime: () => runtime,
+    getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
+  });
+  projectController = createProjectController({
+    store,
+    getRuntime: () => runtime,
+    setRuntime: (nextRuntime) => {
+      runtime = nextRuntime;
+      store.attachRuntime(runtime);
+      domainCrewController.setContext({ runtime, userId: projectController.authUser?.user_id || "" });
+      void refreshRuntimeSurfaceStatus();
+    },
+    onProjectReady: async (runtimeClient) => {
+      if (editorMounted) {
+        await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
+        await refreshPendingKeyframeGenerations(store, runtimeClient);
+      }
+      await refreshProductOverview();
+    },
+    render: () => renderAll(store.get()),
+  });
+  projectController.setAuthUser(authUser);
+}
+function mountStudioDom() {
+  const app = document.getElementById("app");
+  app.className = "product-mode";
+  app.replaceChildren();
+  const productRoot = document.createElement("div");
+  productRoot.id = "product-shell-root";
+  app.appendChild(productRoot);
+  editorMounted = !window.matchMedia("(max-width: 760px)").matches;
+  if (editorMounted) {
+    const editor = document.createElement("div");
+    editor.id = "studio-editor-shell";
+    editor.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从制作总览进入画布，组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
+    app.appendChild(editor);
+  }
+  const overlay = document.createElement("div");
+  overlay.id = "overlay-root";
+  app.appendChild(overlay);
+}
 function bindDomainCrewEvents() {
-  window.addEventListener("afs:studio-open-domain-crew", () => {
-    syncDomainCrewContext();
-    openDomainCrewPanel(domainCrewController);
-  });
+  window.addEventListener("afs:studio-open-domain-crew", () => { syncDomainCrewContext(); openDomainCrewPanel(domainCrewController); });
 }
-
 function bindQualityFeedback() {
-  window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => {
-    handleQualityFeedbackRuntime({ event, runtime, store });
-  });
+  window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => handleQualityFeedbackRuntime({ event, runtime, store }));
 }
-
 function bindHumanGateDecisionEvents() {
-  window.addEventListener(HUMAN_GATE_DECISION_EVENT, (event) => {
-    handleHumanGateDecision(event);
-  });
+  window.addEventListener(HUMAN_GATE_DECISION_EVENT, (event) => handleHumanGateDecision(event));
 }
-
 function bindVideoAssetCardDraft() {
-  window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => {
-    handleVideoAssetCardDraft(event);
-  });
+  window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => handleVideoAssetCardDraft(event));
 }
-
 function bindStudioWorkflowEvents() {
   window.addEventListener("afs:studio-open-generation-panel", (event) => {
     openGenerationForNode(event.detail?.node);
@@ -163,7 +193,6 @@ function bindStudioWorkflowEvents() {
     }, { history: false, persist: false });
   });
 }
-
 function bindSaveAuthRecovery() {
   let recoveryInFlight = false;
   window.addEventListener("afs:studio-save-auth-required", (event) => {
@@ -174,33 +203,19 @@ function bindSaveAuthRecovery() {
     });
   });
 }
-
 async function recoverSaveAuthBoundary(status) {
-  projectController.setAuthUser(null);
-  renderAll(store.get());
-  if (Number(status) === 403) {
-    await signOut(runtime);
+  if (Number(status) === 401 || Number(status) === 403) {
+    await recoverExpiredSession();
+    return;
   }
-  const authState = await ensureAuthSession(runtime, {
-    onAuthenticated: (user) => {
-      projectController.setAuthUser(user);
-      renderAll(store.get());
-    },
-  });
-  projectController.setAuthUser(authState?.user);
-  await refreshRuntimeSurfaceStatus({ authState });
-  if (!authState?.auth_required || authState?.authenticated) {
-    await store.flushRuntimeSave();
-  }
-  renderAll(store.get());
+  await store.flushRuntimeSave();
 }
-
 function bindProjectAccessRecovery() {
-  window.addEventListener("afs:project-access-denied", () => {
-    void projectController.recoverProjectAccessDenied();
-  });
+  window.addEventListener("afs:project-access-denied", () => void projectController.recoverProjectAccessDenied());
 }
-
+function bindSessionExpiryBoundary() {
+  window.addEventListener("afs:auth-session-expired", () => void recoverExpiredSession());
+}
 function openGenerationForNode(inputNode) {
   const node = inputNode?.id ? store.get().nodes[inputNode.id] : selectedNode();
   if (!node) return null;
@@ -210,18 +225,15 @@ function openGenerationForNode(inputNode) {
     onRun: (fresh) => startNodeGeneration(store, runtimeRef, fresh),
   });
 }
-
 function resolveEventNode(event) {
   const nodeId = String(event.detail?.node_id || event.detail?.node?.id || "");
   if (!nodeId) return selectedNode();
   return store.get().nodes[nodeId] || null;
 }
-
 function selectedNode() {
   const id = store.get().selection.nodeIds[0];
   return id ? store.get().nodes[id] || null : null;
 }
-
 async function handleVideoAssetCardDraft(event) {
   const node = resolveEventNode(event) || event.detail?.node;
   const nodeId = String(node?.id || event.detail?.node_id || "");
@@ -269,7 +281,6 @@ async function handleVideoAssetCardDraft(event) {
     });
   }
 }
-
 async function handleHumanGateDecision(event) {
   const requestId = String(event.detail?.request_id || "");
   const payload = event.detail?.payload;
@@ -287,7 +298,6 @@ async function handleHumanGateDecision(event) {
     }));
   }
 }
-
 function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
   const nodeId = String(payload?.node_id || "");
   if (!nodeId) return;
@@ -309,9 +319,9 @@ function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
     ].slice(-12);
   }, { history: false });
 }
-
 function renderAll(state) {
   syncDomainCrewContext();
+  if (!editorMounted) return;
   renderTopbar({
     state,
     store,
@@ -323,17 +333,12 @@ function renderAll(state) {
     onToggleProjectFilter: () => projectController.toggleProjectFilter(),
     onSwitchProject: projectController.switchProject,
     onCreateProject: projectController.createNewProject,
-    onOpenHome: () => openStudioHome(state),
+    onOpenHome: openProductOverview,
     onBeforeSiteHome: () => store.flushRuntimeSave(),
     authUser: projectController.authUser,
     onRetrySave: () => store.flushRuntimeSave(),
     runtimeSurfaceStatus,
-    onSignOut: async () => {
-      await signOut(runtime);
-      projectController.setAuthUser(null);
-      syncDomainCrewContext();
-      window.location.href = "/";
-    },
+    onSignOut: handleSignOut,
   });
   renderCanvas(state, store);
   renderDrawer(state, store, runtimeRef);
@@ -341,14 +346,10 @@ function renderAll(state) {
   renderPromptBar(state, store, runtime);
   renderSpriteWidget(state, runtimeRef);
 }
-
 function syncDomainCrewContext() {
-  domainCrewController.setContext({
-    runtime,
-    userId: projectController.authUser?.user_id || "",
-  });
+  if (!domainCrewController || !projectController) return;
+  domainCrewController.setContext({ runtime, userId: projectController.authUser?.user_id || "" });
 }
-
 function openStudioHome(state = store.get()) {
   return openProjectHub({
     state,
@@ -369,7 +370,13 @@ function openStudioHome(state = store.get()) {
     }, { history: false, persist: false }),
   });
 }
-
+function openProductOverview() {
+  productShell?.showOverview();
+  void refreshProductOverview();
+}
+function openCanvasWorkspace() {
+  if (editorMounted && productShell?.showCanvas()) renderAll(store.get());
+}
 function renderStarters() {
   const row = document.getElementById("starter-row");
   row.replaceChildren();
@@ -385,7 +392,6 @@ function renderStarters() {
     row.appendChild(card);
   }
 }
-
 async function launchStarter(id) {
   if (!hasActiveProject()) {
     const created = await promptCreateProjectBeforeStarter();
@@ -441,7 +447,42 @@ function promptCreateProjectBeforeStarter() {
 }
 
 function safeError(error) {
-  return formatRuntimeError(error, "unknown error");
+  return formatRuntimeError(error, "暂时无法读取制作状态，请稍后重试。");
+}
+
+async function refreshProductOverview() {
+  if (runtime?.workspaceOverview && productShell) await productShell.refresh(runtime, projectController?.authUser || null);
+}
+
+async function handleSignOut() {
+  if (identityBoundaryInFlight) return;
+  identityBoundaryInFlight = true;
+  const logoutRuntime = runtime;
+  store?.resetIdentityState?.();
+  projectController?.setAuthUser(null);
+  clearProjectSession();
+  clearIdentityScopedStudioState();
+  showSecureEntry("正在安全退出…");
+  try {
+    await signOut(logoutRuntime);
+  } finally {
+    window.location.replace("/studio/");
+  }
+}
+
+async function recoverExpiredSession() {
+  if (identityBoundaryInFlight) return;
+  identityBoundaryInFlight = true;
+  store?.resetIdentityState?.();
+  projectController?.setAuthUser(null);
+  clearProjectSession();
+  clearIdentityScopedStudioState();
+  showSecureEntry("登录已过期，请重新登录后继续。");
+  await signOut(runtime);
+  const authState = await ensureAuthSession(createRuntimeClient("studio-pending"), {
+    onAuthenticated: () => window.location.reload(),
+  });
+  if (!authState?.auth_required || authState?.authenticated) window.location.reload();
 }
 
 async function refreshRuntimeSurfaceStatus({ authState = null } = {}) {
@@ -454,9 +495,6 @@ async function refreshRuntimeSurfaceStatus({ authState = null } = {}) {
 }
 
 function setRuntimeSurfaceStatus(nextStatus) {
-  runtimeSurfaceStatus = {
-    ...initialRuntimeSurfaceStatus(),
-    ...(nextStatus || {}),
-  };
-  renderAll(store.get());
+  runtimeSurfaceStatus = { ...initialRuntimeSurfaceStatus(), ...(nextStatus || {}) };
+  if (store) renderAll(store.get());
 }

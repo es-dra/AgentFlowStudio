@@ -18,8 +18,10 @@
 }
 
 @media (max-width: 720px) {
-  .site-header { align-items: flex-start; flex-direction: column; }
-  .nav-links { order: 3; flex-wrap: wrap; gap: 14px; }
+  .site-header { align-items: center; flex-direction: row; flex-wrap: wrap; gap: 12px; width: calc(100% - 28px); padding: 14px 0; }
+  .nav-links { order: 3; width: 100%; flex-wrap: nowrap; gap: 18px; overflow-x: auto; }
+  .nav-action { min-height: 40px; margin-left: auto; padding: 0 12px; font-size: 13px; }
+  .site-account-hint { display: none; }
   h1 { font-size: clamp(50px, 18vw, 84px); }
   .hero-visual { inset: 10px 0 122px; }
   .hero-copy { padding-top: 24vh; }

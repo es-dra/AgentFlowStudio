@@ -17,40 +17,43 @@ export async function signOut(runtime) {
   try {
     await runtime.logout();
   } catch {
-    // Local session cleanup happens in runtime.logout().finally().
+    // runtime.logout() always clears the local token.
   }
 }
 
 function showAuthGate(runtime, { onAuthenticated } = {}) {
   return new Promise((resolve) => {
-    let mode = "register";
+    let mode = "login";
     let settled = false;
     const modal = el("div", "modal compact auth-modal");
+    modal.setAttribute("aria-label", "AgentFlow Studio 账户登录");
     const head = el("div", "modal-head auth-head");
     const title = el("div", "auth-title");
     title.appendChild(el("span", "auth-mark", "AFS"));
-    title.appendChild(el("strong", "", "内测账号"));
+    title.appendChild(el("strong", "", "制作工作空间"));
     head.appendChild(title);
     const tabs = el("div", "modal-tabs");
-    const registerTab = el("button", "modal-tab active", "注册");
-    const loginTab = el("button", "modal-tab", "登录");
-    tabs.append(registerTab, loginTab);
+    const loginTab = el("button", "modal-tab active", "登录");
+    const registerTab = el("button", "modal-tab", "注册");
+    tabs.append(loginTab, registerTab);
     head.appendChild(el("span", "head-spacer"));
     head.appendChild(tabs);
 
     const body = el("div", "modal-body auth-body");
-    const intro = el("p", "auth-copy", "请输入分发的邀请码完成注册。登录后，项目会保存在自己的账号空间中。");
-    const email = field("邮箱", "email", "name@example.com");
-    const password = field("密码", "password", "至少 8 位");
-    const displayName = field("昵称", "text", "可选");
-    const inviteCode = field("邀请码", "text", "由管理员分发");
+    const intro = el("p", "auth-copy", "登录后进入你的工作空间。账户确认前不会加载任何项目、画布或交付内容。");
+    const email = field("邮箱", "email", "name@example.com", "username");
+    const password = field("密码", "password", "至少 8 位", "current-password");
+    const displayName = field("姓名", "text", "团队成员姓名", "name");
+    const inviteCode = field("邀请码", "text", "由管理员分发", "off");
+    displayName.wrap.hidden = true;
+    inviteCode.wrap.hidden = true;
     const error = el("div", "modal-error");
     error.setAttribute("role", "alert");
     error.hidden = true;
     body.append(intro, email.wrap, password.wrap, displayName.wrap, inviteCode.wrap, error);
 
     const actions = el("div", "modal-actions auth-actions");
-    const submit = el("button", "primary-btn", "注册并进入");
+    const submit = el("button", "primary-btn", "登录工作空间");
     actions.appendChild(submit);
     modal.append(head, body, actions);
 
@@ -58,13 +61,14 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
       closeOnOutside: false,
       closeOnEscape: false,
       initialFocus: email.input,
+      ariaLabel: "登录 AgentFlow Studio 制作工作空间",
       onClose: () => {
         if (!settled) resolve({ auth_required: true, authenticated: false, user: null });
       },
     });
 
-    registerTab.addEventListener("click", () => setMode("register"));
     loginTab.addEventListener("click", () => setMode("login"));
+    registerTab.addEventListener("click", () => setMode("register"));
     submit.addEventListener("click", submitAuth);
     for (const input of [email.input, password.input, displayName.input, inviteCode.input]) {
       input.addEventListener("keydown", (event) => {
@@ -74,26 +78,24 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
 
     function setMode(nextMode) {
       mode = nextMode;
-      registerTab.classList.toggle("active", mode === "register");
       loginTab.classList.toggle("active", mode === "login");
+      registerTab.classList.toggle("active", mode === "register");
       displayName.wrap.hidden = mode !== "register";
       inviteCode.wrap.hidden = mode !== "register";
-      submit.textContent = mode === "register" ? "注册并进入" : "登录";
+      submit.textContent = mode === "register" ? "注册并进入" : "登录工作空间";
       intro.textContent = mode === "register"
-        ? "请输入分发的邀请码完成注册。登录后，项目会保存在自己的账号空间中。"
-        : "使用已注册的邮箱和密码进入你的项目空间。";
+        ? "使用团队邀请码创建账户。注册完成前不会加载任何项目内容。"
+        : "登录后进入你的工作空间。账户确认前不会加载任何项目、画布或交付内容。";
+      password.input.autocomplete = mode === "register" ? "new-password" : "current-password";
       error.hidden = true;
     }
 
     async function submitAuth() {
       error.hidden = true;
       submit.disabled = true;
-      submit.innerHTML = `${icon("clock", 14)}<span>处理中</span>`;
+      submit.innerHTML = `${icon("clock", 14)}<span>正在确认…</span>`;
       try {
-        const payload = {
-          email: email.input.value.trim(),
-          password: password.input.value,
-        };
+        const payload = { email: email.input.value.trim(), password: password.input.value };
         const response = mode === "register"
           ? await runtime.register({
               ...payload,
@@ -108,12 +110,12 @@ function showAuthGate(runtime, { onAuthenticated } = {}) {
       } catch (authError) {
         error.textContent = safeError(authError);
         error.hidden = false;
+        error.focus?.();
       } finally {
         submit.disabled = false;
-        submit.textContent = mode === "register" ? "注册并进入" : "登录";
+        submit.textContent = mode === "register" ? "注册并进入" : "登录工作空间";
       }
     }
-
   });
 }
 
@@ -124,11 +126,11 @@ function showAuthStatusBlocked(runtime, options, initialError) {
     const head = el("div", "modal-head auth-head");
     const title = el("div", "auth-title");
     title.appendChild(el("span", "auth-mark", "AFS"));
-    title.appendChild(el("strong", "", "无法确认账号状态"));
+    title.appendChild(el("strong", "", "无法确认账户状态"));
     head.appendChild(title);
 
     const body = el("div", "modal-body auth-body");
-    body.appendChild(el("p", "auth-copy", "Runtime 账号状态确认失败。已暂停项目加载、同步和 Runtime 写入；请检查 Runtime Service 后重试。"));
+    body.appendChild(el("p", "auth-copy", "为了保护项目内容，当前已暂停项目加载、同步和 Runtime 写入，也不会显示画布或交付数据。请恢复连接后重试。"));
     const error = el("div", "modal-error", safeError(initialError));
     error.setAttribute("role", "alert");
     body.appendChild(error);
@@ -142,48 +144,44 @@ function showAuthStatusBlocked(runtime, options, initialError) {
       closeOnOutside: false,
       closeOnEscape: false,
       initialFocus: retry,
-      ariaLabel: "Runtime auth status blocked",
+      ariaLabel: "账户状态检查失败",
       onClose: () => {
         if (!settled) resolve({ auth_status_unknown: true, blocked: true, authenticated: false, user: null });
       },
     });
 
-    retry.addEventListener("click", retryStatus);
-
-    async function retryStatus() {
+    retry.addEventListener("click", async () => {
       retry.disabled = true;
-      retry.innerHTML = `${icon("clock", 14)}<span>检查中</span>`;
+      retry.innerHTML = `${icon("clock", 14)}<span>检查中…</span>`;
       error.hidden = true;
       try {
         const status = await runtime.authStatus();
         settled = true;
         close();
-        if (!status?.auth_required || status.authenticated) {
-          resolve(status);
-          return;
-        }
-        resolve(await showAuthGate(runtime, options));
+        resolve(!status?.auth_required || status.authenticated ? status : await showAuthGate(runtime, options));
       } catch (statusError) {
         error.textContent = safeError(statusError);
         error.hidden = false;
         retry.disabled = false;
         retry.textContent = "重试账号状态检查";
       }
-    }
+    });
   });
 }
 
-function field(label, type, placeholder) {
+function field(label, type, placeholder, autocomplete) {
   const wrap = el("label", "modal-field auth-field");
   wrap.appendChild(el("span", "", label));
   const input = document.createElement("input");
   input.type = type;
   input.placeholder = placeholder;
-  input.autocomplete = type === "password" ? "current-password" : "on";
+  input.autocomplete = autocomplete;
+  input.required = type !== "text" || label === "邀请码";
+  input.setAttribute("aria-label", label);
   wrap.appendChild(input);
   return { wrap, input };
 }
 
 function safeError(error) {
-  return formatRuntimeError(error, "认证请求失败，请检查 Runtime Service 后重试。");
+  return formatRuntimeError(error, "账户请求失败，请检查连接后重试。");
 }

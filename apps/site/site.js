@@ -46,10 +46,10 @@ function applyAuthEntryState(status) {
 }
 
 function entryLabel({ authRequired, authenticated, user }) {
-  if (!authRequired) return "打开 Studio";
+  if (!authRequired) return "进入制作工作空间";
   if (authenticated) {
     const name = String(user?.display_name || user?.email || "").trim();
-    return name ? `进入 ${name} 的 Studio` : "进入我的 Studio";
+    return name ? `进入 ${name} 的工作空间` : "进入我的工作空间";
   }
   return "注册 / 登录后进入";
 }

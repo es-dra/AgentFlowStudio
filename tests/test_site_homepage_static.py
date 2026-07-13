@@ -14,22 +14,24 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert "<title>AFS Studio" in index
     assert 'class="brand" href="/site/"' in index
     assert 'href="/studio/"' in index
-    assert 'href="/site/social-square.html"' in index
+    assert 'href="/site/social-square.html"' not in index
     assert 'href="/site/styles/site.css"' in index
     assert 'href="/site/styles/site-preview.css"' in index
-    assert 'href="/site/styles/social-square.css"' in index
+    assert 'href="/site/styles/social-square.css"' not in index
     assert 'href="/site/styles/site-responsive.css"' in index
     assert 'src="/site/site.js"' in index
-    assert 'src="/site/social-square.js"' in index
+    assert 'src="/site/social-square.js"' not in index
     assert "data-auth-action" in index
-    assert "Agent-native Creative Workspace" in index
-    assert "进入工作台" in index
+    assert "Agent-native Creative Workspace" not in index
+    assert "进入制作工作空间" in index
     assert "hero-visual" in index
     assert "studio-wall" in index
     assert "wall-node director" in index
-    assert "Production Spine" in index
-    assert "导演台" in index
-    assert "社交广场" in index
+    assert "Production Spine" not in index
+    assert "数字剧组" in index
+    assert "主创决策" in index
+    assert "审核与交付" in index
+    assert "社交广场" not in index
     assert "Runtime Service" not in index
     assert 'class="algorithm-section"' not in index
     assert "provider raw" not in index

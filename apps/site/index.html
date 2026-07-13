@@ -3,15 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AFS Studio | AI 视频创作工作台</title>
+    <title>AFS Studio | 数字内容制作工作空间</title>
     <meta
       name="description"
-      content="AFS Studio 是面向 AI 视频创作的工作台，帮助创作者把故事、资产、导演台、关键帧和反馈组织成连续生产链。"
+      content="AgentFlow Studio 面向内容制作团队与 MCN，把项目、单集、数字剧组、主创决策、审核和交付组织在同一制作工作空间。"
     />
     <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/styles/site.css" />
     <link rel="stylesheet" href="/site/styles/site-preview.css" />
-    <link rel="stylesheet" href="/site/styles/social-square.css" />
     <link rel="stylesheet" href="/site/styles/site-responsive.css" />
   </head>
   <body>
@@ -21,12 +20,11 @@
         <span>AFS Studio</span>
       </a>
       <nav class="nav-links" aria-label="页面入口">
-        <a href="/site/social-square.html">社交广场</a>
-        <a href="#director">导演台</a>
-        <a href="#workflow">生产链</a>
-        <a href="#evidence">验收</a>
+        <a href="#workflow">制作流程</a>
+        <a href="#crew">数字剧组</a>
+        <a href="#review">审核交付</a>
       </nav>
-      <a class="nav-action" href="/studio/" data-auth-action>打开 Studio</a>
+      <a class="nav-action" href="/studio/" data-auth-action>进入制作工作空间</a>
     </header>
 
     <main>
@@ -44,53 +42,48 @@
           </div>
         </div>
         <div class="hero-copy">
-          <p class="eyebrow">Agent-native Creative Workspace</p>
-          <h1>AFS Studio</h1>
-          <p class="hero-lede">把故事、设定图、镜头调度、生成结果和反馈放进同一张画布，让每一轮创作都能被继续使用。</p>
+          <h1>让数字剧组完成一集内容</h1>
+          <p class="hero-lede">从项目和单集出发，管理剧本、角色场景设定、分镜、媒体生产、主创决策、质量审核与精确交付。</p>
           <div class="hero-actions">
-            <a class="primary-action" href="/studio/" data-auth-action>进入工作台</a>
-            <a class="secondary-action" href="/site/social-square.html">去社交广场</a>
+            <a class="primary-action" href="/studio/" data-auth-action>进入制作工作空间</a>
           </div>
         </div>
         <div class="hero-signal" aria-label="核心生产动作">
-          <span><strong>01</strong>拆解脚本</span>
-          <span><strong>02</strong>确认资产</span>
-          <span><strong>03</strong>摆放镜头</span>
-          <span><strong>04</strong>生成与修订</span>
+          <span><strong>01</strong>项目与单集</span>
+          <span><strong>02</strong>数字剧组协作</span>
+          <span><strong>03</strong>主创决策</span>
+          <span><strong>04</strong>审核与交付</span>
         </div>
       </section>
 
       <section class="surface-band" id="workflow">
         <div class="section-heading">
-          <p class="eyebrow">Production Spine</p>
-          <h2>不是单次生成，而是可继续的内容生产链</h2>
+          <h2>围绕一集内容组织完整制作流程</h2>
         </div>
         <div class="workflow-line">
           <article>
-            <span>Script</span>
-            <h3>故事进入画布</h3>
-            <p>从想法、剧本或分镜开始，把角色、场景、道具和镜头目标拆成可审查节点。</p>
+            <span>01</span>
+            <h3>从项目与单集开始</h3>
+            <p>制作总览集中呈现阶段进度、下一步行动、阻塞事项和待主创决策。</p>
           </article>
           <article>
-            <span>Asset</span>
-            <h3>候选资产先确认</h3>
-            <p>角色和场景先成为候选卡片，满意后再固定，避免不合格结果污染后续生成。</p>
+            <span>02</span>
+            <h3>数字剧组持续协作</h3>
+            <p>编剧、分镜、美术、导演、连贯性、音频、后期和审核角色明确责任并完成交接。</p>
           </article>
           <article>
-            <span>Iterate</span>
-            <h3>反馈进入下一轮</h3>
-            <p>生成、预览、修改、重生成和固定分开处理，让每次修订都有明确边界。</p>
+            <span>03</span>
+            <h3>主创决定进入下游</h3>
+            <p>角色、场景和版本变化会标记受影响工作，等待责任角色重新确认后继续生产。</p>
           </article>
         </div>
       </section>
 
-      <section class="director-teaser" id="director">
+      <section class="director-teaser" id="crew">
         <div>
-          <p class="eyebrow">Director Stage</p>
-          <h2>用导演台锁定站位、机位和构图，再进入生成</h2>
+          <h2>看清剧组正在做什么，以及为什么被阻塞</h2>
           <p>
-            导演台会把角色位置、机位高度、景别、灯光、道具和下游节点绑定为镜头包。
-            它不是单纯的 2D 图，而是为关键帧生成提供可复用的生产约束。
+            面向主创呈现当前责任、交接、冲突、待决策事项和下游重新确认状态；技术事件与原始标识收进诊断详情。
           </p>
         </div>
         <div class="director-preview" aria-label="导演台预览">
@@ -102,37 +95,22 @@
         </div>
       </section>
 
-      <section class="social-teaser" aria-labelledby="social-teaser-title">
-        <div class="square-heading">
-          <div>
-            <p class="eyebrow">Social Square</p>
-            <h2 id="social-teaser-title">把需求放到广场，找到协作者</h2>
-            <p>发布需求、承接需求、提交成果都在独立页面完成，首页只保留最新协作信号。</p>
-          </div>
-          <a class="secondary-action" href="/site/social-square.html">发布需求</a>
-        </div>
-        <div class="square-list compact" data-social-square-list>
-          <article class="square-empty">正在读取最新需求。</article>
-        </div>
-      </section>
-
-      <section class="evidence-section" id="evidence">
+      <section class="evidence-section" id="review">
         <div class="section-heading">
-          <p class="eyebrow">Evidence</p>
-          <h2>每一次生成都保留可追溯状态</h2>
+          <h2>审核与交付不再藏在画布节点里</h2>
         </div>
         <div class="evidence-grid">
           <article>
-            <strong>候选</strong>
-            <p>生成结果先作为候选，不自动写入固定资产。</p>
+            <strong>对比</strong>
+            <p>集中查看候选、版本差异和修改原因。</p>
           </article>
           <article>
-            <strong>确认</strong>
-            <p>用户满意后再固定角色、场景或道具设定。</p>
+            <strong>检查</strong>
+            <p>统一完成一致性、叙事、音频与字幕检查。</p>
           </article>
           <article>
-            <strong>继续</strong>
-            <p>固定资产、导演台和反馈进入下一轮上下文。</p>
+            <strong>交付</strong>
+            <p>批准后保留版本、来源、导出规格和交付记录。</p>
           </article>
         </div>
       </section>
@@ -140,9 +118,8 @@
 
     <footer class="site-footer">
       <span>AFS Studio</span>
-      <span>Creative production workspace</span>
+      <span>数字内容制作工作空间</span>
     </footer>
     <script type="module" src="/site/site.js"></script>
-    <script type="module" src="/site/social-square.js"></script>
   </body>
 </html>

@@ -116,6 +116,7 @@ async function requestJson(route, { method = "GET", payload = null, meta = null 
     error.errorCode = parsed?.error || "";
     error.requestId = parsed?.request_id || response.headers.get("X-Request-ID") || "";
     error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
+    dispatchAuthBoundaryRequired(error, route);
     dispatchProjectAccessDenied(error, parsed);
     logStudioRequestFinished(requestMeta, {
       status: "failed",
@@ -135,6 +136,18 @@ async function requestJson(route, { method = "GET", payload = null, meta = null 
     elapsed_ms: Date.now() - started,
   });
   return result;
+}
+
+function dispatchAuthBoundaryRequired(error, route) {
+  if (Number(error?.status || 0) !== 401 || String(route || "").startsWith("/auth/")) return;
+  saveAuthToken("");
+  try {
+    window.dispatchEvent(new CustomEvent("afs:auth-session-expired", {
+      detail: { route, request_id: error.requestId || "" },
+    }));
+  } catch {
+    // The Runtime client can run in tests without a browser event target.
+  }
 }
 
 function dispatchProjectAccessDenied(error, parsed = null) {
@@ -456,6 +469,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     listProjects() {
       return requestJson("/projects");
+    },
+    workspaceOverview() {
+      return requestJson("/product/workspace-overview");
+    },
+    projectOverview() {
+      return requestJson(`/projects/${encoded}/product-overview`);
     },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });
