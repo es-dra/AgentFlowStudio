@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1.0",
+  "decision_id": "fixture_creator_decision_001",
+  "creator_id": "fixture_creator",
+  "selected_candidate_ids": [
+    "candidate_bea05ffd8560",
+    "candidate_e6293e130139",
+    "candidate_44a968fd4300"
+  ],
+  "revision_notes": {
+    "candidate_e6293e130139": "Keep Mira's brass signal key visible as the continuity anchor.",
+    "candidate_44a968fd4300": "End on the beacon reflection rather than an explanatory title card."
+  }
+}
