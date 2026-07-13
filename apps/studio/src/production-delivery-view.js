@@ -13,11 +13,14 @@ export function productionDeliveryView(node, candidates) {
   const delivery = productionDeliverySummary(node);
   const selected = Boolean(selection.selected_candidate_id && selection.selected_revision_id);
   const busy = ["quality_saving", "exporting", "refreshing"].includes(delivery.status);
-  const exactApproval = selected
-    && delivery.quality_decision === "approve"
+  const exactDeliveryIdentity = selected
+    && delivery.run_id === selection.run_id
     && delivery.selected_candidate_id === selection.selected_candidate_id
+    && delivery.selected_candidate_digest === selection.selected_candidate_digest
     && delivery.selected_revision_id === selection.selected_revision_id
-    && delivery.selected_revision_digest === selection.selected_revision_digest;
+    && delivery.selected_revision_digest === selection.selected_revision_digest
+    && delivery.parent_job_id === selection.selected_parent_job_id;
+  const exactApproval = exactDeliveryIdentity && delivery.quality_decision === "approve";
 
   const panel = document.createElement("section");
   panel.className = "production-delivery-panel";
@@ -84,7 +87,7 @@ export function productionDeliveryView(node, candidates) {
   status.dataset.productionDeliveryStatus = "true";
   status.dataset.state = delivery.status || (selected ? "ready" : "selection_required");
   status.setAttribute("aria-live", "polite");
-  status.textContent = deliveryMessage(delivery, selected);
+  status.textContent = deliveryMessage(delivery, selected, exactDeliveryIdentity);
   panel.appendChild(status);
 
   const boundary = document.createElement("small");
@@ -117,8 +120,8 @@ function identityView(selection, delivery) {
   return summary;
 }
 
-function deliveryMessage(delivery, selected) {
-  if (delivery.message) return String(delivery.message);
+function deliveryMessage(delivery, selected, exactDeliveryIdentity) {
+  if (exactDeliveryIdentity && delivery.message) return String(delivery.message);
   if (!selected) return "尚未选择可交付候选；审批与导出保持关闭。";
   return "当前候选和修订已绑定。完成四项检查后批准，再执行精确导出。";
 }

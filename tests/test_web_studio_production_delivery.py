@@ -35,6 +35,93 @@ def test_production_delivery_panel_is_wired_to_quality_and_exact_export_actions(
     assert "@media (max-width: 520px)" in styles
 
 
+def test_stale_delivery_authority_cannot_render_current_approval_or_enable_export() -> None:
+    payload = _node_json(
+        r'''
+import { productionDeliveryView } from "./apps/studio/src/production-delivery-view.js";
+
+function makeElement(tagName) {
+  const element = {
+    tagName: String(tagName || "").toUpperCase(),
+    children: [],
+    dataset: {},
+    attributes: {},
+    className: "",
+    title: "",
+    disabled: false,
+    checked: false,
+    textContent: "",
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    append(...children) {
+      children.forEach((child) => this.appendChild(child));
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    },
+  };
+  Object.defineProperty(element, "innerText", {
+    get() {
+      return [this.textContent, ...this.children.map((child) => child.innerText || child.textContent || "")]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    },
+  });
+  return element;
+}
+
+function findByAction(element, action) {
+  if (element?.dataset?.action === action) return element;
+  for (const child of element?.children || []) {
+    const found = findByAction(child, action);
+    if (found) return found;
+  }
+  return null;
+}
+
+globalThis.document = { createElement: makeElement };
+const digest = (char) => char.repeat(64);
+const node = {
+  id: "node-001",
+  params: {
+    creatorSelection: {
+      run_id: "run-current",
+      selected_candidate_id: "candidate-002",
+      selected_candidate_digest: digest("c"),
+      selected_revision_id: "revision-002",
+      selected_revision_digest: digest("e"),
+      selected_parent_job_id: "job-current",
+    },
+    productionDelivery: {
+      status: "approved",
+      run_id: "run-historical",
+      selected_candidate_id: "candidate-002",
+      selected_candidate_digest: digest("d"),
+      selected_revision_id: "revision-002",
+      selected_revision_digest: digest("e"),
+      parent_job_id: "job-historical",
+      quality_decision: "approve",
+      message: "质量门禁已通过：这是旧审批，不得显示为当前审批。",
+    },
+  },
+};
+const panel = productionDeliveryView(node, [{ candidate_id: "candidate-001" }, { candidate_id: "candidate-002" }]);
+const exportButton = findByAction(panel, "production-export");
+process.stdout.write(JSON.stringify({
+  exportDisabled: exportButton?.disabled,
+  text: panel?.innerText || "",
+}));
+'''
+    )
+
+    assert payload["exportDisabled"] is True
+    assert "质量门禁已通过" not in payload["text"]
+
+
 def test_quality_approval_and_export_bind_exact_selected_revision_and_fail_closed() -> None:
     payload = _node_json(
         r'''
