@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,7 @@ from apps.api.runtime_tracing import artifact_refs, blocked_refs_from_blocks, wr
 
 
 SAFE_CANDIDATE_ID = re.compile(r"^candidate_\d{3}$")
+SAFE_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 IMAGE_SUFFIX_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -484,13 +486,19 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
 
 
 def _candidate_records(output_dir: Path, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidate_counts = Counter(
+        item.get("candidate_id")
+        for item in outputs
+        if isinstance(item, dict) and isinstance(item.get("candidate_id"), str)
+    )
     records: list[dict[str, Any]] = []
     for item in outputs:
-        status = str(item.get("status") or "succeeded").strip().lower().replace("-", "_")
-        if status not in {"succeeded", "success", "completed"}:
+        if not isinstance(item, dict) or item.get("status") != "succeeded":
             continue
         candidate_id = item.get("candidate_id")
         if not isinstance(candidate_id, str) or not SAFE_CANDIDATE_ID.fullmatch(candidate_id):
+            continue
+        if candidate_counts[candidate_id] != 1:
             continue
         path = _candidate_file(output_dir, candidate_id)
         if path is None:
@@ -499,13 +507,20 @@ def _candidate_records(output_dir: Path, outputs: list[dict[str, Any]]) -> list[
         dimensions = image_dimensions(image_bytes)
         if not dimensions:
             continue
+        candidate_digest = hashlib.sha256(image_bytes).hexdigest()
+        expected_digest = item.get("source_candidate_digest")
+        if expected_digest is not None:
+            if not isinstance(expected_digest, str) or not SAFE_SHA256.fullmatch(expected_digest):
+                continue
+            if expected_digest != candidate_digest:
+                continue
         records.append(
             {
                 "candidate_id": candidate_id,
                 "path": path,
                 "status": "succeeded",
                 "byte_count": len(image_bytes),
-                "sha256": hashlib.sha256(image_bytes).hexdigest(),
+                "sha256": candidate_digest,
                 "width": dimensions["width"],
                 "height": dimensions["height"],
                 "aspect_ratio": dimensions["aspect_ratio"],
@@ -523,21 +538,33 @@ def _rebind_replay_candidate_authority(
 ) -> dict[str, Any]:
     payload = dict(response)
     job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
-    job_id = str(job.get("job_id") or "")
-    candidate_ids: list[str] = []
-    for collection, field in (
-        (payload.get("candidate_previews"), "candidate_id"),
-        (payload.get("reusable_image_assets"), "source_candidate_id"),
-    ):
-        if not isinstance(collection, list):
-            continue
-        for item in collection:
-            candidate_id = item.get(field) if isinstance(item, dict) else None
-            if isinstance(candidate_id, str) and candidate_id not in candidate_ids:
-                candidate_ids.append(candidate_id)
+    job_id = job.get("job_id") if isinstance(job.get("job_id"), str) else ""
+    replay_outputs: list[dict[str, Any]] = []
+    assets = payload.get("reusable_image_assets")
+    if safe_id(job_id) == job_id and isinstance(assets, list):
+        for item in assets:
+            if not isinstance(item, dict) or item.get("status") != "succeeded":
+                continue
+            candidate_id = item.get("source_candidate_id")
+            candidate_digest = item.get("source_candidate_digest")
+            if item.get("source_job_id") != job_id:
+                continue
+            if not isinstance(candidate_id, str) or not SAFE_CANDIDATE_ID.fullmatch(candidate_id):
+                continue
+            if not isinstance(candidate_digest, str) or not SAFE_SHA256.fullmatch(candidate_digest):
+                continue
+            if item.get("sha256") != candidate_digest:
+                continue
+            replay_outputs.append(
+                {
+                    "candidate_id": candidate_id,
+                    "status": "succeeded",
+                    "source_candidate_digest": candidate_digest,
+                }
+            )
     records = _candidate_records(
         store.run_dir(project_id, job_id),
-        [{"candidate_id": candidate_id, "status": "succeeded"} for candidate_id in candidate_ids],
+        replay_outputs,
     )
     payload["candidate_previews"] = _candidate_previews(project_id, job_id, records)
     payload["reusable_image_assets"] = _reusable_image_assets(

@@ -705,7 +705,7 @@ def _provider_outputs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         outputs.append(
             {
                 "candidate_id": item.get("candidate_id"),
-                "status": item.get("status") or "succeeded",
+                "status": item.get("status"),
                 "byte_count": item.get("byte_count"),
                 "sha256": item.get("sha256"),
                 "width": item.get("width"),

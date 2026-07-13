@@ -98,6 +98,7 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
 
     result = registry.poll("image", "codex_image", task)
     assert result["status"] == "succeeded"
+    assert result["outputs"][0]["status"] == "succeeded"
     assert result["progress"]["mode"] == "complete"
     assert result["progress"]["elapsed_sec"] >= 0
     assert result["progress"]["queued_sec"] >= 0
@@ -519,6 +520,7 @@ def test_generated_image_asset_id_is_stable_for_same_job_candidate(tmp_path) -> 
         source_job_id="job_1",
         source_candidate_id="candidate_001",
         image_path=image_path,
+        source_candidate_status="succeeded",
     )
     second = register_generated_image_asset(
         store,
@@ -527,6 +529,7 @@ def test_generated_image_asset_id_is_stable_for_same_job_candidate(tmp_path) -> 
         source_job_id="job_1",
         source_candidate_id="candidate_001",
         image_path=image_path,
+        source_candidate_status="succeeded",
     )
 
     assert first["asset"]["asset_id"] == second["asset"]["asset_id"]

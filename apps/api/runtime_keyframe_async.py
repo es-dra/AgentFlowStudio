@@ -539,6 +539,9 @@ def _provider_outputs_from_candidate_files(output_dir: Path) -> list[dict[str, A
         outputs.append(
             {
                 "candidate_id": candidate_id,
+                # This helper only emits completed candidates reconstructed from
+                # verified files inside the job's isolated output directory.
+                "status": "succeeded",
                 "byte_count": len(data),
                 "sha256": hashlib.sha256(data).hexdigest(),
                 "width": dimensions.get("width"),

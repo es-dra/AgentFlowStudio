@@ -217,11 +217,20 @@ class ReusableImageAsset(BaseModel):
         return self
 
 
+class KeyframeGenerationJob(BaseModel):
+    """Typed expected-job authority while preserving the existing job wire shape."""
+
+    model_config = ConfigDict(extra="allow")
+
+    job_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
 class KeyframeGenerationResponse(BaseModel):
     """Typed response slice while preserving the existing additive payload."""
 
     model_config = ConfigDict(extra="allow")
 
+    job: KeyframeGenerationJob
     candidate_previews: list[KeyframeCandidatePreview]
     reusable_image_assets: list[ReusableImageAsset]
 
@@ -445,6 +454,7 @@ __all__ = (
     "HumanGateDecisionRequest",
     "ImageAssetUploadRequest",
     "KeyframeCandidatePreview",
+    "KeyframeGenerationJob",
     "KeyframeGenerationRequest",
     "KeyframeGenerationResponse",
     "PromptOptimizationRequest",

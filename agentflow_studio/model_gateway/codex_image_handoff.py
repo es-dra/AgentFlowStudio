@@ -128,6 +128,7 @@ def completed_result_payload(
         "outputs": [
             {
                 "candidate_id": "candidate_001",
+                "status": "succeeded",
                 "image_path": image_ref,
                 "byte_count": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),
@@ -241,6 +242,7 @@ def _safe_outputs(output_dir: Path, result: dict[str, Any]) -> list[dict[str, An
         outputs.append(
             {
                 "candidate_id": candidate_id,
+                "status": "succeeded",
                 "image_path": path.relative_to(root).as_posix(),
                 "byte_count": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),
