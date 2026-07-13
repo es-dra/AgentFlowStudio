@@ -1,9 +1,78 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
+
+
+def test_project_access_recovery_records_warning_without_console_error() -> None:
+    script = r'''
+import {
+  reportProjectAccessRecovery,
+  reportProjectCreateClientError,
+  reportProjectDeleteClientError,
+} from "./apps/studio/src/studio-project-runtime-ops.js";
+
+const events = [];
+let consoleErrors = 0;
+const originalConsoleError = console.error;
+console.error = () => { consoleErrors += 1; };
+try {
+  const returned = reportProjectAccessRecovery(
+    { recordClientEvent: (event) => { events.push(event); return Promise.resolve(); } },
+    new Error("project access denied"),
+    "stale-project-001",
+    "next-project-002",
+    () => "Recovered after Bearer synthetic-secret at D:\\private\\runtime",
+  );
+  const errorsAfterRecovery = consoleErrors;
+  reportProjectCreateClientError(
+    { recordClientEvent: (event) => { events.push(event); return Promise.resolve(); } },
+    new Error("create failed"),
+    (error) => error.message,
+  );
+  reportProjectDeleteClientError(
+    { recordClientEvent: (event) => { events.push(event); return Promise.resolve(); } },
+    new Error("delete failed"),
+    "delete-project-003",
+    (error) => error.message,
+  );
+  process.stdout.write(JSON.stringify({ returned, events, errorsAfterRecovery, consoleErrors }));
+} finally {
+  console.error = originalConsoleError;
+}
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    recovery = payload["events"][0]
+    assert payload["errorsAfterRecovery"] == 0
+    assert payload["returned"] == recovery
+    assert recovery["event_type"] == "project_access_recovered"
+    assert recovery["severity"] == "warning"
+    assert recovery["action"] == "recover_project_access"
+    assert recovery["project_id"] == "stale-project-001"
+    assert recovery["details"] == {
+        "stale_project_id": "stale-project-001",
+        "next_project_id": "next-project-002",
+    }
+    assert "synthetic-secret" not in recovery["message"]
+    assert "D:\\" not in recovery["message"]
+    assert payload["consoleErrors"] == 2
+    assert [event["event_type"] for event in payload["events"][1:]] == [
+        "project_create_failed",
+        "project_delete_failed",
+    ]
+    assert all(event["severity"] == "error" for event in payload["events"][1:])
+
 
 def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert STUDIO_ROOT.exists()

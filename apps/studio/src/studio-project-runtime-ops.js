@@ -27,19 +27,27 @@ export function reportProjectDeleteClientError(runtime, error, projectId, safeEr
 }
 
 export function reportProjectAccessRecovery(runtime, error, staleProjectId, nextProjectId, safeError) {
-  reportClientError({
+  const staleId = safeRecoveryProjectId(staleProjectId);
+  const nextId = safeRecoveryProjectId(nextProjectId);
+  const event = {
     event_type: "project_access_recovered",
     severity: "warning",
-    message: safeError(error || "project access denied"),
+    message: safeRecoveryMessage(safeError(error || "project access denied")),
     action: "recover_project_access",
-    project_id: staleProjectId,
-    runtime,
-    error,
+    project_id: staleId,
     details: {
-      stale_project_id: staleProjectId,
-      next_project_id: nextProjectId,
+      stale_project_id: staleId,
+      next_project_id: nextId,
     },
-  });
+    generated_at: new Date().toISOString(),
+  };
+  try {
+    const pending = runtime?.recordClientEvent?.(event);
+    pending?.catch?.(() => {});
+  } catch {
+    // A successful recovery warning must never break the Studio.
+  }
+  return event;
 }
 
 export async function createProjectWithRetry(runtime, payload) {
@@ -67,4 +75,20 @@ function isTransientRuntimeError(error) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safeRecoveryProjectId(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^0-9A-Za-z_.:-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 160);
+}
+
+function safeRecoveryMessage(value) {
+  return String(value || "Project access recovered")
+    .replace(/Bearer\s+\S+|api[_-]?key\s*[:=]\s*\S+|[a-z]:\\|\/home\/|\/users\//gi, "<redacted>")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240) || "Project access recovered";
 }
