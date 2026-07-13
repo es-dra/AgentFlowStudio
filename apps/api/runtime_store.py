@@ -27,10 +27,11 @@ class RuntimeStore:
             path.mkdir(parents=True, exist_ok=True)
         self.index_path = self.root / "artifact_index.json"
         self.index_transaction_lock_path = self.root / "artifact_index.transaction.lock"
-        if not self.index_path.exists():
-            write_json(self.index_path, {"artifacts": {}})
-        else:
-            write_json(self.index_path, self._artifact_index())
+        with exclusive_file_lock(self.index_transaction_lock_path):
+            if not self.index_path.exists():
+                write_json(self.index_path, {"artifacts": {}})
+            else:
+                write_json(self.index_path, self._artifact_index())
 
     def project_manifest_path(self, project_id: str) -> Path:
         safe = safe_id(project_id)
