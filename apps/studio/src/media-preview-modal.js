@@ -12,6 +12,8 @@ export function openMediaPreviewModal({ url, type = "image", title = "媒体预�
   download.type = "button";
   download.innerHTML = `${icon("archive", 14)}<span>${type === "video" ? "下载视频" : "导出原图"}</span>`;
   const closeBtn = el("button", "modal-close");
+  closeBtn.type = "button";
+  closeBtn.setAttribute("aria-label", "Close media preview");
   closeBtn.innerHTML = icon("x", 15);
   head.append(titleEl, spacer, download, closeBtn);
 
@@ -34,7 +36,7 @@ export function openMediaPreviewModal({ url, type = "image", title = "媒体预�
     body.appendChild(img);
   }
   modal.append(head, body);
-  const close = showModal(modal);
+  const close = showModal(modal, { initialFocus: closeBtn });
   closeBtn.addEventListener("click", close);
   download.addEventListener("click", () => downloadResolvedMedia(url, downloadName || fallbackDownloadName(title, type), download));
 }

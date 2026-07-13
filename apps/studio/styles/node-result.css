@@ -17,6 +17,11 @@
   white-space: normal;
   background: rgba(13, 15, 18, 0.92);
 }
+.node-result.has-candidates:not(.has-preview) {
+  max-height: none;
+  overflow-y: visible;
+  white-space: normal;
+}
 .node.has-media-result .node-body {
   justify-content: flex-start;
   padding: 32px 14px 16px;
@@ -320,4 +325,176 @@
   padding: 2px 7px;
   color: var(--text-secondary);
   background: rgba(0, 0, 0, 0.08);
+}
+
+.candidate-selection-panel {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(20, 22, 25, 0.98);
+  white-space: normal;
+}
+.candidate-selection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+}
+.candidate-selection-head strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+.candidate-refresh,
+.candidate-revise,
+.candidate-preview-open {
+  min-height: 30px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.candidate-refresh,
+.candidate-revise { padding: 5px 8px; }
+.candidate-selection-panel .candidate-grid {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 7px;
+  border-top: 0;
+  background: transparent;
+}
+.candidate-card-shell {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #0b0d10;
+}
+.candidate-card-shell.selected {
+  border-color: rgba(90, 200, 250, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(90, 200, 250, 0.38);
+}
+.candidate-selection-panel .candidate-card {
+  display: block;
+  width: 100%;
+  border-radius: 0;
+  cursor: pointer;
+}
+.candidate-selection-panel .candidate-card:focus-visible,
+.candidate-refresh:focus-visible,
+.candidate-revise:focus-visible,
+.candidate-preview-open:focus-visible,
+.candidate-revision-control textarea:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 2px;
+}
+.candidate-selection-panel .candidate-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+.candidate-selected-label {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: rgba(12, 14, 16, 0.82);
+  color: var(--text-primary);
+  font-size: 10px;
+}
+.candidate-card.selected .candidate-selected-label {
+  border-color: rgba(90, 200, 250, 0.8);
+  font-weight: 700;
+}
+.candidate-preview-open {
+  width: 100%;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  padding: 4px 7px;
+}
+.candidate-preview-open:hover,
+.candidate-refresh:hover,
+.candidate-revise:hover {
+  border-color: var(--border-card);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+.candidate-selection-status {
+  margin: 0;
+  min-height: 18px;
+  color: #cbd2dc;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.candidate-selection-status[data-state="persisted"] { color: #a9dfb6; }
+.candidate-selection-status[data-state="saving"] { color: #ffe29a; }
+.candidate-selection-status[data-state="duplicate"],
+.candidate-selection-status[data-state="duplicate_replayed"] { color: #ffd18b; }
+.candidate-selection-status[data-state="stale_checkpoint"],
+.candidate-selection-status[data-state="retry_required"],
+.candidate-selection-status[data-state="candidate_digest_mismatch"] { color: #ffc285; }
+.candidate-revision-control {
+  display: grid;
+  gap: 7px;
+}
+.candidate-selection-identity {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 8px;
+  margin: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #cbd2dc;
+  font-size: 10px;
+}
+.candidate-selection-identity dt { color: #aeb7c3; }
+.candidate-selection-identity dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #edf2f7;
+}
+.candidate-selection-panel[aria-busy="true"] .candidate-selection-head,
+.candidate-selection-panel[aria-busy="true"] .candidate-grid,
+.candidate-selection-panel[aria-busy="true"] .candidate-revision-control {
+  opacity: 0.7;
+}
+.candidate-revision-control label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.candidate-revision-control textarea {
+  width: 100%;
+  min-height: 54px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: rgba(12, 14, 16, 0.82);
+  color: var(--text-primary);
+  padding: 7px;
+  font: inherit;
+  line-height: 1.4;
+}
+.candidate-revise:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 620px) {
+  .candidate-selection-panel { padding: 9px 8px; }
+  .candidate-selection-head { align-items: flex-start; }
+  .candidate-selection-panel .candidate-grid { grid-template-columns: minmax(0, 1fr); }
+  .candidate-card-shell { display: grid; grid-template-columns: minmax(0, 1fr) 88px; }
+  .candidate-card-shell .candidate-preview-open { border-width: 0 0 0 1px; }
+  .candidate-refresh,
+  .candidate-revise,
+  .candidate-preview-open { min-height: 44px; }
+  .candidate-revision-control textarea { min-height: 72px; }
 }

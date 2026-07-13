@@ -1,4 +1,9 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
+import {
+  candidateSelectionSummary,
+  handleCandidateGridKeydown,
+  isCandidateSelectable,
+} from "./candidate-selection-controller.js";
 import { icon } from "./icons.js";
 import { downloadResolvedMedia, openMediaPreviewModal } from "./media-preview-modal.js";
 import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
@@ -38,9 +43,9 @@ export function resultView(node) {
     frame.appendChild(previewOverlay(node));
     frame.addEventListener("dblclick", () => openNodeMediaPreview(node));
     result.appendChild(frame);
-    if (candidates.length > 1) result.appendChild(candidateGrid(candidates));
     if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result));
   }
+  if (candidates.length > 1) result.appendChild(candidateSelectionPanel(node, candidates));
   const text = document.createElement("div");
   text.className = "node-result-text";
   text.textContent = node.result;
@@ -116,36 +121,159 @@ function regenerateActionTitle(node) {
   return "按当前提示词重新生成整张图片；这不是局部编辑。";
 }
 
-function candidateGrid(candidates) {
+function candidateSelectionPanel(node, candidates) {
+  const selection = candidateSelectionSummary(node);
+  const selectedCandidateId = String(selection.selected_candidate_id || "");
+  const busy = selection.status === "saving";
+  const panel = document.createElement("section");
+  panel.className = "candidate-selection-panel";
+  panel.setAttribute("aria-label", "创作候选选择与修订");
+  panel.setAttribute("aria-busy", busy ? "true" : "false");
+  panel.dataset.busy = busy ? "true" : "false";
+
+  const head = document.createElement("div");
+  head.className = "candidate-selection-head";
+  const title = document.createElement("strong");
+  title.textContent = "选择创作候选";
+  const refresh = document.createElement("button");
+  refresh.className = "candidate-refresh";
+  refresh.type = "button";
+  refresh.dataset.action = "candidate-refresh";
+  refresh.textContent = "刷新已保存选择";
+  refresh.disabled = busy;
+  head.append(title, refresh);
+  panel.appendChild(head);
+
+  panel.appendChild(candidateGrid(candidates, selectedCandidateId, busy));
+
+  const status = document.createElement("p");
+  status.className = "candidate-selection-status";
+  status.dataset.candidateSelectionStatus = "true";
+  status.dataset.state = selection.status || (selectedCandidateId ? "persisted" : "idle");
+  status.setAttribute("aria-live", "polite");
+  status.textContent = candidateSelectionStatusText(selection, selectedCandidateId);
+  panel.appendChild(status);
+  const identity = candidateSelectionIdentity(selection);
+  if (identity) panel.appendChild(identity);
+
+  const revision = document.createElement("div");
+  revision.className = "candidate-revision-control";
+  const label = document.createElement("label");
+  label.textContent = "修订意图";
+  const input = document.createElement("textarea");
+  input.rows = 2;
+  input.maxLength = 800;
+  input.placeholder = "说明希望如何修改当前已选候选";
+  input.dataset.candidateRevisionIntent = "true";
+  input.disabled = busy;
+  input.addEventListener("pointerdown", (event) => event.stopPropagation());
+  input.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+  label.appendChild(input);
+  const revise = document.createElement("button");
+  revise.className = "candidate-revise";
+  revise.type = "button";
+  revise.dataset.action = "candidate-revise";
+  revise.dataset.candidateId = selectedCandidateId;
+  revise.disabled = busy || !selectedCandidateId;
+  revise.textContent = "基于已选候选请求修订";
+  revision.append(label, revise);
+  panel.appendChild(revision);
+  return panel;
+}
+
+function candidateGrid(candidates, selectedCandidateId, busy) {
   const grid = document.createElement("div");
   grid.className = "candidate-grid";
-  candidates.slice(0, 9).forEach((candidate, index) => {
+  grid.setAttribute("role", "radiogroup");
+  grid.setAttribute("aria-label", "生成候选");
+  grid.setAttribute("aria-disabled", busy ? "true" : "false");
+  grid.addEventListener("keydown", handleCandidateGridKeydown);
+  const firstSelectableIndex = candidates.findIndex(isCandidateSelectable);
+  candidates.forEach((candidate, index) => {
     const url = candidate.url || candidate.preview_url;
     const status = candidateStatus(candidate, url);
+    const selectable = isCandidateSelectable(candidate);
+    const selected = selectable && candidate.candidate_id === selectedCandidateId;
+    const shell = document.createElement("article");
+    shell.className = `candidate-card-shell ${status}${selected ? " selected" : ""}`;
+
     const item = document.createElement("button");
-    item.className = `candidate-card ${status}`;
+    item.className = `candidate-card ${status}${selected ? " selected" : ""}`;
     item.type = "button";
-    item.title = candidateTitle(candidate, index + 1, status);
+    item.setAttribute("role", "radio");
+    item.setAttribute("aria-checked", selected ? "true" : "false");
+    item.setAttribute("aria-label", candidateTitle(candidate, index + 1, status));
+    item.dataset.action = "candidate-select";
+    item.dataset.candidateId = candidate.candidate_id || "";
+    item.disabled = busy || !selectable;
+    item.tabIndex = selected || (!selectedCandidateId && index === firstSelectableIndex) ? 0 : -1;
     if (url) {
-      item.addEventListener("click", () => openMediaPreviewModal({
-        url,
-        type: "image",
-        title: `候选 ${index + 1}`,
-        downloadName: `候选-${String(index + 1).padStart(2, "0")}.png`,
-      }));
       const img = document.createElement("img");
       setRuntimeMediaSource(img, url);
       img.alt = `候选 ${index + 1}`;
       img.loading = "lazy";
       item.appendChild(img);
     } else {
-      item.disabled = true;
       item.appendChild(candidatePlaceholder(status));
     }
     item.appendChild(candidateBadge(index + 1));
-    grid.appendChild(item);
+    const stateLabel = document.createElement("span");
+    stateLabel.className = "candidate-selected-label";
+    stateLabel.textContent = selected ? "已选择" : selectable ? "可选择" : "不可选择";
+    item.appendChild(stateLabel);
+    shell.appendChild(item);
+
+    if (url) {
+      const preview = document.createElement("button");
+      preview.className = "candidate-preview-open";
+      preview.type = "button";
+      preview.setAttribute("aria-label", `放大查看候选 ${index + 1}，不会改变选择`);
+      preview.textContent = "放大查看";
+      preview.addEventListener("click", () => openMediaPreviewModal({
+        url,
+        type: "image",
+        title: `候选 ${index + 1}`,
+        downloadName: `候选-${String(index + 1).padStart(2, "0")}.png`,
+      }));
+      shell.appendChild(preview);
+    }
+    grid.appendChild(shell);
   });
   return grid;
+}
+
+function candidateSelectionIdentity(selection) {
+  if (!selection.selected_candidate_id) return null;
+  const summary = document.createElement("dl");
+  summary.className = "candidate-selection-identity";
+  const fields = [
+    ["Candidate", selection.selected_candidate_id],
+    ["Revision", selection.selected_revision_id],
+    ["Checkpoint", Number.isInteger(selection.checkpoint_version) ? `v${selection.checkpoint_version}` : ""],
+    ["Lineage job", selection.selected_parent_job_id],
+    ["Parent candidate", selection.selected_parent_candidate_id],
+    ["Asset source", selection.selected_asset_id],
+  ].filter(([, value]) => String(value || "").trim());
+  for (const [label, value] of fields) {
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.textContent = compactSafeIdentifier(value);
+    detail.title = String(value);
+    summary.append(term, detail);
+  }
+  return summary;
+}
+
+function compactSafeIdentifier(value) {
+  const text = String(value || "");
+  return text.length > 34 ? `${text.slice(0, 18)}…${text.slice(-10)}` : text;
+}
+
+function candidateSelectionStatusText(selection, selectedCandidateId) {
+  if (selection.message) return String(selection.message);
+  if (selectedCandidateId) return `已从生产状态恢复候选 ${selectedCandidateId}`;
+  return "尚未选择。放大查看不会改变选择。";
 }
 
 function candidatePlaceholder(status) {

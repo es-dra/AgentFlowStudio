@@ -28,6 +28,7 @@ import { createProjectController } from "./studio-project-controller.js";
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
+import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -50,7 +51,10 @@ const projectController = createProjectController({
     store.attachRuntime(runtime);
     void refreshRuntimeSurfaceStatus();
   },
-  onProjectReady: (runtimeClient) => refreshPendingKeyframeGenerations(store, runtimeClient),
+  onProjectReady: async (runtimeClient) => {
+    await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
+    await refreshPendingKeyframeGenerations(store, runtimeClient);
+  },
   render: () => renderAll(store.get()),
 });
 
@@ -97,6 +101,7 @@ async function bootstrap() {
   await projectController.ensureAccessibleStartupProject();
   await store.hydrateRuntime(runtime);
   await syncRuntimeAssets(store, runtime);
+  await restoreCandidateSelectionsAfterLoad(store, runtime);
   await refreshPendingKeyframeGenerations(store, runtime);
   await projectController.refreshProjectSummaries();
 }

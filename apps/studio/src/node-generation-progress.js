@@ -1,4 +1,5 @@
 import { responseStatusSummary } from "./generation-status-policy.js";
+import { selectReusableAssetAuthority, validatedCandidatePreviewRoute } from "./reusable-asset-authority.js";
 import { redactUnsafeText } from "./safe-text-redaction.js";
 
 const KIND_LABELS = {
@@ -100,25 +101,28 @@ export function candidatePreviewItems(response) {
   const candidates = [];
   const byKey = new Map();
   const blocks = candidateFailureBlocks(response);
+  const parentJobId = safeIdentifier(response?.job?.job_id, 160);
+  const projectId = trustedEnvelopeProjectId(response);
   const recoveryOutputs = Array.isArray(response?.runtime_recovery?.outputs) ? response.runtime_recovery.outputs : [];
   for (const output of recoveryOutputs) {
-    addCandidatePreview(candidates, byKey, normalizeRecoveryCandidate(output, blocks));
+    addCandidatePreview(candidates, byKey, normalizeRecoveryCandidate(output, blocks, parentJobId, projectId));
   }
   const raw = Array.isArray(response?.candidate_previews) ? response.candidate_previews : [];
   for (const item of raw) {
-    addCandidatePreview(candidates, byKey, normalizeCandidatePreview(item));
+    addCandidatePreview(candidates, byKey, normalizeCandidatePreview(item, parentJobId, projectId));
   }
   if (!recoveryOutputs.length) {
     for (const block of blocks) addCandidatePreview(candidates, byKey, normalizeFailedCandidate(block));
   }
-  return candidates.filter(hasCandidateEvidence);
+  return bindReusableAssetAuthorities(candidates, response?.reusable_image_assets)
+    .filter(hasCandidateEvidence);
 }
 
 export function firstCandidatePreview(response) {
   return candidatePreviewItems(response).find((item) => item.url || item.preview_url) || null;
 }
 
-function normalizeCandidatePreview(item) {
+function normalizeCandidatePreview(item, parentJobId = "", projectId = "") {
   if (typeof item === "string") {
     const url = safePreviewUrl(item);
     if (!url) return null;
@@ -132,16 +136,20 @@ function normalizeCandidatePreview(item) {
     };
   }
   if (!item || typeof item !== "object") return null;
-  const url = firstSafePreviewUrl(item.preview_url, item.url, item.image_asset_preview_url);
+  const identity = normalizedCandidateIdentity(item, parentJobId, projectId);
   return compactCandidate({
-    candidate_id: safeCandidateId(item.candidate_id || item.item_id || item.id) || candidateIdFromUrl(url),
-    url,
-    preview_url: url,
+    candidate_id: identity.candidateId,
+    canonical_digest: safeSha256(item.canonical_digest || item.sha256),
+    parent_job_id: identity.parentJobId,
+    project_id: identity.projectId,
+    parent_candidate_id: safeIdentifier(item.parent_candidate_id, 160),
+    shot_id: safeIdentifier(item.shot_id, 160),
+    url: identity.previewUrl,
+    preview_url: identity.previewUrl,
     width: safeOptionalCount(item.width, 20000),
     height: safeOptionalCount(item.height, 20000),
     aspect_ratio: safeAspectRatio(item.aspect_ratio),
     artifact_id: safeIdentifier(item.artifact_id, 160),
-    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
     byte_count: safeOptionalCount(item.byte_count, 100000000),
     attempt_index: safeOptionalCount(item.attempt_index, 9999),
     requested_count: safeOptionalCount(item.requested_count, 9999),
@@ -152,22 +160,27 @@ function normalizeCandidatePreview(item) {
   });
 }
 
-function normalizeRecoveryCandidate(item, blocks) {
+function normalizeRecoveryCandidate(item, blocks, parentJobId = "", projectId = "") {
   if (!item || typeof item !== "object") return null;
-  const candidateId = safeCandidateId(item.item_id || item.candidate_id || item.id);
+  const identity = normalizedCandidateIdentity(item, parentJobId, projectId, true);
+  const candidateId = identity.candidateId;
   const block = blocks.find((candidateBlock) => safeCandidateId(candidateBlock.candidate_id) === candidateId) || {};
-  const url = firstSafePreviewUrl(item.preview_url, item.image_asset_preview_url, item.url);
+  const url = identity.previewUrl;
   const status = candidateStatus(item.status || item.state || (url ? "succeeded" : ""));
   const state = candidateState(item.state || item.status || status);
   return compactCandidate({
     candidate_id: candidateId,
+    canonical_digest: safeSha256(item.canonical_digest || item.sha256),
+    parent_job_id: identity.parentJobId,
+    project_id: identity.projectId,
+    parent_candidate_id: safeIdentifier(item.parent_candidate_id, 160),
+    shot_id: safeIdentifier(item.shot_id, 160),
     url,
     preview_url: url,
     width: safeOptionalCount(item.width, 20000),
     height: safeOptionalCount(item.height, 20000),
     aspect_ratio: safeAspectRatio(item.aspect_ratio),
     artifact_id: safeIdentifier(item.artifact_id, 160),
-    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
     byte_count: safeOptionalCount(item.byte_count, 100000000),
     attempt_index: safeOptionalCount(item.attempt_index, 9999),
     requested_count: safeOptionalCount(item.requested_count, 9999),
@@ -198,6 +211,64 @@ function normalizeFailedCandidate(block) {
 function candidateFailureBlocks(response) {
   const blocks = Array.isArray(response?.safe_manifest?.blocks) ? response.safe_manifest.blocks : [];
   return blocks.filter((block) => block && typeof block === "object");
+}
+
+function bindReusableAssetAuthorities(candidates, assets) {
+  return candidates.map((candidate) => {
+    const authority = selectReusableAssetAuthority(candidate, assets);
+    return authority
+      ? { ...candidate, reusable_asset_authority: authority, image_asset_id: authority.asset_id }
+      : candidate;
+  });
+}
+
+function normalizedCandidateIdentity(item, parentJobId, projectId, recovery = false) {
+  const firstUrl = recovery
+    ? firstSafePreviewUrl(item.preview_url, item.previewUrl, item.image_asset_preview_url, item.imageAssetPreviewUrl, item.url)
+    : firstSafePreviewUrl(item.preview_url, item.previewUrl, item.url, item.image_asset_preview_url, item.imageAssetPreviewUrl);
+  const candidateId = safeCandidateId(
+    recovery ? item.item_id || item.candidate_id || item.id : item.candidate_id || item.item_id || item.id,
+  ) || candidateIdFromUrl(firstUrl);
+  const envelopeJobId = safeIdentifier(parentJobId, 160);
+  const rawItemJobId = String(item.parent_job_id || "").trim();
+  const itemJobId = safeIdentifier(rawItemJobId, 160);
+  const itemJobMatchesEnvelope = !rawItemJobId || (itemJobId && itemJobId === envelopeJobId);
+  const normalizedParentJobId = envelopeJobId && itemJobMatchesEnvelope ? envelopeJobId : "";
+  const envelopeProjectId = safeIdentifier(projectId, 160);
+  const visibilityProjectId = envelopeProjectId || projectIdFromCandidateUrl(firstUrl);
+  const route = normalizedParentJobId
+    ? validatedCandidatePreviewRoute({
+      candidate_id: candidateId,
+      parent_job_id: normalizedParentJobId,
+      project_id: visibilityProjectId,
+      preview_url: item.preview_url,
+      url: item.url,
+      previewUrl: item.previewUrl,
+      image_asset_preview_url: item.image_asset_preview_url,
+      imageAssetPreviewUrl: item.imageAssetPreviewUrl,
+    })
+    : null;
+  return {
+    candidateId,
+    parentJobId: normalizedParentJobId,
+    projectId: envelopeProjectId,
+    previewUrl: route?.preview_url || "",
+  };
+}
+
+function trustedEnvelopeProjectId(response) {
+  const rawProjectId = String(response?.project_id || "").trim();
+  const rawJobProjectId = String(response?.job?.project_id || "").trim();
+  const projectId = safeIdentifier(rawProjectId, 160);
+  const jobProjectId = safeIdentifier(rawJobProjectId, 160);
+  if ((rawProjectId && !projectId) || (rawJobProjectId && !jobProjectId)) return "";
+  if (projectId && jobProjectId && projectId !== jobProjectId) return "";
+  return projectId || jobProjectId;
+}
+
+function projectIdFromCandidateUrl(url) {
+  const match = String(url || "").match(/^\/projects\/([^/]+)\/keyframe-generations\//);
+  return safeIdentifier(match?.[1], 160);
 }
 
 function addCandidatePreview(candidates, byKey, candidate) {
@@ -251,6 +322,11 @@ function candidateStatus(value) {
 
 function safeCandidateId(value) {
   return safeIdentifier(value, 40);
+}
+
+function safeSha256(value) {
+  const digest = String(value || "").trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(digest) ? digest : "";
 }
 
 function safeReason(value) {

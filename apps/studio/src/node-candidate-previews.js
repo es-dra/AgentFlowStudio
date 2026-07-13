@@ -1,4 +1,5 @@
 import { redactUnsafeText } from "./safe-text-redaction.js";
+import { selectReusableAssetAuthority, validatedCandidatePreviewRoute } from "./reusable-asset-authority.js";
 
 export function candidatePreviewsFromNode(node) {
   const raw = node?.params?.candidatePreviewUrls || node?.params?.candidate_previews || node?.params?.candidates || [];
@@ -25,17 +26,35 @@ function normalizeStoredCandidate(item) {
     };
   }
   if (!item || typeof item !== "object") return null;
-  const url = item.url || item.preview_url || "";
+  const candidateId = safeCandidateId(
+    item.candidate_id || item.item_id || item.id
+    || candidateIdFromUrl(item.url || item.preview_url || item.previewUrl || item.image_asset_preview_url || item.imageAssetPreviewUrl),
+  );
+  const route = validatedCandidatePreviewRoute({
+    candidate_id: candidateId,
+    parent_job_id: item.parent_job_id,
+    project_id: item.project_id,
+    preview_url: item.preview_url,
+    url: item.url,
+    previewUrl: item.previewUrl,
+    image_asset_preview_url: item.image_asset_preview_url,
+    imageAssetPreviewUrl: item.imageAssetPreviewUrl,
+  });
+  const url = route?.preview_url || "";
   const status = candidateStatus(item.status || item.state || (url ? "succeeded" : ""));
-  return {
-    candidate_id: safeCandidateId(item.candidate_id || item.item_id || item.id || candidateIdFromUrl(url)),
+  const candidate = {
+    candidate_id: candidateId,
+    canonical_digest: safeSha256(item.canonical_digest || item.sha256),
+    parent_job_id: safeToken(item.parent_job_id, 160),
+    project_id: safeToken(item.project_id, 160),
+    parent_candidate_id: safeToken(item.parent_candidate_id, 160),
+    shot_id: safeToken(item.shot_id, 160),
     url,
-    preview_url: item.preview_url || url,
+    preview_url: url,
     width: safeOptionalCount(item.width),
     height: safeOptionalCount(item.height),
     aspect_ratio: safeToken(item.aspect_ratio, 20),
     artifact_id: safeToken(item.artifact_id, 160),
-    image_asset_id: safeToken(item.image_asset_id || item.asset_id, 160),
     byte_count: safeOptionalCount(item.byte_count),
     status,
     state: item.state || (status === "succeeded" ? "complete" : status),
@@ -43,6 +62,17 @@ function normalizeStoredCandidate(item) {
     failure_class: safeToken(item.failure_class || item.block_id, 80),
     reason: safeReason(item.reason || item.message || item.error),
   };
+  const authority = selectReusableAssetAuthority({
+    ...candidate,
+    preview_url: item.preview_url,
+    url: item.url,
+    previewUrl: item.previewUrl,
+    image_asset_preview_url: item.image_asset_preview_url,
+    imageAssetPreviewUrl: item.imageAssetPreviewUrl,
+  }, [item.reusable_asset_authority]);
+  return authority
+    ? { ...candidate, reusable_asset_authority: authority, image_asset_id: authority.asset_id }
+    : candidate;
 }
 
 function manifestCandidateItems(manifest) {
@@ -120,6 +150,11 @@ function safeCandidateId(value) {
 
 function safeToken(value, limit) {
   return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, limit);
+}
+
+function safeSha256(value) {
+  const digest = String(value || "").trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(digest) ? digest : "";
 }
 
 function safeOptionalCount(value) {

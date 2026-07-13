@@ -953,6 +953,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "downloadResolvedMedia" in media_preview
     assert "setRuntimeMediaSource(link, url)" in media_preview
     assert "media-preview-modal" in media_preview
+    assert 'closeBtn.setAttribute("aria-label", "Close media preview")' in media_preview
+    assert "showModal(modal, { initialFocus: closeBtn })" in media_preview
     assert "qualityFeedbackView" not in result_view
     assert "openQualityFeedbackMenu" in node_menu
     assert "反馈图片质量" in node_menu

@@ -1,6 +1,7 @@
 import { mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
 import { visibleAssetForNode } from "./node-visible-assets.js";
-import { firstCandidatePreview, updateNodeGenerationState } from "./node-generation-progress.js";
+import { candidatePreviewItems, updateNodeGenerationState } from "./node-generation-progress.js";
+import { selectReusableAssetAuthority } from "./reusable-asset-authority.js";
 import { isKeyframeInProgress, keyframeResultText } from "./node-generation-results.js";
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { keyframeSourceEvidenceTrace } from "./keyframe-source-evidence-trace.js";
@@ -23,17 +24,20 @@ const ALLOWED_PUBLIC_FAILURE_CLASSES = new Set([
   "remote_vision_provider_not_ready",
 ]);
 export function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
+  // reusable_image_assets is normalized once by candidatePreviewItems; this consumer accepts only its validated proof.
   const status = response?.job?.status || "blocked";
   const inProgress = isKeyframeInProgress(response);
   const kind = options.kind || "keyframe";
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
-    const reusableAsset = response?.reusable_image_assets?.[0] || null;
-    const preview = firstCandidatePreview(response) || previewFromReusableAsset(reusableAsset);
+    const candidates = candidatePreviewItems(response);
+    const selectedCandidateId = String(n.params?.creatorSelection?.selected_candidate_id || "");
+    const preview = explicitCandidatePreview(candidates, selectedCandidateId);
+    const reusableAsset = reusableAssetAuthority(preview);
     const outputCount = Number(response?.safe_manifest?.output_count || 0);
     const succeeded = status === "succeeded";
-    const partial = !succeeded && !inProgress && Boolean(preview?.preview_url || reusableAsset?.preview_url || outputCount > 0);
+    const partial = !succeeded && !inProgress && Boolean(candidates.length || reusableAsset?.preview_url || outputCount > 0);
     const jobId = response?.job?.job_id || null;
     const shouldRecordAsset = (succeeded || partial) && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
     updateNodeGenerationState(n, response, { kind, retrying: Boolean(options.retrying) });
@@ -42,6 +46,8 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     if (preview?.preview_url) {
       n.previewUrl = preview.preview_url;
       resizeNodeForImagePreview(n, preview, request.aspect_ratio);
+    } else if (candidates.length > 1 && !selectedCandidateId) {
+      delete n.previewUrl;
     }
     if (succeeded && reusableAsset?.asset_id) {
       n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAssetForNode(n, reusableAsset, kind)).slice(-4);
@@ -53,7 +59,7 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     n.params.lastKeyframeSourceEvidenceTrace = keyframeSourceEvidenceTrace(n) || n.params.lastKeyframeSourceEvidenceTrace || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
     n.result = keyframeResultText(response, request, succeeded, { kind, partial });
-    if (shouldRecordAsset) {
+    if (shouldRecordAsset && n.previewUrl && reusableAsset) {
       n.params.lastKeyframeCompletedJobId = jobId;
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({
@@ -68,6 +74,19 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
       });
     }
   });
+}
+
+function explicitCandidatePreview(candidates, selectedCandidateId) {
+  const previews = Array.isArray(candidates) ? candidates : [];
+  if (selectedCandidateId) {
+    return previews.find((item) => String(item?.candidate_id || "") === selectedCandidateId && (item?.preview_url || item?.url)) || null;
+  }
+  return previews.length === 1 && (previews[0]?.preview_url || previews[0]?.url) ? previews[0] : null;
+}
+
+function reusableAssetAuthority(candidate) {
+  if (!candidate?.reusable_asset_authority) return null;
+  return selectReusableAssetAuthority(candidate, [candidate.reusable_asset_authority]);
 }
 export function nodeGenerationKind(node) {
   return node?.params?.nodeRole === "asset_card_draft" ? "asset" : "keyframe";
@@ -84,16 +103,6 @@ function reusableAssetForNode(node, reusableAsset, kind) {
   const role = { character: "character_reference", scene: "scene_reference", prop: "prop_reference" }[assetType] || "asset_reference";
   return { ...reusableAsset, role };
 }
-function previewFromReusableAsset(asset) {
-  if (!asset?.preview_url) return null;
-  return {
-    preview_url: asset.preview_url,
-    width: asset.width || null,
-    height: asset.height || null,
-    aspect_ratio: asset.aspect_ratio || null,
-  };
-}
-
 function publicGenerationManifest(response) {
   const manifest = response?.safe_manifest;
   if (!manifest || typeof manifest !== "object") return null;

@@ -399,6 +399,116 @@ def test_quality_review_and_export_bind_selected_revision_with_hash_readback(tmp
     assert "export artifact integrity mismatch" in tampered_readback.text
 
 
+def test_authenticated_multi_candidate_creator_flow_restores_and_exports_selected_revision_lineage(
+    tmp_path, monkeypatch
+) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    created_response = client.post(
+        "/projects/owned-project/production-runs",
+        json=_create_payload(),
+        headers=headers,
+    )
+    assert created_response.status_code == 200, created_response.text
+    created = created_response.json()["production_run"]
+    candidate = created["candidates"][1]
+    decision_route = "/projects/owned-project/production-runs/production-run-001/creator-decisions"
+
+    selected_response = client.post(
+        decision_route,
+        json=_creator_decision(
+            created,
+            decision_id="decision-select-candidate-002",
+            idempotency_key="decision-select-candidate-002",
+            candidate_id=candidate["candidate_id"],
+            candidate_digest=candidate["canonical_digest"],
+        ),
+        headers=headers,
+    )
+    assert selected_response.status_code == 200, selected_response.text
+    selected = selected_response.json()["production_run"]
+    selected_revision = selected["selected_revision"]
+
+    refreshed = client.get(
+        "/projects/owned-project/production-runs/production-run-001",
+        headers=headers,
+    )
+    assert refreshed.status_code == 200, refreshed.text
+    assert refreshed.json()["studio_binding"]["selected_candidate_id"] == "candidate-002"
+    assert refreshed.json()["studio_binding"]["selected_revision_id"] == selected_revision["revision_id"]
+
+    revised_response = client.post(
+        decision_route,
+        json=_creator_decision(
+            selected,
+            decision_id="decision-revise-candidate-002",
+            idempotency_key="decision-revise-candidate-002",
+            decision="revise",
+            candidate_id=candidate["candidate_id"],
+            candidate_digest=candidate["canonical_digest"],
+            parent_revision_id=selected_revision["revision_id"],
+            revision_intent="Keep the selected composition and refine the key light.",
+        ),
+        headers=headers,
+    )
+    assert revised_response.status_code == 200, revised_response.text
+    revised = revised_response.json()["production_run"]
+    revision = revised["selected_revision"]
+    assert revision["candidate_id"] == "candidate-002"
+    assert revision["parent_revision_id"] == selected_revision["revision_id"]
+
+    review_payload = {
+        "schema_version": "afs_production_quality_review.v0.1",
+        "review_id": "quality-review-selected-revision",
+        "idempotency_key": "quality-review-selected-revision",
+        "expected_checkpoint_version": revised["checkpoint"]["version"],
+        "reviewed_subject_digest": revision["subject_digest"],
+        "selected_revision_id": revision["revision_id"],
+        "selected_revision_digest": revision["canonical_digest"],
+        "decision": "approve",
+        "checklist": {
+            "story_intent_preserved": True,
+            "character_continuity_checked": True,
+            "shot_coverage_checked": True,
+            "revision_addressed": True,
+        },
+        "note": "Automated contract review only; not human acceptance.",
+    }
+    reviewed_response = client.post(
+        "/projects/owned-project/production-runs/production-run-001/quality-reviews",
+        json=review_payload,
+        headers=headers,
+    )
+    assert reviewed_response.status_code == 200, reviewed_response.text
+    reviewed = reviewed_response.json()["production_run"]
+
+    export_response = client.post(
+        "/projects/owned-project/production-runs/production-run-001/exports",
+        json={
+            "schema_version": "afs_production_export.v0.1",
+            "export_id": "export-selected-revision",
+            "idempotency_key": "export-selected-revision",
+            "expected_checkpoint_version": reviewed["checkpoint"]["version"],
+            "selected_revision_id": revision["revision_id"],
+            "selected_revision_digest": revision["canonical_digest"],
+        },
+        headers=headers,
+    )
+    assert export_response.status_code == 200, export_response.text
+    exported = export_response.json()
+    assert exported["studio_binding"]["last_export_id"] == "export-selected-revision"
+    artifact = client.get(f"/artifacts/{exported['export']['artifact']['artifact_id']}", headers=headers)
+    assert artifact.status_code == 200, artifact.text
+    delivery = artifact.json()["payload"]
+    assert delivery["selected_revision"]["revision_id"] == revision["revision_id"]
+    assert {item["relation"] for item in delivery["lineage"]} >= {
+        "candidate_received_creator_decision",
+        "candidate_selected_as_revision",
+        "creator_decision_defined_revision",
+        "revision_revised_to_revision",
+        "selected_revision_quality_reviewed",
+    }
+
+
 def test_checkpoint_tampering_fails_closed_on_readback(tmp_path, monkeypatch) -> None:
     client, headers = _registered_client(tmp_path, monkeypatch)
     _create_run(client, headers)
