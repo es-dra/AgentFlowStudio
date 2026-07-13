@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import re
+from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -9,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
 from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_generated_image_assets import resolve_generated_candidate_authority
 from apps.api.runtime_production_models import (
     PRODUCTION_CHECKPOINT_SCHEMA_VERSION,
     PRODUCTION_EXPORT_SCHEMA_VERSION,
@@ -25,6 +29,11 @@ from apps.api.runtime_production_models import (
     checkpoint_digest,
 )
 from apps.api.runtime_store import RuntimeStore, safe_id
+from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID, VIDEO_SUFFIX_TYPES
+
+
+SAFE_SHA256 = re.compile(r"^[a-f0-9]{64}$")
+SAFE_PREVIEW_JOB_STATUSES = frozenset({"succeeded", "partially_complete", "complete"})
 
 
 def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -114,7 +123,10 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             _require_run_owner(run, owner_user_id)
             _validate_checkpoint(run)
             _validate_export_artifacts(store, project_id, run)
-        return {"project_id": project_id, "production_runs": runs}
+        return {
+            "project_id": project_id,
+            "production_runs": [_production_run_read_projection(store, project_id, run) for run in runs],
+        }
 
     @app.get("/projects/{project_id}/production-runs/{run_id}")
     def get_production_run(project_id: str, run_id: str, request: Request) -> dict[str, Any]:
@@ -126,7 +138,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         _require_run_owner(run, owner_user_id)
         _validate_checkpoint(run)
         _validate_export_artifacts(store, project_id, run)
-        return _run_response(run)
+        return _run_response(_production_run_read_projection(store, project_id, run))
 
     @app.get("/projects/{project_id}/production-runs/{run_id}/representative-episode-binding")
     def get_representative_episode_binding(
@@ -658,6 +670,160 @@ def _run_response(
     if export is not None:
         payload["export"] = export
     return payload
+
+
+def _production_run_read_projection(
+    store: RuntimeStore,
+    project_id: str,
+    run: dict[str, Any],
+) -> dict[str, Any]:
+    projected = deepcopy(run)
+    candidates = projected.get("candidates")
+    if not isinstance(candidates, list):
+        return projected
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        candidate.pop("safe_preview", None)
+        descriptor = _candidate_safe_preview(store, project_id, candidate)
+        if descriptor is not None:
+            candidate["safe_preview"] = descriptor
+    return projected
+
+
+def _candidate_safe_preview(
+    store: RuntimeStore,
+    project_id: str,
+    candidate: dict[str, Any],
+) -> dict[str, str] | None:
+    candidate_id = candidate.get("candidate_id")
+    parent_job_id = candidate.get("parent_job_id")
+    canonical_digest = candidate.get("canonical_digest")
+    if (
+        not isinstance(candidate_id, str)
+        or not isinstance(parent_job_id, str)
+        or not isinstance(canonical_digest, str)
+        or safe_id(project_id) != project_id
+        or safe_id(parent_job_id) != parent_job_id
+        or SAFE_SHA256.fullmatch(canonical_digest) is None
+    ):
+        return None
+    try:
+        job = store.load_job(parent_job_id)
+    except (KeyError, OSError, ValueError):
+        return None
+    if (
+        job.get("job_id") != parent_job_id
+        or job.get("project_id") != project_id
+        or job.get("status") not in SAFE_PREVIEW_JOB_STATUSES
+    ):
+        return None
+    action = job.get("action")
+    if action == "keyframe_generation":
+        return _image_candidate_safe_preview(
+            store,
+            project_id,
+            parent_job_id,
+            candidate_id,
+            canonical_digest,
+        )
+    if action == "video_generation":
+        return _video_candidate_safe_preview(
+            store,
+            project_id,
+            parent_job_id,
+            candidate_id,
+            canonical_digest,
+        )
+    return None
+
+
+def _image_candidate_safe_preview(
+    store: RuntimeStore,
+    project_id: str,
+    parent_job_id: str,
+    candidate_id: str,
+    canonical_digest: str,
+) -> dict[str, str] | None:
+    try:
+        authority = resolve_generated_candidate_authority(
+            store,
+            project_id,
+            source_job_id=parent_job_id,
+            source_candidate_id=candidate_id,
+            require_existing_asset=True,
+        )
+    except (OSError, ValueError):
+        return None
+    if (
+        authority.get("source_job_id") != parent_job_id
+        or authority.get("source_candidate_id") != candidate_id
+        or authority.get("sha256") != canonical_digest
+    ):
+        return None
+    return {
+        "media_kind": "image",
+        "preview_url": (
+            f"/projects/{project_id}/keyframe-generations/{parent_job_id}/"
+            f"candidates/{candidate_id}/preview"
+        ),
+    }
+
+
+def _video_candidate_safe_preview(
+    store: RuntimeStore,
+    project_id: str,
+    parent_job_id: str,
+    candidate_id: str,
+    canonical_digest: str,
+) -> dict[str, str] | None:
+    if SAFE_CANDIDATE_ID.fullmatch(candidate_id) is None:
+        return None
+    output_dir = store.run_dir(project_id, parent_job_id).resolve()
+    video_dir = (output_dir / "video_candidates").resolve()
+    root = store.root.resolve()
+    try:
+        output_dir.relative_to(root)
+        video_dir.relative_to(output_dir)
+    except ValueError:
+        return None
+    if not video_dir.is_dir():
+        return None
+    candidate_files = [path for path in video_dir.glob(f"{candidate_id}.*") if path.is_file()]
+    if len(candidate_files) != 1:
+        return None
+    path = candidate_files[0].resolve()
+    try:
+        path.relative_to(video_dir)
+    except ValueError:
+        return None
+    if (
+        path.parent != video_dir
+        or path.name != f"{candidate_id}{path.suffix}"
+        or path.suffix not in VIDEO_SUFFIX_TYPES
+    ):
+        return None
+    try:
+        actual_digest = _file_sha256(path)
+    except OSError:
+        return None
+    if actual_digest != canonical_digest:
+        return None
+    return {
+        "media_kind": "video",
+        "preview_url": (
+            f"/projects/{project_id}/video-generations/{parent_job_id}/"
+            f"candidates/{candidate_id}/preview"
+        ),
+    }
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _studio_binding(run: dict[str, Any]) -> dict[str, Any]:
