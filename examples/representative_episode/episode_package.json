@@ -1,0 +1,2215 @@
+{
+  "schema_version": "afs.representative_episode_preparation.v0.1",
+  "evidence_label": "representative_episode_preparation_pass",
+  "provider_calls_started": 0,
+  "media_generation_status": "not_started",
+  "project": {
+    "project_id": "afs-rainlight-project",
+    "episode_id": "ep-rainlight-001",
+    "title": "《雨灯失窃案》第一集：最后一盏引魂灯",
+    "current_version_id": "ep-rainlight-001-v1",
+    "duration_seconds": 135,
+    "format": "16:9 Chinese manhua-drama",
+    "language": "zh-CN"
+  },
+  "creative_brief": {
+    "premise": "暴雨夜，巡灯少女林遥追查被盗的引魂灯，却发现失踪母亲把整群灾民藏进了会呼吸的画卷。",
+    "audience": "18–35岁喜爱国风悬疑、轻奇幻与强角色关系的短剧观众",
+    "hook": "最后一盏灯既能带亡魂回家，也能把被遗忘的人从画里唤醒。",
+    "emotional_arc": "追逐与戒备→母亲真相带来的失衡→拒绝牺牲灯灵→共同守护与更大地下城悬念",
+    "commercial_format": "135秒单集，15镜头，前三秒视觉钩子，结尾可连续追更"
+  },
+  "characters": [
+    {
+      "character_id": "char-lin-yao",
+      "name": "林遥",
+      "role": "巡灯信使",
+      "version_id": "char-lin-yao-v1",
+      "current_version_id": "char-lin-yao-v1",
+      "appearance": "18岁短发少女，墨蓝防水斗篷、铜制灯扣、左眉细疤",
+      "personality": "克制、敏捷、对失踪母亲执着",
+      "continuity_constraints": [
+        "斗篷始终墨蓝",
+        "灯扣位于右肩",
+        "左眉疤不可镜像"
+      ]
+    },
+    {
+      "character_id": "char-xiao-qi",
+      "name": "小祈",
+      "role": "机械狐灯灵",
+      "version_id": "char-xiao-qi-v1",
+      "current_version_id": "char-xiao-qi-v1",
+      "appearance": "掌心大小的白瓷机械狐，青铜关节、青色瞳光",
+      "personality": "机敏、嘴硬、忠诚",
+      "continuity_constraints": [
+        "尾部三节",
+        "左耳缺角",
+        "瞳光仅在运算时增强"
+      ]
+    },
+    {
+      "character_id": "char-curator-yu",
+      "name": "余叔",
+      "role": "档案馆长",
+      "version_id": "char-curator-yu-v1",
+      "current_version_id": "char-curator-yu-v1",
+      "appearance": "五十岁，灰发、旧式圆镜、暗红长衫与防水书袋",
+      "personality": "温和、负疚、守序",
+      "continuity_constraints": [
+        "圆镜右片裂纹",
+        "书袋始终斜挎",
+        "雨后衣摆湿痕连续"
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "scene-rain-alley",
+      "name": "雨巷",
+      "version_id": "scene-rain-alley-v1",
+      "current_version_id": "scene-rain-alley-v1",
+      "description": "霓虹被暴雨切碎的旧城窄巷，积水映出灯塔",
+      "style_constraints": [
+        "墨线轮廓",
+        "冷青雨景",
+        "引魂灯暖金为唯一高饱和"
+      ]
+    },
+    {
+      "scene_id": "scene-archive-tower",
+      "name": "旧档案塔",
+      "version_id": "scene-archive-tower-v1",
+      "current_version_id": "scene-archive-tower-v1",
+      "description": "木构卷宗塔与黄铜齿轮共生，纸页像鸟群环飞",
+      "style_constraints": [
+        "纵深书架",
+        "青铜机械细节",
+        "纸张运动可读"
+      ]
+    },
+    {
+      "scene_id": "scene-dawn-rooftop",
+      "name": "塔顶黎明",
+      "version_id": "scene-dawn-rooftop-v1",
+      "current_version_id": "scene-dawn-rooftop-v1",
+      "description": "雨停后的塔顶与地下城地图叠影，第一束晨光穿云",
+      "style_constraints": [
+        "冷暖交界",
+        "城市剪影",
+        "结尾保留地下城悬念"
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": "shot-001",
+      "scene_id": "scene-rain-alley",
+      "version_id": "shot-001-v1",
+      "current_version_id": "shot-001-v1",
+      "start_seconds": 0,
+      "end_seconds": 9,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-001-motion",
+        "asset-scene-rain-alley-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-001-motion"
+      ],
+      "script": {
+        "visual_action": "雨巷断电，林遥护住最后一盏引魂灯。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-lin-yao",
+            "text": "别灭，城里还有人等它回家。"
+          }
+        ]
+      },
+      "camera": "wide rain-soaked alley",
+      "motion": "handheld push-in",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-002",
+      "scene_id": "scene-rain-alley",
+      "version_id": "shot-002-v1",
+      "current_version_id": "shot-002-v1",
+      "start_seconds": 9,
+      "end_seconds": 18,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-002-motion",
+        "asset-scene-rain-alley-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-002-motion"
+      ],
+      "script": {
+        "visual_action": "机械狐小祈嗅出灯芯里不属于人间的墨香。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-xiao-qi",
+            "text": "墨味来自旧档案塔，偷灯的人在那里。"
+          }
+        ]
+      },
+      "camera": "macro to two-shot",
+      "motion": "rack focus and ear twitch",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-003",
+      "scene_id": "scene-rain-alley",
+      "version_id": "shot-003-v1",
+      "current_version_id": "shot-003-v1",
+      "start_seconds": 18,
+      "end_seconds": 27,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-003-motion",
+        "asset-scene-rain-alley-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-003-motion"
+      ],
+      "script": {
+        "visual_action": "馆长余叔从积水中递出被撕走的借阅页。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-curator-yu",
+            "text": "那页记着你母亲最后一次巡灯。"
+          }
+        ]
+      },
+      "camera": "low angle doorway",
+      "motion": "slow tilt to torn page",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-004",
+      "scene_id": "scene-rain-alley",
+      "version_id": "shot-004-v1",
+      "current_version_id": "shot-004-v1",
+      "start_seconds": 27,
+      "end_seconds": 36,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-004-motion",
+        "asset-scene-rain-alley-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-004-motion"
+      ],
+      "script": {
+        "visual_action": "黑影沿屋檐掠过，灯焰同时变成青色。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-lin-yao",
+            "text": "追！灯在替我们指路。"
+          }
+        ]
+      },
+      "camera": "silhouette tracking",
+      "motion": "fast lateral pan",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-005",
+      "scene_id": "scene-rain-alley",
+      "version_id": "shot-005-v1",
+      "current_version_id": "shot-005-v1",
+      "start_seconds": 36,
+      "end_seconds": 45,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-005-motion",
+        "asset-scene-rain-alley-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-005-motion"
+      ],
+      "script": {
+        "visual_action": "三人冲出雨巷，塔顶钟声提前敲响。",
+        "dialogue": [
+          {
+            "speaker_ref": "narrator",
+            "text": "子夜尚未来，归魂钟却先响了。"
+          }
+        ]
+      },
+      "camera": "city establishing",
+      "motion": "crane up to tower",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-006",
+      "scene_id": "scene-archive-tower",
+      "version_id": "shot-006-v1",
+      "current_version_id": "shot-006-v1",
+      "start_seconds": 45,
+      "end_seconds": 54,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-006-motion",
+        "asset-scene-archive-tower-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-006-motion"
+      ],
+      "script": {
+        "visual_action": "档案塔门被水压封死，小祈钻入齿轮孔。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-xiao-qi",
+            "text": "给我九秒，我让这座老塔想起开门。"
+          }
+        ]
+      },
+      "camera": "mechanical close-up",
+      "motion": "gear-driven dolly",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-007",
+      "scene_id": "scene-archive-tower",
+      "version_id": "shot-007-v1",
+      "current_version_id": "shot-007-v1",
+      "start_seconds": 54,
+      "end_seconds": 63,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-007-motion",
+        "asset-scene-archive-tower-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-007-motion"
+      ],
+      "script": {
+        "visual_action": "门内纸页化作群鸟袭来，林遥用灯焰定住它们。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-lin-yao",
+            "text": "名字不是枷锁，是回家的路。"
+          }
+        ]
+      },
+      "camera": "interior vortex wide",
+      "motion": "orbital camera",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-008",
+      "scene_id": "scene-archive-tower",
+      "version_id": "shot-008-v1",
+      "current_version_id": "shot-008-v1",
+      "start_seconds": 63,
+      "end_seconds": 72,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-008-motion",
+        "asset-scene-archive-tower-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-008-motion"
+      ],
+      "script": {
+        "visual_action": "余叔认出操纵纸鸟的是失踪多年的守卷人影像。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-curator-yu",
+            "text": "他不是贼，他在重复最后一道命令。"
+          }
+        ]
+      },
+      "camera": "over-shoulder projection",
+      "motion": "slow zoom",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-009",
+      "scene_id": "scene-archive-tower",
+      "version_id": "shot-009-v1",
+      "current_version_id": "shot-009-v1",
+      "start_seconds": 72,
+      "end_seconds": 81,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-009-motion",
+        "asset-scene-archive-tower-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-009-motion"
+      ],
+      "script": {
+        "visual_action": "影像要求交出灯，才能开启母亲留下的密函。",
+        "dialogue": [
+          {
+            "speaker_ref": "narrator",
+            "text": "验证巡灯血脉，交付核心火种。"
+          }
+        ]
+      },
+      "camera": "symmetrical confrontation",
+      "motion": "locked frame with flicker",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-010",
+      "scene_id": "scene-archive-tower",
+      "version_id": "shot-010-v1",
+      "current_version_id": "shot-010-v1",
+      "start_seconds": 81,
+      "end_seconds": 90,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-010-motion",
+        "asset-scene-archive-tower-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-010-motion"
+      ],
+      "script": {
+        "visual_action": "林遥拒绝牺牲灯灵，提出用自己的记忆作校验。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-lin-yao",
+            "text": "灯要照活人，也要照亡者；我押上记忆。"
+          }
+        ]
+      },
+      "camera": "hero medium close-up",
+      "motion": "subtle push-in",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-011",
+      "scene_id": "scene-dawn-rooftop",
+      "version_id": "shot-011-v1",
+      "current_version_id": "shot-011-v1",
+      "start_seconds": 90,
+      "end_seconds": 99,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-011-motion",
+        "asset-scene-dawn-rooftop-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-011-motion"
+      ],
+      "script": {
+        "visual_action": "主创选择记忆校验，小祈将新版本指令传给塔心。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-xiao-qi",
+            "text": "校验通过。旧命令，更新为共同守护。"
+          }
+        ]
+      },
+      "camera": "interface montage",
+      "motion": "graphic match cuts",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-012",
+      "scene_id": "scene-dawn-rooftop",
+      "version_id": "shot-012-v1",
+      "current_version_id": "shot-012-v1",
+      "start_seconds": 99,
+      "end_seconds": 108,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-012-motion",
+        "asset-scene-dawn-rooftop-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-012-motion"
+      ],
+      "script": {
+        "visual_action": "塔心释放密函：母亲把失踪居民藏进了画中避灾。",
+        "dialogue": [
+          {
+            "speaker_ref": "narrator",
+            "text": "遥遥，别找我，去把画里的人带回天亮。"
+          }
+        ]
+      },
+      "camera": "scroll reveal wide",
+      "motion": "parallax reveal",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-013",
+      "scene_id": "scene-dawn-rooftop",
+      "version_id": "shot-013-v1",
+      "current_version_id": "shot-013-v1",
+      "start_seconds": 108,
+      "end_seconds": 117,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-013-motion",
+        "asset-scene-dawn-rooftop-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-013-motion"
+      ],
+      "script": {
+        "visual_action": "青焰照进卷轴，数十个剪影开始苏醒。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-lin-yao",
+            "text": "听见我的声音，就跟着灯走。"
+          }
+        ]
+      },
+      "camera": "lantern POV",
+      "motion": "slow sweep across silhouettes",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-014",
+      "scene_id": "scene-dawn-rooftop",
+      "version_id": "shot-014-v1",
+      "current_version_id": "shot-014-v1",
+      "start_seconds": 117,
+      "end_seconds": 126,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-014-motion",
+        "asset-scene-dawn-rooftop-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-014-motion"
+      ],
+      "script": {
+        "visual_action": "守卷影像消散前交出塔钥，余叔向他行礼。",
+        "dialogue": [
+          {
+            "speaker_ref": "char-curator-yu",
+            "text": "你的守望结束了，剩下的路交给我们。"
+          }
+        ]
+      },
+      "camera": "three-layer tableau",
+      "motion": "gentle dissolve",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    },
+    {
+      "shot_id": "shot-015",
+      "scene_id": "scene-dawn-rooftop",
+      "version_id": "shot-015-v1",
+      "current_version_id": "shot-015-v1",
+      "start_seconds": 126,
+      "end_seconds": 135,
+      "character_refs": [
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "required_asset_ids": [
+        "asset-shot-015-motion",
+        "asset-scene-dawn-rooftop-master",
+        "asset-char-lin-yao-master",
+        "asset-char-xiao-qi-master",
+        "asset-char-curator-yu-master"
+      ],
+      "prompt_refs": [
+        "prompt-asset-shot-015-motion"
+      ],
+      "script": {
+        "visual_action": "黎明冲破雨云，林遥背灯走向封存画卷的地下城。",
+        "dialogue": [
+          {
+            "speaker_ref": "narrator",
+            "text": "第一盏灯找回了人，也照出了更深的夜。"
+          }
+        ]
+      },
+      "camera": "rooftop dawn epic",
+      "motion": "pull-back to underground map",
+      "continuity_note": "Match approved character, prop, weather and light state from the preceding shot.",
+      "quality_target": "Readable emotion, stable identity, purposeful motion, no frozen-slate substitution."
+    }
+  ],
+  "asset_manifest": [
+    {
+      "asset_id": "asset-char-lin-yao-master",
+      "asset_type": "visual",
+      "content_class": "character_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-char-lin-yao-master-rev-001",
+      "current_revision_id": "asset-char-lin-yao-master-rev-001",
+      "prompt_id": "prompt-asset-char-lin-yao-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-char-xiao-qi-master",
+      "asset_type": "visual",
+      "content_class": "character_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-char-xiao-qi-master-rev-001",
+      "current_revision_id": "asset-char-xiao-qi-master-rev-001",
+      "prompt_id": "prompt-asset-char-xiao-qi-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-char-curator-yu-master",
+      "asset_type": "visual",
+      "content_class": "character_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-char-curator-yu-master-rev-001",
+      "current_revision_id": "asset-char-curator-yu-master-rev-001",
+      "prompt_id": "prompt-asset-char-curator-yu-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-scene-rain-alley-master",
+      "asset_type": "visual",
+      "content_class": "scene_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-scene-rain-alley-master-rev-001",
+      "current_revision_id": "asset-scene-rain-alley-master-rev-001",
+      "prompt_id": "prompt-asset-scene-rain-alley-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-scene-archive-tower-master",
+      "asset_type": "visual",
+      "content_class": "scene_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-scene-archive-tower-master-rev-001",
+      "current_revision_id": "asset-scene-archive-tower-master-rev-001",
+      "prompt_id": "prompt-asset-scene-archive-tower-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-scene-dawn-rooftop-master",
+      "asset_type": "visual",
+      "content_class": "scene_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-scene-dawn-rooftop-master-rev-001",
+      "current_revision_id": "asset-scene-dawn-rooftop-master-rev-001",
+      "prompt_id": "prompt-asset-scene-dawn-rooftop-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-001-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-001-motion-rev-001",
+      "current_revision_id": "asset-shot-001-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-001-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-002-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-002-motion-rev-001",
+      "current_revision_id": "asset-shot-002-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-002-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-003-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-003-motion-rev-001",
+      "current_revision_id": "asset-shot-003-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-003-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-004-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-004-motion-rev-001",
+      "current_revision_id": "asset-shot-004-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-004-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-005-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-005-motion-rev-001",
+      "current_revision_id": "asset-shot-005-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-005-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-006-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-006-motion-rev-001",
+      "current_revision_id": "asset-shot-006-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-006-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-007-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-007-motion-rev-001",
+      "current_revision_id": "asset-shot-007-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-007-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-008-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-008-motion-rev-001",
+      "current_revision_id": "asset-shot-008-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-008-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-009-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-009-motion-rev-001",
+      "current_revision_id": "asset-shot-009-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-009-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-010-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-010-motion-rev-001",
+      "current_revision_id": "asset-shot-010-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-010-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-011-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-011-motion-rev-001",
+      "current_revision_id": "asset-shot-011-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-011-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-012-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-012-motion-rev-001",
+      "current_revision_id": "asset-shot-012-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-012-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-013-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-013-motion-rev-001",
+      "current_revision_id": "asset-shot-013-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-013-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-014-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-014-motion-rev-001",
+      "current_revision_id": "asset-shot-014-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-014-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-shot-015-motion",
+      "asset_type": "visual",
+      "content_class": "shot_motion_clip",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-shot-015-motion-rev-001",
+      "current_revision_id": "asset-shot-015-motion-rev-001",
+      "prompt_id": "prompt-asset-shot-015-motion",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-dialogue-stem",
+      "asset_type": "audio",
+      "content_class": "dialogue_audio",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-dialogue-stem-rev-001",
+      "current_revision_id": "asset-dialogue-stem-rev-001",
+      "prompt_id": "prompt-asset-dialogue-stem",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-music-stem",
+      "asset_type": "audio",
+      "content_class": "music_audio",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-music-stem-rev-001",
+      "current_revision_id": "asset-music-stem-rev-001",
+      "prompt_id": "prompt-asset-music-stem",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-sfx-stem",
+      "asset_type": "audio",
+      "content_class": "sfx_audio",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-sfx-stem-rev-001",
+      "current_revision_id": "asset-sfx-stem-rev-001",
+      "prompt_id": "prompt-asset-sfx-stem",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    },
+    {
+      "asset_id": "asset-audio-master",
+      "asset_type": "audio",
+      "content_class": "audio_master",
+      "status": "missing",
+      "missing": true,
+      "provider_needed": true,
+      "revision_id": "asset-audio-master-rev-001",
+      "current_revision_id": "asset-audio-master-rev-001",
+      "prompt_id": "prompt-asset-audio-master",
+      "substitution_policy": "reject_solid_color_or_metadata_only",
+      "usage_rights_gate": "pending_provider_decision"
+    }
+  ],
+  "prompt_lineage": [
+    {
+      "prompt_id": "prompt-asset-char-lin-yao-master",
+      "asset_id": "asset-char-lin-yao-master",
+      "version_id": "prompt-asset-char-lin-yao-master-v1",
+      "current_version_id": "prompt-asset-char-lin-yao-master-v1",
+      "source_refs": [
+        "char-lin-yao",
+        "char-lin-yao-v1"
+      ],
+      "prompt": "林遥 authoritative turnaround and expression sheet; 18岁短发少女，墨蓝防水斗篷、铜制灯扣、左眉细疤; Chinese manhua-drama ink-line cinematic style.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-char-xiao-qi-master",
+      "asset_id": "asset-char-xiao-qi-master",
+      "version_id": "prompt-asset-char-xiao-qi-master-v1",
+      "current_version_id": "prompt-asset-char-xiao-qi-master-v1",
+      "source_refs": [
+        "char-xiao-qi",
+        "char-xiao-qi-v1"
+      ],
+      "prompt": "小祈 authoritative turnaround and expression sheet; 掌心大小的白瓷机械狐，青铜关节、青色瞳光; Chinese manhua-drama ink-line cinematic style.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-char-curator-yu-master",
+      "asset_id": "asset-char-curator-yu-master",
+      "version_id": "prompt-asset-char-curator-yu-master-v1",
+      "current_version_id": "prompt-asset-char-curator-yu-master-v1",
+      "source_refs": [
+        "char-curator-yu",
+        "char-curator-yu-v1"
+      ],
+      "prompt": "余叔 authoritative turnaround and expression sheet; 五十岁，灰发、旧式圆镜、暗红长衫与防水书袋; Chinese manhua-drama ink-line cinematic style.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-scene-rain-alley-master",
+      "asset_id": "asset-scene-rain-alley-master",
+      "version_id": "prompt-asset-scene-rain-alley-master-v1",
+      "current_version_id": "prompt-asset-scene-rain-alley-master-v1",
+      "source_refs": [
+        "scene-rain-alley",
+        "scene-rain-alley-v1"
+      ],
+      "prompt": "雨巷 authoritative environment master; 霓虹被暴雨切碎的旧城窄巷，积水映出灯塔; preserve spatial anchors and lighting continuity.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-scene-archive-tower-master",
+      "asset_id": "asset-scene-archive-tower-master",
+      "version_id": "prompt-asset-scene-archive-tower-master-v1",
+      "current_version_id": "prompt-asset-scene-archive-tower-master-v1",
+      "source_refs": [
+        "scene-archive-tower",
+        "scene-archive-tower-v1"
+      ],
+      "prompt": "旧档案塔 authoritative environment master; 木构卷宗塔与黄铜齿轮共生，纸页像鸟群环飞; preserve spatial anchors and lighting continuity.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-scene-dawn-rooftop-master",
+      "asset_id": "asset-scene-dawn-rooftop-master",
+      "version_id": "prompt-asset-scene-dawn-rooftop-master-v1",
+      "current_version_id": "prompt-asset-scene-dawn-rooftop-master-v1",
+      "source_refs": [
+        "scene-dawn-rooftop",
+        "scene-dawn-rooftop-v1"
+      ],
+      "prompt": "塔顶黎明 authoritative environment master; 雨停后的塔顶与地下城地图叠影，第一束晨光穿云; preserve spatial anchors and lighting continuity.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-001-motion",
+      "asset_id": "asset-shot-001-motion",
+      "version_id": "prompt-asset-shot-001-motion-v1",
+      "current_version_id": "prompt-asset-shot-001-motion-v1",
+      "source_refs": [
+        "shot-001",
+        "shot-001-v1",
+        "scene-rain-alley",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 001: 雨巷断电，林遥护住最后一盏引魂灯。 Camera: wide rain-soaked alley. Motion: handheld push-in. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-002-motion",
+      "asset_id": "asset-shot-002-motion",
+      "version_id": "prompt-asset-shot-002-motion-v1",
+      "current_version_id": "prompt-asset-shot-002-motion-v1",
+      "source_refs": [
+        "shot-002",
+        "shot-002-v1",
+        "scene-rain-alley",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 002: 机械狐小祈嗅出灯芯里不属于人间的墨香。 Camera: macro to two-shot. Motion: rack focus and ear twitch. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-003-motion",
+      "asset_id": "asset-shot-003-motion",
+      "version_id": "prompt-asset-shot-003-motion-v1",
+      "current_version_id": "prompt-asset-shot-003-motion-v1",
+      "source_refs": [
+        "shot-003",
+        "shot-003-v1",
+        "scene-rain-alley",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 003: 馆长余叔从积水中递出被撕走的借阅页。 Camera: low angle doorway. Motion: slow tilt to torn page. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-004-motion",
+      "asset_id": "asset-shot-004-motion",
+      "version_id": "prompt-asset-shot-004-motion-v1",
+      "current_version_id": "prompt-asset-shot-004-motion-v1",
+      "source_refs": [
+        "shot-004",
+        "shot-004-v1",
+        "scene-rain-alley",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 004: 黑影沿屋檐掠过，灯焰同时变成青色。 Camera: silhouette tracking. Motion: fast lateral pan. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-005-motion",
+      "asset_id": "asset-shot-005-motion",
+      "version_id": "prompt-asset-shot-005-motion-v1",
+      "current_version_id": "prompt-asset-shot-005-motion-v1",
+      "source_refs": [
+        "shot-005",
+        "shot-005-v1",
+        "scene-rain-alley",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 005: 三人冲出雨巷，塔顶钟声提前敲响。 Camera: city establishing. Motion: crane up to tower. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-006-motion",
+      "asset_id": "asset-shot-006-motion",
+      "version_id": "prompt-asset-shot-006-motion-v1",
+      "current_version_id": "prompt-asset-shot-006-motion-v1",
+      "source_refs": [
+        "shot-006",
+        "shot-006-v1",
+        "scene-archive-tower",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 006: 档案塔门被水压封死，小祈钻入齿轮孔。 Camera: mechanical close-up. Motion: gear-driven dolly. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-007-motion",
+      "asset_id": "asset-shot-007-motion",
+      "version_id": "prompt-asset-shot-007-motion-v1",
+      "current_version_id": "prompt-asset-shot-007-motion-v1",
+      "source_refs": [
+        "shot-007",
+        "shot-007-v1",
+        "scene-archive-tower",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 007: 门内纸页化作群鸟袭来，林遥用灯焰定住它们。 Camera: interior vortex wide. Motion: orbital camera. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-008-motion",
+      "asset_id": "asset-shot-008-motion",
+      "version_id": "prompt-asset-shot-008-motion-v1",
+      "current_version_id": "prompt-asset-shot-008-motion-v1",
+      "source_refs": [
+        "shot-008",
+        "shot-008-v1",
+        "scene-archive-tower",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 008: 余叔认出操纵纸鸟的是失踪多年的守卷人影像。 Camera: over-shoulder projection. Motion: slow zoom. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-009-motion",
+      "asset_id": "asset-shot-009-motion",
+      "version_id": "prompt-asset-shot-009-motion-v1",
+      "current_version_id": "prompt-asset-shot-009-motion-v1",
+      "source_refs": [
+        "shot-009",
+        "shot-009-v1",
+        "scene-archive-tower",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 009: 影像要求交出灯，才能开启母亲留下的密函。 Camera: symmetrical confrontation. Motion: locked frame with flicker. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-010-motion",
+      "asset_id": "asset-shot-010-motion",
+      "version_id": "prompt-asset-shot-010-motion-v1",
+      "current_version_id": "prompt-asset-shot-010-motion-v1",
+      "source_refs": [
+        "shot-010",
+        "shot-010-v1",
+        "scene-archive-tower",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 010: 林遥拒绝牺牲灯灵，提出用自己的记忆作校验。 Camera: hero medium close-up. Motion: subtle push-in. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-011-motion",
+      "asset_id": "asset-shot-011-motion",
+      "version_id": "prompt-asset-shot-011-motion-v1",
+      "current_version_id": "prompt-asset-shot-011-motion-v1",
+      "source_refs": [
+        "shot-011",
+        "shot-011-v1",
+        "scene-dawn-rooftop",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 011: 主创选择记忆校验，小祈将新版本指令传给塔心。 Camera: interface montage. Motion: graphic match cuts. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-012-motion",
+      "asset_id": "asset-shot-012-motion",
+      "version_id": "prompt-asset-shot-012-motion-v1",
+      "current_version_id": "prompt-asset-shot-012-motion-v1",
+      "source_refs": [
+        "shot-012",
+        "shot-012-v1",
+        "scene-dawn-rooftop",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 012: 塔心释放密函：母亲把失踪居民藏进了画中避灾。 Camera: scroll reveal wide. Motion: parallax reveal. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-013-motion",
+      "asset_id": "asset-shot-013-motion",
+      "version_id": "prompt-asset-shot-013-motion-v1",
+      "current_version_id": "prompt-asset-shot-013-motion-v1",
+      "source_refs": [
+        "shot-013",
+        "shot-013-v1",
+        "scene-dawn-rooftop",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 013: 青焰照进卷轴，数十个剪影开始苏醒。 Camera: lantern POV. Motion: slow sweep across silhouettes. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-014-motion",
+      "asset_id": "asset-shot-014-motion",
+      "version_id": "prompt-asset-shot-014-motion-v1",
+      "current_version_id": "prompt-asset-shot-014-motion-v1",
+      "source_refs": [
+        "shot-014",
+        "shot-014-v1",
+        "scene-dawn-rooftop",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 014: 守卷影像消散前交出塔钥，余叔向他行礼。 Camera: three-layer tableau. Motion: gentle dissolve. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-shot-015-motion",
+      "asset_id": "asset-shot-015-motion",
+      "version_id": "prompt-asset-shot-015-motion-v1",
+      "current_version_id": "prompt-asset-shot-015-motion-v1",
+      "source_refs": [
+        "shot-015",
+        "shot-015-v1",
+        "scene-dawn-rooftop",
+        "char-lin-yao",
+        "char-xiao-qi",
+        "char-curator-yu"
+      ],
+      "prompt": "Shot 015: 黎明冲破雨云，林遥背灯走向封存画卷的地下城。 Camera: rooftop dawn epic. Motion: pull-back to underground map. Maintain authoritative character and scene masters.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-dialogue-stem",
+      "asset_id": "asset-dialogue-stem",
+      "version_id": "prompt-asset-dialogue-stem-v1",
+      "current_version_id": "prompt-asset-dialogue-stem-v1",
+      "source_refs": [
+        "ep-rainlight-001",
+        "ep-rainlight-001-v1"
+      ],
+      "prompt": "Mandarin dramatic dialogue, distinct voices, natural breath and emotional continuity.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-music-stem",
+      "asset_id": "asset-music-stem",
+      "version_id": "prompt-asset-music-stem-v1",
+      "current_version_id": "prompt-asset-music-stem-v1",
+      "source_refs": [
+        "ep-rainlight-001",
+        "ep-rainlight-001-v1"
+      ],
+      "prompt": "Original rights-cleared score: rain percussion, restrained strings, dawn motif; no copyrighted melody.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-sfx-stem",
+      "asset_id": "asset-sfx-stem",
+      "version_id": "prompt-asset-sfx-stem-v1",
+      "current_version_id": "prompt-asset-sfx-stem-v1",
+      "source_refs": [
+        "ep-rainlight-001",
+        "ep-rainlight-001-v1"
+      ],
+      "prompt": "Rain, lantern flame, paper flock, gears, bell, archive ambience and rooftop wind.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    },
+    {
+      "prompt_id": "prompt-asset-audio-master",
+      "asset_id": "asset-audio-master",
+      "version_id": "prompt-asset-audio-master-v1",
+      "current_version_id": "prompt-asset-audio-master-v1",
+      "source_refs": [
+        "ep-rainlight-001",
+        "ep-rainlight-001-v1"
+      ],
+      "prompt": "Final 48kHz stereo mix derived from dialogue, music and SFX stems with loudness and peak control.",
+      "negative_constraints": [
+        "solid color",
+        "metadata-only slate",
+        "identity drift",
+        "watermark",
+        "illegible hands"
+      ]
+    }
+  ],
+  "subtitle_plan": {
+    "language": "zh-CN",
+    "style": "bottom-safe white text with dark stroke; max two lines",
+    "cues": [
+      {
+        "shot_id": "shot-001",
+        "start_seconds": 0,
+        "end_seconds": 9,
+        "text": "别灭，城里还有人等它回家。"
+      },
+      {
+        "shot_id": "shot-002",
+        "start_seconds": 9,
+        "end_seconds": 18,
+        "text": "墨味来自旧档案塔，偷灯的人在那里。"
+      },
+      {
+        "shot_id": "shot-003",
+        "start_seconds": 18,
+        "end_seconds": 27,
+        "text": "那页记着你母亲最后一次巡灯。"
+      },
+      {
+        "shot_id": "shot-004",
+        "start_seconds": 27,
+        "end_seconds": 36,
+        "text": "追！灯在替我们指路。"
+      },
+      {
+        "shot_id": "shot-005",
+        "start_seconds": 36,
+        "end_seconds": 45,
+        "text": "子夜尚未来，归魂钟却先响了。"
+      },
+      {
+        "shot_id": "shot-006",
+        "start_seconds": 45,
+        "end_seconds": 54,
+        "text": "给我九秒，我让这座老塔想起开门。"
+      },
+      {
+        "shot_id": "shot-007",
+        "start_seconds": 54,
+        "end_seconds": 63,
+        "text": "名字不是枷锁，是回家的路。"
+      },
+      {
+        "shot_id": "shot-008",
+        "start_seconds": 63,
+        "end_seconds": 72,
+        "text": "他不是贼，他在重复最后一道命令。"
+      },
+      {
+        "shot_id": "shot-009",
+        "start_seconds": 72,
+        "end_seconds": 81,
+        "text": "验证巡灯血脉，交付核心火种。"
+      },
+      {
+        "shot_id": "shot-010",
+        "start_seconds": 81,
+        "end_seconds": 90,
+        "text": "灯要照活人，也要照亡者；我押上记忆。"
+      },
+      {
+        "shot_id": "shot-011",
+        "start_seconds": 90,
+        "end_seconds": 99,
+        "text": "校验通过。旧命令，更新为共同守护。"
+      },
+      {
+        "shot_id": "shot-012",
+        "start_seconds": 99,
+        "end_seconds": 108,
+        "text": "遥遥，别找我，去把画里的人带回天亮。"
+      },
+      {
+        "shot_id": "shot-013",
+        "start_seconds": 108,
+        "end_seconds": 117,
+        "text": "听见我的声音，就跟着灯走。"
+      },
+      {
+        "shot_id": "shot-014",
+        "start_seconds": 117,
+        "end_seconds": 126,
+        "text": "你的守望结束了，剩下的路交给我们。"
+      },
+      {
+        "shot_id": "shot-015",
+        "start_seconds": 126,
+        "end_seconds": 135,
+        "text": "第一盏灯找回了人，也照出了更深的夜。"
+      }
+    ]
+  },
+  "audio_plan": {
+    "coverage_shot_refs": [
+      "shot-001",
+      "shot-002",
+      "shot-003",
+      "shot-004",
+      "shot-005",
+      "shot-006",
+      "shot-007",
+      "shot-008",
+      "shot-009",
+      "shot-010",
+      "shot-011",
+      "shot-012",
+      "shot-013",
+      "shot-014",
+      "shot-015"
+    ],
+    "dialogue_asset_id": "asset-dialogue-stem",
+    "music_asset_id": "asset-music-stem",
+    "sfx_asset_id": "asset-sfx-stem",
+    "master_asset_id": "asset-audio-master",
+    "dialogue_direction": "Three distinct performances plus processed guardian recording; intelligibility first.",
+    "music_direction": "Original rain-to-dawn motif with restrained intensity under dialogue.",
+    "sfx_direction": "Diegetic rain, lantern, paper, gears and bell establish spatial continuity.",
+    "mix_requirements": "48kHz stereo; target -16 LUFS integrated, true peak <= -1 dBTP, duck music 4–6 dB under dialogue."
+  },
+  "assembly_plan": {
+    "contract": "agentflow_studio.production.episode_delivery.v0.1",
+    "duration_seconds": 135,
+    "frame_rate": 24,
+    "resolution": "1920x1080",
+    "precondition": "all_controlled_assets_ready_and_current",
+    "shot_timeline": [
+      {
+        "shot_id": "shot-001",
+        "scene_id": "scene-rain-alley",
+        "visual_asset_id": "asset-shot-001-motion",
+        "start_seconds": 0,
+        "end_seconds": 9,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-002",
+        "scene_id": "scene-rain-alley",
+        "visual_asset_id": "asset-shot-002-motion",
+        "start_seconds": 9,
+        "end_seconds": 18,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-003",
+        "scene_id": "scene-rain-alley",
+        "visual_asset_id": "asset-shot-003-motion",
+        "start_seconds": 18,
+        "end_seconds": 27,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-004",
+        "scene_id": "scene-rain-alley",
+        "visual_asset_id": "asset-shot-004-motion",
+        "start_seconds": 27,
+        "end_seconds": 36,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-005",
+        "scene_id": "scene-rain-alley",
+        "visual_asset_id": "asset-shot-005-motion",
+        "start_seconds": 36,
+        "end_seconds": 45,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-006",
+        "scene_id": "scene-archive-tower",
+        "visual_asset_id": "asset-shot-006-motion",
+        "start_seconds": 45,
+        "end_seconds": 54,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-007",
+        "scene_id": "scene-archive-tower",
+        "visual_asset_id": "asset-shot-007-motion",
+        "start_seconds": 54,
+        "end_seconds": 63,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-008",
+        "scene_id": "scene-archive-tower",
+        "visual_asset_id": "asset-shot-008-motion",
+        "start_seconds": 63,
+        "end_seconds": 72,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-009",
+        "scene_id": "scene-archive-tower",
+        "visual_asset_id": "asset-shot-009-motion",
+        "start_seconds": 72,
+        "end_seconds": 81,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-010",
+        "scene_id": "scene-archive-tower",
+        "visual_asset_id": "asset-shot-010-motion",
+        "start_seconds": 81,
+        "end_seconds": 90,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-011",
+        "scene_id": "scene-dawn-rooftop",
+        "visual_asset_id": "asset-shot-011-motion",
+        "start_seconds": 90,
+        "end_seconds": 99,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-012",
+        "scene_id": "scene-dawn-rooftop",
+        "visual_asset_id": "asset-shot-012-motion",
+        "start_seconds": 99,
+        "end_seconds": 108,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-013",
+        "scene_id": "scene-dawn-rooftop",
+        "visual_asset_id": "asset-shot-013-motion",
+        "start_seconds": 108,
+        "end_seconds": 117,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-014",
+        "scene_id": "scene-dawn-rooftop",
+        "visual_asset_id": "asset-shot-014-motion",
+        "start_seconds": 117,
+        "end_seconds": 126,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      },
+      {
+        "shot_id": "shot-015",
+        "scene_id": "scene-dawn-rooftop",
+        "visual_asset_id": "asset-shot-015-motion",
+        "start_seconds": 126,
+        "end_seconds": 135,
+        "transition": "motivated hard cut; dissolve only at shot-014"
+      }
+    ],
+    "audio_master_asset_id": "asset-audio-master",
+    "subtitle_format": "mov_text + retained SRT",
+    "exact_export_evidence": [
+      "input hashes",
+      "shot lineage",
+      "ffprobe",
+      "decode",
+      "technical QA"
+    ]
+  },
+  "quality_rubric": {
+    "criteria": [
+      {
+        "id": "identity_consistency",
+        "threshold": "No character identity, costume, handedness or signature-prop drift across approved shots."
+      },
+      {
+        "id": "scene_continuity",
+        "threshold": "Spatial anchors, rain state, light direction and object positions remain causally continuous."
+      },
+      {
+        "id": "motion_readability",
+        "threshold": "Every shot contains purposeful, readable motion; no frozen or color-slate substitution."
+      },
+      {
+        "id": "narrative_clarity",
+        "threshold": "A blind review can state goal, reversal, choice and cliffhanger without production notes."
+      },
+      {
+        "id": "audio_quality",
+        "threshold": "Dialogue intelligible; score/SFX support rather than mask; no clipping or long unintended silence."
+      },
+      {
+        "id": "subtitle_quality",
+        "threshold": "Semantically exact, synchronized, safe-area compliant and readable on mobile."
+      },
+      {
+        "id": "technical_delivery",
+        "threshold": "120–180s openable master with exact streams, hashes, lineage and decode pass."
+      },
+      {
+        "id": "commercial_impression",
+        "threshold": "First 3s hook, strong midpoint choice and end cliffhanger support professional-studio review."
+      }
+    ],
+    "gates": [
+      {
+        "gate_type": "creator_approval",
+        "status": "approved",
+        "evidence_ref": "creator-decision-episode-v1"
+      },
+      {
+        "gate_type": "continuity_review",
+        "status": "pending",
+        "evidence_ref": "continuity-review-after-assets"
+      },
+      {
+        "gate_type": "technical_qa",
+        "status": "pending",
+        "evidence_ref": "technical-qa-after-assembly"
+      },
+      {
+        "gate_type": "creative_media_qa",
+        "status": "pending",
+        "evidence_ref": "independent-media-evaluator"
+      },
+      {
+        "gate_type": "human_acceptance",
+        "status": "pending",
+        "evidence_ref": "actual-episode-human-review"
+      }
+    ]
+  },
+  "domain_crew_execution_plan": {
+    "roles": [
+      {
+        "role": "screenwriter",
+        "agent_id": "crew-rainlight-screenwriter",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "storyboard",
+        "agent_id": "crew-rainlight-storyboard",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "art",
+        "agent_id": "crew-rainlight-art",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "director",
+        "agent_id": "crew-rainlight-director",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "continuity",
+        "agent_id": "crew-rainlight-continuity",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "qa",
+        "agent_id": "crew-rainlight-qa",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "audio",
+        "agent_id": "crew-rainlight-audio",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "edit",
+        "agent_id": "crew-rainlight-edit",
+        "ownership": "authenticated_project_owner"
+      },
+      {
+        "role": "export",
+        "agent_id": "crew-rainlight-export",
+        "ownership": "authenticated_project_owner"
+      }
+    ],
+    "tasks": [
+      {
+        "task_id": "task-script",
+        "role": "screenwriter",
+        "assigned_agent_id": "crew-rainlight-screenwriter",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "char-lin-yao",
+          "char-xiao-qi",
+          "char-curator-yu",
+          "scene-rain-alley",
+          "scene-archive-tower",
+          "scene-dawn-rooftop"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-storyboard",
+        "role": "storyboard",
+        "assigned_agent_id": "crew-rainlight-storyboard",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "scene-rain-alley",
+          "scene-archive-tower",
+          "scene-dawn-rooftop",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-art",
+        "role": "art",
+        "assigned_agent_id": "crew-rainlight-art",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "char-lin-yao",
+          "char-xiao-qi",
+          "char-curator-yu",
+          "scene-rain-alley",
+          "scene-archive-tower",
+          "scene-dawn-rooftop",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-director",
+        "role": "director",
+        "assigned_agent_id": "crew-rainlight-director",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-continuity",
+        "role": "continuity",
+        "assigned_agent_id": "crew-rainlight-continuity",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "char-lin-yao",
+          "char-xiao-qi",
+          "char-curator-yu",
+          "scene-rain-alley",
+          "scene-archive-tower",
+          "scene-dawn-rooftop"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-qa",
+        "role": "qa",
+        "assigned_agent_id": "crew-rainlight-qa",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-audio",
+        "role": "audio",
+        "assigned_agent_id": "crew-rainlight-audio",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-edit",
+        "role": "edit",
+        "assigned_agent_id": "crew-rainlight-edit",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1",
+          "shot-001",
+          "shot-002",
+          "shot-003",
+          "shot-004",
+          "shot-005",
+          "shot-006",
+          "shot-007",
+          "shot-008",
+          "shot-009",
+          "shot-010",
+          "shot-011",
+          "shot-012",
+          "shot-013",
+          "shot-014",
+          "shot-015"
+        ],
+        "status": "planned_provider_free"
+      },
+      {
+        "task_id": "task-export",
+        "role": "export",
+        "assigned_agent_id": "crew-rainlight-export",
+        "expected_version_id": "ep-rainlight-001-v1",
+        "entity_refs": [
+          "afs-rainlight-project",
+          "ep-rainlight-001",
+          "ep-rainlight-001-v1"
+        ],
+        "status": "planned_provider_free"
+      }
+    ],
+    "structured_messages": [
+      {
+        "message_id": "msg-script-storyboard",
+        "task_id": "task-script",
+        "from_role": "screenwriter",
+        "to_role": "storyboard",
+        "payload_type": "episode_script_handoff",
+        "entity_version_ref": "ep-rainlight-001-v1"
+      },
+      {
+        "message_id": "msg-storyboard-art",
+        "task_id": "task-storyboard",
+        "from_role": "storyboard",
+        "to_role": "art",
+        "payload_type": "shot_plan_handoff",
+        "entity_version_ref": "ep-rainlight-001-v1"
+      },
+      {
+        "message_id": "msg-art-director",
+        "task_id": "task-art",
+        "from_role": "art",
+        "to_role": "director",
+        "payload_type": "controlled_asset_candidates",
+        "entity_version_ref": "ep-rainlight-001-v1"
+      },
+      {
+        "message_id": "msg-qa-export",
+        "task_id": "task-qa",
+        "from_role": "qa",
+        "to_role": "export",
+        "payload_type": "quality_gate_result",
+        "entity_version_ref": "ep-rainlight-001-v1"
+      }
+    ],
+    "handoffs": [
+      {
+        "handoff_id": "handoff-script-storyboard",
+        "from_task_id": "task-script",
+        "to_task_id": "task-storyboard",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-storyboard-art",
+        "from_task_id": "task-storyboard",
+        "to_task_id": "task-art",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-art-director",
+        "from_task_id": "task-art",
+        "to_task_id": "task-director",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-director-continuity",
+        "from_task_id": "task-director",
+        "to_task_id": "task-continuity",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-continuity-qa",
+        "from_task_id": "task-continuity",
+        "to_task_id": "task-qa",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-audio-edit",
+        "from_task_id": "task-audio",
+        "to_task_id": "task-edit",
+        "status": "planned"
+      },
+      {
+        "handoff_id": "handoff-edit-export",
+        "from_task_id": "task-edit",
+        "to_task_id": "task-export",
+        "status": "planned"
+      }
+    ],
+    "creator_arbitration": {
+      "conflict_id": "conflict-lantern-core-choice",
+      "from_version_id": "ep-rainlight-001-v0",
+      "approved_version_id": "ep-rainlight-001-v1",
+      "creator_decision_ref": "creator-decision-episode-v1",
+      "decision": "Use memory verification; preserve lantern spirit.",
+      "authoritative_affected_task_refs": [
+        "task-storyboard",
+        "task-art",
+        "task-director",
+        "task-continuity",
+        "task-qa",
+        "task-audio",
+        "task-edit",
+        "task-export"
+      ]
+    },
+    "downstream_reconfirmations": [
+      {
+        "task_id": "task-storyboard",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-art",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-director",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-continuity",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-qa",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-audio",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-edit",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      },
+      {
+        "task_id": "task-export",
+        "status": "required_pending",
+        "approved_version_id": "ep-rainlight-001-v1"
+      }
+    ]
+  },
+  "non_claims": [
+    "no_generated_media",
+    "no_creative_media_quality_pass",
+    "no_human_acceptance",
+    "no_business_validation",
+    "no_deploy_or_release"
+  ]
+}
