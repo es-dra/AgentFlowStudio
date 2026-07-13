@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from agentflow_studio.production.vertical_slice import CharacterSeed, DeterministicProductionSlice, ProjectIP
+from apps.api import runtime_store as runtime_store_module
 from apps.api.runtime_production_models import canonical_json_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
@@ -587,6 +588,77 @@ def test_artifact_index_registration_is_transactional_across_threads(tmp_path, m
     assert all(not thread.is_alive() for thread in threads)
     index = json.loads(stores[0].index_path.read_text(encoding="utf-8"))
     assert set(index["artifacts"]) == {"runs-thread-0-artifact", "runs-thread-1-artifact"}
+
+
+def test_artifact_index_constructor_cannot_overwrite_concurrent_registration(tmp_path, monkeypatch) -> None:
+    registration_store = RuntimeStore(tmp_path)
+    artifact_path = tmp_path / "runs" / "constructor-race" / "artifact.json"
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(json.dumps({"artifact_type": "constructor-race-artifact"}), encoding="utf-8")
+
+    constructor_read = threading.Event()
+    allow_constructor_write = threading.Event()
+    registration_lock_attempted = threading.Event()
+    original_artifact_index = RuntimeStore._artifact_index
+    original_exclusive_file_lock = runtime_store_module.exclusive_file_lock
+    transaction_lock = threading.Lock()
+
+    class ControlledTransactionLock:
+        def __enter__(self):
+            if threading.current_thread().name == "artifact-registration":
+                registration_lock_attempted.set()
+            transaction_lock.acquire()
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            transaction_lock.release()
+
+    def controlled_exclusive_file_lock(path: Path):
+        if Path(path) == registration_store.index_transaction_lock_path:
+            return ControlledTransactionLock()
+        return original_exclusive_file_lock(path)
+
+    def pause_constructor_after_read(store: RuntimeStore):
+        index = original_artifact_index(store)
+        if threading.current_thread().name == "runtime-store-constructor":
+            constructor_read.set()
+            if not allow_constructor_write.wait(timeout=2):
+                raise TimeoutError("constructor write was not released")
+        return index
+
+    monkeypatch.setattr(RuntimeStore, "_artifact_index", pause_constructor_after_read)
+    monkeypatch.setattr(runtime_store_module, "exclusive_file_lock", controlled_exclusive_file_lock)
+    errors: list[BaseException] = []
+
+    def construct_store() -> None:
+        try:
+            RuntimeStore(tmp_path)
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    def register_artifact() -> None:
+        try:
+            registration_store.register_artifact(artifact_path, role="production_export")
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    constructor_thread = threading.Thread(target=construct_store, name="runtime-store-constructor")
+    constructor_thread.start()
+    assert constructor_read.wait(timeout=2)
+    constructor_holds_transaction_lock = transaction_lock.locked()
+
+    registration_thread = threading.Thread(target=register_artifact, name="artifact-registration")
+    registration_thread.start()
+    assert registration_lock_attempted.wait(timeout=2)
+    allow_constructor_write.set()
+    constructor_thread.join(timeout=2)
+    registration_thread.join(timeout=2)
+
+    assert not errors
+    assert not constructor_thread.is_alive()
+    assert not registration_thread.is_alive()
+    assert constructor_holds_transaction_lock
+    index = json.loads(registration_store.index_path.read_text(encoding="utf-8"))
+    assert set(index["artifacts"]) == {"runs-constructor-race-artifact"}
 
 
 def test_soft_deleted_project_rejects_new_production_run(tmp_path, monkeypatch) -> None:
