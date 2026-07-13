@@ -128,6 +128,36 @@ def test_checkpoint_recovery_resumes_without_rebuilding_completed_stages(tmp_pat
     assert recovered.state["stage"] == "candidates"
 
 
+def test_fresh_checkpoint_can_reopen_before_the_first_advance(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    first = DeterministicProductionSlice(project, tmp_path)
+    initial = json.loads((tmp_path / "production_state.json").read_text(encoding="utf-8"))
+    initial_integrity = initial["checkpoint_integrity"]
+
+    assert first.state == initial
+    assert initial["stage"] == "initialized"
+    assert initial["recovery_count"] == 0
+    assert initial_integrity["algorithm"] == "sha256"
+    assert initial_integrity["sequence"] == 0
+    assert initial_integrity["previous_chain_digest"] is None
+    assert len(initial_integrity["state_digest"]) == 64
+    assert len(initial_integrity["chain_digest"]) == 64
+    reference = DeterministicProductionSlice(project, tmp_path / "reference")
+    assert reference.state == initial
+
+    recovered = DeterministicProductionSlice(project, tmp_path)
+    persisted = json.loads((tmp_path / "production_state.json").read_text(encoding="utf-8"))
+
+    assert recovered.state == persisted
+    assert recovered.state["stage"] == "initialized"
+    assert recovered.state["recovery_count"] == 1
+    assert recovered.state["checkpoint_integrity"]["sequence"] == 1
+    assert (
+        recovered.state["checkpoint_integrity"]["previous_chain_digest"]
+        == initial_integrity["chain_digest"]
+    )
+
+
 def test_checkpoint_can_reopen_repeatedly_without_an_intervening_advance(tmp_path: Path) -> None:
     project = _load_model("project.example.json", ProjectIP)
     first = DeterministicProductionSlice(project, tmp_path)

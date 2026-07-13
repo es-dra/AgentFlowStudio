@@ -7,7 +7,7 @@
     "selected_count": 3
   },
   "delivery_ref": "production_delivery.json",
-  "delivery_sha256": "9b23f3ec3ccd7964e80d7d59fc17176d3768fcd555a8892a3ea7f2e926c2d75e",
+  "delivery_sha256": "ef53a014edac80a6e0aacab30c0b48d51955f1b7df367633bb272abc1b3df520",
   "lineage": [
     {
       "relation": "project_to_script",
@@ -159,7 +159,7 @@
   "reviewed_subject_digest": "c14e769698c2d2c5a8eb5c6eac874e8b3f30f1a794ea251664d601224379b137",
   "run_id": "run_49984c39f947",
   "schema_version": "0.1.0",
-  "source_state_chain_digest": "71753ed936298a441f4bff2e8bb6dcf4f3be7e195a743a38151cc22340af547f",
+  "source_state_chain_digest": "e08c3469c0bd3ef9a4a4fab1bc186b29d1a24c5109a22741004c945741a35e0f",
   "stage": "exported",
   "state_ref": "production_state.json"
 }
