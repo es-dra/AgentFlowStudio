@@ -228,6 +228,8 @@ def _validate_existing_authority(
     asset_id = metadata.get("asset_id")
     if not isinstance(asset_id, str) or safe_id(asset_id) != asset_id or metadata_path.parent.name != asset_id:
         raise ValueError("existing generated image asset id is inconsistent")
+    if asset_id != _generated_asset_id(source_job_id, source_candidate_id):
+        raise ValueError("existing generated image asset id is not deterministic")
     expected = {
         "project_id": project_id,
         "source_kind": "keyframe_candidate",

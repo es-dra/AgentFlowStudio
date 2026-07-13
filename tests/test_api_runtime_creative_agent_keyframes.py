@@ -429,7 +429,7 @@ def test_keyframe_http_and_replay_leave_ambiguous_candidate_authority_unbound(
     assert preview.content != PNG_BYTES
 
 
-@pytest.mark.parametrize("mutation", ["stored-bytes", "duplicate-metadata"])
+@pytest.mark.parametrize("mutation", ["stored-bytes", "duplicate-metadata", "rogue-asset-id"])
 def test_keyframe_preview_and_replay_fail_closed_after_persisted_authority_mutation(
     tmp_path,
     monkeypatch,
@@ -478,17 +478,27 @@ def test_keyframe_preview_and_replay_fail_closed_after_persisted_authority_mutat
     assert client.get(keyframe_preview_url).content == PNG_BYTES
 
     asset_dir = tmp_path / "projects" / project_id / "image_assets" / asset_id
+    served_asset_id = asset_id
     if mutation == "stored-bytes":
         (asset_dir / "source.png").write_bytes(b"mutated-persisted-bytes")
-    else:
+    elif mutation == "duplicate-metadata":
         metadata = json.loads((asset_dir / "image_asset.json").read_text(encoding="utf-8"))
         duplicate_dir = tmp_path / "projects" / project_id / "image_assets" / "aaa_duplicate"
         duplicate_dir.mkdir(parents=True)
         metadata["asset_id"] = "aaa_duplicate"
         (duplicate_dir / "image_asset.json").write_text(json.dumps(metadata), encoding="utf-8")
+    else:
+        rogue_dir = asset_dir.parent / "rogue_authority"
+        asset_dir.rename(rogue_dir)
+        metadata_path = rogue_dir / "image_asset.json"
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata["asset_id"] = "rogue_authority"
+        metadata["preview_url"] = f"/projects/{project_id}/image-assets/rogue_authority/preview"
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+        served_asset_id = "rogue_authority"
 
     keyframe_preview = client.get(keyframe_preview_url)
-    asset_preview = client.get(f"/projects/{project_id}/image-assets/{asset_id}/preview")
+    asset_preview = client.get(f"/projects/{project_id}/image-assets/{served_asset_id}/preview")
     replay = client.post(f"/projects/{project_id}/keyframe-generations", json=submit_payload)
 
     assert keyframe_preview.status_code == 404

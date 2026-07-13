@@ -150,6 +150,7 @@ def write_image_outputs(
         outputs.append(
             {
                 "candidate_id": candidate_id,
+                "status": "succeeded",
                 "image_path": image_ref,
                 "byte_count": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),

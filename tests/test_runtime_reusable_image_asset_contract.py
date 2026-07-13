@@ -4,12 +4,15 @@ import ast
 import base64
 import hashlib
 import inspect
+import json
 import textwrap
+from pathlib import Path
 
 import pytest
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.codex_image_handoff import _safe_outputs, completed_result_payload
+from agentflow_studio.model_gateway.provider_api_relay_images import write_image_outputs
 from apps.api.runtime_generated_image_assets import (
     register_generated_image_asset,
     resolve_generated_candidate_authority,
@@ -20,6 +23,7 @@ from apps.api.runtime_image_assets import (
     resolve_reference_images,
 )
 from apps.api.runtime_keyframe_async import _provider_outputs_from_candidate_files
+from apps.api.runtime_keyframes import _provider_outputs
 from apps.api.runtime_keyframe_routes import (
     _candidate_previews,
     _candidate_records,
@@ -40,9 +44,10 @@ PNG_BYTES = base64.b64decode(
     (
         completed_result_payload,
         _safe_outputs,
+        write_image_outputs,
         _provider_outputs_from_candidate_files,
     ),
-    ids=("codex_completed_result", "codex_safe_outputs", "verified_candidate_files"),
+    ids=("codex_completed_result", "codex_safe_outputs", "api_relay_writer", "verified_candidate_files"),
 )
 def test_internal_successful_candidate_producer_inventory_sets_explicit_status(producer) -> None:
     tree = ast.parse(textwrap.dedent(inspect.getsource(producer)))
@@ -64,6 +69,93 @@ def test_internal_successful_candidate_producer_inventory_sets_explicit_status(p
             and isinstance(value, ast.Constant)
         }
         assert values.get("status") == "succeeded"
+
+
+def test_trusted_image_candidate_producer_inventory_is_exhaustive_and_explicit() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    source_paths = sorted((repository_root / "agentflow_studio" / "model_gateway").glob("*image*.py"))
+    source_paths.append(repository_root / "apps" / "api" / "runtime_keyframe_async.py")
+    discovered: set[str] = set()
+    for source_path in source_paths:
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for function in (node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
+            has_outputs_container = any(
+                isinstance(node, ast.Dict)
+                and any(isinstance(key, ast.Constant) and key.value == "outputs" for key in node.keys)
+                for node in ast.walk(function)
+            )
+            has_outputs_append = any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "append"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "outputs"
+                for node in ast.walk(function)
+            )
+            has_candidate_id = any(
+                isinstance(node, ast.Dict)
+                and any(isinstance(key, ast.Constant) and key.value == "candidate_id" for key in node.keys)
+                for node in ast.walk(function)
+            )
+            if has_candidate_id and (has_outputs_container or has_outputs_append):
+                discovered.add(f"{source_path.name}:{function.name}")
+
+    assert discovered == {
+        "codex_image_handoff.py:_safe_outputs",
+        "codex_image_handoff.py:completed_result_payload",
+        "provider_api_relay_images.py:write_image_outputs",
+        "runtime_keyframe_async.py:_provider_outputs_from_candidate_files",
+    }
+
+
+def test_api_relay_writer_marks_verified_success_without_provider_call(tmp_path) -> None:
+    outputs = write_image_outputs(
+        tmp_path,
+        {"data": [{"b64_json": base64.b64encode(PNG_BYTES).decode("ascii")}]},
+        1,
+    )
+
+    assert outputs == [
+        {
+            "candidate_id": "candidate_001",
+            "status": "succeeded",
+            "image_path": "image_candidates/candidate_001.png",
+            "byte_count": len(PNG_BYTES),
+            "sha256": hashlib.sha256(PNG_BYTES).hexdigest(),
+            "width": 1,
+            "height": 1,
+            "aspect_ratio": "1:1",
+            "provider_url_persisted": False,
+        }
+    ]
+
+
+def test_api_relay_writer_integrates_through_runtime_candidate_authority_without_provider_call(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_api_relay_authority"
+    job_id = "job-api-relay-authority"
+    store.ensure_project_manifest(project_id)
+    output_dir = store.run_dir(project_id, job_id)
+    outputs = write_image_outputs(
+        output_dir,
+        {"data": [{"b64_json": base64.b64encode(PNG_BYTES).decode("ascii")}]},
+        1,
+    )
+
+    provider_outputs = _provider_outputs({"status": "succeeded", "outputs": outputs})
+    records = _candidate_records(store, project_id, job_id, provider_outputs)
+    assets = _reusable_image_assets(
+        store,
+        project_id,
+        source_node_id="image-node-api-relay",
+        job_id=job_id,
+        records=records,
+    )
+
+    assert [item["candidate_id"] for item in records] == ["candidate_001"]
+    assert records[0]["sha256"] == hashlib.sha256(PNG_BYTES).hexdigest()
+    assert assets[0]["status"] == "succeeded"
+    assert assets[0]["source_job_id"] == job_id
 
 
 def test_runtime_candidate_authority_consumer_inventory_uses_one_resolver_or_thin_forwarder() -> None:
@@ -259,6 +351,47 @@ def test_reregistration_rejects_duplicate_persisted_authority(tmp_path) -> None:
 
     assert resolve_reference_images(store, project_id, [registered["asset"]["asset_id"]]) == []
     with pytest.raises(ValueError, match="unique"):
+        register_generated_image_asset(
+            store,
+            project_id,
+            source_node_id="image-node-001",
+            source_job_id=job_id,
+            source_candidate_id="candidate_001",
+            image_path=image_path,
+            source_candidate_status="succeeded",
+        )
+
+
+def test_deterministic_asset_id_substitution_is_unbound(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_reusable_rogue_asset_id"
+    job_id = "job-rogue-asset-id"
+    store.ensure_project_manifest(project_id)
+    image_path = store.run_dir(project_id, job_id) / "image_candidates" / "candidate_001.png"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(PNG_BYTES)
+    registered = register_generated_image_asset(
+        store,
+        project_id,
+        source_node_id="image-node-001",
+        source_job_id=job_id,
+        source_candidate_id="candidate_001",
+        image_path=image_path,
+        source_candidate_status="succeeded",
+    )
+    original_dir = store.projects_dir / project_id / "image_assets" / registered["asset"]["asset_id"]
+    rogue_dir = original_dir.parent / "rogue_authority"
+    original_dir.rename(rogue_dir)
+    metadata_path = rogue_dir / "image_asset.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["asset_id"] = "rogue_authority"
+    metadata["preview_url"] = f"/projects/{project_id}/image-assets/rogue_authority/preview"
+    write_json(metadata_path, metadata)
+
+    assert resolve_reference_images(store, project_id, ["rogue_authority"]) == []
+    with pytest.raises(ValueError, match="deterministic"):
+        image_asset_metadata(store, project_id, "rogue_authority")
+    with pytest.raises(ValueError, match="deterministic"):
         register_generated_image_asset(
             store,
             project_id,
