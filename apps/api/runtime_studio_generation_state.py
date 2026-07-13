@@ -21,6 +21,13 @@ CANDIDATE_PREVIEW_ROUTE_PATTERN = re.compile(
     r"^/projects/([A-Za-z0-9_.-]+)/keyframe-generations/([A-Za-z0-9_.-]+)/"
     r"candidates/(candidate_\d{3})/preview$"
 )
+CANDIDATE_PREVIEW_ALIASES = (
+    "preview_url",
+    "url",
+    "previewUrl",
+    "image_asset_preview_url",
+    "imageAssetPreviewUrl",
+)
 
 
 def sanitize_generation_param(
@@ -93,7 +100,12 @@ def _candidate_preview_urls(
         artifact_id = text(item.get("artifact_id"), "", 120)
         if artifact_id:
             preview["artifact_id"] = safe_id(artifact_id)
-        candidate_contract = _validated_candidate_contract(item, url=url, project_id=project_id)
+        candidate_contract = _validated_candidate_contract(
+            item,
+            url=url,
+            project_id=project_id,
+            preview_url=preview_url,
+        )
         if candidate_contract:
             preview.update(candidate_contract)
         result.append(preview)
@@ -105,8 +117,23 @@ def _validated_candidate_contract(
     *,
     url: str,
     project_id: str | None,
+    preview_url: Callable[..., str],
 ) -> dict[str, Any] | None:
     if not isinstance(project_id, str) or not SAFE_IDENTIFIER_PATTERN.fullmatch(project_id):
+        return None
+    supplied_routes: list[str] = []
+    for alias in CANDIDATE_PREVIEW_ALIASES:
+        value = item.get(alias)
+        if value is None or value == "":
+            continue
+        try:
+            supplied_route = preview_url(value, project_id=project_id)
+        except (TypeError, ValueError):
+            return None
+        if not supplied_route:
+            return None
+        supplied_routes.append(supplied_route)
+    if not supplied_routes or any(route != url for route in supplied_routes):
         return None
     route = CANDIDATE_PREVIEW_ROUTE_PATTERN.fullmatch(url)
     if not route:
