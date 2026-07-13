@@ -1,4 +1,5 @@
 import { productionDeliveryUnavailableChecks } from "./production-delivery-view.js";
+import { selectedDeliverySubmission } from "./review-delivery-state.js";
 
 const QUALITY_FIELDS = [
   ["story_intent_preserved", "叙事意图", "确认故事重点、情绪走向和信息层级没有偏离。", "narrative"],
@@ -217,8 +218,9 @@ function annotationPanel(state) {
 
 function qualityPanel(state) {
   const panel = surface("交付检查", state.quality?.approved ? "已通过" : "待检查");
+  const readiness = reviewDeliveryActionReadiness(state);
   const fieldset = el("fieldset", "quality-checklist");
-  fieldset.disabled = Boolean(state.busy || state.stale || !state.deliverySnapshot || state.quality?.approved);
+  fieldset.disabled = Boolean(state.busy || state.stale || !readiness.canSubmitDelivery || state.quality?.approved);
   const legend = el("legend", "sr-only", "质量门禁检查项");
   fieldset.appendChild(legend);
   for (const [name, title, copy, key] of QUALITY_FIELDS) {
@@ -242,18 +244,17 @@ function qualityPanel(state) {
 
 function actionPanel(state, handlers) {
   const panel = surface("主创决定", state.busy ? "处理中" : "");
-  const candidate = state.candidates.find((item) => item.candidate_id === state.focusedCandidateId);
-  const canSee = Boolean(candidate?.available);
+  const readiness = reviewDeliveryActionReadiness(state);
   const select = actionButton("select", "选为当前版本", handlers, "primary-button");
-  select.disabled = Boolean(state.busy || state.stale || !state.reviewSnapshot || !canSee);
+  select.disabled = Boolean(state.busy || state.stale || !state.reviewSnapshot || !readiness.focusedMediaAvailable);
   const revise = actionButton("revise", "要求返修", handlers, "quiet-button");
-  revise.disabled = Boolean(state.busy || state.stale || !state.reviewSnapshot || !state.selectedCandidateId || !canSee);
+  revise.disabled = Boolean(state.busy || state.stale || !state.reviewSnapshot || !state.selectedCandidateId || !readiness.focusedMediaAvailable);
   const reject = actionButton("reject", "退回候选", handlers, "danger-button");
   reject.disabled = Boolean(state.busy || state.stale || !state.reviewSnapshot);
   const approve = actionButton("approve", state.quality?.approved ? "质量门禁已通过" : "批准当前修订", handlers, "primary-button");
-  approve.disabled = Boolean(state.busy || state.stale || !state.deliverySnapshot || state.quality?.approved || !canSee);
+  approve.disabled = Boolean(state.busy || state.stale || !readiness.canSubmitDelivery || state.quality?.approved);
   const exportButton = actionButton("export", state.exports.length ? "再次生成交付包" : "生成交付包", handlers, "export-button");
-  exportButton.disabled = Boolean(state.busy || state.stale || !state.deliverySnapshot || !state.quality?.approved || !canSee);
+  exportButton.disabled = Boolean(state.busy || state.stale || !readiness.canSubmitDelivery || !state.quality?.approved);
   panel.body.append(select, el("div", "split-actions", ""));
   panel.body.querySelector(".split-actions").append(revise, reject);
   panel.body.append(approve, exportButton);
@@ -261,14 +262,16 @@ function actionPanel(state, handlers) {
 }
 
 function deliveryPanel(state) {
-  const panel = surface("交付状态", state.exports.length ? "已生成" : state.quality?.approved ? "可导出" : "未就绪");
-  const readiness = el("div", "delivery-status-card");
-  readiness.append(
+  const readiness = reviewDeliveryActionReadiness(state);
+  const exportReady = readiness.canSubmitDelivery && state.quality?.approved && !state.rejected;
+  const panel = surface("交付状态", state.exports.length ? "已生成" : exportReady ? "可导出" : "未就绪");
+  const statusCard = el("div", "delivery-status-card");
+  statusCard.append(
     factRow("候选版本", state.selectedCandidateId && !state.rejected ? "已选择" : "待选择"),
     factRow("质量门禁", state.quality?.approved ? "已通过" : "待通过"),
-    factRow("导出准备", state.quality?.approved && !state.rejected ? "已就绪" : "未就绪"),
+    factRow("导出准备", exportReady ? "已就绪" : "未就绪"),
   );
-  panel.body.appendChild(readiness);
+  panel.body.appendChild(statusCard);
   if (!state.exports.length) panel.body.appendChild(el("p", "empty-delivery", "尚未生成当前版本的交付包。"));
   for (const item of state.exports) {
     const row = el("article", "delivery-history-row");
@@ -276,6 +279,18 @@ function deliveryPanel(state) {
     panel.body.appendChild(row);
   }
   return panel.wrap;
+}
+
+export function reviewDeliveryActionReadiness(state) {
+  const focused = state?.candidates?.find((item) => item.candidate_id === state.focusedCandidateId);
+  const selected = state?.candidates?.find((item) => item.candidate_id === state.selectedCandidateId);
+  const focusedMediaAvailable = Boolean(focused?.available);
+  const selectedMediaAvailable = Boolean(selected?.available);
+  return {
+    focusedMediaAvailable,
+    selectedMediaAvailable,
+    canSubmitDelivery: selectedMediaAvailable && Boolean(selectedDeliverySubmission(state)),
+  };
 }
 
 function lineagePanel(state) {

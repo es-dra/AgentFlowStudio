@@ -186,6 +186,37 @@ export function focusReviewCandidate(state, candidateId) {
   };
 }
 
+export function protectedPreviewDisposition(status) {
+  return Number(status) === 401 ? "session_expired" : "unavailable";
+}
+
+export function selectedDeliverySubmission(state) {
+  const snapshot = state?.deliverySnapshot;
+  const node = state?.node;
+  const run = state?.run;
+  const selectedCandidateId = safeToken(state?.selectedCandidateId);
+  const selectedCandidate = (Array.isArray(run?.candidates) ? run.candidates : [])
+    .find((item) => safeToken(item?.candidate_id) === selectedCandidateId);
+  const revision = objectValue(run?.selected_revision);
+  const selection = objectValue(node?.params?.creatorSelection);
+  const expected = {
+    candidate_id: selectedCandidateId,
+    candidate_digest: safeDigest(selectedCandidate?.canonical_digest),
+    revision_id: safeToken(revision.revision_id || revision.selected_revision_id),
+    revision_digest: safeDigest(
+      revision.canonical_digest || revision.revision_digest || revision.selected_revision_digest,
+    ),
+  };
+  if (!snapshot || !node || Object.values(expected).some((value) => !value)) return null;
+  const snapshotMatches = Object.entries(expected)
+    .every(([key, value]) => String(snapshot?.[key] || "") === value);
+  const nodeMatches = safeToken(selection.selected_candidate_id) === expected.candidate_id
+    && safeDigest(selection.selected_candidate_digest) === expected.candidate_digest
+    && safeToken(selection.selected_revision_id) === expected.revision_id
+    && safeDigest(selection.selected_revision_digest) === expected.revision_digest;
+  return snapshotMatches && nodeMatches ? { snapshot, node } : null;
+}
+
 function newestRun(runs) {
   return [...runs].sort((left, right) => String(right?.updated_at || right?.created_at || "")
     .localeCompare(String(left?.updated_at || left?.created_at || "")))[0] || null;

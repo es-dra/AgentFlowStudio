@@ -173,3 +173,121 @@ process.stdout.write(JSON.stringify({ quality, exported, qualityPosts, exportPos
     assert payload["qualityPosts"] == 0
     assert payload["exportPosts"] == 0
     assert payload["reads"] == 4
+
+
+def test_protected_preview_401_uses_identity_boundary_while_other_media_failures_stay_unavailable() -> None:
+    payload = _node_json(
+        r'''
+import { protectedPreviewDisposition } from "./apps/studio/src/review-delivery-state.js";
+process.stdout.write(JSON.stringify({
+  unauthorized: protectedPreviewDisposition(401),
+  forbidden: protectedPreviewDisposition(403),
+  missing: protectedPreviewDisposition(404),
+  failed: protectedPreviewDisposition(500),
+}));
+'''
+    )
+    main = (STUDIO / "src" / "review-delivery-main.js").read_text(encoding="utf-8")
+    hydrate = main[main.index("async function hydrateCandidateMedia") : main.index("function revokePreviewMedia")]
+    teardown = main[main.index("function clearReviewIdentity") : main.index("async function hydrateCandidateMedia")]
+
+    assert payload == {
+        "unauthorized": "session_expired",
+        "forbidden": "unavailable",
+        "missing": "unavailable",
+        "failed": "unavailable",
+    }
+    assert 'saveAuthToken("");' in hydrate
+    assert 'new CustomEvent("afs:auth-session-expired"' in hydrate
+    assert hydrate.index('protectedPreviewDisposition(response.status) === "session_expired"') < hydrate.index('throw new Error("preview_unavailable")')
+    for marker in (
+        "reviewState.clearIdentity();",
+        "revokePreviewMedia();",
+        "mountedRoot?.replaceChildren();",
+        "clearProjectSession();",
+        "clearIdentityScopedStudioState();",
+        "showSecureEntry(message, options);",
+    ):
+        assert marker in teardown
+
+
+def test_delivery_readiness_and_submission_ignore_focused_card_in_both_mismatch_directions() -> None:
+    payload = _node_json(
+        r'''
+import { selectedDeliverySubmission } from "./apps/studio/src/review-delivery-state.js";
+import { reviewDeliveryActionReadiness } from "./apps/studio/src/review-delivery-workspace.js";
+const digest = (char) => char.repeat(64);
+const candidates = [
+  { candidate_id: "candidate-a", canonical_digest: digest("a"), parent_job_id: "job-001" },
+  { candidate_id: "candidate-b", canonical_digest: digest("b"), parent_job_id: "job-001" },
+];
+function stateFor({ selected, focused, selectedAvailable, focusedAvailable, snapshotCandidate = selected }) {
+  const selectedItem = candidates.find((item) => item.candidate_id === selected);
+  const snapshotItem = candidates.find((item) => item.candidate_id === snapshotCandidate);
+  const revisionId = selected === "candidate-a" ? "revision-a" : "revision-b";
+  const revisionDigest = selected === "candidate-a" ? digest("c") : digest("d");
+  return {
+    selectedCandidateId: selected,
+    focusedCandidateId: focused,
+    candidates: candidates.map((item) => ({
+      ...item,
+      available: item.candidate_id === selected ? selectedAvailable : item.candidate_id === focused ? focusedAvailable : false,
+    })),
+    run: {
+      candidates,
+      selected_revision: {
+        candidate_id: selected,
+        candidate_digest: selectedItem.canonical_digest,
+        revision_id: revisionId,
+        canonical_digest: revisionDigest,
+      },
+    },
+    node: { params: { creatorSelection: {
+      selected_candidate_id: selected,
+      selected_candidate_digest: selectedItem.canonical_digest,
+      selected_revision_id: revisionId,
+      selected_revision_digest: revisionDigest,
+    } } },
+    deliverySnapshot: {
+      candidate_id: snapshotCandidate,
+      candidate_digest: snapshotItem.canonical_digest,
+      revision_id: revisionId,
+      revision_digest: revisionDigest,
+    },
+  };
+}
+const selectedUnavailable = stateFor({
+  selected: "candidate-a", focused: "candidate-b", selectedAvailable: false, focusedAvailable: true,
+});
+const focusedUnavailable = stateFor({
+  selected: "candidate-a", focused: "candidate-b", selectedAvailable: true, focusedAvailable: false,
+});
+const wrongAtoB = stateFor({
+  selected: "candidate-a", focused: "candidate-b", selectedAvailable: true, focusedAvailable: true, snapshotCandidate: "candidate-b",
+});
+const wrongBtoA = stateFor({
+  selected: "candidate-b", focused: "candidate-a", selectedAvailable: true, focusedAvailable: true, snapshotCandidate: "candidate-a",
+});
+process.stdout.write(JSON.stringify({
+  selectedUnavailable: reviewDeliveryActionReadiness(selectedUnavailable),
+  focusedUnavailable: reviewDeliveryActionReadiness(focusedUnavailable),
+  validSubmission: Boolean(selectedDeliverySubmission(focusedUnavailable)),
+  wrongAtoB: selectedDeliverySubmission(wrongAtoB),
+  wrongBtoA: selectedDeliverySubmission(wrongBtoA),
+}));
+'''
+    )
+
+    assert payload["selectedUnavailable"] == {
+        "focusedMediaAvailable": True,
+        "selectedMediaAvailable": False,
+        "canSubmitDelivery": False,
+    }
+    assert payload["focusedUnavailable"] == {
+        "focusedMediaAvailable": False,
+        "selectedMediaAvailable": True,
+        "canSubmitDelivery": True,
+    }
+    assert payload["validSubmission"] is True
+    assert payload["wrongAtoB"] is None
+    assert payload["wrongBtoA"] is None
