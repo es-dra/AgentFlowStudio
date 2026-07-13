@@ -10,6 +10,148 @@ def _read(path: str) -> str:
     return (STUDIO_ROOT / path).read_text(encoding="utf-8")
 
 
+def test_runtime_hydration_uses_target_project_before_candidate_normalization() -> None:
+    script = textwrap.dedent(
+        """
+        import { createStore } from "./apps/studio/src/store.js";
+
+        function installBrowserStubs() {
+          const storage = new Map();
+          globalThis.localStorage = {
+            getItem: (key) => storage.get(key) || null,
+            setItem: (key, value) => storage.set(key, String(value)),
+            removeItem: (key) => storage.delete(key),
+          };
+          globalThis.CustomEvent = class CustomEvent {
+            constructor(type, init = {}) {
+              this.type = type;
+              this.detail = init.detail || {};
+            }
+          };
+          globalThis.window = { dispatchEvent: () => {} };
+        }
+
+        function authority(jobId, candidateId, digest) {
+          return {
+            schema_version: "afs_studio_reusable_asset_authority.v0.1",
+            asset_id: "asset-safe-001",
+            role: "generated_keyframe_reference",
+            source_kind: "keyframe_candidate",
+            status: "succeeded",
+            source_job_id: jobId,
+            source_candidate_id: candidateId,
+            source_candidate_digest: digest,
+            sha256: digest,
+          };
+        }
+
+        function remoteState(projectId, meta) {
+          const jobId = "job-keyframe-001";
+          const candidateId = "candidate_001";
+          const digest = "a".repeat(64);
+          const url = `/projects/${projectId}/keyframe-generations/${jobId}/candidates/${candidateId}/preview`;
+          return {
+            meta,
+            nodes: {
+              image_1: {
+                id: "image_1",
+                type: "image",
+                title: "Hydrated candidate",
+                params: {
+                  candidatePreviewUrls: [{
+                    url,
+                    preview_url: url,
+                    candidate_id: candidateId,
+                    parent_job_id: jobId,
+                    project_id: projectId,
+                    canonical_digest: digest,
+                    reusable_asset_authority: authority(jobId, candidateId, digest),
+                  }],
+                },
+              },
+            },
+            order: ["image_1"],
+          };
+        }
+
+        function assertCandidate(state, projectId, label) {
+          const candidate = state.nodes.image_1?.params?.candidatePreviewUrls?.[0];
+          const expectedUrl = `/projects/${projectId}/keyframe-generations/`
+            + "job-keyframe-001/candidates/candidate_001/preview";
+          if (!candidate) throw new Error(`${label}: candidate missing`);
+          if (candidate.url !== expectedUrl) throw new Error(`${label}: url stripped: ${candidate.url}`);
+          if (candidate.candidate_id !== "candidate_001") throw new Error(`${label}: candidate id stripped`);
+          if (candidate.parent_job_id !== "job-keyframe-001") throw new Error(`${label}: parent job stripped`);
+          if (candidate.project_id !== projectId) throw new Error(`${label}: project id not rebound`);
+          if (candidate.canonical_digest !== "a".repeat(64)) throw new Error(`${label}: digest stripped`);
+          if (candidate.reusable_asset_authority?.asset_id !== "asset-safe-001") {
+            throw new Error(`${label}: authority stripped`);
+          }
+        }
+
+        const projectId = "runtime-hydration-project";
+        for (const [label, meta] of [
+          ["missing-meta-project", { projectName: "Runtime project" }],
+          ["conflicting-meta-project", { projectId: "untrusted-other-project", projectName: "Runtime project" }],
+        ]) {
+          installBrowserStubs();
+          let savedState = null;
+          const store = createStore(projectId);
+          const runtime = {
+            projectId,
+            loadStudioState: async () => ({
+              source: "runtime",
+              state_version: `studio_state:${label}`,
+              saved_at: "2026-07-13T00:00:00.000Z",
+              state: remoteState(projectId, meta),
+            }),
+            saveStudioState: async (state) => {
+              savedState = state;
+              return { state_version: `studio_state:${label}:saved` };
+            },
+          };
+          store.attachRuntime(runtime);
+          const result = await store.hydrateRuntime();
+          if (result.source !== "runtime") throw new Error(`${label}: unexpected source ${result.source}`);
+          if (store.get().meta.projectId !== projectId) throw new Error(`${label}: trusted project id lost`);
+          assertCandidate(store.get(), projectId, `${label}:hydrate`);
+          store.set((state) => { state.nodes.image_1.title = `${label}:edited`; });
+          await store.flushRuntimeSave();
+          assertCandidate(savedState, projectId, `${label}:autosave`);
+        }
+
+        installBrowserStubs();
+        let resolveOldLoad;
+        const staleStore = createStore("runtime-stale-a");
+        const oldHydration = staleStore.hydrateRuntime({
+          projectId: "runtime-stale-a",
+          loadStudioState: async () => new Promise((resolve) => { resolveOldLoad = resolve; }),
+        });
+        await staleStore.switchProject("runtime-stale-b", {
+          projectId: "runtime-stale-b",
+          loadStudioState: async () => ({ source: "empty", state: null, state_version: "" }),
+        });
+        resolveOldLoad({
+          source: "runtime",
+          state_version: "studio_state:stale-a",
+          state: remoteState("runtime-stale-a", {}),
+        });
+        const staleResult = await oldHydration;
+        if (staleResult.source !== "stale" || staleResult.projectId !== "runtime-stale-a") {
+          throw new Error(`stale project boundary failed: ${JSON.stringify(staleResult)}`);
+        }
+        if (staleStore.get().meta.projectId !== "runtime-stale-b") {
+          throw new Error("stale hydration replaced the active project id");
+        }
+        if (Object.keys(staleStore.get().nodes || {}).length) {
+          throw new Error("stale hydration replaced the active project state");
+        }
+        """
+    )
+
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
 def test_project_save_recovery_state_machine_keeps_dirty_until_safe_retry_success() -> None:
     script = textwrap.dedent(
         """
