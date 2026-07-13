@@ -6,24 +6,24 @@ from pathlib import Path
 SITE_ROOT = Path("apps/site")
 
 
-def test_site_homepage_mounts_social_square_without_internal_terms() -> None:
+def test_site_homepage_defers_social_square_while_standalone_assets_remain_preserved() -> None:
     index = (SITE_ROOT / "index.html").read_text(encoding="utf-8")
     square = (SITE_ROOT / "social-square.html").read_text(encoding="utf-8")
 
-    assert 'href="/site/social-square.html"' in index
-    assert "social-teaser" in index
-    assert 'data-social-square-list' in index
-    assert 'src="/site/social-square.js"' in index
-    assert 'href="/site/styles/social-square.css"' in index
+    assert 'href="/site/social-square.html"' not in index
+    assert "social-teaser" not in index
+    assert 'data-social-square-list' not in index
+    assert 'src="/site/social-square.js"' not in index
+    assert 'href="/site/styles/social-square.css"' not in index
+    assert "社交广场" not in index
+    assert "发布需求" not in index
+    assert "承接需求" not in index
     assert "<title>社交广场 | AFS Studio</title>" in square
     assert 'data-social-square-form' in square
     assert 'data-square-search' in square
     assert 'data-square-filter="workflow"' in square
     assert "square-sprite" in square
     assert "团团在广场值班" in square
-    assert "社交广场" in index
-    assert "发布需求" in index
-    assert "承接需求" in index
     assert "provider raw" not in (index + square).lower()
     assert "Runtime Service" not in index + square
 
