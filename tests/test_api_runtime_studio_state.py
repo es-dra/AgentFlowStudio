@@ -166,6 +166,10 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
                     "candidatePreviewUrls": [
                         {
                             "url": candidate_url,
+                            "preview_url": candidate_url,
+                            "previewUrl": candidate_url,
+                            "image_asset_preview_url": candidate_url,
+                            "imageAssetPreviewUrl": candidate_url,
                             "candidate_id": "candidate_001",
                             "canonical_digest": candidate_digest,
                             "parent_job_id": "job_keyframe_001",
@@ -220,6 +224,75 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
         "sha256": candidate_digest,
     }
     assert "internal_note" not in params["candidatePreviewUrls"][0]["reusable_asset_authority"]
+
+
+def test_studio_state_candidate_authority_rejects_conflicting_or_unsafe_preview_aliases(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-alias-mismatch"
+    job_id = "job_keyframe_001"
+    candidate_id = "candidate_001"
+    candidate_digest = "a" * 64
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio alias mismatch test"})
+    candidate_url = (
+        f"/projects/{project_id}/keyframe-generations/{job_id}/"
+        f"candidates/{candidate_id}/preview"
+    )
+    conflicting_url = (
+        f"/projects/{project_id}/keyframe-generations/job_keyframe_002/"
+        f"candidates/{candidate_id}/preview"
+    )
+    authority = {
+        "schema_version": "afs_studio_reusable_asset_authority.v0.1",
+        "asset_id": "asset_safe_001",
+        "role": "generated_keyframe_reference",
+        "source_kind": "keyframe_candidate",
+        "status": "succeeded",
+        "source_job_id": job_id,
+        "source_candidate_id": candidate_id,
+        "source_candidate_digest": candidate_digest,
+        "sha256": candidate_digest,
+    }
+    candidate = {
+        "url": candidate_url,
+        "candidate_id": candidate_id,
+        "canonical_digest": candidate_digest,
+        "parent_job_id": job_id,
+        "project_id": project_id,
+        "reusable_asset_authority": authority,
+    }
+    variants = {
+        "preview_url_conflict": {**candidate, "preview_url": conflicting_url},
+        "preview_url_unsafe": {**candidate, "preview_url": "https://example.invalid/private.png"},
+        "previewUrl_conflict": {**candidate, "previewUrl": conflicting_url},
+        "image_asset_preview_url_unsafe": {
+            **candidate,
+            "image_asset_preview_url": "https://example.invalid/private-candidate.png",
+        },
+        "imageAssetPreviewUrl_conflict": {**candidate, "imageAssetPreviewUrl": conflicting_url},
+    }
+    protected_keys = {
+        "candidate_id",
+        "canonical_digest",
+        "parent_job_id",
+        "project_id",
+        "reusable_asset_authority",
+    }
+
+    for name, variant in variants.items():
+        state = {
+            "nodes": {
+                "image_1": {
+                    "id": "image_1",
+                    "type": "image",
+                    "params": {"candidatePreviewUrls": [variant]},
+                }
+            }
+        }
+        saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+        assert saved.status_code == 200, name
+        projected = saved.json()["state"]["nodes"]["image_1"]["params"]["candidatePreviewUrls"][0]
+        assert projected["url"] == candidate_url, name
+        assert protected_keys.isdisjoint(projected), name
 
 
 def test_studio_state_candidate_authority_mismatches_fail_closed(tmp_path) -> None:
