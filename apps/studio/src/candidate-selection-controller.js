@@ -414,7 +414,6 @@ async function createAndBindProductionRun(store, runtime, node) {
     if (currentNode) {
       currentNode.params = currentNode.params || {};
       currentNode.params.creatorSelection = {
-        ...candidateSelectionSummary(currentNode),
         status: "run_bound",
         run_id: binding.active_run_id,
         selected_parent_job_id: request.candidates[0].parent_job_id,
