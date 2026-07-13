@@ -2,6 +2,8 @@ import { icon } from "./icons.js";
 import { el } from "./overlay.js";
 
 export function renderTopbar(options) {
+  const topbar = document.getElementById("topbar");
+  if (!topbar) return;
   const {
     state,
     store,
@@ -20,7 +22,6 @@ export function renderTopbar(options) {
     onSignOut,
     onRetrySave,
   } = options;
-  const topbar = document.getElementById("topbar");
   const signature = [
     state.meta.projectId,
     state.ui.drawerOpen,

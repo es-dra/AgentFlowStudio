@@ -457,6 +457,7 @@ async function refreshProductOverview() {
 async function handleSignOut() {
   if (identityBoundaryInFlight) return;
   identityBoundaryInFlight = true;
+  editorMounted = false;
   const logoutRuntime = runtime;
   store?.resetIdentityState?.();
   projectController?.setAuthUser(null);
@@ -469,10 +470,10 @@ async function handleSignOut() {
     window.location.replace("/studio/");
   }
 }
-
 async function recoverExpiredSession() {
   if (identityBoundaryInFlight) return;
   identityBoundaryInFlight = true;
+  editorMounted = false;
   store?.resetIdentityState?.();
   projectController?.setAuthUser(null);
   clearProjectSession();
@@ -484,7 +485,6 @@ async function recoverExpiredSession() {
   });
   if (!authState?.auth_required || authState?.authenticated) window.location.reload();
 }
-
 async function refreshRuntimeSurfaceStatus({ authState = null } = {}) {
   const runtimeClient = runtime;
   const sequence = ++runtimeSurfaceStatusSequence;
