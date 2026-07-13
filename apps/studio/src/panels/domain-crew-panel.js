@@ -90,10 +90,12 @@ function renderPanel(body, controller, state) {
 function boundaryBanner(state) {
   const banner = el("div", "domain-crew-boundary");
   banner.dataset.evidence = "domain_crew_ledger_pass";
+  banner.dataset.authorityValid = String(Boolean(state.authorityValid));
   banner.append(
     el("strong", "", "证据边界"),
     el("span", "", "当前界面证明认证域剧组台账与人工控制路径；不证明节点已由真实智能体运行时自主推进。"),
   );
+  if (!state.authorityValid) banner.appendChild(el("span", "domain-crew-authority-locked", "权威状态不可用，所有写操作已锁定；请重新读取。"));
   if (state.busyAction) banner.appendChild(el("span", "domain-crew-busy", `正在同步：${state.busyAction}`));
   return banner;
 }
@@ -167,7 +169,7 @@ function taskCard(controller, crew, task, state) {
   if (task.status === "ready" && !task.claimed_by_agent_id) {
     const claim = smallButton("由责任智能体认领", () => controller.claimTask(task.task_id, task.assigned_agent_id).catch(() => {}));
     claim.dataset.action = "claim-domain-task";
-    claim.disabled = Boolean(state.busyAction) || !agentById(crew, task.assigned_agent_id);
+    claim.disabled = domainCrewMutationsDisabled(state) || !agentById(crew, task.assigned_agent_id);
     actions.appendChild(claim);
   }
   card.appendChild(actions);
@@ -261,7 +263,7 @@ function handoffRecord(controller, item, state) {
         note: decision === "accept" ? "接收精确版本交接" : "退回并请求修订",
       }).catch(() => {}));
       button.dataset.action = `handoff-${decision}`;
-      button.disabled = Boolean(state.busyAction);
+      button.disabled = domainCrewMutationsDisabled(state);
       actions.appendChild(button);
     }
     record.appendChild(actions);
@@ -366,7 +368,7 @@ function propagationSurface(controller, crew, state) {
         observed_version_id: item.approved_version_id,
       }).catch(() => {}));
       reconfirm.dataset.action = "reconfirm-propagation";
-      reconfirm.disabled = Boolean(state.busyAction);
+      reconfirm.disabled = domainCrewMutationsDisabled(state);
       actions.appendChild(reconfirm);
     }
     card.appendChild(actions);
@@ -391,6 +393,7 @@ function createCrewGate(controller, state) {
   const button = el("button", "primary-btn", "初始化数字剧组");
   button.type = "button";
   button.dataset.action = "create-domain-crew";
+  button.disabled = domainCrewMutationsDisabled(state);
   button.addEventListener("click", () => controller.createCrew(input.value).catch(() => {}));
   gate.append(field("剧组 ID", input), button);
   return gate;
@@ -482,8 +485,12 @@ function entityTypeSelect() {
 function submitButton(label, state) {
   const button = el("button", "primary-btn", label);
   button.type = "submit";
-  button.disabled = Boolean(state.busyAction);
+  button.disabled = domainCrewMutationsDisabled(state);
   return button;
+}
+
+export function domainCrewMutationsDisabled(state) {
+  return !state?.authorityValid || Boolean(state?.busyAction) || state?.status === "loading";
 }
 
 function smallButton(label, handler) {
