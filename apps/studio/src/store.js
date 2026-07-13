@@ -80,7 +80,16 @@ export function createStore(projectId = "studio-local-001") {
         return { source: "stale", projectId: targetProjectId };
       }
       const remoteState = payload?.state;
-      const remote = normalizeSnapshot(remoteState);
+      const remoteInput = targetProjectId
+        ? {
+            ...(remoteState && typeof remoteState === "object" ? remoteState : {}),
+            meta: {
+              ...(remoteState?.meta && typeof remoteState.meta === "object" ? remoteState.meta : {}),
+              projectId: targetProjectId,
+            },
+          }
+        : remoteState;
+      const remote = normalizeSnapshot(remoteInput);
       runtimeStateVersion = String(payload?.state_version || "");
       if (shouldKeepLocalOverRemote(state, remote, payload)) {
         await flushRuntimeSave();
