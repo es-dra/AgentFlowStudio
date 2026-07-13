@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
 import pytest
 
 from agentflow_studio.production.vertical_slice import (
+    CHECKPOINT_CHAIN_INPUT_FIELDS,
+    CHECKPOINT_INTEGRITY_FIELDS,
+    CHECKPOINT_STATE_FIELDS,
+    CHECKPOINT_STATE_SEAL_FIELDS,
     CreatorDecision,
     DeterministicProductionSlice,
     ProjectIP,
@@ -18,6 +23,51 @@ EXAMPLE_DIR = Path("examples/deterministic_vertical_slice")
 
 def _load_model(name: str, model):
     return model.model_validate(json.loads((EXAMPLE_DIR / name).read_text(encoding="utf-8")))
+
+
+def _run_to_quality_gate(output_dir: Path) -> tuple[ProjectIP, DeterministicProductionSlice]:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, output_dir)
+    run.advance_to_candidates()
+    run.record_creator_decision(_load_model("creator_decision.example.json", CreatorDecision))
+    run.record_quality_review(_load_model("quality_review.example.json", QualityReview))
+    return project, run
+
+
+def _leaf_paths(value, path=()):
+    if isinstance(value, dict):
+        for key in sorted(value):
+            yield from _leaf_paths(value[key], (*path, key))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _leaf_paths(item, (*path, index))
+    else:
+        yield path
+
+
+def _set_path(value, path, replacement) -> None:
+    target = value
+    for part in path[:-1]:
+        target = target[part]
+    target[path[-1]] = replacement
+
+
+def _mutated_scalar(value):
+    if isinstance(value, bool):
+        return not value
+    if isinstance(value, int):
+        return value + 1
+    if isinstance(value, str):
+        return f"{value}__tampered"
+    if value is None:
+        return "tampered"
+    raise AssertionError(f"unsupported checkpoint scalar in mutation matrix: {type(value).__name__}")
+
+
+def _value_at_path(value, path):
+    for part in path:
+        value = value[part]
+    return value
 
 
 def test_deterministic_vertical_slice_exports_concrete_delivery_and_evidence(tmp_path: Path) -> None:
@@ -243,6 +293,155 @@ def test_review_for_old_selection_fails_closed_after_creator_subject_changes(tmp
     stale_review = _load_model("quality_review.example.json", QualityReview)
     with pytest.raises(ValueError, match="subject digest does not match"):
         run.record_quality_review(stale_review)
+
+
+def test_checkpoint_security_inventory_covers_state_and_every_integrity_field(tmp_path: Path) -> None:
+    _, run = _run_to_quality_gate(tmp_path)
+    checkpoint = json.loads((tmp_path / "production_state.json").read_text(encoding="utf-8"))
+
+    assert set(checkpoint) == CHECKPOINT_STATE_FIELDS
+    assert set(checkpoint["checkpoint_integrity"]) == CHECKPOINT_INTEGRITY_FIELDS
+    assert CHECKPOINT_STATE_SEAL_FIELDS == CHECKPOINT_STATE_FIELDS - {"checkpoint_integrity"}
+    assert CHECKPOINT_CHAIN_INPUT_FIELDS == CHECKPOINT_INTEGRITY_FIELDS - {"chain_digest"}
+    assert {
+        "schema_version",
+        "checkpoint_model_version",
+        "run_id",
+        "project_fingerprint",
+        "stage",
+        "recovery_count",
+        "artifacts",
+        "lineage",
+    } <= CHECKPOINT_STATE_SEAL_FIELDS
+
+    checkpoint["checkpoint_integrity"]["future_unsealed_field"] = "must fail closed"
+    (tmp_path / "production_state.json").write_text(json.dumps(checkpoint), encoding="utf-8")
+    with pytest.raises(ValueError, match="checkpoint integrity field inventory is invalid"):
+        run.export()
+
+
+def test_each_checkpoint_integrity_field_mutation_blocks_reopen_and_export(tmp_path: Path) -> None:
+    project, run = _run_to_quality_gate(tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    mutations = {
+        "algorithm": "sha512",
+        "sequence": -100,
+        "previous_chain_digest": "0" * 64,
+        "state_digest": "0" * 64,
+        "chain_digest": "0" * 64,
+    }
+
+    assert set(mutations) == CHECKPOINT_INTEGRITY_FIELDS
+    assert original["stage"] == "quality_gate"
+    assert original["checkpoint_integrity"]["sequence"] == 5
+    for field, replacement in mutations.items():
+        mutated = copy.deepcopy(original)
+        mutated["checkpoint_integrity"][field] = replacement
+        checkpoint_path.write_text(json.dumps(mutated), encoding="utf-8")
+
+        with pytest.raises(ValueError):
+            run.export()
+        assert not (tmp_path / "production_delivery.json").exists()
+        assert not (tmp_path / "evidence.json").exists()
+        with pytest.raises(ValueError):
+            DeterministicProductionSlice(project, tmp_path)
+        checkpoint_path.write_text(json.dumps(original), encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("replacement", "message"),
+    [
+        (-1, "must be a nonnegative integer"),
+        (True, "must be a nonnegative integer"),
+        ("5", "must be a nonnegative integer"),
+        (5.0, "must be a nonnegative integer"),
+        (4, "precedes stage and recovery count"),
+        (6, "checkpoint chain integrity validation failed"),
+    ],
+)
+def test_checkpoint_sequence_type_range_and_monotonic_consistency_fail_closed(
+    tmp_path: Path, replacement, message: str
+) -> None:
+    project, _ = _run_to_quality_gate(tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["checkpoint_integrity"]["sequence"] = replacement
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        DeterministicProductionSlice(project, tmp_path)
+
+
+def test_checkpoint_previous_link_semantics_fail_closed(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    DeterministicProductionSlice(project, tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["checkpoint_integrity"]["previous_chain_digest"] = "0" * 64
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="initial checkpoint cannot reference"):
+        DeterministicProductionSlice(project, tmp_path)
+
+
+def test_in_memory_sequence_tamper_cannot_be_resealed_on_advance(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    run.state["checkpoint_integrity"]["sequence"] = 10
+
+    with pytest.raises(ValueError, match="previous checkpoint"):
+        run.advance_to_candidates()
+    assert json.loads(checkpoint_path.read_text(encoding="utf-8")) == original
+
+
+def test_each_quality_gate_checkpoint_leaf_mutation_blocks_reopen_and_export(tmp_path: Path) -> None:
+    project, run = _run_to_quality_gate(tmp_path)
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    sealed_state = {key: original[key] for key in CHECKPOINT_STATE_SEAL_FIELDS}
+    paths = list(_leaf_paths(sealed_state))
+
+    assert len(paths) > 100
+    assert {path[0] for path in paths} == CHECKPOINT_STATE_SEAL_FIELDS
+    for path in paths:
+        mutated = copy.deepcopy(original)
+        replacement = _mutated_scalar(_value_at_path(mutated, path))
+        _set_path(mutated, path, replacement)
+        checkpoint_path.write_text(json.dumps(mutated), encoding="utf-8")
+
+        with pytest.raises(ValueError):
+            run.export()
+        assert not (tmp_path / "production_delivery.json").exists(), path
+        assert not (tmp_path / "evidence.json").exists(), path
+        with pytest.raises(ValueError):
+            DeterministicProductionSlice(project, tmp_path)
+        checkpoint_path.write_text(json.dumps(original), encoding="utf-8")
+
+
+def test_each_exported_checkpoint_leaf_mutation_blocks_reopen(tmp_path: Path) -> None:
+    project, run = _run_to_quality_gate(tmp_path)
+    run.export()
+    checkpoint_path = tmp_path / "production_state.json"
+    original = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    sealed_state = {key: original[key] for key in CHECKPOINT_STATE_SEAL_FIELDS}
+    paths = list(_leaf_paths(sealed_state))
+
+    assert original["stage"] == "exported"
+    assert {"delivery_ref", "delivery_sha256", "evidence_ref", "evidence_sha256", "source_state_chain_digest"} == set(
+        original["artifacts"]["export"]
+    )
+    for path in paths:
+        mutated = copy.deepcopy(original)
+        replacement = _mutated_scalar(_value_at_path(mutated, path))
+        _set_path(mutated, path, replacement)
+        checkpoint_path.write_text(json.dumps(mutated), encoding="utf-8")
+
+        with pytest.raises(ValueError):
+            DeterministicProductionSlice(project, tmp_path)
+        checkpoint_path.write_text(json.dumps(original), encoding="utf-8")
 
 
 @pytest.mark.parametrize("tamper_kind", ["state", "artifacts", "lineage"])

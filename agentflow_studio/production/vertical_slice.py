@@ -11,6 +11,24 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 SCHEMA_VERSION = "0.1.0"
 CHECKPOINT_MODEL_VERSION = "1.0.0"
 STAGES = ("initialized", "script_assets", "storyboard", "candidates", "creator_review", "quality_gate", "exported")
+CHECKPOINT_STATE_FIELDS = frozenset(
+    {
+        "schema_version",
+        "checkpoint_model_version",
+        "run_id",
+        "project_fingerprint",
+        "stage",
+        "recovery_count",
+        "artifacts",
+        "lineage",
+        "checkpoint_integrity",
+    }
+)
+CHECKPOINT_STATE_SEAL_FIELDS = CHECKPOINT_STATE_FIELDS - {"checkpoint_integrity"}
+CHECKPOINT_INTEGRITY_FIELDS = frozenset(
+    {"algorithm", "sequence", "previous_chain_digest", "state_digest", "chain_digest"}
+)
+CHECKPOINT_CHAIN_INPUT_FIELDS = CHECKPOINT_INTEGRITY_FIELDS - {"chain_digest"}
 PROTECTED_NON_CLAIMS = {
     "provider_smoke": False,
     "generated_media_quality": False,
@@ -408,38 +426,102 @@ class DeterministicProductionSlice:
 
     def _write_state(self) -> None:
         previous = self.state.get("checkpoint_integrity", {})
-        unsigned_state = {key: value for key, value in self.state.items() if key != "checkpoint_integrity"}
-        state_digest = _digest(unsigned_state)
-        previous_chain_digest = previous.get("chain_digest")
-        self.state["checkpoint_integrity"] = {
+        if previous:
+            if not isinstance(previous, dict) or set(previous) != CHECKPOINT_INTEGRITY_FIELDS:
+                raise ValueError("previous checkpoint integrity field inventory is invalid")
+            if previous.get("algorithm") != "sha256":
+                raise ValueError("previous checkpoint integrity algorithm is unsupported")
+            previous_sequence = _require_nonnegative_int(previous.get("sequence"), "checkpoint sequence")
+            previous_chain_digest = previous.get("chain_digest")
+            previous_link = previous.get("previous_chain_digest")
+            if previous_sequence == 0:
+                if previous_link is not None:
+                    raise ValueError("initial checkpoint cannot reference a previous chain digest")
+            elif not _is_sha256_digest(previous_link):
+                raise ValueError("previous checkpoint link digest is missing or invalid")
+            if not _is_sha256_digest(previous.get("state_digest")):
+                raise ValueError("previous checkpoint state digest is invalid")
+            if not _is_sha256_digest(previous_chain_digest):
+                raise ValueError("previous checkpoint chain digest is invalid")
+            if previous_chain_digest != _checkpoint_chain_digest(previous):
+                raise ValueError("previous checkpoint chain integrity validation failed")
+        else:
+            previous_sequence = -1
+            previous_chain_digest = None
+        stage = self.state.get("stage")
+        if stage not in STAGES:
+            raise ValueError("checkpoint stage is invalid")
+        recovery_count = _require_nonnegative_int(self.state.get("recovery_count"), "checkpoint recovery count")
+        sequence = previous_sequence + 1
+        if sequence < STAGES.index(stage) + recovery_count:
+            raise ValueError("checkpoint write sequence precedes stage and recovery count")
+        state_digest = _digest(_checkpoint_state_payload(self.state))
+        integrity = {
             "algorithm": "sha256",
-            "sequence": int(previous.get("sequence", -1)) + 1,
+            "sequence": sequence,
             "previous_chain_digest": previous_chain_digest,
             "state_digest": state_digest,
-            "chain_digest": _digest(
-                {"previous_chain_digest": previous_chain_digest, "state_digest": state_digest}
-            ),
         }
+        integrity["chain_digest"] = _checkpoint_chain_digest(integrity)
+        self.state["checkpoint_integrity"] = integrity
         _write_json(self.state_path, self.state)
 
     def _validate_checkpoint(self, state: dict[str, Any]) -> None:
+        if not isinstance(state, dict) or set(state) != CHECKPOINT_STATE_FIELDS:
+            raise ValueError("checkpoint state field inventory is invalid")
+        if state.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError("unsupported checkpoint schema version")
         if state.get("checkpoint_model_version") != CHECKPOINT_MODEL_VERSION:
             raise ValueError("unsupported checkpoint model version")
+        if state.get("stage") not in STAGES:
+            raise ValueError("checkpoint stage is invalid")
+        recovery_count = _require_nonnegative_int(state.get("recovery_count"), "checkpoint recovery count")
+        if not isinstance(state.get("artifacts"), dict):
+            raise ValueError("checkpoint artifacts must be an object")
+        self._validate_lineage(state.get("lineage"))
+        expected_fingerprint = _digest(self.project.model_dump(mode="json"))
+        if state.get("project_fingerprint") != expected_fingerprint:
+            raise ValueError("existing checkpoint belongs to a different project input")
+        if state.get("run_id") != _stable_id("run", self.project.project_id, expected_fingerprint):
+            raise ValueError("checkpoint run identity is invalid")
         integrity = state.get("checkpoint_integrity")
-        if not isinstance(integrity, dict) or integrity.get("algorithm") != "sha256":
+        if not isinstance(integrity, dict) or set(integrity) != CHECKPOINT_INTEGRITY_FIELDS:
+            raise ValueError("checkpoint integrity field inventory is invalid")
+        if integrity.get("algorithm") != "sha256":
             raise ValueError("checkpoint integrity metadata is missing or unsupported")
-        unsigned_state = {key: value for key, value in state.items() if key != "checkpoint_integrity"}
-        actual_state_digest = _digest(unsigned_state)
+        sequence = _require_nonnegative_int(integrity.get("sequence"), "checkpoint sequence")
+        previous_chain_digest = integrity.get("previous_chain_digest")
+        if sequence == 0:
+            if previous_chain_digest is not None:
+                raise ValueError("initial checkpoint cannot reference a previous chain digest")
+        elif not _is_sha256_digest(previous_chain_digest):
+            raise ValueError("checkpoint previous chain digest is missing or invalid")
+        if not _is_sha256_digest(integrity.get("state_digest")):
+            raise ValueError("checkpoint state digest is invalid")
+        if not _is_sha256_digest(integrity.get("chain_digest")):
+            raise ValueError("checkpoint chain digest is invalid")
+        actual_state_digest = _digest(_checkpoint_state_payload(state))
         if integrity.get("state_digest") != actual_state_digest:
             raise ValueError("checkpoint state integrity validation failed")
-        actual_chain_digest = _digest(
-            {
-                "previous_chain_digest": integrity.get("previous_chain_digest"),
-                "state_digest": actual_state_digest,
-            }
+        minimum_sequence = STAGES.index(state["stage"]) + recovery_count
+        if sequence < minimum_sequence:
+            raise ValueError("checkpoint sequence precedes stage and recovery count")
+        actual_chain_digest = _checkpoint_chain_digest(
+            {**integrity, "state_digest": actual_state_digest}
         )
         if integrity.get("chain_digest") != actual_chain_digest:
             raise ValueError("checkpoint chain integrity validation failed")
+
+    @staticmethod
+    def _validate_lineage(lineage: Any) -> None:
+        if not isinstance(lineage, list):
+            raise ValueError("checkpoint lineage must be a list")
+        expected_fields = {"source_ref", "target_ref", "relation"}
+        for edge in lineage:
+            if not isinstance(edge, dict) or set(edge) != expected_fields:
+                raise ValueError("checkpoint lineage edge field inventory is invalid")
+            if not all(isinstance(edge[field], str) and edge[field] for field in expected_fields):
+                raise ValueError("checkpoint lineage edge values must be non-empty strings")
 
     def _validate_export_checkpoint(self) -> None:
         self._validate_checkpoint(self.state)
@@ -466,6 +548,32 @@ def _stable_id(prefix: str, *parts: str) -> str:
 def _digest(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _checkpoint_state_payload(state: dict[str, Any]) -> dict[str, Any]:
+    if set(state) - {"checkpoint_integrity"} != CHECKPOINT_STATE_SEAL_FIELDS:
+        raise ValueError("checkpoint state seal field inventory is invalid")
+    return {key: state[key] for key in CHECKPOINT_STATE_SEAL_FIELDS}
+
+
+def _checkpoint_chain_digest(integrity: dict[str, Any]) -> str:
+    if set(integrity) - {"chain_digest"} != CHECKPOINT_CHAIN_INPUT_FIELDS:
+        raise ValueError("checkpoint chain seal field inventory is invalid")
+    return _digest({key: integrity[key] for key in CHECKPOINT_CHAIN_INPUT_FIELDS})
+
+
+def _require_nonnegative_int(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{label} must be a nonnegative integer")
+    return value
+
+
+def _is_sha256_digest(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 def _read_json(path: Path) -> Any:
