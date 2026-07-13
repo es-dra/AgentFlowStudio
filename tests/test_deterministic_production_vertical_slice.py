@@ -45,12 +45,47 @@ def test_deterministic_vertical_slice_exports_concrete_delivery_and_evidence(tmp
     }
     assert evidence["quality_gate"]["review_mode"] == "fixture"
     assert evidence["quality_gate"]["human_acceptance_claimed"] is False
+    assert evidence["quality_gate"]["verified_acceptance_artifact"] is None
     assert evidence["non_claims"]["provider_smoke"] is False
     assert evidence["non_claims"]["generated_media_quality"] is False
     assert evidence["non_claims"]["human_acceptance"] is False
     assert evidence["non_claims"]["business_validation"] is False
     assert len(evidence["delivery_sha256"]) == 64
     assert any(edge["relation"] == "creator_selected_and_revised" for edge in evidence["lineage"])
+    relations = {edge["relation"] for edge in evidence["lineage"]}
+    assert {
+        "project_to_character_asset",
+        "script_to_storyboard",
+        "character_asset_to_shot",
+        "creator_decision_reviewed",
+        "revision_included_in_delivery",
+        "quality_review_approved_delivery",
+    } <= relations
+    lineage = {
+        (edge["source_ref"], edge["target_ref"], edge["relation"])
+        for edge in evidence["lineage"]
+    }
+    project_id = delivery["project"]["project_id"]
+    script_id = delivery["script"]["script_id"]
+    storyboard_id = delivery["storyboard"]["storyboard_id"]
+    delivery_id = delivery["delivery_id"]
+    for asset in delivery["character_assets"]:
+        assert (project_id, asset["asset_id"], "project_to_character_asset") in lineage
+        for shot in delivery["shots"]:
+            assert (asset["asset_id"], shot["shot_id"], "character_asset_to_shot") in lineage
+    assert (script_id, storyboard_id, "script_to_storyboard") in lineage
+    for revision in delivery["selected_revisions"]:
+        assert (revision["revision_id"], delivery_id, "revision_included_in_delivery") in lineage
+    assert (
+        delivery["quality_review_ref"],
+        delivery_id,
+        "quality_review_approved_delivery",
+    ) in lineage
+    state = json.loads(paths["state"].read_text(encoding="utf-8"))
+    assert delivery["source_state_chain_digest"] == evidence["source_state_chain_digest"]
+    assert state["artifacts"]["export"]["source_state_chain_digest"] == evidence["source_state_chain_digest"]
+    assert state["artifacts"]["export"]["delivery_sha256"] == evidence["delivery_sha256"]
+    assert len(state["artifacts"]["export"]["evidence_sha256"]) == 64
 
 
 def test_export_is_blocked_until_creator_and_quality_gates_complete(tmp_path: Path) -> None:
@@ -126,3 +161,57 @@ def test_creator_must_select_exactly_one_candidate_for_every_shot(tmp_path: Path
 
     with pytest.raises(ValueError, match="exactly one candidate for every shot"):
         run.record_creator_decision(incomplete)
+
+
+def test_untrusted_human_review_fields_cannot_claim_human_acceptance(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
+    run.record_creator_decision(_load_model("creator_decision.example.json", CreatorDecision))
+    review = _load_model("quality_review.example.json", QualityReview).model_copy(
+        update={"reviewer_id": "attacker_claims_owner", "review_mode": "human"}
+    )
+    run.record_quality_review(review)
+
+    paths = run.export()
+    evidence = json.loads(paths["evidence"].read_text(encoding="utf-8"))
+    assert evidence["quality_gate"]["human_acceptance_claimed"] is False
+    assert evidence["quality_gate"]["verified_acceptance_artifact"] is None
+    assert evidence["non_claims"]["human_acceptance"] is False
+
+
+def test_review_for_old_selection_fails_closed_after_creator_subject_changes(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
+    original = _load_model("creator_decision.example.json", CreatorDecision)
+    changed_ids = list(original.selected_candidate_ids)
+    changed_ids[0] = next(
+        item["candidate_id"]
+        for item in run.state["artifacts"]["candidates"]
+        if item["shot_id"] == "shot_001" and item["candidate_id"] != changed_ids[0]
+    )
+    run.record_creator_decision(original.model_copy(update={"selected_candidate_ids": changed_ids}))
+
+    stale_review = _load_model("quality_review.example.json", QualityReview)
+    with pytest.raises(ValueError, match="subject digest does not match"):
+        run.record_quality_review(stale_review)
+
+
+@pytest.mark.parametrize("tamper_kind", ["state", "artifacts", "lineage"])
+def test_tampered_checkpoint_contents_fail_integrity_validation(tmp_path: Path, tamper_kind: str) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
+    checkpoint_path = tmp_path / "production_state.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    if tamper_kind == "state":
+        checkpoint["stage"] = "initialized"
+    elif tamper_kind == "artifacts":
+        checkpoint["artifacts"]["candidates"][0]["treatment"] = "silently tampered"
+    else:
+        checkpoint["lineage"].pop()
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint state integrity validation failed"):
+        DeterministicProductionSlice(project, tmp_path)

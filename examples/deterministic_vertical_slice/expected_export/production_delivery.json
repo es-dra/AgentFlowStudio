@@ -13,6 +13,123 @@
   "creator_decision_ref": "fixture_creator_decision_001",
   "delivery_id": "delivery_72fe29e5fc61",
   "export_scope": "script_character_storyboard_candidate_package",
+  "lineage": [
+    {
+      "relation": "project_to_script",
+      "source_ref": "project_lighthouse_choice",
+      "target_ref": "script_21cda20ba542"
+    },
+    {
+      "relation": "project_to_character_asset",
+      "source_ref": "project_lighthouse_choice",
+      "target_ref": "character_asset_626d4bbf9d26"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_001",
+      "target_ref": "shot_001"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_002",
+      "target_ref": "shot_002"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_003",
+      "target_ref": "shot_003"
+    },
+    {
+      "relation": "script_to_storyboard",
+      "source_ref": "script_21cda20ba542",
+      "target_ref": "storyboard_1757d85a09f2"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
+      "target_ref": "shot_001"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
+      "target_ref": "shot_002"
+    },
+    {
+      "relation": "character_asset_to_shot",
+      "source_ref": "character_asset_626d4bbf9d26",
+      "target_ref": "shot_003"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_001",
+      "target_ref": "candidate_bea05ffd8560"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_001",
+      "target_ref": "candidate_015db16b7d25"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_002",
+      "target_ref": "candidate_7af03b300fc1"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_002",
+      "target_ref": "candidate_e6293e130139"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_003",
+      "target_ref": "candidate_44a968fd4300"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_003",
+      "target_ref": "candidate_c94372fe5310"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_bea05ffd8560",
+      "target_ref": "revision_3c5b2d404dec"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_e6293e130139",
+      "target_ref": "revision_28727b2bfe65"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_44a968fd4300",
+      "target_ref": "revision_da4fd1c9ad99"
+    },
+    {
+      "relation": "creator_decision_reviewed",
+      "source_ref": "fixture_creator_decision_001",
+      "target_ref": "fixture_quality_review_001"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_3c5b2d404dec",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_28727b2bfe65",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "revision_included_in_delivery",
+      "source_ref": "revision_da4fd1c9ad99",
+      "target_ref": "delivery_72fe29e5fc61"
+    },
+    {
+      "relation": "quality_review_approved_delivery",
+      "source_ref": "fixture_quality_review_001",
+      "target_ref": "delivery_72fe29e5fc61"
+    }
+  ],
   "project": {
     "audience": "science-fiction short-form viewers",
     "characters": [
@@ -31,6 +148,7 @@
     "tone": "restrained suspense"
   },
   "quality_review_ref": "fixture_quality_review_001",
+  "reviewed_subject_digest": "c14e769698c2d2c5a8eb5c6eac874e8b3f30f1a794ea251664d601224379b137",
   "schema_version": "0.1.0",
   "script": {
     "beats": [
@@ -116,6 +234,7 @@
       "shot_id": "shot_003"
     }
   ],
+  "source_state_chain_digest": "71753ed936298a441f4bff2e8bb6dcf4f3be7e195a743a38151cc22340af547f",
   "storyboard": {
     "shot_refs": [
       "shot_001",
