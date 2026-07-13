@@ -330,6 +330,15 @@ function inferUserAction(route, method) {
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
+  if (/\/domain-crew\/tasks\/[^/]+\/claim$/.test(route) && method === "POST") return "claim_domain_crew_task";
+  if (/\/domain-crew\/tasks$/.test(route) && method === "POST") return "create_domain_crew_task";
+  if (/\/domain-crew\/messages$/.test(route) && method === "POST") return "send_domain_crew_message";
+  if (/\/domain-crew\/handoffs\/[^/]+\/decisions$/.test(route) && method === "POST") return "decide_domain_crew_handoff";
+  if (/\/domain-crew\/handoffs$/.test(route) && method === "POST") return "create_domain_crew_handoff";
+  if (/\/domain-crew\/conflicts\/[^/]+\/arbitrations$/.test(route) && method === "POST") return "arbitrate_domain_crew_conflict";
+  if (/\/domain-crew\/conflicts$/.test(route) && method === "POST") return "escalate_domain_crew_conflict";
+  if (/\/domain-crew\/propagation-reconfirmations\/[^/]+\/actions$/.test(route) && method === "POST") return "reconfirm_domain_crew_propagation";
+  if (/\/domain-crew$/.test(route) && method === "POST") return "create_domain_crew";
   if (/\/creator-decisions$/.test(route) && method === "POST") return "submit_creator_decision";
   if (/\/quality-reviews$/.test(route) && method === "POST") return "record_production_quality_review";
   if (/\/exports$/.test(route) && method === "POST") return "export_selected_production_revision";
@@ -553,6 +562,39 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     exportProductionRun(runId, payload) {
       return requestJson(`/projects/${encoded}/production-runs/${encodeURIComponent(runId)}/exports`, {
+        method: "POST",
+        payload,
+      });
+    },
+    getDomainCrew() {
+      return requestJson(`/projects/${encoded}/domain-crew`);
+    },
+    createDomainCrew(payload) {
+      return requestJson(`/projects/${encoded}/domain-crew`, { method: "POST", payload });
+    },
+    createDomainCrewTask(payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/tasks`, { method: "POST", payload });
+    },
+    claimDomainCrewTask(taskId, payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/tasks/${encodeURIComponent(taskId)}/claim`, { method: "POST", payload });
+    },
+    sendDomainCrewMessage(payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/messages`, { method: "POST", payload });
+    },
+    createDomainCrewHandoff(payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/handoffs`, { method: "POST", payload });
+    },
+    decideDomainCrewHandoff(handoffId, payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/handoffs/${encodeURIComponent(handoffId)}/decisions`, { method: "POST", payload });
+    },
+    createDomainCrewConflict(payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/conflicts`, { method: "POST", payload });
+    },
+    arbitrateDomainCrewConflict(conflictId, payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/conflicts/${encodeURIComponent(conflictId)}/arbitrations`, { method: "POST", payload });
+    },
+    reconfirmDomainCrewPropagation(affectedRefId, payload) {
+      return requestJson(`/projects/${encoded}/domain-crew/propagation-reconfirmations/${encodeURIComponent(affectedRefId)}/actions`, {
         method: "POST",
         payload,
       });

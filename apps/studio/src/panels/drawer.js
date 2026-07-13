@@ -24,6 +24,7 @@ export function renderDrawer(state, store, runtime) {
 
   drawer.appendChild(drawerHeader());
   drawer.appendChild(projectLabel(state));
+  drawer.appendChild(domainCrewEntry());
   drawer.appendChild(tabBar(state, store));
 
   const body = el("div", "drawer-body");
@@ -34,6 +35,15 @@ export function renderDrawer(state, store, runtime) {
   drawer.appendChild(body);
   drawer.appendChild(drawerFooter(state, store));
   drawer.appendChild(drawerResizeHandle(state, store));
+}
+
+function domainCrewEntry() {
+  const button = el("button", "domain-crew-entry");
+  button.type = "button";
+  button.dataset.action = "open-domain-crew";
+  button.append(el("span", "", "数字剧组"), el("small", "", "9 roles · API authority"));
+  button.addEventListener("click", () => window.dispatchEvent(new CustomEvent("afs:studio-open-domain-crew")));
+  return button;
 }
 
 function drawerHeader() {

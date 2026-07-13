@@ -29,6 +29,8 @@ import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
 import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
+import { createDomainCrewController } from "./domain-crew-controller.js";
+import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -38,6 +40,10 @@ let runtimeSurfaceStatusSequence = 0;
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
+const domainCrewController = createDomainCrewController({
+  getRuntime: () => runtime,
+  onNavigateNode: (nodeId) => window.dispatchEvent(new CustomEvent("afs:studio-select-node", { detail: { node_id: nodeId } })),
+});
 installClientErrorReporter({
   getRuntime: () => runtime,
   getProjectId: () => runtime?.projectId || store.get().meta?.projectId || "",
@@ -49,6 +55,10 @@ const projectController = createProjectController({
   setRuntime: (nextRuntime) => {
     runtime = nextRuntime;
     store.attachRuntime(runtime);
+    domainCrewController.setContext({
+      runtime,
+      userId: projectController.authUser?.user_id || "",
+    });
     void refreshRuntimeSurfaceStatus();
   },
   onProjectReady: async (runtimeClient) => {
@@ -81,6 +91,7 @@ async function bootstrap() {
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
   bindStudioWorkflowEvents();
+  bindDomainCrewEvents();
   bindSaveAuthRecovery();
 
   store.subscribe(renderAll);
@@ -104,6 +115,13 @@ async function bootstrap() {
   await restoreCandidateSelectionsAfterLoad(store, runtime);
   await refreshPendingKeyframeGenerations(store, runtime);
   await projectController.refreshProjectSummaries();
+}
+
+function bindDomainCrewEvents() {
+  window.addEventListener("afs:studio-open-domain-crew", () => {
+    syncDomainCrewContext();
+    openDomainCrewPanel(domainCrewController);
+  });
 }
 
 function bindQualityFeedback() {
@@ -286,6 +304,7 @@ function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
 }
 
 function renderAll(state) {
+  syncDomainCrewContext();
   renderTopbar({
     state,
     store,
@@ -305,6 +324,7 @@ function renderAll(state) {
     onSignOut: async () => {
       await signOut(runtime);
       projectController.setAuthUser(null);
+      syncDomainCrewContext();
       window.location.href = "/";
     },
   });
@@ -313,6 +333,13 @@ function renderAll(state) {
   renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
   renderSpriteWidget(state, runtimeRef);
+}
+
+function syncDomainCrewContext() {
+  domainCrewController.setContext({
+    runtime,
+    userId: projectController.authUser?.user_id || "",
+  });
 }
 
 function openStudioHome(state = store.get()) {
