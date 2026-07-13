@@ -68,7 +68,7 @@ export function initialState(projectId = "studio-local-001") {
 }
 
 export function snapshotStudioState(state) {
-  return normalizeSnapshot({
+  return sanitizeSnapshotForPersistence(normalizeSnapshot({
     meta: state.meta,
     viewport: state.viewport,
     nodes: state.nodes,
@@ -76,7 +76,7 @@ export function snapshotStudioState(state) {
     order: state.order,
     assets: state.assets,
     production: state.production,
-  });
+  }), { stripProductionAuthority: true });
 }
 
 export function normalizeSnapshot(snap) {
@@ -170,7 +170,7 @@ function hydrateNodePreviews(nodes) {
   return result;
 }
 
-function sanitizeSnapshotForPersistence(snapshot) {
+function sanitizeSnapshotForPersistence(snapshot, { stripProductionAuthority = false } = {}) {
   const projectId = safeProjectId(snapshot?.meta?.projectId);
   const nodes = {};
   for (const [id, node] of Object.entries(snapshot.nodes || {})) {
@@ -181,7 +181,7 @@ function sanitizeSnapshotForPersistence(snapshot) {
     ...snapshot,
     nodes,
     assets: sanitizeAssetsForPersistence(snapshot.assets || [], projectId),
-    production: sanitizeProductionBinding(snapshot.production),
+    production: stripProductionAuthority ? {} : sanitizeProductionBinding(snapshot.production),
   };
 }
 

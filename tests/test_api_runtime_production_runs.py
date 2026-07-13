@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import threading
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -9,6 +11,7 @@ from fastapi.testclient import TestClient
 from agentflow_studio.production.vertical_slice import CharacterSeed, DeterministicProductionSlice, ProjectIP
 from apps.api.runtime_production_models import canonical_json_digest
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -414,6 +417,34 @@ def test_checkpoint_tampering_fails_closed_on_readback(tmp_path, monkeypatch) ->
     assert "checkpoint integrity mismatch" in response.text
 
 
+def test_checkpoint_version_tampering_with_unchanged_digest_fails_closed(tmp_path, monkeypatch) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    run = _create_run(client, headers)
+    state_path = (
+        tmp_path / "projects" / "owned-project" / "production_runs" / "production-run-001" / "production_run.json"
+    )
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    original_digest = state["checkpoint"]["state_digest"]
+    state["checkpoint"]["version"] = 99
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    readback = client.get(
+        "/projects/owned-project/production-runs/production-run-001",
+        headers=headers,
+    )
+    mutation = client.post(
+        "/projects/owned-project/production-runs/production-run-001/creator-decisions",
+        json=_creator_decision(run, expected_checkpoint_version=99),
+        headers=headers,
+    )
+
+    assert state["checkpoint"]["state_digest"] == original_digest
+    assert readback.status_code == 409
+    assert "checkpoint integrity mismatch" in readback.text
+    assert mutation.status_code == 409
+    assert "checkpoint integrity mismatch" in mutation.text
+
+
 def test_pr127_deterministic_candidates_bridge_into_authenticated_project_run(tmp_path, monkeypatch) -> None:
     client, headers = _registered_client(tmp_path / "runtime", monkeypatch)
     project = ProjectIP(
@@ -465,33 +496,33 @@ def test_pr127_deterministic_candidates_bridge_into_authenticated_project_run(tm
     assert all(item["parent_job_id"] == deterministic.state["run_id"] for item in run["candidates"])
 
 
-def test_studio_state_keeps_only_backend_authoritative_production_binding(tmp_path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-    project_id = "studio-production-binding"
-    client.post("/projects", json={"project_id": project_id, "goal": "Production binding"})
-    digest = _digest("binding")
+def test_studio_state_resolves_production_binding_from_authenticated_ledger(tmp_path, monkeypatch) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    run = _create_run(client, headers)
+    forged_digest = _digest("forged-binding")
 
     response = client.put(
-        f"/projects/{project_id}/studio-state",
+        "/projects/owned-project/studio-state",
         json={
             "state": {
                 "production": {
                     "schema_version": "client-invented-version",
                     "authoritative_source": "client",
                     "compatibility_mode": "client_can_overwrite",
-                    "active_run_id": "production-run-001",
-                    "checkpoint_version": 4,
-                    "checkpoint_digest": digest,
-                    "subject_digest": digest,
-                    "selected_candidate_id": "candidate-001",
-                    "selected_candidate_digest": digest,
-                    "selected_revision_id": "revision-001",
-                    "selected_revision_digest": digest,
-                    "last_export_id": "export-001",
+                    "active_run_id": "forged-run",
+                    "checkpoint_version": 99,
+                    "checkpoint_digest": forged_digest,
+                    "subject_digest": forged_digest,
+                    "selected_candidate_id": "forged-candidate",
+                    "selected_candidate_digest": forged_digest,
+                    "selected_revision_id": "forged-revision",
+                    "selected_revision_digest": forged_digest,
+                    "last_export_id": "forged-export",
                     "provider_response": "must not persist",
                 }
             }
         },
+        headers=headers,
     )
 
     assert response.status_code == 200, response.text
@@ -501,16 +532,75 @@ def test_studio_state_keeps_only_backend_authoritative_production_binding(tmp_pa
         "authoritative_source": "runtime_production_run",
         "compatibility_mode": "backend_authoritative_summary_only",
         "active_run_id": "production-run-001",
-        "checkpoint_version": 4,
-        "checkpoint_digest": digest,
-        "subject_digest": digest,
-        "selected_candidate_id": "candidate-001",
-        "selected_candidate_digest": digest,
-        "selected_revision_id": "revision-001",
-        "selected_revision_digest": digest,
-        "last_export_id": "export-001",
+        "checkpoint_version": 1,
+        "checkpoint_digest": run["checkpoint"]["state_digest"],
+        "subject_digest": run["subject_digest"],
     }
     assert "provider_response" not in json.dumps(binding)
+    assert "forged" not in json.dumps(binding)
+
+    restored = client.get("/projects/owned-project/studio-state", headers=headers)
+    assert restored.status_code == 200
+    assert restored.json()["state"]["production"] == binding
+
+    persisted = json.loads(
+        (tmp_path / "projects" / "owned-project" / "studio_state.json").read_text(encoding="utf-8")
+    )
+    assert persisted["state"]["production"] == binding
+
+
+def test_artifact_index_registration_is_transactional_across_threads(tmp_path, monkeypatch) -> None:
+    stores = [RuntimeStore(tmp_path), RuntimeStore(tmp_path)]
+    paths = [tmp_path / "runs" / f"thread-{index}" / "artifact.json" for index in range(2)]
+    for index, path in enumerate(paths):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"artifact_type": f"thread-artifact-{index}"}), encoding="utf-8")
+
+    read_barrier = threading.Barrier(2)
+    for store in stores:
+        original_artifact_index = store._artifact_index
+
+        def synchronized_artifact_index(original=original_artifact_index):
+            index = original()
+            try:
+                read_barrier.wait(timeout=0.2)
+            except threading.BrokenBarrierError:
+                pass
+            return index
+
+        monkeypatch.setattr(store, "_artifact_index", synchronized_artifact_index)
+    errors: list[BaseException] = []
+
+    def register(store: RuntimeStore, path: Path) -> None:
+        try:
+            store.register_artifact(path, role="production_export")
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=register, args=(store, path)) for store, path in zip(stores, paths)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert not errors
+    assert all(not thread.is_alive() for thread in threads)
+    index = json.loads(stores[0].index_path.read_text(encoding="utf-8"))
+    assert set(index["artifacts"]) == {"runs-thread-0-artifact", "runs-thread-1-artifact"}
+
+
+def test_soft_deleted_project_rejects_new_production_run(tmp_path, monkeypatch) -> None:
+    client, headers = _registered_client(tmp_path, monkeypatch)
+    deleted = client.delete("/projects/owned-project", headers=headers)
+    created = client.post(
+        "/projects/owned-project/production-runs",
+        json=_create_payload(),
+        headers=headers,
+    )
+
+    assert deleted.status_code == 200, deleted.text
+    assert created.status_code == 404
+    assert "project not found" in created.text
 
 
 def test_studio_client_and_store_expose_frozen_production_contract() -> None:
@@ -527,4 +617,33 @@ def test_studio_client_and_store_expose_frozen_production_contract() -> None:
     ):
         assert f"{method}(" in runtime_client
     assert 'authoritative_source: "runtime_production_run"' in store_state
+    assert "stripProductionAuthority: true" in store_state
+
+    script = r"""
+import { initialState, normalizeSnapshot, snapshotStudioState } from "./apps/studio/src/store-state.js";
+const binding = {
+  schema_version: "afs_studio_production_binding.v0.1",
+  authoritative_source: "runtime_production_run",
+  compatibility_mode: "backend_authoritative_summary_only",
+  active_run_id: "production-run-001",
+  checkpoint_version: 7,
+  checkpoint_digest: "a".repeat(64),
+  subject_digest: "b".repeat(64),
+};
+const hydrated = normalizeSnapshot({ ...initialState("owned-project"), production: binding });
+const persisted = snapshotStudioState({ ...initialState("owned-project"), production: binding });
+process.stdout.write(JSON.stringify({ hydrated: hydrated.production, persisted: persisted.production }));
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    result = json.loads(completed.stdout)
+    assert result["hydrated"]["active_run_id"] == "production-run-001"
+    assert result["hydrated"]["checkpoint_version"] == 7
+    assert result["persisted"] == {}
     assert 'compatibility_mode: "backend_authoritative_summary_only"' in store_state

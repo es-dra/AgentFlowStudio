@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -36,6 +37,23 @@ SAFE_ARTIFACT_ROLES = frozenset(
 
 class ProductionContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class ProductionCheckpoint(ProductionContractModel):
+    schema_version: Literal["afs_runtime_production_checkpoint.v0.1"] = PRODUCTION_CHECKPOINT_SCHEMA_VERSION
+    version: int = Field(ge=1, strict=True)
+    previous_digest: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    state_digest: str = Field(pattern=SHA256_PATTERN)
+    updated_at: str = Field(min_length=1, max_length=80)
+
+    @field_validator("updated_at")
+    @classmethod
+    def validate_updated_at(cls, value: str) -> str:
+        try:
+            datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError("checkpoint updated_at must be an ISO-8601 timestamp") from exc
+        return value
 
 
 class SafeArtifactRef(ProductionContractModel):
@@ -141,7 +159,11 @@ def canonical_json_digest(payload: Any) -> str:
 
 
 def checkpoint_digest(payload: dict[str, Any]) -> str:
-    unsigned = {key: value for key, value in payload.items() if key != "checkpoint"}
+    checkpoint = payload.get("checkpoint") if isinstance(payload.get("checkpoint"), dict) else {}
+    unsigned = {
+        **{key: value for key, value in payload.items() if key != "checkpoint"},
+        "checkpoint": {key: value for key, value in checkpoint.items() if key != "state_digest"},
+    }
     return canonical_json_digest(unsigned)
 
 
@@ -165,6 +187,7 @@ __all__ = (
     "STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION",
     "CreatorDecisionRequest",
     "ProductionCandidate",
+    "ProductionCheckpoint",
     "ProductionExportRequest",
     "ProductionQualityChecklist",
     "ProductionQualityReviewRequest",

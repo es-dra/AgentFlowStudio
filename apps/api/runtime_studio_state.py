@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_exception_detail
+from apps.api.runtime_production_runs import resolve_project_studio_binding
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state
 
@@ -17,28 +19,38 @@ class StudioStateRequest(BaseModel):
     expected_version: str = Field(default="", max_length=120)
 
 
-def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> None:
+def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
     @app.get("/projects/{project_id}/studio-state")
-    def get_studio_state(project_id: str) -> dict[str, Any]:
+    def get_studio_state(project_id: str, request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        production_binding = _project_production_binding(store, auth, request, project_id)
         path = _state_path(store, project_id)
         if not path.exists():
-            return {"project_id": project_id, "source": "empty", "state": None, "state_version": "", "saved_at": ""}
+            return {
+                "project_id": project_id,
+                "source": "empty",
+                "state": {"production": production_binding} if production_binding else None,
+                "state_version": "",
+                "saved_at": "",
+            }
         payload = read_json(path)
         reject_unsafe_payload(payload)
+        state = payload.get("state") if isinstance(payload.get("state"), dict) else {}
+        state = {**state, "production": production_binding}
         return {
             "project_id": project_id,
             "source": "runtime",
-            "state": payload.get("state"),
+            "state": state,
             "state_version": _payload_version(payload),
             "saved_at": str(payload.get("saved_at", "")),
         }
 
     @app.put("/projects/{project_id}/studio-state")
-    def put_studio_state(project_id: str, request: StudioStateRequest) -> dict[str, Any]:
+    def put_studio_state(project_id: str, body: StudioStateRequest, request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
         try:
-            state = sanitize_studio_state(request.state, project_id=project_id)
+            state = sanitize_studio_state(body.state, project_id=project_id)
+            state["production"] = _project_production_binding(store, auth, request, project_id)
             reject_unsafe_payload(state)
         except ValueError as exc:
             raise HTTPException(
@@ -48,7 +60,7 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
 
         path = _state_path(store, project_id)
         current_version = _current_state_version(path)
-        expected_version = str(request.expected_version or "").strip()
+        expected_version = str(body.expected_version or "").strip()
         if expected_version and current_version and expected_version != current_version:
             raise HTTPException(status_code=409, detail="studio state version conflict")
 
@@ -77,6 +89,21 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
 
 def _state_path(store: RuntimeStore, project_id: str):
     return store.projects_dir / safe_id(project_id) / "studio_state.json"
+
+
+def _project_production_binding(
+    store: RuntimeStore,
+    auth: RuntimeAuthStore,
+    request: Request,
+    project_id: str,
+) -> dict[str, Any]:
+    owner_user_id = None
+    if auth.enabled():
+        user = auth.require_user(request)
+        owner_user_id = str(user.get("user_id") or "")
+        if not owner_user_id or not auth.user_can_access_project(owner_user_id, project_id):
+            raise HTTPException(status_code=403, detail="project access denied")
+    return resolve_project_studio_binding(store, project_id, owner_user_id=owner_user_id)
 
 
 def _current_state_version(path) -> str:
