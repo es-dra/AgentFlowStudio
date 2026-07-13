@@ -19,7 +19,12 @@ import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
-import { buildUserAssetCardRevisionState } from "./asset-revision-references.js";
+import {
+  ASSET_REFERENCE_MODES,
+  assetReferenceMode,
+  canUseAssetReferenceMode,
+  buildUserAssetCardRevisionState,
+} from "./asset-revision-references.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -80,6 +85,10 @@ function buildBar(store, runtime, node) {
     bar.appendChild(chips);
   }
 
+  if (canUseAssetReferenceMode(node)) {
+    bar.appendChild(buildAssetReferenceModeTabs(store, node));
+  }
+
   const textarea = document.createElement("textarea");
   textarea.placeholder = promptTextPlaceholder(node);
   textarea.value = promptTextValue(node);
@@ -93,7 +102,12 @@ function buildBar(store, runtime, node) {
         n.params.assetCardDraft.user_edited_text = textarea.value;
         n.params.assetCardDraft.updated_by_user = Boolean(textarea.value.trim());
         if (textarea.value.trim()) {
-          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value);
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(
+            n,
+            n.params.assetCardDraft,
+            textarea.value,
+            n.params.assetReferenceMode,
+          );
         } else if (usesPromptBarAssetCardRevision(n.params.assetCardRevision)) {
           delete n.params.assetCardRevision;
         }
@@ -126,6 +140,43 @@ function buildBar(store, runtime, node) {
   bindBarResizePositioning(bar, store, node.id);
   syncPromptBarState(bar, node);
   return bar;
+}
+
+function buildAssetReferenceModeTabs(store, node) {
+  const wrap = el("div", "mode-tabs asset-reference-mode-tabs");
+  const current = assetReferenceMode(node);
+  const modes = [
+    [ASSET_REFERENCE_MODES.LOCALIZED_EDIT, "局部修订", "按参考图稳定身份，只修改你写明的细节"],
+    [ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE, "原创重生", "只提取灵感方向，重新设计以降低 IP 风险"],
+  ];
+  for (const [mode, label, title] of modes) {
+    const tab = el("button", `mode-tab${current === mode ? " active" : ""}`, label);
+    tab.type = "button";
+    tab.title = title;
+    tab.dataset.mode = mode;
+    tab.setAttribute("aria-pressed", current === mode ? "true" : "false");
+    tab.addEventListener("click", () => {
+      store.set((s) => {
+        const n = s.nodes[node.id];
+        if (!n) return;
+        n.params.assetReferenceMode = mode;
+        if (n.params.assetCardDraft && String(n.prompt || n.params.assetCardDraft.user_edited_text || "").trim()) {
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(
+            n,
+            n.params.assetCardDraft,
+            n.prompt || n.params.assetCardDraft.user_edited_text,
+            mode,
+          );
+        } else if (n.params.assetCardRevision) {
+          n.params.assetCardRevision.mode = mode;
+        }
+        delete n.params.lastOptimizedPromptPlain;
+      }, { history: false });
+      syncAssetReferenceModeTabs(wrap, mode);
+    });
+    wrap.appendChild(tab);
+  }
+  return wrap;
 }
 
 function buildToolChips(store, node, defs) {
@@ -179,7 +230,7 @@ function buildBottomRow(store, runtime, node, textarea) {
   optimizeBtn.innerHTML = `${icon("sparkles", 14)}<span>优化</span>`;
   optimizeBtn.title = "优化提示词";
   optimizeBtn.addEventListener("click", () => {
-    if (!optimizableNodeText(store.get().nodes[node.id]).trim()) {
+    if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
       flashTooltip(optimizeBtn, "先输入提示词");
       return;
     }
@@ -212,7 +263,9 @@ function textAction(iconName, label, onClick) {
   return button;
 }
 
-function optimizableNodeText(node) {
+function optimizableNodeText(node, textarea = null) {
+  const currentInput = String(textarea?.value || "").trim();
+  if (currentInput) return currentInput;
   if (!node) return "";
   if (isTextContentNode(node)) return String(node.content || node.prompt || "");
   return String(node.prompt || node.content || "");
@@ -226,6 +279,7 @@ export function syncPromptBarState(bar, node) {
   const task = activePromptTaskProgress(node);
   const running = Boolean(task);
   bar.classList.toggle("optimizing", running);
+  syncAssetReferenceModeTabs(bar, assetReferenceMode(node));
   const textarea = bar.querySelector("textarea");
   if (textarea) {
     textarea.classList.toggle("prompt-shimmer", running);
@@ -244,6 +298,14 @@ export function syncPromptBarState(bar, node) {
     optimizeBtn.disabled = running;
     const label = optimizeBtn.querySelector("span");
     if (label) label.textContent = running ? promptTaskLabel(task) : "优化";
+  }
+}
+
+function syncAssetReferenceModeTabs(root, activeMode) {
+  for (const tab of root.querySelectorAll(".asset-reference-mode-tabs [data-mode]")) {
+    const active = tab.dataset.mode === activeMode;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-pressed", active ? "true" : "false");
   }
 }
 
