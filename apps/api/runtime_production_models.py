@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 
 PRODUCTION_RUN_SCHEMA_VERSION = "afs_runtime_production_run.v0.1"
 PRODUCTION_CHECKPOINT_SCHEMA_VERSION = "afs_runtime_production_checkpoint.v0.1"
@@ -88,6 +89,11 @@ class CreatorDecisionRequest(ProductionContractModel):
     parent_revision_id: str | None = Field(default=None, pattern=SAFE_IDENTIFIER_PATTERN)
     revision_intent: str = Field(min_length=1, max_length=800)
 
+    @field_validator("revision_intent")
+    @classmethod
+    def validate_revision_intent(cls, value: str) -> str:
+        return _safe_public_text(value)
+
 
 class ProductionQualityChecklist(ProductionContractModel):
     story_intent_preserved: bool
@@ -107,6 +113,11 @@ class ProductionQualityReviewRequest(ProductionContractModel):
     decision: Literal["approve", "reject"]
     checklist: ProductionQualityChecklist
     note: str = Field(default="", max_length=800)
+
+    @field_validator("note")
+    @classmethod
+    def validate_note(cls, value: str) -> str:
+        return _safe_public_text(value)
 
     @model_validator(mode="after")
     def approved_review_requires_complete_checklist(self) -> "ProductionQualityReviewRequest":
@@ -136,6 +147,13 @@ def checkpoint_digest(payload: dict[str, Any]) -> str:
 
 def is_sha256(value: str) -> bool:
     return bool(re.fullmatch(SHA256_PATTERN, str(value or "")))
+
+
+def _safe_public_text(value: str) -> str:
+    lowered = str(value or "").lower()
+    if any(fragment.lower() in lowered for fragment in AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS):
+        raise ValueError("production contract text contains a private path, media ref, or secret-like fragment")
+    return str(value)
 
 
 __all__ = (
