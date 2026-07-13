@@ -16,9 +16,11 @@ import {
   temporaryAssetExclusionsForKeyframeConstraints,
 } from "./keyframe-constraints.js";
 import {
+  assetReferenceMode,
   assetCardNodeUploadImageRefs,
   assetCardReferenceImageRefs,
   assetCardRevisionImageRefs,
+  canUseAssetReferenceMode,
   safeAssetCardRevisionSnapshot,
 } from "./asset-revision-references.js";
 import { feedbackOverlayDecisionsForRequest } from "./feedback-context-overlays.js";
@@ -130,6 +132,11 @@ function nodeParameterSnapshot(node, state = null) {
   }
   if (p.assetCardDraft) snapshot.asset_card_draft = safeAssetCardSnapshot(p.assetCardDraft);
   if (p.assetCardRevision) snapshot.asset_card_revision = safeAssetCardRevisionSnapshot(p.assetCardRevision);
+  if (p.assetReferenceMode || p.referenceTransformMode || p.assetCardRevision || canUseAssetReferenceMode(node)) {
+    const mode = assetReferenceMode(node);
+    snapshot.reference_transform_mode = mode;
+    snapshot.asset_reference_mode = mode;
+  }
   if (node.type === "image" && p.spec) {
     snapshot.spec = imageSpecLabel(p.spec);
     snapshot.panorama = Boolean(p.spec.panorama);

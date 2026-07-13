@@ -5,6 +5,8 @@ const HISTORY_LIMIT = 80;
 const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/([a-zA-Z0-9_.-]+)\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
 const HTML_ERROR_RE = /<\/?(html|head|body|center|title|h1|hr)\b/i;
 const MEDIA_FILENAME_FRAGMENT_RE = /\.(mp4|mov)\b/i;
+const PROVIDER_RESPONSE_REDACTION = "<provider-response-redacted>";
+const PROVIDER_RESPONSE_REDACTION_SENTINEL = "__AFS_RESPONSE_REDACTION__";
 const FORBIDDEN_RAW_PROVIDER_KEYS = new Set([
   "provider_raw",
   "providerraw",
@@ -427,6 +429,7 @@ function isForbiddenRawProviderKey(key) {
 function safePersistentString(value) {
   const original = String(value || "");
   return redactUnsafeText(original, Math.max(160, original.length + 128))
+    .replaceAll(PROVIDER_RESPONSE_REDACTION, PROVIDER_RESPONSE_REDACTION_SENTINEL)
     .replace(/api[_-]?key/gi, "<credential-redacted>")
     .replace(/access[_-]?token|refresh[_-]?token|\btoken\b/gi, "<credential-redacted>")
     .replace(/client[_-]?secret|secret[_-]?key|\bsecret\b/gi, "<credential-redacted>")
@@ -434,13 +437,14 @@ function safePersistentString(value) {
     .replace(/cookie/gi, "<credential-redacted>")
     .replace(/provider[_-]?config/gi, "<provider-config-redacted>")
     .replace(/signed[_-]?url/gi, "<signed-url-redacted>")
-    .replace(/provider[_-]?raw/gi, "<provider-redacted>")
-    .replace(/provider[_-]?response/gi, "<provider-redacted>")
-    .replace(/raw[_-]?response/gi, "<provider-redacted>")
+    .replace(/provider[_-]?raw/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/provider[_-]?response/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/raw[_-]?response/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
     .replace(/media[_-]?bytes/gi, "<media-bytes-redacted>")
     .replace(/knowledge[_-]?weights/gi, "<knowledge-redacted>")
     .replace(/hidden[_-]?memory/gi, "<memory-redacted>")
-    .replace(/\btrace\b/gi, "<trace-redacted>");
+    .replace(/\btrace\b/gi, "<trace-redacted>")
+    .replaceAll(PROVIDER_RESPONSE_REDACTION_SENTINEL, PROVIDER_RESPONSE_REDACTION);
 }
 
 function sanitizeGenerationManifestSummary(value) {
@@ -607,12 +611,15 @@ function sanitizeCountMap(value) {
 }
 
 function safePublicStatusText(value, limit) {
-  return redactUnsafeText(String(value || "")
-    .replace(/provider[_\s-]*raw(?:[_\s-]*(?:response|persisted|stored))?/gi, "<provider-response-redacted>")
-    .replace(/raw[_\s-]*provider[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
-    .replace(/raw[_\s-]*response(?:[_\s-]*stored)?/gi, "<provider-response-redacted>")
-    .replace(/provider[_\s-]*response/gi, "<provider-response-redacted>")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>"), limit);
+  const text = String(value || "")
+    .replaceAll(PROVIDER_RESPONSE_REDACTION, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/provider[_\s-]*raw(?:[_\s-]*(?:response|persisted|stored))?/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/raw[_\s-]*provider[_\s-]*response(?:[_\s-]*stored)?/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/raw[_\s-]*response(?:[_\s-]*stored)?/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/provider[_\s-]*response/gi, PROVIDER_RESPONSE_REDACTION_SENTINEL)
+    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  return redactUnsafeText(text, limit)
+    .replaceAll(PROVIDER_RESPONSE_REDACTION_SENTINEL, PROVIDER_RESPONSE_REDACTION);
 }
 
 function safeShortText(value, limit) {
