@@ -7,6 +7,7 @@ import {
 import { icon } from "./icons.js";
 import { downloadResolvedMedia, openMediaPreviewModal } from "./media-preview-modal.js";
 import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
+import { productionDeliveryView } from "./production-delivery-view.js";
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
 
 export function resultView(node) {
@@ -43,9 +44,11 @@ export function resultView(node) {
     frame.appendChild(previewOverlay(node));
     frame.addEventListener("dblclick", () => openNodeMediaPreview(node));
     result.appendChild(frame);
-    if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result));
+    if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result, candidates.length > 1));
   }
   if (candidates.length > 1) result.appendChild(candidateSelectionPanel(node, candidates));
+  const delivery = productionDeliveryView(node, candidates);
+  if (delivery) result.appendChild(delivery);
   const text = document.createElement("div");
   text.className = "node-result-text";
   text.textContent = node.result;
@@ -63,7 +66,7 @@ function previewOverlay(node) {
   return overlay;
 }
 
-function resultActions(node, result) {
+function resultActions(node, result, controlledDelivery = false) {
   const actions = document.createElement("div");
   actions.className = "media-result-actions";
   const continueButton = document.createElement("button");
@@ -90,8 +93,7 @@ function resultActions(node, result) {
   previewButton.addEventListener("click", () => openNodeMediaPreview(node));
   actions.appendChild(previewButton);
 
-  const download = downloadPreviewButton(node);
-  actions.appendChild(download);
+  if (!controlledDelivery) actions.appendChild(downloadPreviewButton(node));
   if (node.type === "video") {
     const draftButton = document.createElement("button");
     draftButton.className = "mini-btn video-asset-card-draft";
