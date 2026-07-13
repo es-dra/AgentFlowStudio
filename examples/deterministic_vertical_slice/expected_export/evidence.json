@@ -1,0 +1,110 @@
+{
+  "artifact_type": "deterministic_vertical_slice_evidence",
+  "claim_level": "deterministic_local_structure_and_flow",
+  "creator_in_loop": {
+    "decision_ref": "fixture_creator_decision_001",
+    "revision_count": 2,
+    "selected_count": 3
+  },
+  "delivery_ref": "production_delivery.json",
+  "delivery_sha256": "084151450b146fa1d48635f6ed1fd9ad418a7696013a1dfa4bdc1efa20a82781",
+  "lineage": [
+    {
+      "relation": "project_to_script",
+      "source_ref": "project_lighthouse_choice",
+      "target_ref": "script_21cda20ba542"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_001",
+      "target_ref": "shot_001"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_002",
+      "target_ref": "shot_002"
+    },
+    {
+      "relation": "beat_to_shot",
+      "source_ref": "beat_003",
+      "target_ref": "shot_003"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_001",
+      "target_ref": "candidate_bea05ffd8560"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_001",
+      "target_ref": "candidate_015db16b7d25"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_002",
+      "target_ref": "candidate_7af03b300fc1"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_002",
+      "target_ref": "candidate_e6293e130139"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_003",
+      "target_ref": "candidate_44a968fd4300"
+    },
+    {
+      "relation": "shot_to_candidate",
+      "source_ref": "shot_003",
+      "target_ref": "candidate_c94372fe5310"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_bea05ffd8560",
+      "target_ref": "revision_3c5b2d404dec"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_e6293e130139",
+      "target_ref": "revision_28727b2bfe65"
+    },
+    {
+      "relation": "creator_selected_and_revised",
+      "source_ref": "candidate_44a968fd4300",
+      "target_ref": "revision_da4fd1c9ad99"
+    }
+  ],
+  "non_claims": {
+    "business_validation": false,
+    "cos_active_rule_promotion": false,
+    "generated_media_quality": false,
+    "human_acceptance": false,
+    "provider_smoke": false,
+    "public_release": false
+  },
+  "quality_gate": {
+    "checklist": {
+      "character_continuity_checked": true,
+      "revision_addressed": true,
+      "shot_coverage_checked": true,
+      "story_intent_preserved": true
+    },
+    "decision": "approve",
+    "human_acceptance_claimed": false,
+    "notes": "Deterministic fixture approval permits export testing only; it is not human creative acceptance.",
+    "review_id": "fixture_quality_review_001",
+    "review_mode": "fixture",
+    "reviewer_id": "fixture_reviewer",
+    "schema_version": "0.1.0"
+  },
+  "recovery": {
+    "checkpointed": true,
+    "last_checkpoint": "quality_gate",
+    "recovery_count": 0
+  },
+  "run_id": "run_49984c39f947",
+  "schema_version": "0.1.0",
+  "stage": "exported",
+  "state_ref": "production_state.json"
+}

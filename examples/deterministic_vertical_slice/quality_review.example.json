@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1.0",
+  "review_id": "fixture_quality_review_001",
+  "reviewer_id": "fixture_reviewer",
+  "review_mode": "fixture",
+  "decision": "approve",
+  "checklist": {
+    "story_intent_preserved": true,
+    "character_continuity_checked": true,
+    "shot_coverage_checked": true,
+    "revision_addressed": true
+  },
+  "notes": "Deterministic fixture approval permits export testing only; it is not human creative acceptance."
+}

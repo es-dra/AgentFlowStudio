@@ -1,0 +1,17 @@
+{
+  "schema_version": "0.1.0",
+  "project_id": "project_lighthouse_choice",
+  "title": "The Last Signal",
+  "premise": "A young lighthouse keeper must choose between preserving the final analog beacon and following an unknown signal into the storm.",
+  "audience": "science-fiction short-form viewers",
+  "format": "three-shot proof sequence",
+  "tone": "restrained suspense",
+  "characters": [
+    {
+      "character_id": "keeper_mira",
+      "name": "Mira",
+      "role": "lighthouse keeper",
+      "visual_anchor": "weathered yellow coat, brass signal key, cropped dark hair"
+    }
+  ]
+}

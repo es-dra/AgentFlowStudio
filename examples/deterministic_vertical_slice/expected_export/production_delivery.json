@@ -1,0 +1,128 @@
+{
+  "artifact_type": "deterministic_storyboard_delivery",
+  "character_assets": [
+    {
+      "asset_id": "character_asset_626d4bbf9d26",
+      "asset_kind": "deterministic_character_definition",
+      "character_id": "keeper_mira",
+      "name": "Mira",
+      "role": "lighthouse keeper",
+      "visual_anchor": "weathered yellow coat, brass signal key, cropped dark hair"
+    }
+  ],
+  "creator_decision_ref": "fixture_creator_decision_001",
+  "delivery_id": "delivery_72fe29e5fc61",
+  "export_scope": "script_character_storyboard_candidate_package",
+  "project": {
+    "audience": "science-fiction short-form viewers",
+    "characters": [
+      {
+        "character_id": "keeper_mira",
+        "name": "Mira",
+        "role": "lighthouse keeper",
+        "visual_anchor": "weathered yellow coat, brass signal key, cropped dark hair"
+      }
+    ],
+    "format": "three-shot proof sequence",
+    "premise": "A young lighthouse keeper must choose between preserving the final analog beacon and following an unknown signal into the storm.",
+    "project_id": "project_lighthouse_choice",
+    "schema_version": "0.1.0",
+    "title": "The Last Signal",
+    "tone": "restrained suspense"
+  },
+  "quality_review_ref": "fixture_quality_review_001",
+  "schema_version": "0.1.0",
+  "script": {
+    "beats": [
+      {
+        "beat_id": "beat_001",
+        "purpose": "hook",
+        "text": "A young lighthouse keeper must choose between preserving the final analog beacon and following an unknown signal into the storm."
+      },
+      {
+        "beat_id": "beat_002",
+        "purpose": "choice",
+        "text": "The lead makes a visible choice that tests the restrained suspense premise."
+      },
+      {
+        "beat_id": "beat_003",
+        "purpose": "payoff",
+        "text": "The consequence lands in a final image that can be evaluated shot by shot."
+      }
+    ],
+    "script_id": "script_21cda20ba542"
+  },
+  "selected_revisions": [
+    {
+      "candidate_id": "candidate_bea05ffd8560",
+      "creator_decision_id": "fixture_creator_decision_001",
+      "direction": "clarity_first",
+      "generation_mode": "local_deterministic_text_treatment",
+      "is_generated_media": false,
+      "revision_id": "revision_3c5b2d404dec",
+      "revision_note": "",
+      "shot_id": "shot_001",
+      "treatment": "wide frame; A young lighthouse keeper must choose between preserving the final analog beacon and following an unknown signal into the storm. Direction: clarity_first."
+    },
+    {
+      "candidate_id": "candidate_e6293e130139",
+      "creator_decision_id": "fixture_creator_decision_001",
+      "direction": "tension_first",
+      "generation_mode": "local_deterministic_text_treatment",
+      "is_generated_media": false,
+      "revision_id": "revision_28727b2bfe65",
+      "revision_note": "Keep Mira's brass signal key visible as the continuity anchor.",
+      "shot_id": "shot_002",
+      "treatment": "medium frame; The lead makes a visible choice that tests the restrained suspense premise. Direction: tension_first."
+    },
+    {
+      "candidate_id": "candidate_44a968fd4300",
+      "creator_decision_id": "fixture_creator_decision_001",
+      "direction": "clarity_first",
+      "generation_mode": "local_deterministic_text_treatment",
+      "is_generated_media": false,
+      "revision_id": "revision_da4fd1c9ad99",
+      "revision_note": "End on the beacon reflection rather than an explanatory title card.",
+      "shot_id": "shot_003",
+      "treatment": "close frame; The consequence lands in a final image that can be evaluated shot by shot. Direction: clarity_first."
+    }
+  ],
+  "shots": [
+    {
+      "action": "A young lighthouse keeper must choose between preserving the final analog beacon and following an unknown signal into the storm.",
+      "beat_id": "beat_001",
+      "character_asset_refs": [
+        "character_asset_626d4bbf9d26"
+      ],
+      "framing": "wide",
+      "shot_id": "shot_001"
+    },
+    {
+      "action": "The lead makes a visible choice that tests the restrained suspense premise.",
+      "beat_id": "beat_002",
+      "character_asset_refs": [
+        "character_asset_626d4bbf9d26"
+      ],
+      "framing": "medium",
+      "shot_id": "shot_002"
+    },
+    {
+      "action": "The consequence lands in a final image that can be evaluated shot by shot.",
+      "beat_id": "beat_003",
+      "character_asset_refs": [
+        "character_asset_626d4bbf9d26"
+      ],
+      "framing": "close",
+      "shot_id": "shot_003"
+    }
+  ],
+  "storyboard": {
+    "shot_refs": [
+      "shot_001",
+      "shot_002",
+      "shot_003"
+    ],
+    "source_script_id": "script_21cda20ba542",
+    "storyboard_id": "storyboard_1757d85a09f2"
+  }
+}
