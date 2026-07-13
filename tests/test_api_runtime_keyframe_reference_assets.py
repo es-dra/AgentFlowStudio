@@ -204,6 +204,7 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",

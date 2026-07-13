@@ -7,6 +7,7 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
@@ -209,6 +210,7 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",
@@ -292,6 +294,7 @@ def test_keyframe_partial_outputs_are_preserved_with_failed_item_retry_scope(tmp
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",
@@ -350,6 +353,76 @@ def test_keyframe_partial_outputs_are_preserved_with_failed_item_retry_scope(tmp
     assert "api_key" not in serialized
 
 
+@pytest.mark.parametrize(
+    ("case", "statuses"),
+    [
+        ("missing", [None]),
+        ("failed", ["failed"]),
+        ("retryable", ["retryable"]),
+        ("invalid", ["success"]),
+        ("type-invalid", [7]),
+        ("duplicate", ["succeeded", "succeeded"]),
+    ],
+)
+def test_keyframe_http_and_replay_leave_ambiguous_candidate_authority_unbound(
+    tmp_path,
+    monkeypatch,
+    case,
+    statuses,
+) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    dispatch_count = 0
+
+    def fake_dispatch(capability, service_id, request):
+        nonlocal dispatch_count
+        dispatch_count += 1
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        outputs = []
+        for status in statuses:
+            item = {
+                "candidate_id": "candidate_001",
+                "image_path": "image_candidates/candidate_001.png",
+                "byte_count": image_path.stat().st_size,
+                "sha256": hashlib.sha256(PNG_BYTES).hexdigest(),
+                "width": 1,
+                "height": 1,
+                "aspect_ratio": "1:1",
+            }
+            if status is not None:
+                item["status"] = status
+            outputs.append(item)
+        return {"status": "succeeded", "outputs": outputs}
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = f"proj_candidate_authority_{case}"
+    request = {
+        "node_id": f"image-node-{case}",
+        "prompt_text": "Create an authority-bound keyframe candidate.",
+        "optimized_prompt": "Create an authority-bound keyframe candidate.",
+        "candidate_count": 1,
+        "generated_at": "2026-07-13T14:00:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    submit_payload = {**request, "preflight_token": preflight.json()["preflight_token"]}
+
+    first = client.post(f"/projects/{project_id}/keyframe-generations", json=submit_payload)
+    replay = client.post(f"/projects/{project_id}/keyframe-generations", json=submit_payload)
+
+    assert first.status_code == 200
+    assert replay.status_code == 200
+    assert dispatch_count == 1
+    assert first.json()["candidate_previews"] == []
+    assert first.json()["reusable_image_assets"] == []
+    assert replay.json()["candidate_previews"] == []
+    assert replay.json()["reusable_image_assets"] == []
+
+
 def test_async_keyframe_poll_safe_manifest_does_not_echo_provider_paths(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
 
@@ -377,6 +450,7 @@ def test_async_keyframe_poll_safe_manifest_does_not_echo_provider_paths(tmp_path
                 "outputs": [
                     {
                         "candidate_id": "candidate_001",
+                        "status": "succeeded",
                         "image_path": "image_candidates/candidate_001.png",
                         "byte_count": image_path.stat().st_size,
                         "sha256": "fake-sha256",
@@ -450,6 +524,7 @@ def test_sync_keyframe_provider_can_continue_in_runtime_background(tmp_path, mon
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",
@@ -557,6 +632,7 @@ def test_async_image_provider_already_complete_returns_succeeded_preview(tmp_pat
                 "outputs": [
                     {
                         "candidate_id": "candidate_001",
+                        "status": "succeeded",
                         "image_path": "image_candidates/candidate_001.png",
                         "byte_count": byte_count,
                         "sha256": "fake-sha256",
@@ -607,6 +683,7 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",
@@ -789,6 +866,7 @@ def test_keyframe_generation_uses_provider_descriptor_prompt_limit(tmp_path, mon
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
+                    "status": "succeeded",
                     "image_path": "image_candidates/candidate_001.png",
                     "byte_count": image_path.stat().st_size,
                     "sha256": "fake-sha256",
@@ -830,6 +908,7 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
     schema = json.loads(exported_path.read_text(encoding="utf-8"))
     keyframe_schema = schema["components"]["schemas"]["KeyframeGenerationRequest"]
+    keyframe_job_schema = schema["components"]["schemas"]["KeyframeGenerationJob"]
     keyframe_response_schema = schema["components"]["schemas"]["KeyframeGenerationResponse"]
     reusable_asset_schema = schema["components"]["schemas"]["ReusableImageAsset"]
     serialized = json.dumps(keyframe_schema, ensure_ascii=False).lower()
@@ -844,6 +923,10 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     assert keyframe_response_schema["properties"]["reusable_image_assets"]["items"]["$ref"].endswith(
         "/ReusableImageAsset"
     )
+    assert keyframe_response_schema["properties"]["job"]["$ref"].endswith("/KeyframeGenerationJob")
+    assert "job" in keyframe_response_schema["required"]
+    assert keyframe_job_schema["properties"]["job_id"]["pattern"].startswith("^[A-Za-z0-9]")
+    assert "job_id" in keyframe_job_schema["required"]
     assert reusable_asset_schema["properties"]["status"]["enum"] == ["succeeded", "failed", "retryable"]
     assert reusable_asset_schema["properties"]["source_candidate_digest"]["pattern"] == "^[a-f0-9]{64}$"
     assert reusable_asset_schema["properties"]["source_candidate_id"]["pattern"] == r"^candidate_\d{3}$"

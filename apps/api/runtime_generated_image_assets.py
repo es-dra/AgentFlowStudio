@@ -26,7 +26,7 @@ def register_generated_image_asset(
     source_candidate_id: str,
     image_path: Path,
     source_candidate_digest: str | None = None,
-    source_candidate_status: str = "succeeded",
+    source_candidate_status: str | None = None,
 ) -> dict[str, Any]:
     root = store.root.resolve()
     resolved = Path(image_path).resolve()
@@ -39,9 +39,9 @@ def register_generated_image_asset(
 
     normalized_job_id = _source_job_id(source_job_id)
     normalized_candidate_id = _source_candidate_id(source_candidate_id)
-    normalized_status = str(source_candidate_status or "").strip().lower()
-    if normalized_status not in REUSABLE_IMAGE_ASSET_STATUSES:
+    if not isinstance(source_candidate_status, str) or source_candidate_status not in REUSABLE_IMAGE_ASSET_STATUSES:
         raise ValueError("generated image asset status is invalid")
+    normalized_status = source_candidate_status
     if normalized_status != "succeeded":
         raise ValueError("only succeeded generated image assets are reusable")
 
