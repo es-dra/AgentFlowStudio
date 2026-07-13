@@ -257,11 +257,14 @@ def test_runtime_service_serves_site_homepage_as_root_entry(tmp_path) -> None:
     assert home.status_code == 200
     assert home.headers["cache-control"] == "no-store"
     assert "<title>AFS Studio" in home.text
+    assert '<html lang="zh-CN">' in home.text
     assert 'href="/studio/"' in home.text
-    assert "Agent-native Creative Workspace" in home.text
-    assert "进入工作台" in home.text
+    assert "数字内容制作工作空间" in home.text
+    assert "进入制作工作空间" in home.text
+    assert "让数字剧组完成一集内容" in home.text
     assert "studio-wall" in home.text
-    assert 'href="/site/social-square.html"' in home.text
+    assert 'href="/site/social-square.html"' not in home.text
+    assert "社交广场" not in home.text
     assert client.get("/site/social-square.html").status_code == 200
     assert base_css.status_code == 200
     assert preview_css.status_code == 200
