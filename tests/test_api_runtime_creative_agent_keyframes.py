@@ -417,8 +417,85 @@ def test_keyframe_http_and_replay_leave_ambiguous_candidate_authority_unbound(
     assert first.status_code == 200
     assert replay.status_code == 200
     assert dispatch_count == 1
+    job_id = first.json()["job"]["job_id"]
+    preview = client.get(
+        f"/projects/{project_id}/keyframe-generations/{job_id}/candidates/candidate_001/preview"
+    )
     assert first.json()["candidate_previews"] == []
     assert first.json()["reusable_image_assets"] == []
+    assert replay.json()["candidate_previews"] == []
+    assert replay.json()["reusable_image_assets"] == []
+    assert preview.status_code == 404
+    assert preview.content != PNG_BYTES
+
+
+@pytest.mark.parametrize("mutation", ["stored-bytes", "duplicate-metadata"])
+def test_keyframe_preview_and_replay_fail_closed_after_persisted_authority_mutation(
+    tmp_path,
+    monkeypatch,
+    mutation,
+) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    def fake_dispatch(capability, service_id, request):
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "status": "succeeded",
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "status": "succeeded",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "sha256": hashlib.sha256(PNG_BYTES).hexdigest(),
+                }
+            ],
+        }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = f"proj_preview_authority_{mutation}"
+    request = {
+        "node_id": f"image-node-{mutation}",
+        "prompt_text": "Create a preview authority candidate.",
+        "optimized_prompt": "Create a preview authority candidate.",
+        "candidate_count": 1,
+        "generated_at": "2026-07-13T15:00:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    submit_payload = {**request, "preflight_token": preflight.json()["preflight_token"]}
+    first = client.post(f"/projects/{project_id}/keyframe-generations", json=submit_payload)
+    assert first.status_code == 200
+    payload = first.json()
+    job_id = payload["job"]["job_id"]
+    asset_id = payload["reusable_image_assets"][0]["asset_id"]
+    keyframe_preview_url = (
+        f"/projects/{project_id}/keyframe-generations/{job_id}/candidates/candidate_001/preview"
+    )
+    assert client.get(keyframe_preview_url).content == PNG_BYTES
+
+    asset_dir = tmp_path / "projects" / project_id / "image_assets" / asset_id
+    if mutation == "stored-bytes":
+        (asset_dir / "source.png").write_bytes(b"mutated-persisted-bytes")
+    else:
+        metadata = json.loads((asset_dir / "image_asset.json").read_text(encoding="utf-8"))
+        duplicate_dir = tmp_path / "projects" / project_id / "image_assets" / "aaa_duplicate"
+        duplicate_dir.mkdir(parents=True)
+        metadata["asset_id"] = "aaa_duplicate"
+        (duplicate_dir / "image_asset.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    keyframe_preview = client.get(keyframe_preview_url)
+    asset_preview = client.get(f"/projects/{project_id}/image-assets/{asset_id}/preview")
+    replay = client.post(f"/projects/{project_id}/keyframe-generations", json=submit_payload)
+
+    assert keyframe_preview.status_code == 404
+    assert keyframe_preview.content != PNG_BYTES
+    assert asset_preview.status_code == 404
+    assert asset_preview.content != PNG_BYTES
+    assert replay.status_code == 200
     assert replay.json()["candidate_previews"] == []
     assert replay.json()["reusable_image_assets"] == []
 

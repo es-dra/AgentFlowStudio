@@ -10,14 +10,22 @@ import pytest
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.codex_image_handoff import _safe_outputs, completed_result_payload
-from apps.api.runtime_generated_image_assets import register_generated_image_asset
-from apps.api.runtime_image_assets import image_asset_metadata, public_reusable_image_asset
+from apps.api.runtime_generated_image_assets import (
+    register_generated_image_asset,
+    resolve_generated_candidate_authority,
+)
+from apps.api.runtime_image_assets import (
+    image_asset_metadata,
+    public_reusable_image_asset,
+    resolve_reference_images,
+)
 from apps.api.runtime_keyframe_async import _provider_outputs_from_candidate_files
 from apps.api.runtime_keyframe_routes import (
     _candidate_previews,
     _candidate_records,
     _rebind_replay_candidate_authority,
     _reusable_image_assets,
+    register_runtime_keyframe_routes,
 )
 from apps.api.runtime_store import RuntimeStore
 
@@ -58,6 +66,22 @@ def test_internal_successful_candidate_producer_inventory_sets_explicit_status(p
         assert values.get("status") == "succeeded"
 
 
+def test_runtime_candidate_authority_consumer_inventory_uses_one_resolver_or_thin_forwarder() -> None:
+    resolver_name = resolve_generated_candidate_authority.__name__
+    direct_consumers = (
+        register_generated_image_asset,
+        _candidate_records,
+        image_asset_metadata,
+        register_runtime_keyframe_routes,
+    )
+    for consumer in direct_consumers:
+        assert resolver_name in inspect.getsource(consumer)
+    assert "_candidate_records" in inspect.getsource(_rebind_replay_candidate_authority)
+    reference_source = inspect.getsource(resolve_reference_images)
+    assert "image_asset_metadata" in reference_source
+    assert "image_asset_file_path" in reference_source
+
+
 def test_reusable_asset_authority_uses_candidate_bytes_and_filters_non_success(tmp_path) -> None:
     store = RuntimeStore(tmp_path)
     project_id = "proj_reusable_contract"
@@ -70,7 +94,9 @@ def test_reusable_asset_authority_uses_candidate_bytes_and_filters_non_success(t
         (image_dir / f"{candidate_id}.png").write_bytes(PNG_BYTES)
 
     records = _candidate_records(
-        output_dir,
+        store,
+        project_id,
+        job_id,
         [
             {"candidate_id": "candidate_001", "status": "succeeded", "sha256": "provider-value-is-not-authority"},
             {"candidate_id": "candidate_002", "status": "failed"},
@@ -148,6 +174,102 @@ def test_reusable_asset_registration_rejects_false_authority_and_unsafe_ids(tmp_
         )
 
 
+def test_registration_rejects_candidate_path_from_different_job(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_reusable_job_path"
+    store.ensure_project_manifest(project_id)
+    image_path = store.run_dir(project_id, "job-a") / "image_candidates" / "candidate_001.png"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(PNG_BYTES)
+
+    with pytest.raises(ValueError, match="canonical candidate"):
+        register_generated_image_asset(
+            store,
+            project_id,
+            source_node_id="image-node-001",
+            source_job_id="job-b",
+            source_candidate_id="candidate_001",
+            image_path=image_path,
+            source_candidate_status="succeeded",
+        )
+
+
+def test_reregistration_rejects_mutated_persisted_bytes(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_reusable_mutated_stored"
+    job_id = "job-mutated-stored"
+    store.ensure_project_manifest(project_id)
+    image_path = store.run_dir(project_id, job_id) / "image_candidates" / "candidate_001.png"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(PNG_BYTES)
+    registered = register_generated_image_asset(
+        store,
+        project_id,
+        source_node_id="image-node-001",
+        source_job_id=job_id,
+        source_candidate_id="candidate_001",
+        image_path=image_path,
+        source_candidate_status="succeeded",
+    )
+    stored_path = (
+        store.projects_dir
+        / project_id
+        / "image_assets"
+        / registered["asset"]["asset_id"]
+        / "source.png"
+    )
+    stored_path.write_bytes(b"mutated-persisted-bytes")
+
+    assert resolve_reference_images(store, project_id, [registered["asset"]["asset_id"]]) == []
+    with pytest.raises(ValueError, match="stored bytes"):
+        register_generated_image_asset(
+            store,
+            project_id,
+            source_node_id="image-node-001",
+            source_job_id=job_id,
+            source_candidate_id="candidate_001",
+            image_path=image_path,
+            source_candidate_status="succeeded",
+        )
+
+
+def test_reregistration_rejects_duplicate_persisted_authority(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_reusable_duplicate_metadata"
+    job_id = "job-duplicate-metadata"
+    store.ensure_project_manifest(project_id)
+    image_path = store.run_dir(project_id, job_id) / "image_candidates" / "candidate_001.png"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(PNG_BYTES)
+    registered = register_generated_image_asset(
+        store,
+        project_id,
+        source_node_id="image-node-001",
+        source_job_id=job_id,
+        source_candidate_id="candidate_001",
+        image_path=image_path,
+        source_candidate_status="succeeded",
+    )
+    metadata = image_asset_metadata(store, project_id, registered["asset"]["asset_id"])
+    duplicate = dict(metadata)
+    duplicate["asset_id"] = "aaa_duplicate"
+    duplicate_path = store.projects_dir / project_id / "image_assets" / "aaa_duplicate" / "image_asset.json"
+    duplicate_path.parent.mkdir(parents=True)
+    write_json(duplicate_path, duplicate)
+
+    assert resolve_reference_images(store, project_id, [registered["asset"]["asset_id"]]) == []
+    with pytest.raises(ValueError, match="unique"):
+        register_generated_image_asset(
+            store,
+            project_id,
+            source_node_id="image-node-001",
+            source_job_id=job_id,
+            source_candidate_id="candidate_001",
+            image_path=image_path,
+            source_candidate_status="succeeded",
+        )
+
+
 @pytest.mark.parametrize(
     ("source_status", "error"),
     [
@@ -206,7 +328,7 @@ def test_candidate_projection_leaves_ambiguous_authority_unbound(tmp_path, outpu
     image_path.parent.mkdir(parents=True)
     image_path.write_bytes(PNG_BYTES)
 
-    records = _candidate_records(output_dir, outputs)
+    records = _candidate_records(store, project_id, job_id, outputs)
 
     assert records == []
     assert _candidate_previews(project_id, job_id, records) == []
@@ -219,7 +341,7 @@ def test_candidate_projection_leaves_ambiguous_authority_unbound(tmp_path, outpu
     ) == []
 
 
-def test_existing_additive_generated_asset_digest_is_upgraded_only_from_matching_bytes(tmp_path) -> None:
+def test_legitimate_reregistration_and_replay_pass_but_missing_persisted_digest_fails_closed(tmp_path) -> None:
     store = RuntimeStore(tmp_path)
     project_id = "proj_reusable_compat"
     job_id = "job-compat"
@@ -237,20 +359,6 @@ def test_existing_additive_generated_asset_digest_is_upgraded_only_from_matching
         image_path=image_path,
         source_candidate_status="succeeded",
     )
-    metadata = image_asset_metadata(store, project_id, registered["asset"]["asset_id"])
-    metadata.pop("source_candidate_digest")
-    metadata_path = (
-        store.projects_dir
-        / project_id
-        / "image_assets"
-        / registered["asset"]["asset_id"]
-        / "image_asset.json"
-    )
-    write_json(metadata_path, metadata)
-
-    with pytest.raises(ValueError):
-        public_reusable_image_asset(metadata)
-
     repeated = register_generated_image_asset(
         store,
         project_id,
@@ -274,7 +382,32 @@ def test_existing_additive_generated_asset_digest_is_upgraded_only_from_matching
     )
     assert rebound["candidate_previews"][0]["sha256"] == hashlib.sha256(PNG_BYTES).hexdigest()
     assert rebound["reusable_image_assets"][0]["status"] == "succeeded"
-    assert rebound["reusable_image_assets"][0]["source_candidate_digest"] == hashlib.sha256(PNG_BYTES).hexdigest()
+
+    metadata = image_asset_metadata(store, project_id, registered["asset"]["asset_id"])
+    metadata.pop("source_candidate_digest")
+    metadata_path = (
+        store.projects_dir
+        / project_id
+        / "image_assets"
+        / registered["asset"]["asset_id"]
+        / "image_asset.json"
+    )
+    write_json(metadata_path, metadata)
+
+    with pytest.raises(ValueError):
+        public_reusable_image_asset(metadata)
+    with pytest.raises(ValueError, match="source_candidate_digest"):
+        image_asset_metadata(store, project_id, registered["asset"]["asset_id"])
+    with pytest.raises(ValueError, match="source_candidate_digest"):
+        register_generated_image_asset(
+            store,
+            project_id,
+            source_node_id="image-node-001",
+            source_job_id=job_id,
+            source_candidate_id="candidate_001",
+            image_path=image_path,
+            source_candidate_status="succeeded",
+        )
 
 
 @pytest.mark.parametrize(

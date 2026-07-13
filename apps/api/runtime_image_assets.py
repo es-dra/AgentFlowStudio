@@ -125,6 +125,20 @@ def image_asset_metadata(store: RuntimeStore, project_id: str, asset_id: str) ->
         raise KeyError(asset_id)
     metadata = read_json(path)
     reject_unsafe_payload(metadata)
+    if metadata.get("source_kind") == "keyframe_candidate":
+        from apps.api.runtime_generated_image_assets import resolve_generated_candidate_authority
+
+        authority = resolve_generated_candidate_authority(
+            store,
+            project_id,
+            source_job_id=metadata.get("source_job_id"),
+            source_candidate_id=metadata.get("source_candidate_id"),
+            require_existing_asset=True,
+        )
+        validated_metadata, validated_path = authority["existing"]
+        if validated_path.resolve() != path or validated_metadata.get("asset_id") != asset_id:
+            raise ValueError("image asset is not the unique candidate authority")
+        return validated_metadata
     return metadata
 
 
@@ -139,8 +153,10 @@ def list_image_assets(store: RuntimeStore, project_id: str) -> list[dict[str, An
     if not image_assets_dir.is_dir():
         return []
     for path in sorted(image_assets_dir.glob("*/image_asset.json")):
-        metadata = read_json(path)
-        reject_unsafe_payload(metadata)
+        try:
+            metadata = image_asset_metadata(store, project_id, path.parent.name)
+        except (KeyError, ValueError):
+            continue
         assets.append(public_image_asset(metadata))
     return assets
 
