@@ -50,6 +50,30 @@ class RuntimeStore:
     def production_run_lock_path(self, project_id: str) -> Path:
         return self.production_runs_dir(project_id) / "production_runs.lock"
 
+    def domain_crew_path(self, project_id: str) -> Path:
+        return self.projects_dir / safe_id(project_id) / "domain_crew.json"
+
+    def domain_crew_lock_path(self, project_id: str) -> Path:
+        return self.projects_dir / safe_id(project_id) / "domain_crew.lock"
+
+    def write_domain_crew(self, project_id: str, crew: dict[str, Any]) -> dict[str, Any]:
+        self.ensure_project_manifest(project_id)
+        if str(crew.get("project_id") or "") != project_id:
+            raise ValueError("domain crew project id does not match storage scope")
+        reject_unsafe_payload(crew)
+        write_json(self.domain_crew_path(project_id), crew)
+        return crew
+
+    def load_domain_crew(self, project_id: str) -> dict[str, Any]:
+        path = self.domain_crew_path(project_id)
+        if not path.exists():
+            raise KeyError(project_id)
+        crew = read_json(path)
+        reject_unsafe_payload(crew)
+        if str(crew.get("project_id") or "") != project_id:
+            raise ValueError("domain crew storage identity mismatch")
+        return crew
+
     def is_project_deleted(self, project_id: str) -> bool:
         return self.project_deleted_marker_path(project_id).is_file()
 
