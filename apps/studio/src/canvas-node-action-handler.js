@@ -6,6 +6,7 @@ import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { openNodeMenu } from "./panels/node-menu.js";
+import { handleProductionDeliveryAction } from "./production-delivery-controller.js";
 
 export function handleCanvasNodeClick(store, runtime, e) {
   const nodeEl = e.target.closest(".node");
@@ -19,6 +20,8 @@ export function handleCanvasNodeClick(store, runtime, e) {
 
   if (["candidate-select", "candidate-revise", "candidate-refresh"].includes(action)) {
     void handleCandidateCreatorAction(store, runtime, node, actionEl);
+  } else if (action === "production-quality-approve" || action === "production-export" || action === "production-delivery-refresh") {
+    void handleProductionDeliveryAction(store, runtime, node, actionEl);
   } else if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
   else if (action === "open-director") openDirectorShell(store, node);
   else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
