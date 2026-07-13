@@ -1,4 +1,3 @@
-import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { dedicatedReviewActionSnapshot } from "./candidate-selection-controller.js";
 import { dedicatedDeliveryActionSnapshot } from "./production-delivery-controller.js";
 
@@ -10,7 +9,6 @@ const EMPTY = Object.freeze({
   project: null,
   projectId: "",
   run: null,
-  node: null,
   candidates: [],
   focusedCandidateId: "",
   selectedCandidateId: "",
@@ -62,7 +60,6 @@ export function createReviewDeliveryState(onChange = () => {}) {
       projectId,
       project: null,
       run: null,
-      node: null,
       candidates: [],
       reviewSnapshot: null,
       deliverySnapshot: null,
@@ -103,13 +100,9 @@ export function createReviewDeliveryState(onChange = () => {}) {
   };
 }
 
-export function composeReviewDeliveryState({ workspace, project, runsPayload, studioPayload, projectId }) {
+export function composeReviewDeliveryState({ workspace, project, runsPayload, projectId }) {
   const runs = Array.isArray(runsPayload?.production_runs) ? runsPayload.production_runs : [];
-  const studioState = studioPayload?.state && typeof studioPayload.state === "object" ? studioPayload.state : {};
-  const nodes = Object.values(studioState.nodes || {}).filter((node) => node && typeof node === "object");
-  const preferredRunId = safeToken(studioState.production?.active_run_id)
-    || safeToken(nodes.map((node) => node?.params?.creatorSelection?.run_id).find(Boolean));
-  const run = runs.find((item) => safeToken(item?.run_id) === preferredRunId) || newestRun(runs);
+  const run = newestRun(runs);
   if (!run) {
     return {
       phase: "empty",
@@ -117,7 +110,6 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, st
       project,
       projectId,
       run: null,
-      node: null,
       candidates: [],
       focusedCandidateId: "",
       selectedCandidateId: "",
@@ -132,22 +124,19 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, st
   }
 
   const runCandidates = Array.isArray(run.candidates) ? run.candidates : [];
-  const sourceNode = bestCandidateNode(nodes, run);
-  const previews = storedCandidatePreviews(sourceNode || {}, projectId);
-  const candidates = runCandidates.map((candidate, index) => candidateView(candidate, previews, projectId, index));
+  const candidates = runCandidates.map((candidate, index) => candidateView(candidate, projectId, index));
   const selectedRevision = objectValue(run.selected_revision);
   const selectedCandidateId = safeToken(selectedRevision.candidate_id || selectedRevision.selected_candidate_id);
   const latestDecision = Array.isArray(run.creator_decisions) ? run.creator_decisions.at(-1) : null;
   const rejected = String(run.status || "") === "creator_revision_required" || String(latestDecision?.decision || "") === "reject";
   const focusedCandidateId = selectedCandidateId || candidates.find((item) => item.preview_url)?.candidate_id || candidates[0]?.candidate_id || "";
-  const node = deliveryNode(sourceNode, run, candidates, selectedCandidateId, projectId);
   const reviewSnapshot = focusedCandidateId
-    ? dedicatedReviewActionSnapshot(run, focusedCandidateId, node.id)
+    ? dedicatedReviewActionSnapshot(run, focusedCandidateId)
     : null;
   let deliverySnapshot = null;
   if (selectedCandidateId && !rejected) {
     try {
-      deliverySnapshot = dedicatedDeliveryActionSnapshot(run, node);
+      deliverySnapshot = dedicatedDeliveryActionSnapshot(run);
     } catch {
       deliverySnapshot = null;
     }
@@ -160,7 +149,6 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, st
     project,
     projectId,
     run,
-    node,
     candidates,
     focusedCandidateId,
     selectedCandidateId,
@@ -177,11 +165,11 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, st
 
 export function focusReviewCandidate(state, candidateId) {
   const candidate = state.candidates.find((item) => item.candidate_id === candidateId);
-  if (!candidate || !state.run || !state.node) return state;
+  if (!candidate || !state.run) return state;
   return {
     ...state,
     focusedCandidateId: candidate.candidate_id,
-    reviewSnapshot: dedicatedReviewActionSnapshot(state.run, candidate.candidate_id, state.node.id),
+    reviewSnapshot: dedicatedReviewActionSnapshot(state.run, candidate.candidate_id),
     notice: "",
   };
 }
@@ -192,13 +180,11 @@ export function protectedPreviewDisposition(status) {
 
 export function selectedDeliverySubmission(state) {
   const snapshot = state?.deliverySnapshot;
-  const node = state?.node;
   const run = state?.run;
   const selectedCandidateId = safeToken(state?.selectedCandidateId);
   const selectedCandidate = (Array.isArray(run?.candidates) ? run.candidates : [])
     .find((item) => safeToken(item?.candidate_id) === selectedCandidateId);
   const revision = objectValue(run?.selected_revision);
-  const selection = objectValue(node?.params?.creatorSelection);
   const expected = {
     candidate_id: selectedCandidateId,
     candidate_digest: safeDigest(selectedCandidate?.canonical_digest),
@@ -207,14 +193,10 @@ export function selectedDeliverySubmission(state) {
       revision.canonical_digest || revision.revision_digest || revision.selected_revision_digest,
     ),
   };
-  if (!snapshot || !node || Object.values(expected).some((value) => !value)) return null;
+  if (!snapshot || Object.values(expected).some((value) => !value)) return null;
   const snapshotMatches = Object.entries(expected)
     .every(([key, value]) => String(snapshot?.[key] || "") === value);
-  const nodeMatches = safeToken(selection.selected_candidate_id) === expected.candidate_id
-    && safeDigest(selection.selected_candidate_digest) === expected.candidate_digest
-    && safeToken(selection.selected_revision_id) === expected.revision_id
-    && safeDigest(selection.selected_revision_digest) === expected.revision_digest;
-  return snapshotMatches && nodeMatches ? { snapshot, node } : null;
+  return snapshotMatches ? { snapshot } : null;
 }
 
 function newestRun(runs) {
@@ -222,102 +204,39 @@ function newestRun(runs) {
     .localeCompare(String(left?.updated_at || left?.created_at || "")))[0] || null;
 }
 
-function bestCandidateNode(nodes, run) {
-  const runId = safeToken(run?.run_id);
-  const candidateIds = new Set((run?.candidates || []).map((item) => safeToken(item?.candidate_id)).filter(Boolean));
-  return nodes.find((node) => safeToken(node?.params?.creatorSelection?.run_id) === runId)
-    || nodes.find((node) => rawCandidateItems(node).filter((item) => candidateIds.has(safeToken(item?.candidate_id))).length >= 2)
-    || null;
-}
-
-function candidateView(candidate, previews, projectId, index) {
+function candidateView(candidate, projectId, index) {
   const id = safeToken(candidate?.candidate_id);
   const digest = safeDigest(candidate?.canonical_digest);
   const jobId = safeToken(candidate?.parent_job_id);
-  const preview = previews.find((item) => item.candidate_id === id
-    && safeDigest(item.canonical_digest || item.sha256) === digest
-    && safeToken(item.parent_job_id) === jobId) || null;
-  const previewUrl = safePreviewUrl(preview?.preview_url || preview?.url, projectId, jobId, id);
+  const preview = safePreviewDescriptor(candidate?.safe_preview, projectId, jobId, id);
   return {
     candidate_id: id,
     canonical_digest: digest,
     parent_job_id: jobId,
     label: `方案 ${String.fromCharCode(65 + index)}`,
-    preview_url: previewUrl,
-    media_kind: previewUrl.includes("/video-generations/") ? "video" : "image",
-    available: Boolean(previewUrl),
-    aspect_ratio: String(preview?.aspect_ratio || "").trim(),
+    preview_url: preview?.preview_url || "",
+    media_kind: preview?.media_kind || "",
+    available: Boolean(preview),
+    aspect_ratio: "",
   };
 }
 
-function deliveryNode(sourceNode, run, candidates, selectedCandidateId, projectId) {
-  const selectedCandidate = candidates.find((item) => item.candidate_id === selectedCandidateId);
-  const revision = objectValue(run.selected_revision);
-  return {
-    ...(sourceNode || {}),
-    id: safeToken(sourceNode?.id) || "review-delivery",
-    type: sourceNode?.type || (candidates.some((item) => item.media_kind === "video") ? "video" : "image"),
-    params: {
-      ...(sourceNode?.params || {}),
-      lastKeyframeJobId: selectedCandidate?.parent_job_id || candidates[0]?.parent_job_id || "",
-      lastVideoJobId: selectedCandidate?.parent_job_id || candidates[0]?.parent_job_id || "",
-      candidatePreviewUrls: candidates.map((item) => ({
-        candidate_id: item.candidate_id,
-        canonical_digest: item.canonical_digest,
-        parent_job_id: item.parent_job_id,
-        project_id: projectId,
-        preview_url: item.preview_url,
-        status: item.available ? "succeeded" : "",
-      })),
-      reviewDeliveryCandidates: candidates.map((item) => ({
-        candidate_id: item.candidate_id,
-        canonical_digest: item.canonical_digest,
-        parent_job_id: item.parent_job_id,
-      })),
-      creatorSelection: {
-        status: "persisted",
-        authoritative_source: "runtime_production_run",
-        run_id: safeToken(run.run_id),
-        selected_candidate_id: selectedCandidateId,
-        selected_candidate_digest: safeDigest(selectedCandidate?.canonical_digest),
-        selected_revision_id: safeToken(revision.revision_id || revision.selected_revision_id),
-        selected_revision_digest: safeDigest(
-          revision.canonical_digest || revision.revision_digest || revision.selected_revision_digest,
-        ),
-        checkpoint_version: Number(run?.checkpoint?.version || 0),
-        checkpoint_digest: safeDigest(run?.checkpoint?.state_digest),
-        selected_parent_job_id: selectedCandidate?.parent_job_id || "",
-      },
-    },
-  };
-}
-
-function storedCandidatePreviews(node, projectId) {
-  const normalized = candidatePreviewsFromNode(node);
-  const raw = rawCandidateItems(node).map((item) => {
-    const candidateId = safeToken(item?.candidate_id || item?.id);
-    const parentJobId = safeToken(item?.parent_job_id);
-    const canonicalDigest = safeDigest(item?.canonical_digest || item?.sha256);
-    const previewUrl = safePreviewUrl(item?.preview_url || item?.url || item?.previewUrl, projectId, parentJobId, candidateId);
-    return {
-      candidate_id: candidateId,
-      parent_job_id: parentJobId,
-      canonical_digest: canonicalDigest,
-      preview_url: previewUrl,
-      url: previewUrl,
-      aspect_ratio: String(item?.aspect_ratio || "").trim(),
-    };
-  });
-  const byId = new Map();
-  for (const item of [...raw, ...normalized]) {
-    if (item?.candidate_id && !byId.has(item.candidate_id)) byId.set(item.candidate_id, item);
-  }
-  return [...byId.values()];
-}
-
-function rawCandidateItems(node) {
-  const value = node?.params?.candidatePreviewUrls || node?.params?.candidate_previews || node?.params?.candidates;
-  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object" && !Array.isArray(item)) : [];
+function safePreviewDescriptor(value, projectId, jobId, candidateId) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== "media_kind" || keys[1] !== "preview_url") return null;
+  const mediaKind = value.media_kind === "image" || value.media_kind === "video" ? value.media_kind : "";
+  const previewUrl = String(value.preview_url || "").trim();
+  if (!mediaKind || !previewUrl || !safeToken(projectId) || !jobId || !candidateId) return null;
+  const match = previewUrl.match(/^\/projects\/([^/]+)\/(keyframe-generations|video-generations)\/([^/]+)\/candidates\/([^/]+)\/preview$/);
+  if (!match) return null;
+  const [, descriptorProjectId, collection, descriptorJobId, descriptorCandidateId] = match;
+  const expectedCollection = mediaKind === "image" ? "keyframe-generations" : "video-generations";
+  if (descriptorProjectId !== projectId
+    || collection !== expectedCollection
+    || descriptorJobId !== jobId
+    || descriptorCandidateId !== candidateId) return null;
+  return { media_kind: mediaKind, preview_url: previewUrl };
 }
 
 function qualityProjection(run, revision, rejected) {
@@ -364,15 +283,6 @@ function lineageProjection(run) {
   if (reviews.length) result.push({ label: `已记录 ${reviews.length} 次质量审核`, state: "complete" });
   if (exports.length) result.push({ label: `已生成 ${exports.length} 个交付包`, state: "complete" });
   return result;
-}
-
-function safePreviewUrl(value, projectId, jobId, candidateId) {
-  const text = String(value || "").trim();
-  if (!text.startsWith(`/projects/${encodeURIComponent(projectId)}/`)
-    && !text.startsWith(`/projects/${projectId}/`)) return "";
-  if (!text.endsWith(`/candidates/${candidateId}/preview`)) return "";
-  if (!text.includes(`/${jobId}/candidates/`)) return "";
-  return text;
 }
 
 function safeToken(value) {

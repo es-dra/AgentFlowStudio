@@ -176,7 +176,7 @@ export async function submitCandidateRevision(store, runtime, node, candidateId,
   return submitCreatorDecision(store, runtime, node, candidateId, "revise", revisionIntent, options);
 }
 
-export function dedicatedReviewActionSnapshot(run, candidateId, nodeId = "review-delivery") {
+export function dedicatedReviewActionSnapshot(run, candidateId) {
   const candidate = authoritativeCandidate(run, candidateId);
   const revision = objectValue(run?.selected_revision);
   const checkpointVersion = Number(run?.checkpoint?.version || 0);
@@ -185,7 +185,6 @@ export function dedicatedReviewActionSnapshot(run, candidateId, nodeId = "review
   }
   return {
     run_id: safeIdentifier(run?.run_id, "run_id"),
-    node_id: safeIdentifier(nodeId, "node_id"),
     subject_digest: safeDigest(run?.subject_digest, "subject_digest"),
     checkpoint_version: checkpointVersion,
     checkpoint_digest: safeDigest(run?.checkpoint?.state_digest, "checkpoint_digest"),
@@ -210,15 +209,8 @@ export async function submitDedicatedReviewDecision(runtime, snapshot, decision,
     const before = authoritativeRun(beforePayload);
     lastAuthoritativeRun = before;
     const candidate = authoritativeCandidate(before, snapshot?.candidate_id);
-    assertDedicatedSnapshot(snapshot, dedicatedReviewActionSnapshot(before, candidate.candidate_id, snapshot?.node_id));
-    const node = {
-      id: snapshot.node_id,
-      params: {
-        lastKeyframeJobId: candidate.parent_job_id,
-        lastVideoJobId: candidate.parent_job_id,
-      },
-    };
-    const context = buildCreatorDecisionContext(before, node, candidate, decision, revisionIntent, options);
+    assertDedicatedSnapshot(snapshot, dedicatedReviewActionSnapshot(before, candidate.candidate_id));
+    const context = buildDedicatedCreatorDecisionContext(before, candidate, decision, revisionIntent, options);
     const submitted = await runtime.submitCreatorDecision(runId, context.request);
     const afterPayload = await runtime.getProductionRun(runId);
     const after = authoritativeRun(afterPayload);
@@ -600,10 +592,49 @@ function authoritativeCandidate(run, candidateId) {
   return candidate;
 }
 
+function buildDedicatedCreatorDecisionContext(run, candidate, decision, revisionIntent, options = {}) {
+  const runId = safeIdentifier(run?.run_id, "run_id");
+  const candidateId = safeIdentifier(candidate?.candidate_id, "candidate_id");
+  const canonicalDigest = safeDigest(candidate?.canonical_digest, "canonical_digest");
+  const subjectDigest = safeDigest(run?.subject_digest, "subject_digest");
+  const checkpointVersion = Number(run?.checkpoint?.version || 0);
+  if (!Number.isInteger(checkpointVersion) || checkpointVersion < 1) {
+    throw selectionError("invalid_checkpoint", "Production checkpoint is missing or invalid.");
+  }
+  const normalizedDecision = ["select", "revise", "reject"].includes(decision) ? decision : "select";
+  const intent = String(revisionIntent || "").trim() || (normalizedDecision === "select" ? DEFAULT_SELECTION_INTENT : "");
+  if (!intent) throw selectionError("missing_revision_intent", "Enter revision intent before requesting a revision.");
+  if (intent.length > 800) throw selectionError("revision_intent_too_long", "Revision intent must be 800 characters or fewer.");
+  const selectedRevision = objectValue(run?.selected_revision);
+  const currentRevisionId = optionalIdentifier(selectedRevision.revision_id || selectedRevision.selected_revision_id);
+  if (normalizedDecision === "revise" && !currentRevisionId) {
+    throw selectionError("missing_parent_revision", "Refresh the authoritative selection before requesting a revision.");
+  }
+  const parentRevisionId = currentRevisionId || optionalIdentifier(candidate?.parent_revision_id);
+  const suffix = safeIdentifier(
+    options.idempotencyKey || `creator-${normalizedDecision}-${shortIdentifier(runId)}-${shortIdentifier(candidateId)}-${checkpointVersion}-${uniqueSuffix(options)}`,
+    "idempotency_key",
+  );
+  const decisionId = safeIdentifier(options.decisionId || `decision-${suffix}`.slice(0, 160), "decision_id");
+  return {
+    request: {
+      schema_version: "afs_creator_decision.v0.1",
+      decision_id: decisionId,
+      idempotency_key: suffix,
+      expected_checkpoint_version: checkpointVersion,
+      subject_digest: subjectDigest,
+      decision: normalizedDecision,
+      candidate_id: candidateId,
+      candidate_digest: canonicalDigest,
+      parent_revision_id: parentRevisionId || null,
+      revision_intent: intent,
+    },
+  };
+}
+
 function assertDedicatedSnapshot(expected, current) {
   const fields = [
     "run_id",
-    "node_id",
     "subject_digest",
     "checkpoint_version",
     "checkpoint_digest",

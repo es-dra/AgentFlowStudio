@@ -37,6 +37,16 @@ def test_review_delivery_is_a_dedicated_authenticated_chinese_creator_surface() 
     assert "mountedRoot?.replaceChildren();" in main
     assert "clearIdentityScopedStudioState();" in main
     assert 'window.addEventListener("afs:auth-session-expired"' in main
+    assert "loadStudioState" not in main
+    state = (STUDIO / "src" / "review-delivery-state.js").read_text(encoding="utf-8")
+    for forbidden in (
+        "studioPayload",
+        "candidatePreviewsFromNode",
+        "candidatePreviewUrls",
+        "reviewDeliveryCandidates",
+        "creatorSelection",
+    ):
+        assert forbidden not in state
 
     for label in (
         "审核与交付",
@@ -74,8 +84,20 @@ import { composeReviewDeliveryState } from "./apps/studio/src/review-delivery-st
 const digest = (char) => char.repeat(64);
 const projectId = "project-001";
 const candidates = [
-  { candidate_id: "candidate-001", canonical_digest: digest("a"), parent_job_id: "job-001" },
-  { candidate_id: "candidate-002", canonical_digest: digest("b"), parent_job_id: "job-001" },
+  {
+    candidate_id: "candidate-001", canonical_digest: digest("a"), parent_job_id: "job-001",
+    safe_preview: {
+      media_kind: "image",
+      preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/candidate-001/preview",
+    },
+  },
+  {
+    candidate_id: "candidate-002", canonical_digest: digest("b"), parent_job_id: "job-002",
+    safe_preview: {
+      media_kind: "video",
+      preview_url: "/projects/project-001/video-generations/job-002/candidates/candidate-002/preview",
+    },
+  },
 ];
 const revision = {
   revision_id: "revision-001",
@@ -99,19 +121,10 @@ const run = {
   lineage: [],
   checkpoint: { version: 2, state_digest: digest("f") },
 };
-const studioPayload = { state: { production: { active_run_id: "run-001" }, nodes: {
-  image_1: { id: "image_1", type: "image", params: { candidatePreviewUrls: candidates.map((item) => ({
-    ...item,
-    project_id: projectId,
-    preview_url: `/projects/${projectId}/keyframe-generations/${item.parent_job_id}/candidates/${item.candidate_id}/preview`,
-    status: "succeeded",
-  })) } },
-} } };
 const state = composeReviewDeliveryState({
   workspace: { projects: [{ project_id: projectId, name: "雨夜灯火" }] },
   project: { project_id: projectId, name: "雨夜灯火", episode: "第 01 集" },
   runsPayload: { production_runs: [run] },
-  studioPayload,
   projectId,
 });
 process.stdout.write(JSON.stringify({
@@ -127,6 +140,7 @@ process.stdout.write(JSON.stringify({
   subtitle: state.quality.subtitle,
   exportCount: state.exports.length,
   previewAvailable: state.candidates.every((item) => item.available),
+  previews: state.candidates.map((item) => ({ kind: item.media_kind, url: item.preview_url })),
 }));
 '''
     )
@@ -144,7 +158,65 @@ process.stdout.write(JSON.stringify({
         "subtitle": "unavailable",
         "exportCount": 0,
         "previewAvailable": True,
+        "previews": [
+            {
+                "kind": "image",
+                "url": "/projects/project-001/keyframe-generations/job-001/candidates/candidate-001/preview",
+            },
+            {
+                "kind": "video",
+                "url": "/projects/project-001/video-generations/job-002/candidates/candidate-002/preview",
+            },
+        ],
     }
+
+
+def test_review_delivery_safe_preview_omits_absent_unsafe_malformed_and_mismatched_descriptors() -> None:
+    payload = _node_json(
+        r'''
+import { composeReviewDeliveryState } from "./apps/studio/src/review-delivery-state.js";
+const digest = (char) => char.repeat(64);
+const descriptors = [
+  undefined,
+  { media_kind: "image", preview_url: "https://example.test/preview" },
+  { media_kind: "audio", preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/candidate-003/preview" },
+  { media_kind: "image", preview_url: "/projects/project-001/video-generations/job-001/candidates/candidate-004/preview" },
+  { media_kind: "video", preview_url: "/projects/project-001/video-generations/job-999/candidates/candidate-005/preview" },
+  { media_kind: "image", preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/other/preview" },
+  { media_kind: "image", preview_url: "/projects/project-999/keyframe-generations/job-001/candidates/candidate-007/preview" },
+  {
+    media_kind: "image",
+    preview_url: "/projects/project-001/keyframe-generations/job-001/candidates/candidate-008/preview",
+    inferred_kind: "image",
+  },
+];
+const candidates = descriptors.map((safe_preview, index) => ({
+  candidate_id: `candidate-00${index + 1}`,
+  canonical_digest: digest(String(index + 1)),
+  parent_job_id: "job-001",
+  ...(safe_preview ? { safe_preview } : {}),
+}));
+const run = {
+  run_id: "run-001", subject_digest: digest("a"), status: "candidates_ready", candidates,
+  selected_revision: null, creator_decisions: [], quality_reviews: [], exports: [],
+  checkpoint: { version: 1, state_digest: digest("b") },
+};
+const state = composeReviewDeliveryState({
+  workspace: { projects: [{ project_id: "project-001" }] },
+  project: { project_id: "project-001" },
+  runsPayload: { production_runs: [run] },
+  projectId: "project-001",
+});
+process.stdout.write(JSON.stringify(state.candidates.map((item) => ({
+  available: item.available, preview_url: item.preview_url, media_kind: item.media_kind,
+}))));
+'''
+    )
+
+    assert payload == [
+        {"available": False, "preview_url": "", "media_kind": ""}
+        for _ in range(8)
+    ]
 
 
 def test_dedicated_review_stale_snapshot_fails_closed_and_requires_authoritative_readback() -> None:
@@ -164,7 +236,7 @@ const base = {
   creator_decisions: [],
   checkpoint: { version: 1, state_digest: digest("c") },
 };
-const snapshot = dedicatedReviewActionSnapshot(base, "candidate-001", "review-delivery");
+const snapshot = dedicatedReviewActionSnapshot(base, "candidate-001");
 const changed = { ...base, checkpoint: { version: 2, state_digest: digest("d") } };
 let reads = 0;
 let posts = 0;
