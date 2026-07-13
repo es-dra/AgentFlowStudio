@@ -64,6 +64,10 @@ export function representativeEpisodeBindingSummary(run) {
 }
 
 export function productionDeliveryAuthority(run, node) {
+  const latestDecision = Array.isArray(run?.creator_decisions) ? run.creator_decisions.at(-1) : null;
+  if (String(run?.status || "") === "creator_revision_required" || String(latestDecision?.decision || "") === "reject") {
+    throw deliveryError("delivery_creator_rejected", "The current revision was rejected and must be selected or revised again.");
+  }
   const selection = candidateSelectionSummary(node);
   const selectedCandidateId = optionalIdentifier(selection.selected_candidate_id);
   if (!selectedCandidateId) {
@@ -74,7 +78,7 @@ export function productionDeliveryAuthority(run, node) {
     throw deliveryError("delivery_run_stale", "The selected candidate belongs to a different production run. Refresh before continuing.");
   }
   const candidates = Array.isArray(run?.candidates) ? run.candidates : [];
-  const visibleCandidates = candidatePreviewsFromNode(node);
+  const visibleCandidates = visibleDeliveryCandidates(node);
   if (candidates.length < 2 || visibleCandidates.length < 2) {
     throw deliveryError("delivery_candidate_inventory_incomplete", "At least two production candidates are required for this delivery gate.");
   }
@@ -171,6 +175,76 @@ export function buildProductionExportRequest(run, node, options = {}) {
     selected_revision_id: authority.revision_id,
     selected_revision_digest: authority.revision_digest,
   };
+}
+
+export function dedicatedDeliveryActionSnapshot(run, node) {
+  const authority = productionDeliveryAuthority(run, node);
+  return {
+    ...authority,
+    checkpoint_digest: safeDigest(run?.checkpoint?.state_digest, "checkpoint_digest"),
+  };
+}
+
+export async function submitDedicatedQualityApproval(runtime, snapshot, node, checklist, options = {}) {
+  return submitDedicatedDeliveryMutation(runtime, snapshot, node, "quality", checklist, options);
+}
+
+export async function submitDedicatedProductionExport(runtime, snapshot, node, options = {}) {
+  return submitDedicatedDeliveryMutation(runtime, snapshot, node, "export", null, options);
+}
+
+async function submitDedicatedDeliveryMutation(runtime, snapshot, node, action, checklist, options) {
+  const runId = optionalIdentifier(snapshot?.run_id);
+  const writer = action === "quality" ? runtime?.recordProductionQualityReview : runtime?.exportProductionRun;
+  if (!runId || !runtime?.getProductionRun || !writer) {
+    return { ok: false, code: "delivery_client_missing", message: "当前无法完成交付操作。" };
+  }
+  let lastAuthoritativeRun = null;
+  try {
+    const before = authoritativeRun(await runtime.getProductionRun(runId));
+    lastAuthoritativeRun = before;
+    assertDedicatedDeliverySnapshot(snapshot, dedicatedDeliveryActionSnapshot(before, node));
+    const request = action === "quality"
+      ? buildQualityApprovalRequest(before, node, { checklist, ...options })
+      : buildProductionExportRequest(before, node, options);
+    const submitted = await writer.call(runtime, runId, request);
+    const after = authoritativeRun(await runtime.getProductionRun(runId));
+    lastAuthoritativeRun = after;
+    const authority = productionDeliveryAuthority(after, node);
+    if (action === "quality" && !approvedReviewForAuthority(after, authority)) {
+      throw deliveryError("delivery_quality_readback_missing", "Quality approval was not present in authoritative readback.");
+    }
+    if (action === "export") {
+      const exported = objectValue(submitted?.export || latestExport(after));
+      if (optionalIdentifier(exported.selected_revision_id) !== authority.revision_id
+        || safeDigest(exported.selected_revision_digest, "export_revision_digest") !== authority.revision_digest) {
+        throw deliveryError("delivery_export_readback_mismatch", "Export readback does not match the exact selected revision.");
+      }
+    }
+    return {
+      ok: true,
+      duplicate: Boolean(submitted?.idempotent_replay),
+      status: action === "quality" ? "approved" : "exported",
+      production_run: after,
+    };
+  } catch (error) {
+    const code = classifyError(error);
+    const stale = Number(error?.status) === 409 || isDedicatedDeliveryStaleCode(code);
+    if (stale && runtime?.getProductionRun && runId) {
+      try {
+        lastAuthoritativeRun = authoritativeRun(await runtime.getProductionRun(runId));
+      } catch {
+        // A full reload remains the only recovery when readback also fails.
+      }
+    }
+    return {
+      ok: false,
+      code,
+      stale,
+      message: stale ? "制作状态已变化，请读取最新版本后再继续。" : publicErrorMessage(error),
+      production_run: lastAuthoritativeRun,
+    };
+  }
 }
 
 export async function handleProductionDeliveryAction(store, runtime, node, actionEl) {
@@ -290,6 +364,7 @@ function deliveryStateFromRun(run, authority, fallbackStatus, overrides = {}) {
 }
 
 function approvedReviewForAuthority(run, authority) {
+  if (String(run?.status || "") === "quality_rejected") return null;
   const reviews = Array.isArray(run?.quality_reviews) ? run.quality_reviews : [];
   return [...reviews].reverse().find((review) => (
     String(review?.decision || "") === "approve"
@@ -311,6 +386,19 @@ function normalizedChecklist(value) {
     shot_coverage_checked: source.shot_coverage_checked === true,
     revision_addressed: source.revision_addressed === true,
   };
+}
+
+function visibleDeliveryCandidates(node) {
+  const standard = candidatePreviewsFromNode(node);
+  if (standard.length >= 2) return standard;
+  const dedicated = Array.isArray(node?.params?.reviewDeliveryCandidates)
+    ? node.params.reviewDeliveryCandidates
+    : [];
+  return dedicated.map((item) => ({
+    candidate_id: optionalIdentifier(item?.candidate_id),
+    canonical_digest: optionalDigest(item?.canonical_digest),
+    parent_job_id: optionalIdentifier(item?.parent_job_id),
+  })).filter((item) => item.candidate_id && item.canonical_digest && item.parent_job_id);
 }
 
 function checklistFromPanel(panel) {
@@ -372,6 +460,35 @@ function classifyError(error) {
   if (Number(error?.status) === 409) return "delivery_stale_checkpoint";
   if (Number(error?.status) === 401 || Number(error?.status) === 403) return "delivery_auth_required";
   return "delivery_failed";
+}
+
+function assertDedicatedDeliverySnapshot(expected, current) {
+  const fields = [
+    "run_id",
+    "candidate_id",
+    "candidate_digest",
+    "revision_id",
+    "revision_digest",
+    "parent_job_id",
+    "checkpoint_version",
+    "checkpoint_digest",
+  ];
+  if (fields.some((field) => String(expected?.[field] ?? "") !== String(current?.[field] ?? ""))) {
+    throw deliveryError("delivery_stale_snapshot", "The visible delivery state no longer matches production authority.");
+  }
+}
+
+function isDedicatedDeliveryStaleCode(code) {
+  return new Set([
+    "delivery_stale_snapshot",
+    "delivery_stale_checkpoint",
+    "delivery_run_stale",
+    "delivery_candidate_stale",
+    "delivery_revision_stale",
+    "delivery_lineage_stale",
+    "delivery_checkpoint_invalid",
+    "delivery_creator_rejected",
+  ]).has(String(code || ""));
 }
 
 function publicErrorMessage(error) {

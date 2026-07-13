@@ -176,6 +176,96 @@ export async function submitCandidateRevision(store, runtime, node, candidateId,
   return submitCreatorDecision(store, runtime, node, candidateId, "revise", revisionIntent, options);
 }
 
+export function dedicatedReviewActionSnapshot(run, candidateId, nodeId = "review-delivery") {
+  const candidate = authoritativeCandidate(run, candidateId);
+  const revision = objectValue(run?.selected_revision);
+  const checkpointVersion = Number(run?.checkpoint?.version || 0);
+  if (!Number.isInteger(checkpointVersion) || checkpointVersion < 1) {
+    throw selectionError("invalid_checkpoint", "Production checkpoint is missing or invalid.");
+  }
+  return {
+    run_id: safeIdentifier(run?.run_id, "run_id"),
+    node_id: safeIdentifier(nodeId, "node_id"),
+    subject_digest: safeDigest(run?.subject_digest, "subject_digest"),
+    checkpoint_version: checkpointVersion,
+    checkpoint_digest: safeDigest(run?.checkpoint?.state_digest, "checkpoint_digest"),
+    candidate_id: safeIdentifier(candidate.candidate_id, "candidate_id"),
+    candidate_digest: safeDigest(candidate.canonical_digest, "canonical_digest"),
+    parent_job_id: safeIdentifier(candidate.parent_job_id, "parent_job_id"),
+    revision_id: optionalIdentifier(revision.revision_id || revision.selected_revision_id),
+    revision_digest: optionalDigest(
+      revision.canonical_digest || revision.revision_digest || revision.selected_revision_digest,
+    ),
+  };
+}
+
+export async function submitDedicatedReviewDecision(runtime, snapshot, decision, revisionIntent, options = {}) {
+  const runId = optionalIdentifier(snapshot?.run_id);
+  if (!runId || !runtime?.getProductionRun || !runtime?.submitCreatorDecision) {
+    return { ok: false, code: "client_contract_missing", message: "当前无法提交主创决定。" };
+  }
+  let lastAuthoritativeRun = null;
+  try {
+    const beforePayload = await runtime.getProductionRun(runId);
+    const before = authoritativeRun(beforePayload);
+    lastAuthoritativeRun = before;
+    const candidate = authoritativeCandidate(before, snapshot?.candidate_id);
+    assertDedicatedSnapshot(snapshot, dedicatedReviewActionSnapshot(before, candidate.candidate_id, snapshot?.node_id));
+    const node = {
+      id: snapshot.node_id,
+      params: {
+        lastKeyframeJobId: candidate.parent_job_id,
+        lastVideoJobId: candidate.parent_job_id,
+      },
+    };
+    const context = buildCreatorDecisionContext(before, node, candidate, decision, revisionIntent, options);
+    const submitted = await runtime.submitCreatorDecision(runId, context.request);
+    const afterPayload = await runtime.getProductionRun(runId);
+    const after = authoritativeRun(afterPayload);
+    lastAuthoritativeRun = after;
+    const recorded = [...(Array.isArray(after.creator_decisions) ? after.creator_decisions : [])]
+      .reverse()
+      .find((item) => optionalIdentifier(item?.decision_id) === context.request.decision_id);
+    if (!recorded || String(recorded.decision || "") !== context.request.decision) {
+      throw selectionError("decision_readback_missing", "Authoritative decision readback is missing.");
+    }
+    if (decision === "reject") {
+      if (String(after.status || "") !== "creator_revision_required") {
+        throw selectionError("decision_readback_mismatch", "Authoritative rejection state is missing.");
+      }
+    } else {
+      const revision = objectValue(after.selected_revision);
+      if (optionalIdentifier(revision.candidate_id) !== context.request.candidate_id
+        || optionalIdentifier(revision.creator_decision_id) !== context.request.decision_id) {
+        throw selectionError("decision_readback_mismatch", "Authoritative revision does not match this decision.");
+      }
+    }
+    return {
+      ok: true,
+      duplicate: Boolean(submitted?.idempotent_replay || submitted?.duplicate),
+      decision,
+      production_run: after,
+    };
+  } catch (error) {
+    const code = classifyError(error);
+    const stale = isStaleSelectionCode(code) || Number(error?.status) === 409;
+    if (stale && runtime?.getProductionRun && runId) {
+      try {
+        lastAuthoritativeRun = authoritativeRun(await runtime.getProductionRun(runId));
+      } catch {
+        // The caller still fails closed and can retry a full authoritative reload.
+      }
+    }
+    return {
+      ok: false,
+      code,
+      stale,
+      message: stale ? "制作状态已变化，请读取最新版本后再继续。" : publicErrorMessage(error),
+      production_run: lastAuthoritativeRun,
+    };
+  }
+}
+
 export async function handleCandidateCreatorAction(store, runtime, node, actionEl) {
   const action = String(actionEl?.dataset?.action || "");
   const candidateId = String(actionEl?.dataset?.candidateId || "");
@@ -500,6 +590,34 @@ function authoritativeRun(payload) {
   return run;
 }
 
+function authoritativeCandidate(run, candidateId) {
+  const expectedId = safeIdentifier(candidateId, "candidate_id");
+  const candidate = (Array.isArray(run?.candidates) ? run.candidates : [])
+    .find((item) => optionalIdentifier(item?.candidate_id) === expectedId);
+  if (!candidate) throw selectionError("candidate_not_in_run", "Candidate is not present in the authoritative production run.");
+  safeDigest(candidate.canonical_digest, "canonical_digest");
+  safeIdentifier(candidate.parent_job_id, "parent_job_id");
+  return candidate;
+}
+
+function assertDedicatedSnapshot(expected, current) {
+  const fields = [
+    "run_id",
+    "node_id",
+    "subject_digest",
+    "checkpoint_version",
+    "checkpoint_digest",
+    "candidate_id",
+    "candidate_digest",
+    "parent_job_id",
+    "revision_id",
+    "revision_digest",
+  ];
+  if (fields.some((field) => String(expected?.[field] ?? "") !== String(current?.[field] ?? ""))) {
+    throw selectionError("stale_review_snapshot", "The visible review state no longer matches production authority.");
+  }
+}
+
 function selectedIdentity(run) {
   const revision = objectValue(run?.selected_revision);
   const decisions = Array.isArray(run?.creator_decisions) ? run.creator_decisions : [];
@@ -655,6 +773,20 @@ function classifyError(error) {
   if (Number(error?.status) === 409) return "stale_checkpoint";
   if ([401, 403].includes(Number(error?.status))) return "auth_required";
   return "retry_required";
+}
+
+function isStaleSelectionCode(code) {
+  return new Set([
+    "stale_review_snapshot",
+    "stale_checkpoint",
+    "stale_production_checkpoint",
+    "candidate_digest_mismatch",
+    "candidate_authority_mismatch",
+    "candidate_not_in_run",
+    "lineage_mismatch",
+    "invalid_checkpoint",
+    "binding_integrity_mismatch",
+  ]).has(String(code || ""));
 }
 
 function publicErrorMessage(error) {

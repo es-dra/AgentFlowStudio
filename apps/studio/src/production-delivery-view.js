@@ -9,6 +9,23 @@ const CHECKS = [
   ["revision_addressed", "本轮修订已核对"],
 ];
 
+export function productionDeliveryUnavailableChecks() {
+  return [
+    {
+      key: "audio",
+      label: "音频检查",
+      status: "不可用",
+      message: "当前权威审核记录没有专项音频检查结果。",
+    },
+    {
+      key: "subtitle",
+      label: "字幕检查",
+      status: "不可用",
+      message: "当前权威审核记录没有专项字幕检查结果。",
+    },
+  ];
+}
+
 export function productionDeliveryView(node, candidates) {
   if (!Array.isArray(candidates) || candidates.length < 2) return null;
   const selection = selectionSummary(node);
