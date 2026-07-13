@@ -183,6 +183,7 @@ class DeterministicProductionSlice:
         self._write_state()
 
     def export(self) -> dict[str, Path]:
+        self._validate_export_checkpoint()
         if self._stage_index() < STAGES.index("quality_gate"):
             raise ValueError("quality review is required before export")
         review = QualityReview.model_validate(self.state["artifacts"]["quality_review"])
@@ -288,8 +289,9 @@ class DeterministicProductionSlice:
             if state.get("project_fingerprint") != fingerprint:
                 raise ValueError("existing checkpoint belongs to a different project input")
             state["recovery_count"] += 1
-            _write_json(self.state_path, state)
-            return state
+            self.state = state
+            self._write_state()
+            return self.state
         state = {
             "schema_version": SCHEMA_VERSION,
             "checkpoint_model_version": CHECKPOINT_MODEL_VERSION,
@@ -437,6 +439,13 @@ class DeterministicProductionSlice:
         )
         if integrity.get("chain_digest") != actual_chain_digest:
             raise ValueError("checkpoint chain integrity validation failed")
+
+    def _validate_export_checkpoint(self) -> None:
+        self._validate_checkpoint(self.state)
+        persisted_state = _read_json(self.state_path)
+        self._validate_checkpoint(persisted_state)
+        if persisted_state != self.state:
+            raise ValueError("persisted checkpoint does not match current production state")
 
     def _review_subject_digest(self) -> str:
         return _digest(

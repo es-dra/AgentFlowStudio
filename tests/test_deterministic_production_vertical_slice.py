@@ -128,6 +128,23 @@ def test_checkpoint_recovery_resumes_without_rebuilding_completed_stages(tmp_pat
     assert recovered.state["stage"] == "candidates"
 
 
+def test_checkpoint_can_reopen_repeatedly_without_an_intervening_advance(tmp_path: Path) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    first = DeterministicProductionSlice(project, tmp_path)
+    first.advance_to_candidates(fail_after_stage=None)
+    initial_sequence = first.state["checkpoint_integrity"]["sequence"]
+
+    recovered_once = DeterministicProductionSlice(project, tmp_path)
+    first_recovery_digest = recovered_once.state["checkpoint_integrity"]["chain_digest"]
+    recovered_twice = DeterministicProductionSlice(project, tmp_path)
+
+    assert recovered_once.state["recovery_count"] == 1
+    assert recovered_once.state["checkpoint_integrity"]["sequence"] == initial_sequence + 1
+    assert recovered_twice.state["recovery_count"] == 2
+    assert recovered_twice.state["checkpoint_integrity"]["sequence"] == initial_sequence + 2
+    assert recovered_twice.state["checkpoint_integrity"]["previous_chain_digest"] == first_recovery_digest
+
+
 def test_completed_run_is_replayable_without_duplicate_lineage(tmp_path: Path) -> None:
     first = DeterministicProductionSlice.from_files(
         EXAMPLE_DIR / "project.example.json",
@@ -215,3 +232,42 @@ def test_tampered_checkpoint_contents_fail_integrity_validation(tmp_path: Path, 
 
     with pytest.raises(ValueError, match="checkpoint state integrity validation failed"):
         DeterministicProductionSlice(project, tmp_path)
+
+
+@pytest.mark.parametrize("tamper_kind", ["state", "artifacts", "lineage"])
+def test_persisted_checkpoint_mutation_after_quality_gate_blocks_export(tmp_path: Path, tamper_kind: str) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
+    run.record_creator_decision(_load_model("creator_decision.example.json", CreatorDecision))
+    run.record_quality_review(_load_model("quality_review.example.json", QualityReview))
+    checkpoint_path = tmp_path / "production_state.json"
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    if tamper_kind == "state":
+        checkpoint["stage"] = "exported"
+    elif tamper_kind == "artifacts":
+        checkpoint["artifacts"]["selected_revisions"][0]["revision_note"] = "post-gate mutation"
+    else:
+        checkpoint["lineage"].pop()
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint state integrity validation failed"):
+        run.export()
+
+
+@pytest.mark.parametrize("tamper_kind", ["state", "artifacts", "lineage"])
+def test_in_memory_mutation_after_quality_gate_blocks_export(tmp_path: Path, tamper_kind: str) -> None:
+    project = _load_model("project.example.json", ProjectIP)
+    run = DeterministicProductionSlice(project, tmp_path)
+    run.advance_to_candidates()
+    run.record_creator_decision(_load_model("creator_decision.example.json", CreatorDecision))
+    run.record_quality_review(_load_model("quality_review.example.json", QualityReview))
+    if tamper_kind == "state":
+        run.state["stage"] = "exported"
+    elif tamper_kind == "artifacts":
+        run.state["artifacts"]["selected_revisions"][0]["revision_note"] = "post-gate mutation"
+    else:
+        run.state["lineage"].pop()
+
+    with pytest.raises(ValueError, match="checkpoint state integrity validation failed"):
+        run.export()
