@@ -49,6 +49,11 @@ ALLOWED_LATIN_UNIT_TOKENS = {
     "iso",
 }
 
+ALLOWED_NUMERIC_UNIT_KEY_RE = re.compile(
+    r"^\d+(?:_\d+)?(?:ms|s|fps|khz|hz|db|px|dpi|p|k|kb|mb|gb|tb|mm|cm|m|kg)$"
+)
+ALLOWED_RESOLUTION_KEY_RE = re.compile(r"^\d{2,5}x\d{2,5}$")
+
 ENGLISH_PHRASE_CONNECTOR_TOKENS = {
     "a",
     "an",
@@ -159,11 +164,11 @@ def _is_allowed_latin_fragment(key: str, *, source_allowed: set[str], field_allo
         part in source_allowed
         or part in field_allowed
         or part in ALLOWED_LATIN_UNIT_TOKENS
-        or _is_model_like_latin_key(part)
+        or _is_allowed_numeric_format_key(part)
         for part in parts
     ):
         return True
-    return _is_model_like_latin_key(key)
+    return _is_allowed_numeric_format_key(key)
 
 
 def _possessive_base_key(key: str) -> str:
@@ -172,8 +177,8 @@ def _possessive_base_key(key: str) -> str:
     return ""
 
 
-def _is_model_like_latin_key(key: str) -> bool:
-    return bool(re.search(r"[a-z]", key)) and bool(re.search(r"\d", key))
+def _is_allowed_numeric_format_key(key: str) -> bool:
+    return bool(ALLOWED_NUMERIC_UNIT_KEY_RE.fullmatch(key) or ALLOWED_RESOLUTION_KEY_RE.fullmatch(key))
 
 
 def _source_latin_token_keys(source_script_text: str) -> set[str]:

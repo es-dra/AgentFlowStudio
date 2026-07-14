@@ -171,6 +171,74 @@ def test_storyboard_provider_parser_rejects_untranslated_display_english() -> No
         )
 
 
+@pytest.mark.parametrize(
+    "field",
+    ("description", "shot_size", "light_atmosphere", "camera_motion", "dialogue", "sound"),
+)
+@pytest.mark.parametrize("leak", ("EnglishLeak9", "cinematic9"))
+def test_storyboard_provider_parser_rejects_arbitrary_alphanumeric_english_in_display_fields(
+    field: str,
+    leak: str,
+) -> None:
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_01",
+                "index": 1,
+                "duration": "5s",
+                "description": "@阿团 @厨房。阿团走进厨房。",
+                "shot_size": "中景",
+                "light_atmosphere": "暖色主光",
+                "camera_motion": "固定机位",
+                "dialogue": "无明确对白",
+                "sound": "环境底噪",
+                "source_span": {"text": "阿团走进厨房。"},
+                "asset_refs": [
+                    {"label": "阿团", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                    {"label": "厨房", "asset_type": "scene", "status": "mentioned", "source": "explicit"},
+                ],
+            }
+        ]
+    }
+    payload["shots"][0][field] = f"中文内容 {leak}"
+
+    with pytest.raises(ValueError, match=rf"untranslated English in {field}"):
+        shots_from_provider_text(
+            json.dumps(payload, ensure_ascii=False),
+            source_script_text="阿团走进厨房。",
+        )
+
+
+def test_storyboard_provider_parser_preserves_allowed_numeric_units_and_formats() -> None:
+    description = "@阿团。输出5s、720p、1080p、4K、16:9与1920x1080预览。"
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_01",
+                "index": 1,
+                "duration": "5s",
+                "description": description,
+                "shot_size": "中景",
+                "light_atmosphere": "暖色主光",
+                "camera_motion": "固定机位",
+                "dialogue": "无明确对白",
+                "sound": "环境底噪",
+                "source_span": {"text": "阿团查看预览。"},
+                "asset_refs": [
+                    {"label": "阿团", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                ],
+            }
+        ]
+    }
+
+    shots = shots_from_provider_text(
+        json.dumps(payload, ensure_ascii=False),
+        source_script_text="阿团查看预览。",
+    )
+
+    assert shots[0]["description"] == description
+
+
 def test_storyboard_provider_parser_preserves_source_script_english() -> None:
     source_script = "Bob把AI camera放在厨房桌面上，随后说AI camera ready。"
     payload = {
