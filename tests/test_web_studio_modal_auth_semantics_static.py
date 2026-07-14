@@ -46,6 +46,15 @@ def test_auth_status_failure_blocks_bootstrap_until_retry_confirms_status() -> N
     assert main.index(blocked_guard) < main.index("await projectController.ensureAccessibleStartupProject()")
 
 
+def test_product_shell_does_not_render_sign_out_for_anonymous_local_runtime() -> None:
+    product_shell = _read("src/product-shell.js")
+
+    assert "if (snapshot.authUser) {" in product_shell
+    assert "actions.appendChild(language);" in product_shell
+    assert "actions.appendChild(account);" in product_shell
+    assert "actions.append(language, account);" not in product_shell
+
+
 def test_accepted_plan_copy_keeps_non_claim_boundaries_explicit() -> None:
     panel = _read("src/panels/accepted-generation-plan-panel.js")
 

@@ -82,11 +82,14 @@ export function createProductShell(options = {}) {
       locale = setLocale(locale === "zh-CN" ? "en" : "zh-CN");
       render();
     });
-    const account = node("button", "product-account-button", userLabel(snapshot.authUser));
-    account.type = "button";
-    account.setAttribute("aria-label", message("signOut", locale));
-    account.addEventListener("click", () => options.onSignOut?.());
-    actions.append(language, account);
+    actions.appendChild(language);
+    if (snapshot.authUser) {
+      const account = node("button", "product-account-button", userLabel(snapshot.authUser));
+      account.type = "button";
+      account.setAttribute("aria-label", message("signOut", locale));
+      account.addEventListener("click", () => options.onSignOut?.());
+      actions.appendChild(account);
+    }
     header.append(identity, actions);
     return header;
   }
