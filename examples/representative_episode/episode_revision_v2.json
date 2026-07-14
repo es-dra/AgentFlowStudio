@@ -1,0 +1,36 @@
+{
+  "schema_version": "afs.representative_episode_revision.v0.1",
+  "project_id": "afs-rainlight-project",
+  "episode_id": "ep-rainlight-001",
+  "from_episode_version_id": "ep-rainlight-001-v1",
+  "approved_episode_version_id": "ep-rainlight-001-v2",
+  "from_package_sha256": "0af7d008c39074765e60057f5d80f92f59ce45999ef3e216fd8562a963b9a2a2",
+  "creator_decision_ref": "creator-decision-episode-v2",
+  "creator_rationale": "主创确认共同守护的选择必须在塔心画面中清晰落地，并传播到全部下游制作责任。",
+  "changed_shot": {
+    "shot_id": "shot-011",
+    "from_version_id": "shot-011-v1",
+    "approved_version_id": "shot-011-v2",
+    "field": "visual_action",
+    "from_value": "主创选择记忆校验，小祈将新版本指令传给塔心。",
+    "approved_value": "主创确认共同守护，小祈将第 2 版指令传入塔心，暖金灯纹沿画卷扩散。"
+  },
+  "preservation_contract": {
+    "shot_count": 15,
+    "unchanged_shot_count": 14,
+    "preserve_for_unchanged_shots": [
+      "identity",
+      "approved_version",
+      "timing",
+      "scene_and_character_refs",
+      "required_asset_refs",
+      "dialogue",
+      "camera",
+      "motion",
+      "continuity",
+      "quality_target"
+    ]
+  },
+  "media_status": "media_assets_pending",
+  "provider_dispatch_count": 0
+}

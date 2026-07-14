@@ -813,7 +813,7 @@ const digest = (char) => char.repeat(64);
 const timeline = Array.from({ length: 15 }, (_, index) => ({
   shot_number: index + 1,
   label: `第 ${String(index + 1).padStart(2, "0")} 镜`,
-  version_id: `shot-${String(index + 1).padStart(3, "0")}-v1`,
+  version_id: `shot-${String(index + 1).padStart(3, "0")}-${index === 10 ? "v2" : "v1"}`,
   start_seconds: index * 9,
   end_seconds: (index + 1) * 9,
   scene: index < 5 ? "雨巷" : index < 10 ? "档案塔" : "黎明屋顶",
@@ -828,16 +828,27 @@ const timeline = Array.from({ length: 15 }, (_, index) => ({
 }));
 const canonicalState = {
   status_label: "15/15", episode_title: "《雨灯失窃案》第一集：最后一盏引魂灯",
-  episode_version_id: "ep-rainlight-001-v1", package_sha256: digest("a"), canon_digest: digest("b"),
-  checkpoint_version: 3, duration_seconds: 135, characters: 3, scenes: 3, shots: 15, audio_items: 4,
+  episode_version_id: "ep-rainlight-001-v2", package_sha256: digest("a"), canon_digest: digest("b"),
+  checkpoint_version: 4, duration_seconds: 135, characters: 3, scenes: 3, shots: 15, audio_items: 4,
   character_versions: ["林遥", "小七", "余馆长"].map((name, index) => ({ name, version_id: `character-${index + 1}-v1`, continuity: ["造型连续"] })),
   scene_versions: ["雨巷", "档案塔", "黎明屋顶"].map((name, index) => ({ name, version_id: `scene-${index + 1}-v1`, continuity: ["空间与光线连续"] })),
   timeline,
   audio: { covered_shot_count: 15, total_shot_count: 15, pending_asset_count: 4, all_audio_ready: false, status: "音频待制作" },
   pending_media_count: 25, all_assets_ready: false, propagation_complete: false, readiness: "制作素材待补齐",
 };
-const run = { checkpoint: { version: 3 }, candidates: [], creator_decisions: [], quality_reviews: [], exports: [] };
-const project = { name: "雨灯制作项目", episode: "第 01 集", current_stage: "分镜", canonical_state: canonicalState };
+const run = { checkpoint: { version: 4 }, candidates: [], creator_decisions: [], quality_reviews: [], exports: [] };
+const project = {
+  name: "雨灯制作项目", episode: "第 01 集", current_stage: "分镜", canonical_state: canonicalState,
+  crew: { episode_execution: {
+    role_count: 9, approved_version: "第 2 版", pending_reconfirmation_count: 0,
+    reconfirmed_count: 8, propagation_complete: true,
+    responsibilities: ["编剧组", "分镜组", "美术组", "导演组", "连贯性检查", "质量审核", "音频组", "后期组", "交付组"].map((role, index) => ({
+      role, responsibility: `${role}的本集制作责任`, state: index ? "待开始" : "进行中",
+      approved_version: "第 2 版", propagation_state: index ? "已按批准版本重确认" : "主创决定后已恢复",
+      reconfirmed: index > 0, pending_reconfirmation: false,
+    })),
+  }},
+};
 const state = composeReviewDeliveryState({
   workspace: { projects: [{ project_id: "afs-rainlight-project", name: "雨灯制作项目" }] },
   project,
@@ -847,6 +858,22 @@ const state = composeReviewDeliveryState({
 state.authUser = { user_id: "creator-001", display_name: "主创" };
 const root = makeElement("div");
 renderReviewDeliveryWorkspace(root, state, {});
+const pendingProject = JSON.parse(JSON.stringify(project));
+pendingProject.crew.episode_execution.propagation_complete = false;
+pendingProject.crew.episode_execution.pending_reconfirmation_count = 8;
+pendingProject.crew.episode_execution.reconfirmed_count = 0;
+pendingProject.crew.episode_execution.responsibilities = pendingProject.crew.episode_execution.responsibilities.map((item, index) => ({
+  ...item,
+  propagation_state: index ? "等待责任人重确认" : "主创决定后已恢复",
+  reconfirmed: false,
+  pending_reconfirmation: index > 0,
+}));
+const pendingState = composeReviewDeliveryState({
+  workspace: { projects: [{ project_id: "afs-rainlight-project", name: "雨灯制作项目" }] },
+  project: pendingProject, runsPayload: { production_runs: [run] }, projectId: "afs-rainlight-project",
+});
+const pendingRoot = makeElement("div");
+renderReviewDeliveryWorkspace(pendingRoot, pendingState, {});
 
 const lifecycle = createReviewDeliveryState();
 lifecycle.setIdentity({ user_id: "creator-001" });
@@ -856,15 +883,18 @@ lifecycle.clearIdentity();
 const latePublished = lifecycle.finishAction(staleToken, { episodeCanon: state.episodeCanon });
 
 const mismatched = composeReviewDeliveryState({
-  workspace: {}, project, runsPayload: { production_runs: [{ ...run, checkpoint: { version: 4 } }] },
+  workspace: {}, project, runsPayload: { production_runs: [{ ...run, checkpoint: { version: 5 } }] },
   projectId: "afs-rainlight-project",
 });
 process.stdout.write(JSON.stringify({
   text: root.innerText,
   shotCards: countClass(root, "episode-shot-card"),
+  crewCards: countClass(root, "crew-responsibility"),
+  pendingCrewCards: countClass(pendingRoot, "pending"),
+  pendingCrewText: pendingRoot.innerText,
   canonReady: state.episodeCanon?.shots?.length === 15,
   rawDigestVisible: root.innerText.includes(digest("a")) || root.innerText.includes(digest("b")),
-  rawIdVisible: root.innerText.includes("shot-001") || root.innerText.includes("ep-rainlight-001-v1"),
+  rawIdVisible: root.innerText.includes("shot-001") || root.innerText.includes("ep-rainlight-001-v1") || root.innerText.includes("ep-rainlight-001-v2"),
   clearedCanon: lifecycle.get().episodeCanon,
   clearedProject: lifecycle.get().projectId,
   latePublished,
@@ -875,12 +905,20 @@ process.stdout.write(JSON.stringify({
 
     assert payload["canonReady"] is True
     assert payload["shotCards"] == 15
+    assert payload["crewCards"] == 9
+    assert payload["pendingCrewCards"] >= 8
     assert "15/15 镜已绑定" in payload["text"]
     assert "第 01 镜" in payload["text"] and "第 15 镜" in payload["text"]
     assert "00:00–00:09" in payload["text"] and "02:06–02:15" in payload["text"]
     assert "保持角色服装、雨势与灯光连续" in payload["text"]
     assert "素材待补齐" in payload["text"]
     assert "音频待制作" in payload["text"]
+    assert "本集数字剧组" in payload["text"]
+    assert "版本传播已完成" in payload["text"]
+    assert "交付组的本集制作责任" in payload["text"]
+    assert "已按批准版本重确认" in payload["text"]
+    assert "等待下游确认" in payload["pendingCrewText"]
+    assert "等待责任人重确认" in payload["pendingCrewText"]
     assert payload["rawDigestVisible"] is False
     assert payload["rawIdVisible"] is False
     assert payload["clearedCanon"] is None
@@ -896,9 +934,12 @@ def test_review_delivery_canon_mobile_contract_has_single_column_and_no_raw_diag
     assert "本集制作规范" in source
     assert "15/15 镜已绑定" in source
     assert "镜头顺序、版本、连续性与音频覆盖均来自当前项目的服务器制作记录" in source
+    assert "本集数字剧组" in source
+    assert "九个制作岗位的当前责任、批准版本与下游确认均来自项目服务器记录" in source
     assert "package_sha256" not in source
     assert "canon_digest" not in source
     assert ".episode-shot-timeline" in styles
+    assert ".crew-responsibility-list" in styles
     assert "grid-template-columns: minmax(0, 1fr)" in styles
     assert "overflow-wrap: anywhere" in styles
 
@@ -909,9 +950,14 @@ def test_provider_free_authenticated_browser_fixture_restores_candidate_authorit
     assert seed["candidate_count"] == 2
     assert seed["selected_candidate_id"] == "candidate_002"
     assert str(seed["selected_revision_id"]).startswith("revision-")
-    assert seed["episode_version_id"] == "ep-rainlight-001-v1"
+    assert seed["episode_version_id"] == "ep-rainlight-001-v2"
     assert seed["canon_shot_count"] == 15
-    assert seed["canon_checkpoint_version"] == 2
+    assert seed["canon_checkpoint_version"] == 4
+    assert seed["crew_execution"]["status"] == "episode_v2_bound"
+    assert seed["crew_execution"]["role_count"] == 9
+    assert seed["crew_execution"]["accepted_handoff_count"] == 8
+    assert seed["crew_execution"]["reconfirmed_count"] == 8
+    assert seed["crew_execution"]["propagation_complete"] is True
     assert seed["provider_calls_started"] is False
     assert seed["evidence_boundary"] == "provider-free deterministic UI/runtime verification only"
     assert seed["browser_preflight"] == {
@@ -919,6 +965,7 @@ def test_provider_free_authenticated_browser_fixture_restores_candidate_authorit
         "missing_candidate_authority_fields": [],
         "persisted_candidate_count": 2,
         "authoritative_canon_ready": True,
+        "episode_crew_ready": True,
         "stop_reason": "",
     }
 
@@ -945,6 +992,8 @@ def test_provider_free_authenticated_browser_fixture_restores_candidate_authorit
     assert len(canon["shots"]) == 15
     assert canon["shots"][0]["start_seconds"] == 0
     assert canon["shots"][-1]["end_seconds"] == 135
+    assert canon["episode_version_id"] == "ep-rainlight-001-v2"
+    assert canon["shots"][10]["current_approved_version_id"] == "shot-011-v2"
     candidates = state.json()["state"]["nodes"][seed["node_id"]]["params"]["candidatePreviewUrls"]
     assert len(candidates) == 2
     assert all(item["preview_url"].endswith("/preview") for item in candidates)

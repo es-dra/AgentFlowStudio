@@ -20,6 +20,7 @@ ROLE_LABELS = {
     "edit": "后期组",
     "export": "交付组",
 }
+ROLE_ORDER = tuple(ROLE_LABELS)
 
 STAGES = (
     ("brief", "创作简报"),
@@ -217,6 +218,31 @@ def _crew_summary(crew: dict[str, Any]) -> dict[str, Any]:
     blocked = [item for item in tasks if str(item.get("status") or "") in blocked_states]
     active = [item for item in tasks if str(item.get("status") or "") in {"ready", "claimed", "reconfirmation_required"}]
     role_by_agent = {str(item.get("agent_id") or ""): str(item.get("role") or "") for item in agents}
+    agent_by_role = {
+        str(item.get("role") or ""): item
+        for item in agents
+        if str(item.get("role") or "") in ROLE_LABELS
+    }
+    arbitrations = [item for item in crew.get("arbitrations") or [] if isinstance(item, dict)]
+    latest_arbitration = arbitrations[-1] if arbitrations else {}
+    latest_conflict_id = str(latest_arbitration.get("conflict_id") or "")
+    approved_version_id = str(latest_arbitration.get("selected_version_id") or "")
+    task_by_role: dict[str, dict[str, Any]] = {}
+    for task in tasks:
+        role = role_by_agent.get(str(task.get("assigned_agent_id") or ""), "")
+        agent = agent_by_role.get(role)
+        if not agent or task.get("assigned_agent_id") != agent.get("agent_id"):
+            continue
+        task_by_role[role] = task
+    reconfirmation_by_role = {
+        str(item.get("responsible_agent_role") or ""): item
+        for item in crew.get("propagation_reconfirmations") or []
+        if isinstance(item, dict)
+        and latest_conflict_id
+        and item.get("arbitration_conflict_id") == latest_conflict_id
+        and str(item.get("responsible_agent_role") or "") in ROLE_LABELS
+        and item.get("responsible_agent_id") == agent_by_role.get(str(item.get("responsible_agent_role") or ""), {}).get("agent_id")
+    }
     activities = []
     for task in active[:6]:
         role = role_by_agent.get(str(task.get("assigned_agent_id") or ""), "")
@@ -225,12 +251,56 @@ def _crew_summary(crew: dict[str, Any]) -> dict[str, Any]:
             "responsibility": _safe_text(task.get("objective"), 140) or "等待下一步制作任务",
             "state": _localized_task_status(str(task.get("status") or "")),
         })
+    responsibilities = []
+    for role in ROLE_ORDER:
+        task = task_by_role.get(role)
+        if not task:
+            continue
+        reconfirmation = reconfirmation_by_role.get(role)
+        reconfirmed = bool(reconfirmation and reconfirmation.get("reconfirmation_status") == "reconfirmed")
+        pending = bool(reconfirmation and reconfirmation.get("reconfirmation_status") == "required_pending")
+        if reconfirmed:
+            propagation_state = "已按批准版本重确认"
+        elif pending:
+            propagation_state = "等待责任人重确认"
+        elif role == "screenwriter" and str(task.get("version_id") or ""):
+            propagation_state = "主创决定后已恢复"
+        else:
+            propagation_state = "等待版本传播"
+        responsibilities.append({
+            "role": ROLE_LABELS[role],
+            "responsibility": _safe_text(task.get("objective"), 140) or "等待下一步制作任务",
+            "state": _localized_task_status(str(task.get("status") or "")),
+            "approved_version": _localized_version(task.get("version_id")),
+            "propagation_state": propagation_state,
+            "reconfirmed": reconfirmed,
+            "pending_reconfirmation": pending,
+        })
+    pending_reconfirmations = sum(item["pending_reconfirmation"] for item in responsibilities)
+    reconfirmed_responsibilities = sum(item["reconfirmed"] for item in responsibilities)
+    authoritative_version_complete = bool(
+        approved_version_id
+        and len(responsibilities) == 9
+        and all(task_by_role[role].get("version_id") == approved_version_id for role in ROLE_ORDER)
+    )
     return {
         "registered_role_count": len({item.get("role") for item in agents if item.get("role")}),
         "active_count": len(active),
         "blocked_count": len(blocked),
         "pending_handoff_count": sum(item.get("status") == "pending_receiver" for item in handoffs),
         "activities": activities,
+        "episode_execution": {
+            "role_count": len(responsibilities),
+            "approved_version": _localized_version(approved_version_id),
+            "pending_reconfirmation_count": pending_reconfirmations,
+            "reconfirmed_count": reconfirmed_responsibilities,
+            "propagation_complete": (
+                latest_arbitration.get("propagation_complete") is True
+                and authoritative_version_complete
+                and reconfirmed_responsibilities == 8
+            ),
+            "responsibilities": responsibilities,
+        },
     }
 
 
@@ -500,6 +570,14 @@ def _localized_task_status(status: str) -> str:
         "revision_required": "待修改",
         "reconfirmation_required": "待重新确认",
     }.get(status, "待处理")
+
+
+def _localized_version(value: Any) -> str:
+    text = _safe_text(value, 160)
+    marker = text.rsplit("-v", 1)
+    if len(marker) == 2 and marker[1].isdigit():
+        return f"第 {int(marker[1])} 版"
+    return "当前批准版本"
 
 
 def _safe_text(value: Any, limit: int) -> str:
