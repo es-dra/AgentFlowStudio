@@ -981,10 +981,10 @@ const urlApi = {
   revokeObjectURL(value) { revoked.push(value); },
 };
 const dependencies = {
-  authToken: () => "session-token",
-  serviceBaseUrl: () => "http://127.0.0.1:8876",
-  mediaUrl: (value) => `http://127.0.0.1:8876${value}`,
-  saveAuthToken: (value) => tokens.push(value),
+  readToken: () => "session-token",
+  baseUrl: () => "http://127.0.0.1:8876",
+  resolveUrl: (value) => `http://127.0.0.1:8876${value}`,
+  clearToken: (value) => tokens.push(value),
   URL: urlApi,
   eventTarget: { dispatchEvent: (event) => events.push({ type: event.type, detail: event.detail }) },
 };
@@ -1017,7 +1017,7 @@ let unsafeFetches = 0;
 const unsafePreview = { dataset: {} };
 await hydrateCanonicalDeliveryPreview(unsafePreview, "https://provider.invalid/signed", {
   ...dependencies,
-  mediaUrl: (value) => value,
+  resolveUrl: (value) => value,
   fetch: async () => { unsafeFetches += 1; throw new Error("must not fetch"); },
 });
 

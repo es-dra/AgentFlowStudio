@@ -1,8 +1,6 @@
 import { productionDeliveryUnavailableChecks } from "./production-delivery-view.js";
 import { selectedDeliverySubmission } from "./review-delivery-state.js";
 
-const sessionClientPromise = import("./run\u0074ime-client.js");
-
 const canonicalPreviewObjectUrls = new Set();
 const canonicalPreviewRequests = new Set();
 
@@ -91,7 +89,7 @@ function buildWorkspace(state, handlers) {
   main.tabIndex = -1;
   main.append(buildPageHeading(state, handlers));
   if (state.stale || state.writeError || state.notice) main.append(buildNotice(state, handlers));
-  main.append(buildEpisodeCanon(state));
+  main.append(buildEpisodeCanon(state, handlers));
   main.append(buildEpisodeCrew(state));
 
   const layout = el("div", "review-layout");
@@ -158,7 +156,7 @@ function buildEpisodeCrew(state) {
   return section;
 }
 
-function buildEpisodeCanon(state) {
+function buildEpisodeCanon(state, handlers) {
   const canon = state.episodeCanon;
   const section = el("section", "episode-canon-board");
   section.setAttribute("aria-labelledby", "episode-canon-heading");
@@ -191,7 +189,7 @@ function buildEpisodeCanon(state) {
     canonMetric("下游确认", canon.propagation_complete ? "已完成" : "待制作团队确认", canon.propagation_complete),
   );
   section.appendChild(metrics);
-  section.appendChild(buildCanonicalMediaBoard(canon.media_delivery));
+  section.appendChild(buildCanonicalMediaBoard(canon.media_delivery, handlers.canonicalPreviewSession));
 
   const canonDetails = el("div", "canon-identity-grid");
   canonDetails.append(
@@ -207,7 +205,7 @@ function buildEpisodeCanon(state) {
   return section;
 }
 
-function buildCanonicalMediaBoard(media) {
+function buildCanonicalMediaBoard(media, previewSession) {
   const board = el("section", "canonical-media-board");
   board.setAttribute("aria-labelledby", "canonical-media-heading");
   const head = el("header", "canonical-media-head");
@@ -249,26 +247,25 @@ function buildCanonicalMediaBoard(media) {
     preview.setAttribute("aria-label", "本集 135 秒技术交付预览");
     preview.dataset.previewState = "loading";
     board.appendChild(preview);
-    void hydrateCanonicalDeliveryPreview(preview, media.delivery_preview_url);
+    void hydrateCanonicalDeliveryPreview(preview, media.delivery_preview_url, previewSession);
   }
   board.appendChild(el("p", "media-evidence-note", "当前仅证明媒体接纳、结构连续性与技术组装机制；代表性内容质量、人工验收和商业验证尚未开始。"));
   return board;
 }
 
-export async function hydrateCanonicalDeliveryPreview(preview, route, dependencies = {}) {
-  const sessionClient = dependencies.sessionClient || await sessionClientPromise;
-  const readToken = dependencies.authToken || sessionClient.authToken;
-  const resolveMediaUrl = dependencies.mediaUrl || sessionClient["run" + "timeMediaUrl"];
-  const readServiceBaseUrl = dependencies.serviceBaseUrl || sessionClient["run" + "timeBaseUrl"];
-  const persistToken = dependencies.saveAuthToken || sessionClient.saveAuthToken;
-  const fetchImpl = dependencies.fetch || globalThis.fetch;
-  const urlApi = dependencies.URL || globalThis.URL;
-  const eventTarget = dependencies.eventTarget || globalThis.window;
-  const abortController = dependencies.abortController || new AbortController();
+export async function hydrateCanonicalDeliveryPreview(preview, route, session = {}) {
+  const readToken = session.readToken;
+  const resolveUrl = session.resolveUrl;
+  const readBaseUrl = session.baseUrl;
+  const clearToken = session.clearToken;
+  const fetchImpl = session.fetch || globalThis.fetch;
+  const urlApi = session.URL || globalThis.URL;
+  const eventTarget = session.eventTarget || globalThis.window;
+  const abortController = session.abortController || new AbortController();
   const raw = String(route || "").trim();
-  const resolved = resolveMediaUrl(raw);
-  const token = readToken();
-  if (!preview || !token || !safeCanonicalDeliveryRoute(raw, resolved, readServiceBaseUrl())) {
+  const resolved = resolveUrl?.(raw) || "";
+  const token = readToken?.() || "";
+  if (!preview || !token || !safeCanonicalDeliveryRoute(raw, resolved, readBaseUrl?.() || "")) {
     if (preview) preview.dataset.previewState = "unavailable";
     return "";
   }
@@ -280,7 +277,7 @@ export async function hydrateCanonicalDeliveryPreview(preview, route, dependenci
       signal: abortController.signal,
     });
     if (response.status === 401) {
-      persistToken("");
+      clearToken?.("");
       preview.dataset.previewState = "session_expired";
       try {
         eventTarget?.dispatchEvent(new CustomEvent("afs:auth-session-expired", {
