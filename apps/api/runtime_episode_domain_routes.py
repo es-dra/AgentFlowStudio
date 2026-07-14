@@ -10,7 +10,14 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from apps.api.runtime_auth import RuntimeAuthStore
-from apps.api.runtime_episode_domain_contract import SAFE_ID, ProductionProjectAggregate, TenantScope
+from apps.api.runtime_episode_domain_contract import (
+    SAFE_ID,
+    AssetCandidateVersion,
+    DeliveryVersion,
+    ProductionProjectAggregate,
+    SafeArtifactRef,
+    TenantScope,
+)
 from apps.api.runtime_episode_domain_store import (
     AggregateIdempotencyConflictError,
     AggregateIntegrityError,
@@ -58,11 +65,49 @@ _SIGNED_QUERY_KEYS = frozenset(
 )
 
 
+class EpisodeSafeArtifactRef(SafeArtifactRef):
+    pass
+
+
+class EpisodeAssetCandidateVersion(AssetCandidateVersion):
+    artifact_ref: EpisodeSafeArtifactRef | None = None
+
+
+class EpisodeDeliveryVersion(DeliveryVersion):
+    preview_artifact_ref: EpisodeSafeArtifactRef | None = None
+    export_artifact_refs: tuple[EpisodeSafeArtifactRef, ...] = Field(
+        default_factory=tuple,
+        max_length=64,
+    )
+
+
+class EpisodeProductionProjectAggregate(ProductionProjectAggregate):
+    asset_candidates: tuple[EpisodeAssetCandidateVersion, ...] = Field(
+        default_factory=tuple,
+        max_length=65536,
+    )
+    deliveries: tuple[EpisodeDeliveryVersion, ...] = Field(
+        default_factory=tuple,
+        max_length=4096,
+    )
+
+
 class EpisodeAggregateReplaceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_aggregate_version: int = Field(ge=0, strict=True)
-    aggregate: ProductionProjectAggregate
+    aggregate: EpisodeProductionProjectAggregate
+
+
+class EpisodeAggregateReadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    aggregate: EpisodeProductionProjectAggregate
+    aggregate_version: int = Field(ge=1, strict=True)
+
+
+class EpisodeAggregateWriteResponse(EpisodeAggregateReadResponse):
+    replayed: bool
 
 
 IdempotencyKey = Annotated[
@@ -83,7 +128,10 @@ def register_runtime_episode_domain_routes(
 ) -> None:
     aggregate_store = EpisodeDomainAggregateStore(store.root)
 
-    @app.get("/projects/{project_id}/episode-production-aggregate")
+    @app.get(
+        "/projects/{project_id}/episode-production-aggregate",
+        response_model=EpisodeAggregateReadResponse,
+    )
     def get_episode_production_aggregate(
         project_id: str,
         request: Request,
@@ -114,17 +162,23 @@ def register_runtime_episode_domain_routes(
             "aggregate_version": aggregate.aggregate_version,
         }
 
-    @app.put("/projects/{project_id}/episode-production-aggregate")
+    @app.put(
+        "/projects/{project_id}/episode-production-aggregate",
+        response_model=EpisodeAggregateWriteResponse,
+    )
     def replace_episode_production_aggregate(
         project_id: str,
         body: EpisodeAggregateReplaceRequest,
         request: Request,
         idempotency_key: IdempotencyKey,
     ) -> dict[str, Any]:
+        aggregate = ProductionProjectAggregate.model_validate(
+            body.aggregate.model_dump(mode="json")
+        )
         scope = _require_project_scope(store, auth, request, project_id)
-        _require_exact_aggregate_scope(body.aggregate, scope, request=request)
+        _require_exact_aggregate_scope(aggregate, scope, request=request)
         _safe_aggregate_payload(
-            body.aggregate,
+            aggregate,
             request=request,
             project_id=project_id,
             status_code=422,
@@ -133,11 +187,11 @@ def register_runtime_episode_domain_routes(
         payload_digest = _mutation_digest(
             project_id=project_id,
             expected_aggregate_version=body.expected_aggregate_version,
-            aggregate=body.aggregate,
+            aggregate=aggregate,
         )
         try:
             result = aggregate_store.save(
-                body.aggregate,
+                aggregate,
                 expected_aggregate_version=body.expected_aggregate_version,
                 idempotency_key=idempotency_key,
                 payload_digest=payload_digest,
@@ -464,7 +518,13 @@ def _raise_api_error(
 
 
 __all__ = (
+    "EpisodeAggregateReadResponse",
     "EpisodeAggregateReplaceRequest",
+    "EpisodeAggregateWriteResponse",
+    "EpisodeAssetCandidateVersion",
+    "EpisodeDeliveryVersion",
+    "EpisodeProductionProjectAggregate",
+    "EpisodeSafeArtifactRef",
     "LOCAL_ACTOR_ID",
     "LOCAL_ORG_ID",
     "register_runtime_episode_domain_routes",

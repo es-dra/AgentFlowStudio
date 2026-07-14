@@ -128,6 +128,99 @@ def _replace_body(aggregate: dict[str, Any], expected: int) -> dict[str, Any]:
     return {"expected_aggregate_version": expected, "aggregate": aggregate}
 
 
+def _aggregate_with_safe_artifact() -> dict[str, Any]:
+    aggregate = _aggregate(PROJECT_ID, LOCAL_ORG_ID, LOCAL_ACTOR_ID)
+    scope = aggregate["scope"]
+
+    def fact(entity_type: str, entity_id: str, version_id: str, created_at: str) -> dict[str, Any]:
+        return {
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "version_id": version_id,
+            "revision": 1,
+            "parent_version_id": None,
+            "lifecycle_state": "draft",
+            "review_state": "not_requested",
+            "content_digest": _digest(f"{entity_type}:{entity_id}:{version_id}"),
+            "scope": scope,
+            "created_at": created_at,
+            "source_refs": [],
+        }
+
+    project_ref = {
+        "entity_type": "project",
+        "entity_id": PROJECT_ID,
+        "version_id": f"{PROJECT_ID}-v1",
+    }
+    series = {
+        **fact("series", "series-001", "series-001-v1", "2026-07-15T08:01:00+00:00"),
+        "project_ref": project_ref,
+        "title": "Rainlight",
+    }
+    series_ref = {
+        "entity_type": "series",
+        "entity_id": "series-001",
+        "version_id": "series-001-v1",
+    }
+    episode = {
+        **fact("episode", "episode-001", "episode-001-v1", "2026-07-15T08:02:00+00:00"),
+        "series_ref": series_ref,
+        "title": "Episode 1",
+    }
+    episode_ref = {
+        "entity_type": "episode",
+        "entity_id": "episode-001",
+        "version_id": "episode-001-v1",
+    }
+    scene = {
+        **fact("scene", "scene-001", "scene-001-v1", "2026-07-15T08:03:00+00:00"),
+        "episode_ref": episode_ref,
+        "sequence": 1,
+        "title": "Warehouse",
+    }
+    scene_ref = {
+        "entity_type": "scene",
+        "entity_id": "scene-001",
+        "version_id": "scene-001-v1",
+    }
+    shot = {
+        **fact("shot", "shot-001", "shot-001-v1", "2026-07-15T08:04:00+00:00"),
+        "scene_ref": scene_ref,
+        "sequence": 1,
+        "duration_seconds": 6.0,
+        "continuity_refs": [],
+    }
+    shot_ref = {
+        "entity_type": "shot",
+        "entity_id": "shot-001",
+        "version_id": "shot-001-v1",
+    }
+    candidate = {
+        **fact(
+            "asset_candidate",
+            "candidate-001",
+            "candidate-001-v1",
+            "2026-07-15T08:05:00+00:00",
+        ),
+        "target_ref": shot_ref,
+        "artifact_ref": {
+            "artifact_id": "artifact-001",
+            "artifact_type": "image_asset",
+            "content_digest": _digest("artifact-001"),
+        },
+        "job_id": "job-001",
+        "job_state": "succeeded",
+    }
+    aggregate.update(
+        series=[series],
+        episodes=[episode],
+        scenes=[scene],
+        shots=[shot],
+        asset_candidates=[candidate],
+    )
+    return aggregate
+
+
 def _error(response) -> str:
     return str(response.json().get("detail", {}).get("error") or "")
 
@@ -411,6 +504,38 @@ def test_projection_safety_preserves_ordinary_text_and_relative_artifact_url(
     assert loaded.json()["aggregate"]["provider_contracts"][0]["surface"] == relative_url
 
 
+def test_episode_safe_artifact_projection_roundtrips_through_frozen_store(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    assert client.post(
+        "/projects",
+        json={"project_id": PROJECT_ID, "goal": "Safe artifact projection"},
+    ).status_code == 200
+    aggregate = _aggregate_with_safe_artifact()
+
+    created = client.put(
+        ROUTE,
+        headers={"Idempotency-Key": "safe-artifact-projection"},
+        json=_replace_body(aggregate, expected=0),
+    )
+    loaded = client.get(ROUTE)
+    frozen = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=LOCAL_ORG_ID,
+        project_id=PROJECT_ID,
+    )
+
+    assert created.status_code == 200, created.text
+    assert loaded.status_code == 200, loaded.text
+    expected_ref = aggregate["asset_candidates"][0]["artifact_ref"]
+    assert created.json()["aggregate"]["asset_candidates"][0]["artifact_ref"] == expected_ref
+    assert loaded.json()["aggregate"]["asset_candidates"][0]["artifact_ref"] == expected_ref
+    assert frozen.asset_candidates[0].artifact_ref is not None
+    assert frozen.asset_candidates[0].artifact_ref.model_dump(mode="json") == expected_ref
+
+
 def test_auth_off_uses_explicit_local_scope_and_keeps_project_binding(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -487,3 +612,32 @@ def test_idempotency_header_is_required_and_openapi_exposes_no_store_internals(
     assert "episode_aggregates" not in serialized
     assert "data/processed/runs" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_openapi_preserves_existing_safe_artifact_component_and_ref(tmp_path: Path) -> None:
+    schema = create_runtime_app(runtime_root=tmp_path).openapi()
+    schemas = schema["components"]["schemas"]
+
+    assert "SafeArtifactRef" in schemas
+    assert schemas["ProductionCandidate"]["properties"]["safe_artifact_refs"]["items"] == {
+        "$ref": "#/components/schemas/SafeArtifactRef"
+    }
+
+
+def test_openapi_uses_unique_episode_projection_components(tmp_path: Path) -> None:
+    schema = create_runtime_app(runtime_root=tmp_path).openapi()
+    schemas = schema["components"]["schemas"]
+
+    assert "EpisodeSafeArtifactRef" in schemas
+    assert not any(
+        name.endswith("runtime_production_models__SafeArtifactRef")
+        or name.endswith("runtime_episode_domain_contract__SafeArtifactRef")
+        for name in schemas
+    )
+    operation = schema["paths"]["/projects/{project_id}/episode-production-aggregate"]
+    assert operation["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/EpisodeAggregateReadResponse"
+    }
+    assert operation["put"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/EpisodeAggregateWriteResponse"
+    }
