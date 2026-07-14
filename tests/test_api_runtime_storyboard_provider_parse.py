@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from apps.api.runtime_storyboard_provider_parse import shots_from_provider_text
 
 
@@ -128,3 +130,82 @@ def test_storyboard_provider_parser_localizes_mixed_english_chinese_camera_motio
     assert shots[0]["camera_motion"] == "手持轻晃，轻微上升，模拟阿团跳跃"
     assert "handheld" not in json.dumps(shots[0], ensure_ascii=False)
     assert "mimicking" not in json.dumps(shots[0], ensure_ascii=False)
+
+
+def test_storyboard_provider_parser_rejects_untranslated_display_english() -> None:
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_03",
+                "index": 3,
+                "duration": "2.2s",
+                "description": "@阿团 @厨房。低角度跟拍：阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。",
+                "shot_size": "中景",
+                "light_atmosphere": "暖色主光",
+                "camera_motion": "subtle parallax drift following 阿团's arm arc",
+                "dialogue": "无明确对白",
+                "sound": "环境底噪，动作音随画面同步",
+                "source_span": {"text": "阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。"},
+                "asset_refs": [
+                    {
+                        "label": "阿团",
+                        "asset_type": "character",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                    {
+                        "label": "厨房",
+                        "asset_type": "scene",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                ],
+            }
+        ]
+    }
+
+    with pytest.raises(ValueError, match="untranslated English in camera_motion"):
+        shots_from_provider_text(
+            json.dumps(payload, ensure_ascii=False),
+            source_script_text="阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。",
+        )
+
+
+def test_storyboard_provider_parser_preserves_source_script_english() -> None:
+    source_script = "Bob把AI camera放在厨房桌面上，随后说AI camera ready。"
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_01",
+                "index": 1,
+                "duration": "3s",
+                "description": "@Bob @厨房。Bob把AI camera放在桌面上，屏幕亮起。",
+                "shot_size": "中景",
+                "light_atmosphere": "暖色主光",
+                "camera_motion": "固定机位",
+                "dialogue": "Bob：AI camera ready。",
+                "sound": "环境底噪，轻微电子提示音",
+                "source_span": {"text": source_script},
+                "asset_refs": [
+                    {
+                        "label": "Bob",
+                        "asset_type": "character",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                    {
+                        "label": "厨房",
+                        "asset_type": "scene",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                ],
+            }
+        ]
+    }
+
+    shots = shots_from_provider_text(json.dumps(payload, ensure_ascii=False), source_script_text=source_script)
+
+    serialized = json.dumps(shots[0], ensure_ascii=False)
+    assert "Bob" in serialized
+    assert "AI camera" in serialized
