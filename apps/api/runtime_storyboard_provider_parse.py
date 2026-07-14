@@ -13,6 +13,87 @@ from apps.api.runtime_storyboard_grounding import (
 from apps.api.runtime_storyboard_local import structured_shot
 
 
+SHOT_SIZE_LABELS = {
+    "extreme_close_up": "极近特写",
+    "big_close_up": "大特写",
+    "close_up": "特写",
+    "closeup": "特写",
+    "detail_shot": "细节特写",
+    "insert_shot": "插入特写",
+    "insert": "插入特写",
+    "medium_close_up": "中近景",
+    "medium_closeup": "中近景",
+    "medium_shot": "中景",
+    "medium": "中景",
+    "medium_wide": "中远景",
+    "medium_wide_shot": "中远景",
+    "wide": "远景",
+    "wide_shot": "远景",
+    "long_shot": "远景",
+    "full_shot": "全景",
+    "full_body": "全身景",
+    "establishing_shot": "定场远景",
+    "establishing": "定场远景",
+    "over_the_shoulder": "过肩镜头",
+    "pov": "主观镜头",
+    "point_of_view": "主观镜头",
+}
+
+CAMERA_MOTION_LABELS = {
+    "static": "固定机位",
+    "locked_off": "固定机位",
+    "fixed": "固定机位",
+    "tripod": "三脚架固定",
+    "handheld": "手持轻晃",
+    "hand_held": "手持轻晃",
+    "tracking": "跟拍移动",
+    "tracking_shot": "跟拍移动",
+    "follow": "跟随拍摄",
+    "follow_shot": "跟随拍摄",
+    "dolly_in": "缓慢推近",
+    "push_in": "缓慢推近",
+    "truck_in": "缓慢推近",
+    "dolly_out": "缓慢拉远",
+    "pull_back": "缓慢拉远",
+    "pull_out": "缓慢拉远",
+    "pan": "横摇",
+    "pan_left": "向左横摇",
+    "pan_right": "向右横摇",
+    "tilt": "俯仰摇镜",
+    "tilt_up": "向上摇镜",
+    "tilt_down": "向下摇镜",
+    "crane_up": "升镜",
+    "crane_down": "降镜",
+    "orbit": "环绕运动",
+    "arc": "弧线环绕",
+    "rack_focus": "焦点转移",
+    "shallow_depth_of_field": "浅景深",
+    "deep_focus": "深焦",
+    "slow_motion": "慢动作",
+    "camera_shake": "镜头震动",
+    "shake": "镜头震动",
+    "whip_pan": "快速甩镜",
+}
+
+FOCUS_TARGET_LABELS = {
+    "fingertip": "指尖",
+    "fingertips": "指尖",
+    "finger": "手指",
+    "fingers": "手指",
+    "score": "分数",
+    "test_paper": "试卷",
+    "paper": "试卷",
+    "exam_paper": "试卷",
+    "eyes": "眼睛",
+    "eye": "眼睛",
+    "face": "面部",
+    "expression": "表情",
+    "subject": "主体",
+    "background": "背景",
+    "sword": "剑",
+}
+
+
 def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list[dict[str, Any]]:
     payload = _json_from_text(text)
     raw_shots = payload.get("shots")
@@ -69,7 +150,7 @@ def _first_json_object_with_shots(text: str) -> dict[str, Any]:
 def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str = "") -> dict[str, Any]:
     if not isinstance(item, dict):
         return {}
-    description = _clean(item.get("description") or item.get("source_text") or "")
+    description = _localize_display_text(_clean(item.get("description") or item.get("source_text") or ""))
     source_span = _provider_source_span(item.get("source_span"), description, source_script_text, index)
     fallback = structured_shot(source_span["text"] or description, index, full_source=source_script_text or description)
     asset_refs = item.get("asset_refs")
@@ -91,14 +172,14 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
         "index": int(item.get("index") or index),
         "duration": str(item.get("duration") or fallback["duration"]),
         "description": description or fallback["description"],
-        "shot_size": str(item.get("shot_size") or fallback["shot_size"]),
-        "light_atmosphere": str(item.get("light_atmosphere") or fallback["light_atmosphere"]),
-        "camera_motion": str(item.get("camera_motion") or fallback["camera_motion"]),
-        "dialogue": str(item.get("dialogue") or fallback["dialogue"]),
-        "sound": str(item.get("sound") or fallback["sound"]),
+        "shot_size": _localized_shot_size(item.get("shot_size"), fallback["shot_size"]),
+        "light_atmosphere": _localize_display_text(item.get("light_atmosphere") or fallback["light_atmosphere"]),
+        "camera_motion": _localized_camera_motion(item.get("camera_motion"), fallback["camera_motion"]),
+        "dialogue": _localize_display_text(item.get("dialogue") or fallback["dialogue"]),
+        "sound": _localize_display_text(item.get("sound") or fallback["sound"]),
         "asset_refs": refs,
         "dropped_asset_ref_diagnostics": dropped_refs,
-        "source_text": _clean(item.get("source_text") or description),
+        "source_text": _localize_display_text(_clean(item.get("source_text") or description)),
         "source_span": source_span,
         "grounding_status": grounding_status_for_unsupported(unsupported),
         "unsupported_additions": unsupported,
@@ -165,6 +246,86 @@ def _descriptive_text(value: Any) -> str:
 
 def _clean(value: Any) -> str:
     return " ".join(str(value or "").split())
+
+
+def _localized_shot_size(value: Any, fallback: str) -> str:
+    text = _clean(value)
+    if not text:
+        return str(fallback)
+    key = _token_key(text)
+    if key in SHOT_SIZE_LABELS:
+        return SHOT_SIZE_LABELS[key]
+    if _has_cjk(text):
+        return _localize_display_text(text)
+    return str(fallback)
+
+
+def _localized_camera_motion(value: Any, fallback: str) -> str:
+    text = _clean(value)
+    if not text:
+        return str(fallback)
+    if _has_cjk(text):
+        return _localize_display_text(text)
+    parts = [part.strip() for part in re.split(r"[,;，；、]+", text) if part.strip()]
+    localized: list[str] = []
+    for part in parts or [text]:
+        for label in _camera_motion_labels_for_part(part):
+            if label and label not in localized:
+                localized.append(label)
+    return "，".join(localized) if localized else str(fallback)
+
+
+def _camera_motion_labels_for_part(value: str) -> list[str]:
+    key = _token_key(value)
+    if key in CAMERA_MOTION_LABELS:
+        return [CAMERA_MOTION_LABELS[key]]
+    labels: list[str] = []
+    for token, label in sorted(CAMERA_MOTION_LABELS.items(), key=lambda item: len(item[0]), reverse=True):
+        if token in key and label not in labels:
+            labels.append(label)
+    target = _focus_target_label(key)
+    if target:
+        labels.append(f"焦点锁定{target}")
+    return labels
+
+
+def _focus_target_label(key: str) -> str:
+    match = re.search(r"focus_on_(.+)$", key)
+    if not match:
+        return ""
+    target = re.sub(r"^(?:the_)?", "", match.group(1))
+    target = target.replace("_and_", "_")
+    labels: list[str] = []
+    for token in target.split("_"):
+        label = FOCUS_TARGET_LABELS.get(token)
+        if label and label not in labels:
+            labels.append(label)
+    return "和".join(labels)
+
+
+def _localize_display_text(value: Any) -> str:
+    text = _clean(value)
+    replacements = {
+        "(OS)": "（画外音）",
+        "（OS）": "（画外音）",
+        "(V.O.)": "（旁白）",
+        "（V.O.）": "（旁白）",
+        "(VO)": "（旁白）",
+        "（VO）": "（旁白）",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return text
+
+
+def _token_key(value: Any) -> str:
+    text = _clean(value).lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return re.sub(r"_+", "_", text).strip("_")
+
+
+def _has_cjk(value: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in value)
 
 
 __all__ = ("shots_from_provider_text",)
