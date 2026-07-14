@@ -1,14 +1,22 @@
 {
-  "schema_version": "afs_episode_loop_phase2_fixture_manifest.v0.1",
+  "schema_version": "afs_episode_loop_phase2_fixture_manifest.v0.2",
   "base_commit": "7f74f2280dca8d4a8d86b9aefda017e5b2e5f62a",
-  "domain_contract_commit": "c3ff529940538d42ac95d9c575b605a866e2e42b",
+  "base_commit_role": "phase1_research_evidence_commit",
+  "common_harness_commit": "9bda0a284bdee18866cf4b3c99764065af10fa61",
+  "domain_contract_commit": "bf44e54edaf53a32917522ae7cfbf43563277ded",
+  "domain_contract_revision": "v0.1.1",
+  "domain_contract_wire_schema_literal": "afs_episode_production_aggregate.v0.1",
+  "domain_contract_artifact": {
+    "path": "docs/architecture/AFS_EPISODE_PRODUCTION_FACT_CONTRACT.md",
+    "sha256": "38b2b8671e7d732ccb3d1cb71a4e374a63dfa7aa1a89b13551ddea5dc58cf36c"
+  },
   "evidence_matrix": {
     "path": "docs/research/AFS_PHASE1_EVIDENCE_MATRIX.md",
     "sha256": "290c73640ba6592f692a791f02aef847f2f986e3f1dac0e95c0397ec25918995"
   },
   "evaluation_protocol": {
     "path": "docs/AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md",
-    "sha256": "a39f358d697ae04dcacfa4f05bc3c72a8489ae295774c792784d3831ce4aea36"
+    "sha256": "c76d6d7e2fefd7169c83472f897efa9ac0108f14dfc7d4345a5b157e7b0112f3"
   },
   "fixtures": [
     {
@@ -25,6 +33,13 @@
     "storyboard": "experiments/episode-loop-phase2/prototypes/storyboard",
     "hybrid": "experiments/episode-loop-phase2/prototypes/hybrid"
   },
+  "variant_commits": {
+    "guided": "a704a1cc1ba69e745d185ea3098209eaa419bee5",
+    "storyboard": "9edd03f68e9e5c77819985e2ffc4605fc75d4332",
+    "hybrid": "3346f5d4813d2e87a0abf113e73f9757a9eb5531"
+  },
+  "frontend_direction": "hybrid_shell_storyboard_workspace_contextual_decision_inspector",
+  "comparison_purpose": "evidence_hygiene_and_structure_risk_only",
   "provider_dispatch_allowed": false,
   "expected_missing_assets": 25,
   "expected_provider_dispatch_count": 0

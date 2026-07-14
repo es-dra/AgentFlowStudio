@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMON = ROOT / "experiments" / "episode-loop-phase2" / "common"
+PACKAGE = ROOT / "examples" / "representative_episode" / "episode_package.json"
 
 
 def sha256(path: Path) -> str:
@@ -21,9 +22,18 @@ def load_json(name: str) -> dict:
 def test_manifest_freezes_contract_research_protocol_and_fixtures() -> None:
     manifest = load_json("fixture-manifest.json")
 
+    assert manifest["schema_version"] == "afs_episode_loop_phase2_fixture_manifest.v0.2"
     assert manifest["base_commit"] == "7f74f2280dca8d4a8d86b9aefda017e5b2e5f62a"
-    assert manifest["domain_contract_commit"] == "c3ff529940538d42ac95d9c575b605a866e2e42b"
+    assert manifest["base_commit_role"] == "phase1_research_evidence_commit"
+    assert manifest["common_harness_commit"] == "9bda0a284bdee18866cf4b3c99764065af10fa61"
+    assert manifest["domain_contract_commit"] == "bf44e54edaf53a32917522ae7cfbf43563277ded"
+    assert manifest["domain_contract_revision"] == "v0.1.1"
+    assert (
+        manifest["domain_contract_wire_schema_literal"]
+        == "afs_episode_production_aggregate.v0.1"
+    )
     for entry in (
+        manifest["domain_contract_artifact"],
         manifest["evidence_matrix"],
         manifest["evaluation_protocol"],
         *manifest["fixtures"],
@@ -35,6 +45,21 @@ def test_manifest_freezes_contract_research_protocol_and_fixtures() -> None:
     assert manifest["provider_dispatch_allowed"] is False
     assert manifest["expected_missing_assets"] == 25
     assert manifest["expected_provider_dispatch_count"] == 0
+
+
+def test_manifest_freezes_the_exact_repaired_comparison_heads() -> None:
+    manifest = load_json("fixture-manifest.json")
+
+    assert manifest["variant_commits"] == {
+        "guided": "a704a1cc1ba69e745d185ea3098209eaa419bee5",
+        "storyboard": "9edd03f68e9e5c77819985e2ffc4605fc75d4332",
+        "hybrid": "3346f5d4813d2e87a0abf113e73f9757a9eb5531",
+    }
+    assert (
+        manifest["frontend_direction"]
+        == "hybrid_shell_storyboard_workspace_contextual_decision_inspector"
+    )
+    assert manifest["comparison_purpose"] == "evidence_hygiene_and_structure_risk_only"
 
 
 def test_scenario_is_variant_neutral_and_preserves_truth_constraints() -> None:
@@ -87,12 +112,59 @@ def test_protocol_consumes_research_and_has_human_evidence_boundary() -> None:
     protocol = (ROOT / "docs" / "AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md").read_text(
         encoding="utf-8"
     )
+    compact_protocol = " ".join(protocol.split())
 
     assert "research/AFS_PHASE1_EVIDENCE_MATRIX.md" in protocol
     assert "same-task" in protocol.lower()
-    assert "six valid sessions" in protocol.lower()
-    assert "cannot\nclaim human acceptance" in protocol
-    assert "decision_needed" in protocol
+    assert "frontend_direction_decided" in protocol
+    assert "must not select a winner" in compact_protocol
+    assert "cannot claim real creator acceptance" in compact_protocol
+    assert "`evidence_valid` or `evidence_invalid`" in protocol
+    assert "reopen architecture selection" in protocol
+    assert "select_for_production_validation" not in protocol
+    assert "decision_needed" not in protocol
+
+
+def test_protocol_locks_fixture_visible_facts_and_new_semantic_hard_gates() -> None:
+    protocol = (ROOT / "docs" / "AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md").read_text(
+        encoding="utf-8"
+    )
+    compact_protocol = " ".join(protocol.split())
+    package = json.loads(PACKAGE.read_text(encoding="utf-8"))
+    lin_yao = next(
+        character for character in package["characters"] if character["character_id"] == "char-lin-yao"
+    )
+
+    assert lin_yao["name"] == "林遥"
+    assert "铜制灯扣" in lin_yao["appearance"]
+    assert "灯扣位于右肩" in lin_yao["continuity_constraints"]
+    assert "左眉疤不可镜像" in lin_yao["continuity_constraints"]
+    for visible_fact in ("林遥", "铜制提灯扣位于右肩", "左眉疤不可镜像"):
+        assert visible_fact in protocol
+
+    assert "active Shot 6 matching the suggested next action" in compact_protocol
+    assert '"currently viewing" from "suggested next"' in compact_protocol
+    assert "selecting v2 and reconfirming are disabled" in compact_protocol
+    assert "direct handler call fails closed without mutation" in compact_protocol
+    assert "Request reset, cancel it" in compact_protocol
+    assert "cancel leaves state unchanged" in compact_protocol
+
+
+def test_protocol_names_exact_heads_without_reopening_the_structure_vote() -> None:
+    protocol = (ROOT / "docs" / "AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md").read_text(
+        encoding="utf-8"
+    )
+
+    for revision in (
+        "bf44e54edaf53a32917522ae7cfbf43563277ded",
+        "9bda0a284bdee18866cf4b3c99764065af10fa61",
+        "a704a1cc1ba69e745d185ea3098209eaa419bee5",
+        "9edd03f68e9e5c77819985e2ffc4605fc75d4332",
+        "3346f5d4813d2e87a0abf113e73f9757a9eb5531",
+    ):
+        assert revision in protocol
+    assert "Hybrid shell and Storyboard-centered workspace" in protocol
+    assert "must not output a winner" in protocol
 
 
 def test_neutral_tokens_provide_accessibility_basics_without_layout_choice() -> None:
