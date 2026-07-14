@@ -823,8 +823,8 @@ const timeline = Array.from({ length: 15 }, (_, index) => ({
   camera: "宽幅镜头",
   motion: "缓慢推进",
   continuity: "保持角色服装、雨势与灯光连续。",
-  media: { required_count: 5, ready_count: 0, pending_count: 5, all_ready: false, status: "素材待补齐" },
-  audio: { covered: true, pending_asset_count: 4, status: "音频待制作" },
+  media: { required_count: 5, ready_count: 5, pending_count: 0, all_ready: true, status: "素材已齐" },
+  audio: { covered: true, pending_asset_count: 0, status: "音频已齐" },
 }));
 const canonicalState = {
   status_label: "15/15", episode_title: "《雨灯失窃案》第一集：最后一盏引魂灯",
@@ -833,10 +833,18 @@ const canonicalState = {
   character_versions: ["林遥", "小七", "余馆长"].map((name, index) => ({ name, version_id: `character-${index + 1}-v1`, continuity: ["造型连续"] })),
   scene_versions: ["雨巷", "档案塔", "黎明屋顶"].map((name, index) => ({ name, version_id: `scene-${index + 1}-v1`, continuity: ["空间与光线连续"] })),
   timeline,
-  audio: { covered_shot_count: 15, total_shot_count: 15, pending_asset_count: 4, all_audio_ready: false, status: "音频待制作" },
-  pending_media_count: 25, all_assets_ready: false, propagation_complete: false, readiness: "制作素材待补齐",
+  audio: { covered_shot_count: 15, total_shot_count: 15, pending_asset_count: 0, all_audio_ready: true, status: "音频已齐" },
+  pending_media_count: 0, all_assets_ready: true, propagation_complete: true, readiness: "25/25 制作素材已接纳",
+  media_delivery: {
+    status: "media_ready", accepted_count: 25, required_count: 25, visual_count: 21, audio_count: 4,
+    continuity_status: "structural_checked",
+    continuity_checks: ["规范版本一致", "十五镜时间线", "角色场景与镜头素材", "对白音乐音效与母版"].map((label) => ({ label, status: "structural_checked" })),
+    assembly_status: "technical_qa_passed", duration_seconds: 135, shot_count: 15,
+    delivery_preview_url: "/projects/afs-rainlight-project/production-runs/production-run-001/representative-episode-media/delivery/preview",
+    representative_content_proof: "not_started", creative_media_quality: "not_evaluated", human_acceptance: "not_evaluated",
+  },
 };
-const run = { checkpoint: { version: 4 }, candidates: [], creator_decisions: [], quality_reviews: [], exports: [] };
+const run = { project_id: "afs-rainlight-project", run_id: "production-run-001", checkpoint: { version: 4 }, candidates: [], creator_decisions: [], quality_reviews: [], exports: [] };
 const project = {
   name: "雨灯制作项目", episode: "第 01 集", current_stage: "分镜", canonical_state: canonicalState,
   crew: { episode_execution: {
@@ -911,8 +919,12 @@ process.stdout.write(JSON.stringify({
     assert "第 01 镜" in payload["text"] and "第 15 镜" in payload["text"]
     assert "00:00–00:09" in payload["text"] and "02:06–02:15" in payload["text"]
     assert "保持角色服装、雨势与灯光连续" in payload["text"]
-    assert "素材待补齐" in payload["text"]
-    assert "音频待制作" in payload["text"]
+    assert "素材已齐" in payload["text"]
+    assert "音频已齐" in payload["text"]
+    assert "规范媒体与技术交付" in payload["text"]
+    assert "25/25 已接纳" in payload["text"]
+    assert "135 秒技术检查通过" in payload["text"]
+    assert "代表性内容质量、人工验收和商业验证尚未开始" in payload["text"]
     assert "本集数字剧组" in payload["text"]
     assert "版本传播已完成" in payload["text"]
     assert "交付组的本集制作责任" in payload["text"]
@@ -935,13 +947,118 @@ def test_review_delivery_canon_mobile_contract_has_single_column_and_no_raw_diag
     assert "15/15 镜已绑定" in source
     assert "镜头顺序、版本、连续性与音频覆盖均来自当前项目的服务器制作记录" in source
     assert "本集数字剧组" in source
+    assert "规范媒体与技术交付" in source
+    assert "结构检查不等于内容质量验收" in source
     assert "九个制作岗位的当前责任、批准版本与下游确认均来自项目服务器记录" in source
     assert "package_sha256" not in source
     assert "canon_digest" not in source
     assert ".episode-shot-timeline" in styles
     assert ".crew-responsibility-list" in styles
+    assert ".canonical-media-metrics" in styles
+    assert ".canonical-continuity-list" in styles
     assert "grid-template-columns: minmax(0, 1fr)" in styles
     assert "overflow-wrap: anywhere" in styles
+
+
+def test_canonical_delivery_preview_uses_authenticated_blob_and_clears_expired_session() -> None:
+    payload = _node_json(
+        r'''
+import {
+  hydrateCanonicalDeliveryPreview,
+  releaseCanonicalDeliveryPreviews,
+} from "./apps/studio/src/review-delivery-workspace.js";
+
+globalThis.CustomEvent = class CustomEvent {
+  constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+};
+const route = "/projects/project-001/production-runs/run-001/representative-episode-media/delivery/preview";
+const requests = [];
+const revoked = [];
+const events = [];
+const tokens = [];
+const urlApi = {
+  createObjectURL(blob) { return `blob:canonical-${blob.size}`; },
+  revokeObjectURL(value) { revoked.push(value); },
+};
+const dependencies = {
+  readToken: () => "session-token",
+  baseUrl: () => "http://127.0.0.1:8876",
+  resolveUrl: (value) => `http://127.0.0.1:8876${value}`,
+  clearToken: (value) => tokens.push(value),
+  URL: urlApi,
+  eventTarget: { dispatchEvent: (event) => events.push({ type: event.type, detail: event.detail }) },
+};
+const preview = { dataset: {}, loadCalls: 0, load() { this.loadCalls += 1; } };
+const objectUrl = await hydrateCanonicalDeliveryPreview(preview, route, {
+  ...dependencies,
+  fetch: async (url, options) => {
+    requests.push({ url, authorization: options.headers.Authorization, cache: options.cache });
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (name) => name.toLowerCase() === "content-type" ? "video/mp4" : "" },
+      blob: async () => new Blob(["canonical-video"]),
+    };
+  },
+});
+releaseCanonicalDeliveryPreviews({ URL: urlApi });
+
+const expiredPreview = { dataset: {} };
+await hydrateCanonicalDeliveryPreview(expiredPreview, route, {
+  ...dependencies,
+  fetch: async () => ({
+    ok: false,
+    status: 401,
+    headers: { get: () => "application/json" },
+  }),
+});
+
+let unsafeFetches = 0;
+const unsafePreview = { dataset: {} };
+await hydrateCanonicalDeliveryPreview(unsafePreview, "https://provider.invalid/signed", {
+  ...dependencies,
+  resolveUrl: (value) => value,
+  fetch: async () => { unsafeFetches += 1; throw new Error("must not fetch"); },
+});
+
+process.stdout.write(JSON.stringify({
+  objectUrl,
+  preview,
+  requests,
+  revoked,
+  events,
+  tokens,
+  expiredState: expiredPreview.dataset.previewState,
+  unsafeState: unsafePreview.dataset.previewState,
+  unsafeFetches,
+}));
+'''
+    )
+
+    assert payload["objectUrl"].startswith("blob:canonical-")
+    assert payload["preview"]["src"] == payload["objectUrl"]
+    assert payload["preview"]["dataset"]["previewState"] == "ready"
+    assert payload["preview"]["loadCalls"] == 1
+    assert payload["requests"] == [{
+        "url": (
+            "http://127.0.0.1:8876/projects/project-001/production-runs/run-001/"
+            "representative-episode-media/delivery/preview"
+        ),
+        "authorization": "Bearer session-token",
+        "cache": "no-store",
+    }]
+    assert payload["revoked"] == [payload["objectUrl"]]
+    assert payload["tokens"] == [""]
+    assert payload["expiredState"] == "session_expired"
+    assert payload["events"] == [{
+        "type": "afs:auth-session-expired",
+        "detail": {"route": (
+            "/projects/project-001/production-runs/run-001/"
+            "representative-episode-media/delivery/preview"
+        ), "status": 401},
+    }]
+    assert payload["unsafeState"] == "unavailable"
+    assert payload["unsafeFetches"] == 0
 
 
 def test_provider_free_authenticated_browser_fixture_restores_candidate_authority(tmp_path: Path) -> None:

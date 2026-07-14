@@ -1,5 +1,11 @@
 import { ensureAuthSession, signOut } from "./auth-gate.js";
-import { authToken, createRuntimeClient, saveAuthToken } from "./runtime-client.js";
+import {
+  authToken,
+  createRuntimeClient,
+  runtimeBaseUrl,
+  runtimeMediaUrl,
+  saveAuthToken,
+} from "./runtime-client.js";
 import { clearProjectSession, safeProjectId } from "./studio-project-session.js";
 import { clearIdentityScopedStudioState } from "./store-persistence.js";
 import {
@@ -22,6 +28,12 @@ let runtime = createRuntimeClient("studio-pending");
 let mountedRoot = null;
 let boundaryInFlight = false;
 const previewObjectUrls = new Set();
+const canonicalPreviewSession = {
+  readToken: authToken,
+  resolveUrl: runtimeMediaUrl,
+  baseUrl: runtimeBaseUrl,
+  clearToken: saveAuthToken,
+};
 const reviewState = createReviewDeliveryState((state) => {
   if (!mountedRoot) return;
   renderReviewDeliveryWorkspace(mountedRoot, state, handlers);
@@ -34,6 +46,7 @@ const handlers = {
     if (options.focus) requestAnimationFrame(() => mountedRoot?.querySelector('[role="radio"][aria-checked="true"]')?.focus());
   },
   onAction: (action) => void handleAction(action),
+  canonicalPreviewSession,
 };
 
 bootstrap().catch((error) => showSecureEntry(readError(error), { error: true }));

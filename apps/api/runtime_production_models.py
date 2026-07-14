@@ -17,6 +17,8 @@ CREATOR_DECISION_SCHEMA_VERSION = "afs_creator_decision.v0.1"
 QUALITY_REVIEW_SCHEMA_VERSION = "afs_production_quality_review.v0.1"
 PRODUCTION_EXPORT_SCHEMA_VERSION = "afs_production_export.v0.1"
 REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION = "afs_representative_episode_binding.v0.1"
+REPRESENTATIVE_EPISODE_MEDIA_INTAKE_SCHEMA_VERSION = "afs_representative_episode_media_intake.v0.1"
+REPRESENTATIVE_EPISODE_MEDIA_ASSEMBLY_SCHEMA_VERSION = "afs_representative_episode_media_assembly.v0.1"
 
 SAFE_IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
@@ -429,6 +431,41 @@ class RepresentativeEpisodeBindingRequest(ProductionContractModel):
         return self
 
 
+class RepresentativeEpisodeMediaAssetInput(ProductionContractModel):
+    asset_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    revision_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    media_kind: Literal["image", "video", "audio"]
+    mime_type: Literal["image/png", "image/jpeg", "video/mp4", "audio/wav"]
+    sha256: str = Field(pattern=SHA256_PATTERN)
+    data_base64: str = Field(min_length=4, max_length=67_108_864)
+
+
+class RepresentativeEpisodeMediaIntakeRequest(ProductionContractModel):
+    schema_version: Literal["afs_representative_episode_media_intake.v0.1"] = (
+        REPRESENTATIVE_EPISODE_MEDIA_INTAKE_SCHEMA_VERSION
+    )
+    idempotency_key: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    expected_checkpoint_version: int = Field(ge=1, strict=True)
+    expected_binding_digest: str = Field(pattern=SHA256_PATTERN)
+    expected_episode_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    assets: list[RepresentativeEpisodeMediaAssetInput] = Field(min_length=25, max_length=25)
+
+    @model_validator(mode="after")
+    def admission_ids_are_unique(self) -> "RepresentativeEpisodeMediaIntakeRequest":
+        _require_unique_refs(self.assets, "asset_id", "media admission asset")
+        return self
+
+
+class RepresentativeEpisodeMediaAssemblyRequest(ProductionContractModel):
+    schema_version: Literal["afs_representative_episode_media_assembly.v0.1"] = (
+        REPRESENTATIVE_EPISODE_MEDIA_ASSEMBLY_SCHEMA_VERSION
+    )
+    idempotency_key: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    expected_checkpoint_version: int = Field(ge=1, strict=True)
+    expected_binding_digest: str = Field(pattern=SHA256_PATTERN)
+    expected_media_manifest_sha256: str = Field(pattern=SHA256_PATTERN)
+
+
 def canonical_json_digest(payload: Any) -> str:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -474,6 +511,8 @@ __all__ = (
     "PRODUCTION_RUN_SCHEMA_VERSION",
     "QUALITY_REVIEW_SCHEMA_VERSION",
     "REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION",
+    "REPRESENTATIVE_EPISODE_MEDIA_INTAKE_SCHEMA_VERSION",
+    "REPRESENTATIVE_EPISODE_MEDIA_ASSEMBLY_SCHEMA_VERSION",
     "STUDIO_PRODUCTION_BINDING_SCHEMA_VERSION",
     "CreatorDecisionRequest",
     "ProductionCandidate",
@@ -492,6 +531,9 @@ __all__ = (
     "EpisodeShotCanonRecord",
     "RepresentativeEpisodeCanon",
     "RepresentativeEpisodeBindingRequest",
+    "RepresentativeEpisodeMediaAssetInput",
+    "RepresentativeEpisodeMediaIntakeRequest",
+    "RepresentativeEpisodeMediaAssemblyRequest",
     "SafeArtifactRef",
     "canonical_json_digest",
     "checkpoint_digest",

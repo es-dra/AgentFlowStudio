@@ -175,6 +175,7 @@ function episodeCanonProjection(value, run) {
   const characters = Array.isArray(canon.character_versions) ? canon.character_versions : [];
   const scenes = Array.isArray(canon.scene_versions) ? canon.scene_versions : [];
   const audio = objectValue(canon.audio);
+  const mediaDelivery = mediaDeliveryProjection(canon.media_delivery, run);
   if (canon.status_label !== "15/15"
     || canon.shots !== 15
     || canon.characters !== 3
@@ -189,7 +190,13 @@ function episodeCanonProjection(value, run) {
     || characters.length !== 3
     || scenes.length !== 3
     || audio.covered_shot_count !== 15
-    || audio.total_shot_count !== 15) return null;
+    || audio.total_shot_count !== 15
+    || (mediaDelivery.accepted_count === 25 && (
+      canon.pending_media_count !== 0
+      || canon.all_assets_ready !== true
+      || audio.pending_asset_count !== 0
+      || audio.all_audio_ready !== true
+    ))) return null;
   const shots = [];
   for (const [index, item] of timeline.entries()) {
     const media = objectValue(item?.media);
@@ -255,11 +262,52 @@ function episodeCanonProjection(value, run) {
       all_audio_ready: audio.all_audio_ready === true,
       status: audio.status === "音频已齐" ? "音频已齐" : "音频待制作",
     },
+    media_delivery: mediaDelivery,
     pending_media_count: Math.max(0, Math.trunc(canon.pending_media_count || 0)),
     all_assets_ready: canon.all_assets_ready === true,
     propagation_complete: canon.propagation_complete === true,
     readiness: canon.all_assets_ready === true ? "制作素材已齐" : "制作素材待补齐",
   };
+}
+
+function mediaDeliveryProjection(value, run) {
+  const media = objectValue(value);
+  const status = ["not_started", "media_pending", "media_ready", "blocked"].includes(media.status)
+    ? media.status : "not_started";
+  const continuity = ["structural_checked", "blocked", "not_evaluated"].includes(media.continuity_status)
+    ? media.continuity_status : "not_evaluated";
+  const checks = (Array.isArray(media.continuity_checks) ? media.continuity_checks : []).map((item) => ({
+    label: safeText(item?.label, 80),
+    status: ["structural_checked", "blocked", "not_evaluated"].includes(item?.status)
+      ? item.status : "not_evaluated",
+  })).filter((item) => item.label);
+  const previewUrl = safeDeliveryPreview(media.delivery_preview_url, run?.project_id, run?.run_id);
+  return {
+    status,
+    accepted_count: Math.max(0, Math.trunc(Number(media.accepted_count) || 0)),
+    required_count: media.required_count === 25 ? 25 : 25,
+    visual_count: Math.max(0, Math.trunc(Number(media.visual_count) || 0)),
+    audio_count: Math.max(0, Math.trunc(Number(media.audio_count) || 0)),
+    continuity_status: continuity,
+    continuity_checks: checks,
+    assembly_status: media.assembly_status === "technical_qa_passed" ? "technical_qa_passed" : "not_started",
+    delivery_preview_url: previewUrl,
+    duration_seconds: Number(media.duration_seconds) === 135 ? 135 : 0,
+    shot_count: Number(media.shot_count) === 15 ? 15 : 0,
+    representative_content_proof: "not_started",
+    creative_media_quality: "not_evaluated",
+    human_acceptance: "not_evaluated",
+  };
+}
+
+function safeDeliveryPreview(value, projectId, runId) {
+  const project = safeToken(projectId);
+  const run = safeToken(runId);
+  const path = String(value || "").trim();
+  const expected = project && run
+    ? `/projects/${project}/production-runs/${run}/representative-episode-media/delivery/preview`
+    : "";
+  return path === expected ? path : "";
 }
 
 export function focusReviewCandidate(state, candidateId) {
