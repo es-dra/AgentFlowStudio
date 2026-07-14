@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+import json
 
 import pytest
+from pydantic import ValidationError
 
 from apps.api.runtime_episode_continuity_service import (
     ContinuityServiceError,
@@ -444,6 +446,59 @@ def test_corrupted_operation_membership_fails_closed_without_digest_authority() 
             scope=corrupted.scope,
             expected_aggregate_version=3,
             proposal_ref=forged.as_ref(),
+            created_at=UNDO_TIME,
+        )
+
+
+def test_coordinated_membership_crop_is_invalid_json_and_rejected_by_service() -> None:
+    aggregate = build_episode()
+    _, applied = apply_partial(aggregate, selected_count=2)
+    proposal = applied.agent_proposals[0]
+    orphan_ref = proposal.applied_refs[1]
+
+    payload = applied.model_dump(mode="json")
+    payload["agent_proposals"][0]["applied_refs"] = payload["agent_proposals"][0][
+        "applied_refs"
+    ][:1]
+    for shot in payload["shots"]:
+        if (
+            shot["entity_id"] == orphan_ref.entity_id
+            and shot["version_id"] == orphan_ref.version_id
+        ):
+            shot["source_proposal_ref"] = None
+            break
+
+    with pytest.raises(
+        ValidationError,
+        match="continuity change requires an exact source proposal",
+    ):
+        ProductionProjectAggregate.model_validate_json(json.dumps(payload))
+
+    cropped = proposal.model_copy(update={"applied_refs": proposal.applied_refs[:1]})
+    corrupted_shots = tuple(
+        shot.model_copy(update={"source_proposal_ref": None})
+        if shot.as_ref() == orphan_ref
+        else shot
+        for shot in applied.shots
+    )
+    corrupted = applied.model_copy(
+        update={
+            "shots": corrupted_shots,
+            "agent_proposals": (cropped,),
+            # Keep the original digest: integrity evidence cannot repair or
+            # authorize cropped explicit operation membership.
+        }
+    )
+
+    with pytest.raises(
+        ContinuityServiceError,
+        match="violates the episode fact contract",
+    ):
+        undo_change(
+            corrupted,
+            scope=corrupted.scope,
+            expected_aggregate_version=2,
+            proposal_ref=cropped.as_ref(),
             created_at=UNDO_TIME,
         )
 
