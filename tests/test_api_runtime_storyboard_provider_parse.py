@@ -41,3 +41,48 @@ def test_storyboard_provider_parser_localizes_english_shot_fields() -> None:
     assert shots[0]["dialogue"] == "班主任（画外音）：心比天高，基础不牢……"
     assert "extreme_close_up" not in json.dumps(shots[0], ensure_ascii=False)
     assert "shallow_depth_of_field" not in json.dumps(shots[0], ensure_ascii=False)
+
+
+def test_storyboard_provider_parser_localizes_lighting_sound_and_compacts_camera_motion() -> None:
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_01",
+                "index": 1,
+                "duration": "2.4s",
+                "description": "@古战场。暴雨倾盆的古战场俯拍：断戟斜插泥泞，残旗半埋于焦黑土中，妖气如墨色浓雾翻涌蒸腾。",
+                "shot_size": "medium_shot",
+                "light_atmosphere": (
+                    "high-contrast chiaroscuro; cold blue-green key light from storm clouds, "
+                    "deep indigo shadows pooling in craters and weapon grooves, mist diffusing highlights"
+                ),
+                "camera_motion": "tilt_up, tilt",
+                "dialogue": "无明确对白",
+                "sound": "thunder rumble (low-frequency), torrential rain on metal/earth, distant guttural growls layered beneath",
+                "source_span": {"text": "暴雨倾盆的古战场上，断戟斜插泥泞，残旗半埋于焦黑土中。"},
+                "asset_refs": [
+                    {
+                        "label": "古战场",
+                        "asset_type": "scene",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    }
+                ],
+            }
+        ]
+    }
+
+    shots = shots_from_provider_text(
+        json.dumps(payload, ensure_ascii=False),
+        source_script_text="暴雨倾盆的古战场上，断戟斜插泥泞，残旗半埋于焦黑土中。",
+    )
+
+    shot = shots[0]
+    assert shot["shot_size"] == "中景"
+    assert shot["camera_motion"] == "向上摇镜"
+    assert shot["light_atmosphere"] == "高反差明暗对照，暴风云层投下冷蓝绿色主光，深靛色阴影在弹坑与兵器沟槽中堆积，雾气柔化高光"
+    assert shot["sound"] == "低频雷鸣轰隆，暴雨击打金属与泥土，远处喉音低吼在底层铺陈"
+    serialized = json.dumps(shot, ensure_ascii=False)
+    assert "high-contrast" not in serialized
+    assert "thunder rumble" not in serialized
+    assert "俯仰摇镜" not in shot["camera_motion"]

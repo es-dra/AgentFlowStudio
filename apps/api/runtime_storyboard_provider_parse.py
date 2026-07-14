@@ -93,6 +93,31 @@ FOCUS_TARGET_LABELS = {
     "sword": "剑",
 }
 
+LIGHT_ATMOSPHERE_RULES = (
+    (("high_contrast", "chiaroscuro"), "高反差明暗对照"),
+    (("cold", "blue", "green", "key_light", "storm_clouds"), "暴风云层投下冷蓝绿色主光"),
+    (("deep_indigo_shadows", "craters", "weapon_grooves"), "深靛色阴影在弹坑与兵器沟槽中堆积"),
+    (("deep_indigo_shadows",), "深靛色阴影压低画面暗部"),
+    (("mist", "diffusing", "highlights"), "雾气柔化高光"),
+    (("rim_light",), "轮廓光勾边"),
+    (("backlight",), "逆光勾勒主体"),
+    (("low_key",), "低调光压暗环境"),
+    (("warm", "key_light"), "暖色主光"),
+    (("cold", "key_light"), "冷色主光"),
+)
+
+SOUND_RULES = (
+    (("thunder", "rumble", "low_frequency"), "低频雷鸣轰隆"),
+    (("thunder", "rumble"), "雷鸣轰隆"),
+    (("torrential_rain", "metal", "earth"), "暴雨击打金属与泥土"),
+    (("torrential_rain",), "暴雨持续倾泻"),
+    (("distant", "guttural", "growls", "layered_beneath"), "远处喉音低吼在底层铺陈"),
+    (("distant", "guttural", "growls"), "远处喉音低吼"),
+    (("low_frequency",), "低频氛围音"),
+    (("metal",), "金属受击声"),
+    (("earth",), "泥土受雨声"),
+)
+
 
 def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list[dict[str, Any]]:
     payload = _json_from_text(text)
@@ -173,10 +198,13 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
         "duration": str(item.get("duration") or fallback["duration"]),
         "description": description or fallback["description"],
         "shot_size": _localized_shot_size(item.get("shot_size"), fallback["shot_size"]),
-        "light_atmosphere": _localize_display_text(item.get("light_atmosphere") or fallback["light_atmosphere"]),
+        "light_atmosphere": _localized_light_atmosphere(
+            item.get("light_atmosphere"),
+            fallback["light_atmosphere"],
+        ),
         "camera_motion": _localized_camera_motion(item.get("camera_motion"), fallback["camera_motion"]),
         "dialogue": _localize_display_text(item.get("dialogue") or fallback["dialogue"]),
-        "sound": _localize_display_text(item.get("sound") or fallback["sound"]),
+        "sound": _localized_sound(item.get("sound"), fallback["sound"]),
         "asset_refs": refs,
         "dropped_asset_ref_diagnostics": dropped_refs,
         "source_text": _localize_display_text(_clean(item.get("source_text") or description)),
@@ -272,6 +300,7 @@ def _localized_camera_motion(value: Any, fallback: str) -> str:
         for label in _camera_motion_labels_for_part(part):
             if label and label not in localized:
                 localized.append(label)
+    localized = _compact_camera_motion_labels(localized)
     return "，".join(localized) if localized else str(fallback)
 
 
@@ -289,6 +318,21 @@ def _camera_motion_labels_for_part(value: str) -> list[str]:
     return labels
 
 
+def _compact_camera_motion_labels(labels: list[str]) -> list[str]:
+    compact = list(labels)
+    specific_tilts = {CAMERA_MOTION_LABELS["tilt_up"], CAMERA_MOTION_LABELS["tilt_down"]}
+    if any(label in compact for label in specific_tilts):
+        compact = [label for label in compact if label != CAMERA_MOTION_LABELS["tilt"]]
+    specific_pans = {
+        CAMERA_MOTION_LABELS["pan_left"],
+        CAMERA_MOTION_LABELS["pan_right"],
+        CAMERA_MOTION_LABELS["whip_pan"],
+    }
+    if any(label in compact for label in specific_pans):
+        compact = [label for label in compact if label != CAMERA_MOTION_LABELS["pan"]]
+    return compact
+
+
 def _focus_target_label(key: str) -> str:
     match = re.search(r"focus_on_(.+)$", key)
     if not match:
@@ -301,6 +345,64 @@ def _focus_target_label(key: str) -> str:
         if label and label not in labels:
             labels.append(label)
     return "和".join(labels)
+
+
+def _localized_light_atmosphere(value: Any, fallback: str) -> str:
+    return _localized_english_field(value, fallback, LIGHT_ATMOSPHERE_RULES)
+
+
+def _localized_sound(value: Any, fallback: str) -> str:
+    return _localized_english_field(value, fallback, SOUND_RULES)
+
+
+def _localized_english_field(
+    value: Any,
+    fallback: str,
+    rules: tuple[tuple[tuple[str, ...], str], ...],
+) -> str:
+    text = _localize_display_text(value)
+    if not text:
+        return str(fallback)
+    if not _has_latin(text):
+        return text
+    key = _token_key(text)
+    labels: list[str] = []
+    for required_tokens, label in rules:
+        if all(token in key for token in required_tokens) and label not in labels:
+            labels.append(label)
+    if rules is LIGHT_ATMOSPHERE_RULES:
+        labels = _compact_light_atmosphere_labels(labels)
+    elif rules is SOUND_RULES:
+        labels = _compact_sound_labels(labels)
+    if labels:
+        return "，".join(labels)
+    return str(fallback)
+
+
+def _compact_light_atmosphere_labels(labels: list[str]) -> list[str]:
+    compact = list(labels)
+    specific_shadow = "深靛色阴影在弹坑与兵器沟槽中堆积"
+    generic_shadow = "深靛色阴影压低画面暗部"
+    if specific_shadow in compact:
+        compact = [label for label in compact if label != generic_shadow]
+    specific_key_light = "暴风云层投下冷蓝绿色主光"
+    generic_key_light = "冷色主光"
+    if specific_key_light in compact:
+        compact = [label for label in compact if label != generic_key_light]
+    return compact
+
+
+def _compact_sound_labels(labels: list[str]) -> list[str]:
+    compact = list(labels)
+    suppressions = {
+        "低频雷鸣轰隆": {"雷鸣轰隆", "低频氛围音"},
+        "暴雨击打金属与泥土": {"暴雨持续倾泻", "金属受击声", "泥土受雨声"},
+        "远处喉音低吼在底层铺陈": {"远处喉音低吼"},
+    }
+    for specific, generic_labels in suppressions.items():
+        if specific in compact:
+            compact = [label for label in compact if label not in generic_labels]
+    return compact
 
 
 def _localize_display_text(value: Any) -> str:
@@ -326,6 +428,10 @@ def _token_key(value: Any) -> str:
 
 def _has_cjk(value: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in value)
+
+
+def _has_latin(value: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", value))
 
 
 __all__ = ("shots_from_provider_text",)
