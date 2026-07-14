@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from apps.api.runtime_episode_domain_contract import (
+    AgentProposal,
     AssetCandidateVersion,
     ConsentRecord,
     ContinuityStateVersion,
     DeliveryVersion,
     EntityVersionRef,
+    EPISODE_PRODUCTION_CONTRACT_REVISION,
     EpisodeVersion,
     ProductionProjectAggregate,
     ProjectVersion,
@@ -25,6 +28,7 @@ from apps.api.runtime_episode_domain_contract import (
     TenantScope,
     is_lifecycle_transition_allowed,
 )
+from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore
 
 
 NOW = "2026-07-15T20:30:00+00:00"
@@ -70,6 +74,8 @@ def build_aggregate() -> ProductionProjectAggregate:
     series = SeriesVersion(
         **common(scope, "series-1"), project_ref=ref(project), title="第一季"
     )
+
+
     episode = EpisodeVersion(
         **common(scope, "episode-1"), series_ref=ref(series), title="试播集"
     )
@@ -144,6 +150,108 @@ def build_aggregate() -> ProductionProjectAggregate:
         selections=(selection,),
         review_decisions=(decision,),
         deliveries=(delivery,),
+    )
+
+
+def build_applied_continuity_operation(
+    *,
+    selected_shot_ids: tuple[str, ...] = ("shot-1",),
+) -> ProductionProjectAggregate:
+    aggregate = build_aggregate()
+    old_continuity = aggregate.continuity_states[0]
+    target = old_continuity.model_copy(
+        update={
+            "version_id": "character-lin.v2",
+            "revision": 2,
+            "parent_version_id": old_continuity.version_id,
+            "lifecycle_state": "candidate",
+            "review_state": "needs_review",
+            "content_digest": digest("character-lin-black-coat"),
+            "created_at": LATER,
+            "identity_baseline": ("left-cheek-scar", "black-coat"),
+        }
+    )
+    proposal = AgentProposal(
+        **common(
+            aggregate.scope,
+            "proposal-lin-wardrobe",
+            lifecycle="draft",
+            review="not_requested",
+            created_at=LATER,
+        ),
+        target_ref=ref(target),
+        impact_refs=tuple(ref(shot) for shot in aggregate.shots),
+        action="replace_continuity_ref",
+        decision_state="executed",
+    )
+    selected = [shot for shot in aggregate.shots if shot.entity_id in selected_shot_ids]
+    successors = tuple(
+        shot.model_copy(
+            update={
+                "version_id": f"{shot.entity_id}.v2",
+                "revision": 2,
+                "parent_version_id": shot.version_id,
+                "lifecycle_state": "candidate",
+                "review_state": "needs_review",
+                "content_digest": digest(f"{shot.entity_id}-black-coat"),
+                "created_at": LATER,
+                "continuity_refs": (ref(target),),
+                "source_proposal_ref": ref(proposal),
+            }
+        )
+        for shot in selected
+    )
+    proposal = proposal.model_copy(update={"applied_refs": tuple(ref(shot) for shot in successors)})
+    return ProductionProjectAggregate(
+        **{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots, *successors),
+            "continuity_states": (*aggregate.continuity_states, target),
+            "agent_proposals": (proposal,),
+        }
+    )
+
+
+def append_full_undo(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate:
+    executed = aggregate.agent_proposals[0]
+    old_continuity = aggregate.continuity_states[0]
+    applied_shots = {
+        shot.as_ref(): shot for shot in aggregate.shots if shot.as_ref() in executed.applied_refs
+    }
+    undo = executed.model_copy(
+        update={
+            "version_id": "proposal-lin-wardrobe.v2",
+            "revision": 2,
+            "parent_version_id": executed.version_id,
+            "target_ref": ref(old_continuity),
+            "impact_refs": executed.applied_refs,
+            "applied_refs": (),
+            "decision_state": "undone",
+            "content_digest": digest("proposal-lin-wardrobe-undo"),
+            "created_at": "2026-07-15T20:32:00+00:00",
+        }
+    )
+    restored = tuple(
+        shot.model_copy(
+            update={
+                "version_id": f"{shot.entity_id}.v3",
+                "revision": 3,
+                "parent_version_id": shot.version_id,
+                "content_digest": digest(f"{shot.entity_id}-restore-blue-coat"),
+                "created_at": "2026-07-15T20:32:00+00:00",
+                "continuity_refs": (ref(old_continuity),),
+                "source_proposal_ref": ref(undo),
+            }
+        )
+        for shot in applied_shots.values()
+    )
+    undo = undo.model_copy(update={"applied_refs": tuple(ref(shot) for shot in restored)})
+    return ProductionProjectAggregate(
+        **{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots, *restored),
+            "agent_proposals": (*aggregate.agent_proposals, undo),
+        }
     )
 
 
@@ -674,3 +782,278 @@ def test_delivery_cannot_include_a_selection_from_another_episode() -> None:
             "episodes": (*aggregate.episodes, other_episode),
             "deliveries": (delivery,),
         })
+
+
+def test_continuity_operation_records_predicted_and_partial_applied_scope_separately() -> None:
+    aggregate = build_applied_continuity_operation(selected_shot_ids=("shot-1",))
+    proposal = aggregate.agent_proposals[0]
+
+    assert proposal.decision_state == "executed"
+    assert proposal.impact_refs == tuple(ref(shot) for shot in aggregate.shots[:2])
+    assert [item.entity_id for item in proposal.applied_refs] == ["shot-1"]
+    assert aggregate.shots[-1].source_proposal_ref == ref(proposal)
+
+
+def test_continuity_operation_can_apply_full_predicted_scope() -> None:
+    aggregate = build_applied_continuity_operation(selected_shot_ids=("shot-1", "shot-2"))
+
+    assert {item.entity_id for item in aggregate.agent_proposals[0].applied_refs} == {
+        "shot-1",
+        "shot-2",
+    }
+
+
+@pytest.mark.parametrize("decision_state", ["pending", "accepted", "partially_accepted", "rejected"])
+def test_non_executed_proposal_state_cannot_claim_applied_refs(decision_state: str) -> None:
+    aggregate = build_applied_continuity_operation()
+    proposal = aggregate.agent_proposals[0].model_copy(update={"decision_state": decision_state})
+
+    with pytest.raises(ValidationError, match="decision state cannot claim"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "agent_proposals": (proposal,),
+        })
+
+
+def test_application_rejects_cropped_added_and_duplicate_membership() -> None:
+    aggregate = build_applied_continuity_operation(selected_shot_ids=("shot-1", "shot-2"))
+    proposal = aggregate.agent_proposals[0]
+
+    cropped = proposal.model_copy(update={"applied_refs": proposal.applied_refs[:1]})
+    with pytest.raises(ValidationError, match="bidirectionally exact"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "agent_proposals": (cropped,),
+        })
+
+    added = proposal.model_copy(update={"applied_refs": (*proposal.applied_refs, ref(aggregate.shots[0]))})
+    with pytest.raises(ValidationError, match="distinct shot entities"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "agent_proposals": (added,),
+        })
+
+    duplicate = proposal.model_copy(update={"impact_refs": (*proposal.impact_refs, proposal.impact_refs[0])})
+    with pytest.raises(ValidationError, match="impact refs must be unique"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "agent_proposals": (duplicate,),
+        })
+
+
+def test_application_rejects_source_scope_and_non_continuity_fact_mismatch() -> None:
+    aggregate = build_applied_continuity_operation()
+    successor = aggregate.shots[-1]
+    without_source = successor.model_copy(update={"source_proposal_ref": None})
+    with pytest.raises(ValidationError, match="source proposal"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots[:-1], without_source),
+        })
+
+    foreign_actor = aggregate.scope.model_copy(update={"actor_id": "creator-2"})
+    foreign_proposal = aggregate.agent_proposals[0].model_copy(update={"scope": foreign_actor})
+    with pytest.raises(ValidationError, match="exact org, project, and actor"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "agent_proposals": (foreign_proposal,),
+        })
+
+    changed_duration = successor.model_copy(update={"duration_seconds": 9.0})
+    with pytest.raises(ValidationError, match="non-continuity shot facts"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots[:-1], changed_duration),
+        })
+
+    skipped_review = successor.model_copy(update={"review_state": "not_requested"})
+    with pytest.raises(ValidationError, match="require creator review"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots[:-1], skipped_review),
+        })
+
+    additive_continuity = successor.model_copy(
+        update={
+            "continuity_refs": (
+                ref(aggregate.continuity_states[0]),
+                ref(aggregate.continuity_states[-1]),
+            )
+        }
+    )
+    with pytest.raises(ValidationError, match="only replace"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots[:-1], additive_continuity),
+        })
+
+
+def test_every_predicted_impact_must_contain_exact_parent_continuity_ref() -> None:
+    aggregate = build_applied_continuity_operation()
+    unrelated = aggregate.continuity_states[0].model_copy(
+        update={
+            "entity_id": "character-qiao",
+            "version_id": "character-qiao.v1",
+            "subject_id": "qiao",
+            "parent_version_id": None,
+            "revision": 1,
+            "content_digest": digest("character-qiao"),
+        }
+    )
+    unaffected_parent = aggregate.shots[1].model_copy(update={"continuity_refs": (ref(unrelated),)})
+
+    with pytest.raises(ValidationError, match="every predicted impact shot"):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (aggregate.shots[0], unaffected_parent, *aggregate.shots[2:]),
+            "continuity_states": (*aggregate.continuity_states, unrelated),
+        })
+
+
+def test_same_target_independent_shot_is_not_claimed_by_operation_membership() -> None:
+    aggregate = build_applied_continuity_operation()
+    independent = aggregate.shots[0].model_copy(
+        update={
+            "entity_id": "shot-independent",
+            "version_id": "shot-independent.v1",
+            "revision": 1,
+            "parent_version_id": None,
+            "sequence": 3,
+            "continuity_refs": (ref(aggregate.continuity_states[-1]),),
+            "source_proposal_ref": None,
+            "content_digest": digest("shot-independent"),
+        }
+    )
+    restored = ProductionProjectAggregate(**{
+        **aggregate.model_dump(),
+        "shots": (*aggregate.shots, independent),
+    })
+
+    assert ref(independent) not in restored.agent_proposals[0].applied_refs
+
+
+def test_later_proposal_keeps_operation_membership_separate() -> None:
+    aggregate = build_applied_continuity_operation()
+    first_proposal = aggregate.agent_proposals[0]
+    first_successor = aggregate.shots[-1]
+    first_target = aggregate.continuity_states[-1]
+    second_target = first_target.model_copy(
+        update={
+            "version_id": "character-lin.v3",
+            "revision": 3,
+            "parent_version_id": first_target.version_id,
+            "content_digest": digest("character-lin-rain-coat"),
+            "created_at": "2026-07-15T20:32:00+00:00",
+        }
+    )
+    second_proposal = first_proposal.model_copy(
+        update={
+            "entity_id": "proposal-lin-rain-coat",
+            "version_id": "proposal-lin-rain-coat.v1",
+            "revision": 1,
+            "parent_version_id": None,
+            "target_ref": ref(second_target),
+            "impact_refs": (ref(first_successor),),
+            "applied_refs": (),
+            "content_digest": digest("proposal-lin-rain-coat"),
+            "created_at": "2026-07-15T20:32:00+00:00",
+        }
+    )
+    second_successor = first_successor.model_copy(
+        update={
+            "version_id": "shot-1.v3",
+            "revision": 3,
+            "parent_version_id": first_successor.version_id,
+            "continuity_refs": (ref(second_target),),
+            "source_proposal_ref": ref(second_proposal),
+            "content_digest": digest("shot-1-rain-coat"),
+            "created_at": "2026-07-15T20:32:00+00:00",
+        }
+    )
+    second_proposal = second_proposal.model_copy(update={"applied_refs": (ref(second_successor),)})
+    restored = ProductionProjectAggregate(**{
+        **aggregate.model_dump(),
+        "shots": (*aggregate.shots, second_successor),
+        "continuity_states": (*aggregate.continuity_states, second_target),
+        "agent_proposals": (*aggregate.agent_proposals, second_proposal),
+    })
+
+    assert restored.agent_proposals[0].applied_refs == (ref(first_successor),)
+    assert restored.agent_proposals[1].applied_refs == (ref(second_successor),)
+
+
+def test_undo_requires_and_records_full_restoration_operation() -> None:
+    applied = build_applied_continuity_operation(selected_shot_ids=("shot-1", "shot-2"))
+    restored = append_full_undo(applied)
+    undo = restored.agent_proposals[-1]
+
+    assert set(undo.impact_refs) == set(applied.agent_proposals[0].applied_refs)
+    assert {item.entity_id for item in undo.applied_refs} == {"shot-1", "shot-2"}
+    assert all(
+        restored.continuity_states[0].as_ref() in shot.continuity_refs
+        for shot in restored.shots[-2:]
+    )
+
+
+def test_undo_rejects_partial_restoration_and_wrong_parent_scope() -> None:
+    applied = build_applied_continuity_operation(selected_shot_ids=("shot-1", "shot-2"))
+    restored = append_full_undo(applied)
+    undo = restored.agent_proposals[-1]
+    partial = undo.model_copy(update={"applied_refs": undo.applied_refs[:1]})
+    with pytest.raises(ValidationError, match="restore the full parent applied scope"):
+        ProductionProjectAggregate(**{
+            **restored.model_dump(),
+            "agent_proposals": (restored.agent_proposals[0], partial),
+        })
+
+    wrong_impact = undo.model_copy(update={"impact_refs": tuple(reversed(undo.impact_refs[:-1]))})
+    with pytest.raises(ValidationError, match="exactly equal"):
+        ProductionProjectAggregate(**{
+            **restored.model_dump(),
+            "agent_proposals": (restored.agent_proposals[0], wrong_impact),
+        })
+
+
+def test_operation_facts_survive_json_and_store_roundtrip(tmp_path: Path) -> None:
+    aggregate = build_applied_continuity_operation()
+    decoded = ProductionProjectAggregate.model_validate_json(aggregate.model_dump_json())
+    assert decoded == aggregate
+
+    store = EpisodeDomainAggregateStore(tmp_path)
+    store.save(
+        aggregate,
+        expected_aggregate_version=0,
+        idempotency_key="contract-v011-roundtrip",
+        payload_digest=digest("contract-v011-roundtrip"),
+    )
+    assert store.load(org_id=aggregate.scope.org_id, project_id=aggregate.scope.project_id) == aggregate
+
+
+def test_old_v01_payload_without_additive_fields_keeps_defaults() -> None:
+    aggregate = build_aggregate()
+    proposal = AgentProposal(
+        **common(
+            aggregate.scope,
+            "proposal-old-v01",
+            lifecycle="draft",
+            review="not_requested",
+        ),
+        target_ref=ref(aggregate.continuity_states[0]),
+        impact_refs=tuple(ref(shot) for shot in aggregate.shots),
+        action="inspect_continuity",
+        decision_state="accepted",
+    )
+    payload = {
+        **aggregate.model_dump(mode="json"),
+        "agent_proposals": [proposal.model_dump(mode="json")],
+    }
+    for shot in payload["shots"]:
+        shot.pop("source_proposal_ref")
+    payload["agent_proposals"][0].pop("applied_refs")
+
+    decoded = ProductionProjectAggregate.model_validate(payload)
+
+    assert decoded.schema_version == "afs_episode_production_aggregate.v0.1"
+    assert EPISODE_PRODUCTION_CONTRACT_REVISION == "v0.1.1"
+    assert decoded.agent_proposals[0].applied_refs == ()
+    assert all(shot.source_proposal_ref is None for shot in decoded.shots)

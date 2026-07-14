@@ -1,7 +1,10 @@
-# AFS Episode Production Fact Contract v0.1
+# AFS Episode Production Fact Contract v0.1.1
 
-Status: Phase 1 shared contract candidate. This contract is schema-first and is
-not yet a claim that the Runtime, Studio, provider path, or delivery path has
+Status: frozen v0.1 contract plus the additive v0.1.1 continuity-operation
+evidence repair. The wire aggregate schema literal remains
+`afs_episode_production_aggregate.v0.1`; old payloads omit the additive fields
+and receive empty or null defaults. This contract is schema-first and is not
+yet a claim that the Runtime, Studio, provider path, or delivery path has
 implemented the complete episode loop.
 
 ## Purpose
@@ -96,6 +99,39 @@ propose new fact version
 ```
 
 No silent destructive cascade is allowed.
+
+### Proposal application and undo evidence (v0.1.1)
+
+`AgentProposal.impact_refs` remains the predicted, creator-visible set of exact
+shot facts before an operation. It is not overwritten with the applied result.
+`AgentProposal.applied_refs` records the exact successor shot facts actually
+created by one executed proposal revision. Each applied successor carries the
+same exact proposal revision in `ShotVersion.source_proposal_ref`.
+
+The aggregate validates this membership in both directions. Applied refs must
+be exact successors of impact refs for the same shot entities, the proposal,
+target continuity state, and shots must share exact organization, project, and
+actor scope, and a successor may only replace the old exact continuity ref with
+the target exact continuity ref. Scene, sequence, duration, and source evidence
+remain unchanged. Every successor re-enters `candidate + needs_review`; applying
+a proposal cannot silently preserve approval or lock state.
+
+Proposal states have separate meanings:
+
+- `pending`, `accepted`, `partially_accepted`, and `rejected` express a creator
+  decision and cannot claim applied refs;
+- `executed` is an operation fact with one or more applied successors; its
+  applied shot entities may be a subset of the predicted impact;
+- `undone` is the next revision of the exact executed proposal. Its impact refs
+  equal the executed revision's applied refs, and it must restore the complete
+  applied set through new review-required successors targeting the exact prior
+  continuity version.
+
+This makes partial apply creator-visible and makes undo atomic. A later proposal
+may advance one of the same shots, but its operation membership remains separate;
+Runtime must still enforce latest-head comparison-and-swap before attempting an
+undo. `content_digest` remains integrity evidence. It is not the source of
+proposal ownership or undo authorization.
 
 ## Candidate, review, and delivery rules
 

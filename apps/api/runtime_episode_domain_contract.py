@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 EPISODE_PRODUCTION_AGGREGATE_SCHEMA_VERSION = "afs_episode_production_aggregate.v0.1"
+EPISODE_PRODUCTION_CONTRACT_REVISION = "v0.1.1"
 SAFE_ID = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$"
 SHA256 = r"^[a-f0-9]{64}$"
 
@@ -213,6 +214,7 @@ class ShotVersion(VersionedFact):
     sequence: int = Field(ge=1, strict=True)
     duration_seconds: float = Field(gt=0, le=3600)
     continuity_refs: tuple[EntityVersionRef, ...] = Field(default_factory=tuple, max_length=64)
+    source_proposal_ref: EntityVersionRef | None = None
 
 
 class ContinuityStateVersion(VersionedFact):
@@ -272,6 +274,7 @@ class AgentProposal(VersionedFact):
     entity_type: Literal["agent_proposal"] = "agent_proposal"
     target_ref: EntityVersionRef
     impact_refs: tuple[EntityVersionRef, ...] = Field(default_factory=tuple, max_length=128)
+    applied_refs: tuple[EntityVersionRef, ...] = Field(default_factory=tuple, max_length=128)
     action: str = Field(min_length=1, max_length=120)
     decision_state: Literal[
         "pending",
@@ -552,10 +555,136 @@ class ProductionProjectAggregate(EpisodeContractModel):
                 raise ValueError("approved or locked selection requires a valid approved candidate")
         for item in self.review_decisions:
             require(item.subject_ref)
+        proposal_index = {item.as_ref(): item for item in self.agent_proposals}
         for item in self.agent_proposals:
-            require(item.target_ref)
-            for ref in item.impact_refs:
-                require(ref)
+            target = require(item.target_ref)
+            if len(item.impact_refs) != len(set(item.impact_refs)):
+                raise ValueError("proposal impact refs must be unique exact shot refs")
+            if len(item.applied_refs) != len(set(item.applied_refs)):
+                raise ValueError("proposal applied refs must be unique exact shot refs")
+
+            impact_shots = [require(ref, ("shot",)) for ref in item.impact_refs]
+            applied_shots = [require(ref, ("shot",)) for ref in item.applied_refs]
+            for shot in (*impact_shots, *applied_shots):
+                if shot.scope != item.scope:
+                    raise ValueError("proposal operation facts must share exact org, project, and actor scope")
+
+            if item.decision_state in (
+                "pending",
+                "accepted",
+                "partially_accepted",
+                "rejected",
+            ):
+                if item.applied_refs:
+                    raise ValueError("proposal decision state cannot claim applied successor refs")
+                continue
+
+            if not item.applied_refs:
+                raise ValueError("executed or undone proposal requires applied successor refs")
+            if target.entity_type != "continuity_state":
+                raise ValueError("proposal application target must be an exact continuity state")
+            if target.scope != item.scope:
+                raise ValueError("proposal target must share exact org, project, and actor scope")
+
+            impact_by_entity = {shot.entity_id: shot for shot in impact_shots}
+            if len(impact_by_entity) != len(impact_shots):
+                raise ValueError("proposal impact refs must name distinct shot entities")
+            applied_by_entity = {shot.entity_id: shot for shot in applied_shots}
+            if len(applied_by_entity) != len(applied_shots):
+                raise ValueError("proposal applied refs must name distinct shot entities")
+            if item.decision_state == "executed":
+                if not set(applied_by_entity).issubset(impact_by_entity):
+                    raise ValueError("executed proposal applied scope must be a subset of predicted impact")
+                if target.parent_version_id is None:
+                    raise ValueError("executed continuity target must have an exact parent version")
+                old_continuity_ref = EntityVersionRef(
+                    entity_type="continuity_state",
+                    entity_id=target.entity_id,
+                    version_id=target.parent_version_id,
+                )
+                old_continuity = require(old_continuity_ref, ("continuity_state",))
+                if old_continuity.scope != item.scope:
+                    raise ValueError(
+                        "proposal continuity history must share exact org, project, and actor scope"
+                    )
+                if any(
+                    shot.continuity_refs.count(old_continuity_ref) != 1
+                    or item.target_ref in shot.continuity_refs
+                    for shot in impact_shots
+                ):
+                    raise ValueError(
+                        "every predicted impact shot must contain the exact parent continuity ref"
+                    )
+            else:
+                if item.parent_version_id is None:
+                    raise ValueError("undone proposal must identify its executed parent revision")
+                parent_ref = EntityVersionRef(
+                    entity_type="agent_proposal",
+                    entity_id=item.entity_id,
+                    version_id=item.parent_version_id,
+                )
+                parent_proposal = proposal_index.get(parent_ref)
+                if parent_proposal is None or parent_proposal.decision_state != "executed":
+                    raise ValueError("undone proposal parent must be an exact executed proposal revision")
+                if set(item.impact_refs) != set(parent_proposal.applied_refs):
+                    raise ValueError("undone proposal impact must exactly equal its parent applied scope")
+                if set(applied_by_entity) != set(impact_by_entity):
+                    raise ValueError("undone proposal must restore the full parent applied scope")
+                parent_target = require(parent_proposal.target_ref, ("continuity_state",))
+                if parent_target.parent_version_id is None:
+                    raise ValueError("executed parent target must have an exact continuity parent")
+                old_continuity_ref = parent_proposal.target_ref
+                expected_restore_ref = EntityVersionRef(
+                    entity_type="continuity_state",
+                    entity_id=parent_target.entity_id,
+                    version_id=parent_target.parent_version_id,
+                )
+                if item.target_ref != expected_restore_ref:
+                    raise ValueError("undone proposal must target the exact prior continuity version")
+
+            for entity_id, successor in applied_by_entity.items():
+                parent = impact_by_entity[entity_id]
+                if successor.parent_version_id != parent.version_id:
+                    raise ValueError("applied shot must be the exact successor of its impact ref")
+                if successor.source_proposal_ref != item.as_ref():
+                    raise ValueError("applied shot must identify its exact source proposal revision")
+                if successor.lifecycle_state != "candidate" or successor.review_state != "needs_review":
+                    raise ValueError("applied shot successor must require creator review")
+                if (
+                    successor.scene_ref != parent.scene_ref
+                    or successor.sequence != parent.sequence
+                    or successor.duration_seconds != parent.duration_seconds
+                    or successor.source_refs != parent.source_refs
+                ):
+                    raise ValueError("continuity application cannot change non-continuity shot facts")
+                if old_continuity_ref not in parent.continuity_refs:
+                    raise ValueError("impact shot must contain the exact replaced continuity ref")
+                expected_continuity_refs = tuple(
+                    item.target_ref if ref == old_continuity_ref else ref
+                    for ref in parent.continuity_refs
+                )
+                if successor.continuity_refs != expected_continuity_refs:
+                    raise ValueError("applied shot must only replace the exact continuity ref")
+
+        for shot in self.shots:
+            if shot.source_proposal_ref is None:
+                continue
+            proposal = proposal_index.get(shot.source_proposal_ref)
+            if proposal is None:
+                raise ValueError("shot source proposal ref must resolve inside the aggregate")
+            if shot.scope != proposal.scope:
+                raise ValueError("shot and source proposal must share exact org, project, and actor scope")
+            if shot.as_ref() not in proposal.applied_refs:
+                raise ValueError("shot source proposal membership must be bidirectionally exact")
+
+        for proposal in self.agent_proposals:
+            owned_refs = {
+                shot.as_ref()
+                for shot in self.shots
+                if shot.source_proposal_ref == proposal.as_ref()
+            }
+            if owned_refs != set(proposal.applied_refs):
+                raise ValueError("proposal applied membership must be bidirectionally exact")
         for item in self.deliveries:
             delivery_episode = require(item.episode_ref, ("episode",))
             selections = [require(ref, ("selected_version",)) for ref in item.selection_refs]
@@ -646,6 +775,7 @@ __all__ = (
     "DeliveryVersion",
     "EntityVersionRef",
     "EpisodeVersion",
+    "EPISODE_PRODUCTION_CONTRACT_REVISION",
     "EPISODE_PRODUCTION_AGGREGATE_SCHEMA_VERSION",
     "ProductionProjectAggregate",
     "ProjectDataPolicy",
