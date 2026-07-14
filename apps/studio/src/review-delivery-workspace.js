@@ -86,6 +86,7 @@ function buildWorkspace(state, handlers) {
   main.append(buildPageHeading(state, handlers));
   if (state.stale || state.writeError || state.notice) main.append(buildNotice(state, handlers));
   main.append(buildEpisodeCanon(state));
+  main.append(buildEpisodeCrew(state));
 
   const layout = el("div", "review-layout");
   const stage = el("section", "review-stage");
@@ -104,6 +105,51 @@ function buildWorkspace(state, handlers) {
   layout.append(stage, aside);
   main.appendChild(layout);
   return main;
+}
+
+function buildEpisodeCrew(state) {
+  const execution = state.project?.crew?.episode_execution;
+  const section = el("section", "episode-crew-board");
+  section.setAttribute("aria-labelledby", "episode-crew-heading");
+  const header = el("header", "episode-crew-head");
+  const copy = el("div");
+  const title = el("h2", "", "本集数字剧组");
+  title.id = "episode-crew-heading";
+  copy.append(
+    title,
+    el("p", "", execution?.role_count === 9
+      ? "九个制作岗位的当前责任、批准版本与下游确认均来自项目服务器记录。"
+      : "本集尚未形成完整的数字剧组责任链，不会把缺失岗位显示为已完成。"),
+  );
+  const complete = execution?.propagation_complete === true;
+  header.append(copy, el("span", `crew-state ${complete ? "ready" : "pending"}`, complete ? "版本传播已完成" : "等待下游确认"));
+  section.appendChild(header);
+  if (!execution?.responsibilities?.length) {
+    section.appendChild(el("div", "crew-empty", "数字剧组责任状态暂不可用"));
+    return section;
+  }
+  const summary = el("div", "crew-summary");
+  summary.append(
+    factRow("当前批准版本", execution.approved_version || "当前批准版本"),
+    factRow("岗位覆盖", `${execution.role_count}/9`),
+    factRow("下游重确认", `${execution.reconfirmed_count}/8`),
+  );
+  section.appendChild(summary);
+  const list = el("ol", "crew-responsibility-list");
+  list.setAttribute("aria-label", "本集九个数字剧组岗位责任");
+  for (const item of execution.responsibilities) {
+    const row = el("li", `crew-responsibility ${item.reconfirmed ? "reconfirmed" : item.pending_reconfirmation ? "pending" : "active"}`);
+    const head = el("div", "crew-responsibility-head");
+    head.append(el("strong", "", item.role), el("span", "crew-version", item.approved_version));
+    row.append(
+      head,
+      el("p", "", item.responsibility),
+      el("div", "crew-responsibility-state", item.propagation_state),
+    );
+    list.appendChild(row);
+  }
+  section.appendChild(list);
+  return section;
 }
 
 function buildEpisodeCanon(state) {

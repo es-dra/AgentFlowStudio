@@ -22,18 +22,34 @@ from apps.api.runtime_generated_image_assets import register_generated_image_ass
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 from agentflow_studio.production.representative_episode import validate_representative_episode
+from agentflow_studio.representative_episode_execution import RepresentativeEpisodeExecution
 
 
 PROJECT_ID = "afs-rainlight-project"
 NODE_ID = "image_delivery_qa_001"
 JOB_ID = "job_delivery_qa_001"
 RUN_ID = "production_delivery_qa_001"
+CREW_ID = "crew-rainlight"
+EPISODE_EXECUTION_ID = "rainlight-episode-v2"
 QA_EMAIL = "delivery-qa@local.test"
 QA_PASSWORD = "Local-QA-Delivery-2026!"
 QA_INVITE = "delivery-qa-invite"
 
 
-def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
+class _AuthenticatedClientTransport:
+    def __init__(self, client: TestClient, headers: dict[str, str]) -> None:
+        self.client = client
+        self.headers = headers
+
+    def request(self, method: str, path: str, *, json: dict[str, object] | None = None):
+        return self.client.request(method, path, json=json, headers=self.headers)
+
+
+def prepare_provider_free_delivery_qa(
+    runtime_root: Path, *, run_episode_execution: bool = True, episode_execution_phase: str = "complete",
+) -> dict[str, object]:
+    if episode_execution_phase not in {"pending", "complete"}:
+        raise ValueError("episode_execution_phase must be pending or complete")
     runtime_root = Path(runtime_root).resolve()
     runtime_root.mkdir(parents=True, exist_ok=True)
     with _qa_environment(), TestClient(create_runtime_app(runtime_root=runtime_root)) as client:
@@ -117,6 +133,36 @@ def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
         )
         decision_response.raise_for_status()
         selected_run = decision_response.json()["production_run"]
+        crew_execution: dict[str, object] = {
+            "status": "not_started",
+            "role_count": 0,
+            "accepted_handoff_count": 0,
+            "reconfirmed_count": 0,
+            "propagation_complete": False,
+            "media_status": "media_assets_pending",
+        }
+        if run_episode_execution:
+            crew_response = client.post(
+                f"/projects/{PROJECT_ID}/domain-crew",
+                json={"crew_id": CREW_ID},
+                headers=headers,
+            )
+            crew_response.raise_for_status()
+            execution = RepresentativeEpisodeExecution.from_revision_path(
+                _AuthenticatedClientTransport(client, headers),
+                project_id=PROJECT_ID,
+                crew_id=CREW_ID,
+                run_id=RUN_ID,
+                execution_id=EPISODE_EXECUTION_ID,
+                revision_path=REPO_ROOT / "examples" / "representative_episode" / "episode_revision_v2.json",
+            )
+            execution.run_phase_a()
+            crew_execution = execution.record_creator_revision()
+            if episode_execution_phase == "complete":
+                crew_execution = execution.run_phase_b()
+            selected_run = client.get(
+                f"/projects/{PROJECT_ID}/production-runs/{RUN_ID}", headers=headers,
+            ).json()["production_run"]
         saved = client.put(
             f"/projects/{PROJECT_ID}/studio-state",
             json={"state": _studio_state(authorities)},
@@ -151,16 +197,21 @@ def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
             "selected_candidate_id": selected["candidate_id"],
             "selected_revision_id": selected_run["selected_revision"]["revision_id"],
             "candidate_count": len(candidates),
-            "episode_version_id": run["representative_episode_binding"]["episode_version_id"],
-            "canon_shot_count": len(run["representative_episode_binding"]["episode_canon"]["shots"]),
-            "canon_checkpoint_version": run["checkpoint"]["version"],
+            "episode_version_id": selected_run["representative_episode_binding"]["episode_version_id"],
+            "canon_shot_count": len(selected_run["representative_episode_binding"]["episode_canon"]["shots"]),
+            "canon_checkpoint_version": selected_run["checkpoint"]["version"],
+            "crew_execution": crew_execution,
             "provider_calls_started": False,
             "evidence_boundary": "provider-free deterministic UI/runtime verification only",
             "browser_preflight": {
                 "ready": not missing_authority_fields,
                 "missing_candidate_authority_fields": missing_authority_fields,
                 "persisted_candidate_count": len(persisted_candidates),
-                "authoritative_canon_ready": len(run["representative_episode_binding"]["episode_canon"]["shots"]) == 15,
+                "authoritative_canon_ready": len(selected_run["representative_episode_binding"]["episode_canon"]["shots"]) == 15,
+                "episode_crew_ready": (
+                    not run_episode_execution
+                    or crew_execution.get("role_count") == 9
+                ),
                 "stop_reason": (
                     "authenticated Studio state cannot restore selectable candidate authority"
                     if missing_authority_fields
@@ -414,8 +465,11 @@ def _qa_environment() -> Iterator[None]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare provider-free authenticated Studio production-delivery browser QA.")
     parser.add_argument("--runtime-root", type=Path, required=True)
+    parser.add_argument("--episode-execution-phase", choices=("pending", "complete"), default="complete")
     args = parser.parse_args()
-    print(json.dumps(prepare_provider_free_delivery_qa(args.runtime_root), ensure_ascii=False))
+    print(json.dumps(prepare_provider_free_delivery_qa(
+        args.runtime_root, episode_execution_phase=args.episode_execution_phase,
+    ), ensure_ascii=False))
     return 0
 
 

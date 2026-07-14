@@ -132,9 +132,9 @@ def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_
     canon = response.json()["project"]["canonical_state"]
     assert canon["status_label"] == "15/15"
     assert canon["episode_title"] == "《雨灯失窃案》第一集：最后一盏引魂灯"
-    assert canon["episode_version_id"] == "ep-rainlight-001-v1"
+    assert canon["episode_version_id"] == "ep-rainlight-001-v2"
     assert canon["duration_seconds"] == 135
-    assert canon["checkpoint_version"] == 3
+    assert canon["checkpoint_version"] == 4
     assert (canon["characters"], canon["scenes"], canon["shots"], canon["audio_items"]) == (3, 3, 15, 4)
     assert len(canon["character_versions"]) == 3
     assert len(canon["scene_versions"]) == 3
@@ -142,7 +142,11 @@ def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_
     assert [(item["start_seconds"], item["end_seconds"]) for item in canon["timeline"]] == [
         ((index - 1) * 9, index * 9) for index in range(1, 16)
     ]
-    assert all(item["version_id"].endswith("-v1") for item in canon["timeline"])
+    assert [item["version_id"] for item in canon["timeline"] if item["shot_number"] != 11] == [
+        f"shot-{index:03d}-v1" for index in range(1, 16) if index != 11
+    ]
+    assert canon["timeline"][10]["version_id"] == "shot-011-v2"
+    assert "暖金灯纹沿画卷扩散" in canon["timeline"][10]["visual_action"]
     assert all(item["continuity"] for item in canon["timeline"])
     assert all(item["media"]["status"] == "素材待补齐" for item in canon["timeline"])
     assert all(item["audio"]["status"] == "音频待制作" for item in canon["timeline"])
@@ -155,11 +159,27 @@ def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_
     }
     assert canon["pending_media_count"] == 25
     assert canon["readiness"] == "制作素材待补齐"
+    crew_execution = response.json()["project"]["crew"]["episode_execution"]
+    assert crew_execution["role_count"] == 9
+    assert crew_execution["approved_version"] == "第 2 版"
+    assert crew_execution["pending_reconfirmation_count"] == 0
+    assert crew_execution["reconfirmed_count"] == 8
+    assert crew_execution["propagation_complete"] is True
+    assert [item["role"] for item in crew_execution["responsibilities"]] == [
+        "编剧组", "分镜组", "美术组", "导演组", "连贯性检查", "质量审核", "音频组", "后期组", "交付组",
+    ]
+    assert all(item["approved_version"] == "第 2 版" for item in crew_execution["responsibilities"])
+    assert crew_execution["responsibilities"][0]["propagation_state"] == "主创决定后已恢复"
+    assert all(item["reconfirmed"] for item in crew_execution["responsibilities"][1:])
     encoded = json.dumps(canon, ensure_ascii=False)
     assert "required_asset_ids" not in encoded
     assert "entity_id" not in encoded
     assert "provider_needed" not in encoded
     assert "D:\\" not in encoded and "/opt/" not in encoded
+    crew_encoded = json.dumps(crew_execution, ensure_ascii=False)
+    assert "crew-rainlight" not in crew_encoded
+    assert "rainlight-episode-v2-task" not in crew_encoded
+    assert "creator-decision-episode-v2" not in crew_encoded
 
     reloaded = TestClient(create_runtime_app(runtime_root=tmp_path)).get(
         f"/projects/{seed['project_id']}/product-overview",
