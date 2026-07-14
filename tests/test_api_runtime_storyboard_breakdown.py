@@ -334,6 +334,8 @@ def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, 
     assert len(calls) == 1
     provider_prompt = calls[0].prompt
     assert "专业知识库约束" in provider_prompt
+    assert "显示字段语言约束" in provider_prompt
+    assert "不要在显示字段输出英文摄影、光影、声音术语" in provider_prompt
     assert "storyboard_shot_numbering_handoff_v1" in provider_prompt
     assert payload["provider_calls_started"] is True
     assert payload["safe_manifest"]["status"] == "provider_structured"
@@ -524,6 +526,79 @@ def test_storyboard_breakdown_keeps_provider_started_when_llm_json_is_discarded(
     assert payload["safe_manifest"]["raw_provider_response_stored"] is False
     assert payload["safe_manifest"]["discard_reason"]
     assert payload["shots"]
+
+
+def test_storyboard_breakdown_discards_provider_json_with_untranslated_display_english(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+
+    class Descriptor:
+        modality = "llm"
+
+    class FakeRegistry:
+        _descriptors = {"prompt_optimizer": Descriptor()}
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {
+                "text": json.dumps(
+                    {
+                        "shots": [
+                            {
+                                "shot_id": "shot_03",
+                                "index": 3,
+                                "duration": "2.2s",
+                                "description": "@阿团 @厨房。低角度跟拍：阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。",
+                                "shot_size": "中景",
+                                "light_atmosphere": "暖色主光",
+                                "camera_motion": "subtle parallax drift following 阿团's arm arc",
+                                "dialogue": "无明确对白",
+                                "sound": "环境底噪，动作音随画面同步",
+                                "source_span": {"text": "阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。"},
+                                "asset_refs": [
+                                    {"label": "阿团", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                                    {"label": "厨房", "asset_type": "scene", "status": "mentioned", "source": "explicit"},
+                                ],
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                "provider_calls_started": True,
+            }
+
+    monkeypatch.setattr("apps.api.runtime_storyboard_breakdown.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post(
+        "/projects",
+        json={
+            "project_id": "proj_sb_eng_discard",
+            "project_type": "short_video_campaign",
+            "goal": "Create a visual story from a complete script.",
+        },
+    )
+
+    response = client.post(
+        "/projects/proj_sb_eng_discard/storyboard-breakdowns",
+        json={
+            "node_id": "text_001",
+            "script_text": "阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。厨房暖光照着桌面。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {"llm_provider": "prompt_optimizer"},
+            "generated_at": "2026-07-14T10:08:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    shots_serialized = json.dumps(payload["shots"], ensure_ascii=False)
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["status"] == "local_fallback"
+    assert payload["safe_manifest"]["raw_provider_response_stored"] is False
+    assert "untranslated English in camera_motion" in payload["safe_manifest"]["discard_reason"]
+    assert "subtle parallax" not in shots_serialized
+    assert "following" not in shots_serialized
 
 
 def test_storyboard_breakdown_is_exported_without_secret_surface(tmp_path) -> None:

@@ -26,6 +26,7 @@ ROLE_LABELS = {
     "export": "交付组",
 }
 ROLE_ORDER = tuple(ROLE_LABELS)
+LOCAL_RUNTIME_USER_ID = "local-runtime-user"
 
 STAGES = (
     ("brief", "创作简报"),
@@ -48,8 +49,13 @@ def register_runtime_product_read_model_routes(
     @app.get("/product/workspace-overview", tags=["product"])
     def workspace_overview(request: Request) -> dict[str, Any]:
         user_id = _require_user(auth, request)
-        summaries = auth.filter_project_summaries(user_id, store.list_project_summaries())
-        projects = [_project_overview(store, summary, user_id=user_id) for summary in summaries]
+        summaries = store.list_project_summaries()
+        if auth.enabled():
+            summaries = auth.filter_project_summaries(user_id, summaries)
+        projects = [
+            _project_overview(store, summary, user_id=user_id, owner_scoped=auth.enabled())
+            for summary in summaries
+        ]
         projects.sort(key=lambda item: (str(item.get("updated_at") or ""), item["project_id"]), reverse=True)
         return {
             "schema_version": "afs_product_workspace_overview.v0.1",
@@ -76,13 +82,13 @@ def register_runtime_product_read_model_routes(
         return {
             "schema_version": "afs_product_project_overview.v0.1",
             "locale": "zh-CN",
-            "project": _project_overview(store, summary, user_id=user_id, expanded=True),
+            "project": _project_overview(store, summary, user_id=user_id, expanded=True, owner_scoped=auth.enabled()),
         }
 
 
 def _require_user(auth: RuntimeAuthStore, request: Request) -> str:
     if not auth.enabled():
-        raise HTTPException(status_code=403, detail="产品工作空间需要登录后访问。")
+        return LOCAL_RUNTIME_USER_ID
     user_id = str(auth.require_user(request).get("user_id") or "")
     if not user_id:
         raise HTTPException(status_code=401, detail="登录状态已失效，请重新登录。")
@@ -100,7 +106,7 @@ def _require_project_owner(
         not project_id
         or store.is_project_deleted(project_id)
         or not store.project_manifest_path(project_id).is_file()
-        or not auth.user_can_access_project(user_id, project_id)
+        or (auth.enabled() and not auth.user_can_access_project(user_id, project_id))
     ):
         raise HTTPException(status_code=403, detail="你没有访问该项目的权限。")
     return user_id
@@ -112,13 +118,14 @@ def _project_overview(
     *,
     user_id: str,
     expanded: bool = False,
+    owner_scoped: bool = True,
 ) -> dict[str, Any]:
     project_id = str(summary.get("project_id") or "")
     manifest = store.ensure_project_manifest(project_id)
-    crew = _owned_crew(store, project_id, user_id)
+    crew = _owned_crew(store, project_id, user_id, owner_scoped=owner_scoped)
     runs = [
         item for item in store.list_production_runs(project_id)
-        if str(item.get("owner_user_id") or "") == user_id
+        if not owner_scoped or str(item.get("owner_user_id") or "") == user_id
     ]
     latest_run = max(runs, key=lambda item: str(item.get("updated_at") or ""), default={})
     studio_meta = _studio_meta(store, project_id)
@@ -155,12 +162,12 @@ def _project_overview(
     return result
 
 
-def _owned_crew(store: RuntimeStore, project_id: str, user_id: str) -> dict[str, Any]:
+def _owned_crew(store: RuntimeStore, project_id: str, user_id: str, *, owner_scoped: bool = True) -> dict[str, Any]:
     try:
         crew = store.load_domain_crew(project_id)
     except KeyError:
         return {}
-    if str(crew.get("owner_user_id") or "") != user_id:
+    if owner_scoped and str(crew.get("owner_user_id") or "") != user_id:
         return {}
     return crew
 

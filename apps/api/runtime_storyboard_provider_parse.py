@@ -11,6 +11,18 @@ from apps.api.runtime_storyboard_grounding import (
     unsupported_additions_for_description,
 )
 from apps.api.runtime_storyboard_local import structured_shot
+from apps.api.runtime_storyboard_provider_latin_guard import (
+    validate_localized_display_fields as _validate_localized_display_fields,
+    validate_raw_display_field_english as _validate_raw_display_field_english,
+)
+from apps.api.runtime_storyboard_provider_localization import (
+    localized_camera_motion as _localized_camera_motion,
+    localized_light_atmosphere as _localized_light_atmosphere,
+    localized_shot_size as _localized_shot_size,
+    localized_sound as _localized_sound,
+    localize_display_text as _localize_display_text,
+)
+from apps.api.runtime_storyboard_provider_text import clean_text as _clean
 
 
 def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list[dict[str, Any]]:
@@ -18,6 +30,7 @@ def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list
     raw_shots = payload.get("shots")
     if not isinstance(raw_shots, list):
         raise ValueError("provider storyboard response missing shots")
+    _validate_raw_display_field_english(raw_shots, source_script_text)
     shots = [
         _normalize_provider_shot(item, index + 1, source_script_text=source_script_text)
         for index, item in enumerate(raw_shots)
@@ -26,6 +39,7 @@ def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list
     if not shots:
         raise ValueError("provider storyboard response has no usable shots")
     _validate_provider_shots(shots, source_script_text)
+    _validate_localized_display_fields(shots, source_script_text)
     return shots
 
 
@@ -69,7 +83,7 @@ def _first_json_object_with_shots(text: str) -> dict[str, Any]:
 def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str = "") -> dict[str, Any]:
     if not isinstance(item, dict):
         return {}
-    description = _clean(item.get("description") or item.get("source_text") or "")
+    description = _localize_display_text(_clean(item.get("description") or item.get("source_text") or ""))
     source_span = _provider_source_span(item.get("source_span"), description, source_script_text, index)
     fallback = structured_shot(source_span["text"] or description, index, full_source=source_script_text or description)
     asset_refs = item.get("asset_refs")
@@ -91,14 +105,17 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
         "index": int(item.get("index") or index),
         "duration": str(item.get("duration") or fallback["duration"]),
         "description": description or fallback["description"],
-        "shot_size": str(item.get("shot_size") or fallback["shot_size"]),
-        "light_atmosphere": str(item.get("light_atmosphere") or fallback["light_atmosphere"]),
-        "camera_motion": str(item.get("camera_motion") or fallback["camera_motion"]),
-        "dialogue": str(item.get("dialogue") or fallback["dialogue"]),
-        "sound": str(item.get("sound") or fallback["sound"]),
+        "shot_size": _localized_shot_size(item.get("shot_size"), fallback["shot_size"]),
+        "light_atmosphere": _localized_light_atmosphere(
+            item.get("light_atmosphere"),
+            fallback["light_atmosphere"],
+        ),
+        "camera_motion": _localized_camera_motion(item.get("camera_motion"), fallback["camera_motion"]),
+        "dialogue": _localize_display_text(item.get("dialogue") or fallback["dialogue"]),
+        "sound": _localized_sound(item.get("sound"), fallback["sound"]),
         "asset_refs": refs,
         "dropped_asset_ref_diagnostics": dropped_refs,
-        "source_text": _clean(item.get("source_text") or description),
+        "source_text": _localize_display_text(_clean(item.get("source_text") or description)),
         "source_span": source_span,
         "grounding_status": grounding_status_for_unsupported(unsupported),
         "unsupported_additions": unsupported,
@@ -161,10 +178,6 @@ def _validate_provider_shots(shots: list[dict[str, Any]], source_script_text: st
 def _descriptive_text(value: Any) -> str:
     text = re.sub(r"@[\w\u4e00-\u9fff-]+", "", str(value or ""))
     return "".join(char for char in text if not char.isspace() and char not in "，。,.；;：:、")
-
-
-def _clean(value: Any) -> str:
-    return " ".join(str(value or "").split())
 
 
 __all__ = ("shots_from_provider_text",)

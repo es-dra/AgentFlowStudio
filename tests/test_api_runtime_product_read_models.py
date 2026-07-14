@@ -44,6 +44,23 @@ def _create_project(client: TestClient, headers: dict[str, str], project_id: str
     assert state.status_code == 200, state.text
 
 
+def test_product_overview_allows_auth_disabled_local_runtime(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+    monkeypatch.delenv("AFS_INVITE_CODES", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _create_project(client, {}, "local-project", "Local Project")
+
+    workspace = client.get("/product/workspace-overview")
+    assert workspace.status_code == 200, workspace.text
+    payload = workspace.json()
+    assert payload["workspace"]["project_count"] == 1
+    assert [item["project_id"] for item in payload["projects"]] == ["local-project"]
+
+    project = client.get("/projects/local-project/product-overview")
+    assert project.status_code == 200, project.text
+    assert project.json()["project"]["project_id"] == "local-project"
+
+
 def test_product_overview_is_authenticated_owner_scoped_and_safe(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
     monkeypatch.setenv("AFS_INVITE_CODES", "alpha-invite,beta-invite")
