@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Sequence
@@ -12,6 +13,7 @@ from apps.api.runtime_episode_domain_contract import (
     EntityVersionRef,
     ProductionProjectAggregate,
     ReviewDecision,
+    SAFE_ID,
     SafeArtifactRef,
     SelectedVersion,
     TenantScope,
@@ -59,6 +61,21 @@ class DeliveryReadiness:
     blockers: tuple[str, ...]
     preview_artifact_ref: SafeArtifactRef | None
     export_artifact_refs: tuple[SafeArtifactRef, ...]
+
+
+@dataclass(frozen=True)
+class ArtifactAvailabilityProof:
+    artifact_ref: SafeArtifactRef
+    verification_id: str
+    available: bool
+    playable: bool = False
+
+
+@dataclass(frozen=True)
+class CurrentDeliveryValidity:
+    delivery: DeliveryVersion
+    current_valid: bool
+    blockers: tuple[str, ...]
 
 
 def compare_candidate_versions(
@@ -115,7 +132,20 @@ def select_candidate(
 ) -> ProductionProjectAggregate:
     _require_mutation(aggregate, scope, expected_aggregate_version)
     candidate = _candidate(aggregate, candidate_ref)
+    if not _is_latest(
+        aggregate.asset_candidates,
+        candidate.entity_id,
+        candidate.version_id,
+    ):
+        raise ReviewDeliveryVersionConflictError(
+            "candidate ref is not the latest exact version; historical candidates require restore"
+        )
     _require_selectable_candidate(candidate)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=candidate.target_ref,
+        purpose=purpose,
+    )
     if any(item.entity_id == selection_entity_id for item in aggregate.selections):
         raise ReviewDeliveryStateError(
             "new candidate selection requires a new selection entity; use restore for history"
@@ -151,6 +181,16 @@ def review_selection(
 ) -> ProductionProjectAggregate:
     _require_mutation(aggregate, scope, expected_aggregate_version)
     current = _latest_exact_selection(aggregate, selection_ref)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=current.target_ref,
+        purpose=current.purpose,
+        allowed_entity_id=current.entity_id,
+    )
+    if decision == "approve" and _has_valid_approval(aggregate, current):
+        raise ReviewDeliveryStateError(
+            "selection already has an exact approval; duplicate approve is forbidden"
+        )
     if current.lifecycle_state not in ("candidate", "approved"):
         raise ReviewDeliveryStateError("only a candidate or unlocked selection can be reviewed")
     if current.lifecycle_state == "approved" and decision == "reject":
@@ -203,6 +243,12 @@ def lock_selection(
 ) -> ProductionProjectAggregate:
     _require_mutation(aggregate, scope, expected_aggregate_version)
     current = _latest_exact_selection(aggregate, selection_ref)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=current.target_ref,
+        purpose=current.purpose,
+        allowed_entity_id=current.entity_id,
+    )
     if current.lifecycle_state != "approved" or current.review_state != "approved":
         raise ReviewDeliveryStateError("only an approved selection can be locked")
     if not _has_valid_approval(aggregate, current):
@@ -248,6 +294,12 @@ def unlock_selection(
 ) -> ProductionProjectAggregate:
     _require_mutation(aggregate, scope, expected_aggregate_version)
     current = _latest_exact_selection(aggregate, selection_ref)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=current.target_ref,
+        purpose=current.purpose,
+        allowed_entity_id=current.entity_id,
+    )
     if current.lifecycle_state != "locked":
         raise ReviewDeliveryStateError("only the latest locked selection can be unlocked")
     unlock = _decision(
@@ -276,6 +328,125 @@ def unlock_selection(
     )
 
 
+def request_selection_revision(
+    aggregate: ProductionProjectAggregate,
+    *,
+    scope: TenantScope,
+    expected_aggregate_version: int,
+    selection_ref: EntityVersionRef,
+    selection_version_id: str,
+    decision_entity_id: str,
+    decision_version_id: str,
+    created_at: str,
+    note: str = "",
+    unlock_decision_entity_id: str | None = None,
+    unlock_decision_version_id: str | None = None,
+) -> ProductionProjectAggregate:
+    """Invalidate an exact selection approval/lock and request a new revision."""
+
+    _require_mutation(aggregate, scope, expected_aggregate_version)
+    current = _latest_exact_selection(aggregate, selection_ref)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=current.target_ref,
+        purpose=current.purpose,
+        allowed_entity_id=current.entity_id,
+    )
+    if current.lifecycle_state == "retired":
+        raise ReviewDeliveryStateError("retired selection cannot request revision")
+    revision_request = _decision(
+        scope=scope,
+        entity_id=decision_entity_id,
+        version_id=decision_version_id,
+        subject_ref=current.as_ref(),
+        decision="request_revision",
+        created_at=created_at,
+        note=note,
+    )
+    decisions = [revision_request]
+    if current.lifecycle_state == "locked":
+        if unlock_decision_entity_id is None or unlock_decision_version_id is None:
+            raise ReviewDeliveryStateError(
+                "locked selection revision request requires an exact companion unlock decision"
+            )
+        decisions.append(
+            _decision(
+                scope=scope,
+                entity_id=unlock_decision_entity_id,
+                version_id=unlock_decision_version_id,
+                subject_ref=current.as_ref(),
+                decision="unlock",
+                created_at=created_at,
+                note="revision request invalidated the prior lock",
+            )
+        )
+        lifecycle_state = "approved"
+    else:
+        if unlock_decision_entity_id is not None or unlock_decision_version_id is not None:
+            raise ReviewDeliveryStateError(
+                "unlocked selection cannot carry a companion unlock decision"
+            )
+        lifecycle_state = "candidate"
+    successor = current.model_copy(
+        update={
+            "version_id": selection_version_id,
+            "revision": current.revision + 1,
+            "parent_version_id": current.version_id,
+            "lifecycle_state": lifecycle_state,
+            "review_state": "needs_review",
+            "created_at": created_at,
+        }
+    )
+    return _append(
+        aggregate,
+        evaluated_at=created_at,
+        selections=(successor,),
+        review_decisions=tuple(decisions),
+    )
+
+
+def retire_selection(
+    aggregate: ProductionProjectAggregate,
+    *,
+    scope: TenantScope,
+    expected_aggregate_version: int,
+    selection_ref: EntityVersionRef,
+    selection_version_id: str,
+    decision_entity_id: str,
+    decision_version_id: str,
+    created_at: str,
+    note: str = "",
+) -> ProductionProjectAggregate:
+    _require_mutation(aggregate, scope, expected_aggregate_version)
+    current = _latest_exact_selection(aggregate, selection_ref)
+    if current.lifecycle_state == "retired":
+        raise ReviewDeliveryStateError("selection is already retired")
+    retire = _decision(
+        scope=scope,
+        entity_id=decision_entity_id,
+        version_id=decision_version_id,
+        subject_ref=current.as_ref(),
+        decision="retire",
+        created_at=created_at,
+        note=note,
+    )
+    retired = current.model_copy(
+        update={
+            "version_id": selection_version_id,
+            "revision": current.revision + 1,
+            "parent_version_id": current.version_id,
+            "lifecycle_state": "retired",
+            "created_at": created_at,
+        }
+    )
+    return _append(
+        aggregate,
+        evaluated_at=created_at,
+        selections=(retired,),
+        review_decisions=(retire,),
+    )
+
+
 def restore_selection(
     aggregate: ProductionProjectAggregate,
     *,
@@ -288,6 +459,12 @@ def restore_selection(
 ) -> ProductionProjectAggregate:
     _require_mutation(aggregate, scope, expected_aggregate_version)
     current = _latest_exact_selection(aggregate, selection_ref)
+    _require_single_selection_authority(
+        aggregate,
+        target_ref=current.target_ref,
+        purpose=current.purpose,
+        allowed_entity_id=current.entity_id,
+    )
     if current.lifecycle_state == "locked":
         raise ReviewDeliveryStateError("locked selection must be explicitly unlocked before restore")
     if current.lifecycle_state == "retired":
@@ -324,6 +501,7 @@ def assess_delivery_readiness(
     missing_inventory_count: int,
     preview_artifact_ref: SafeArtifactRef | None,
     export_artifact_refs: Sequence[SafeArtifactRef] = (),
+    artifact_proofs: Sequence[ArtifactAvailabilityProof] = (),
 ) -> DeliveryReadiness:
     _require_scope(aggregate, scope)
     episode = _entity(aggregate, episode_ref, "episode")
@@ -334,6 +512,7 @@ def assess_delivery_readiness(
     selections = tuple(_selection(aggregate, ref) for ref in selection_refs)
     safe_preview = _safe_artifact(preview_artifact_ref) if preview_artifact_ref is not None else None
     safe_exports = tuple(_safe_artifact(ref) for ref in export_artifact_refs)
+    proofs = _artifact_proof_index(artifact_proofs)
     blockers: list[str] = []
     if not _is_latest(aggregate.episodes, episode.entity_id, episode.version_id):
         blockers.append(f"episode_not_latest:{episode.entity_id}:{episode.version_id}")
@@ -343,6 +522,20 @@ def assess_delivery_readiness(
         blockers.append("playable_preview_missing")
     elif safe_preview.artifact_type != "video":
         blockers.append("playable_preview_type_invalid")
+    else:
+        preview_proof = proofs.get(safe_preview)
+        if preview_proof is None:
+            blockers.append(f"preview_artifact_unverified:{safe_preview.artifact_id}")
+        elif not preview_proof.available:
+            blockers.append(f"preview_artifact_unavailable:{safe_preview.artifact_id}")
+        elif not preview_proof.playable:
+            blockers.append(f"preview_artifact_not_playable:{safe_preview.artifact_id}")
+    for export_ref in safe_exports:
+        export_proof = proofs.get(export_ref)
+        if export_proof is None:
+            blockers.append(f"export_artifact_unverified:{export_ref.artifact_id}")
+        elif not export_proof.available:
+            blockers.append(f"export_artifact_unavailable:{export_ref.artifact_id}")
 
     episode_scenes = {
         scene.as_ref()
@@ -413,6 +606,19 @@ def assess_delivery_readiness(
             _require_approved_candidate(candidate)
         except ReviewDeliveryStateError:
             blockers.append(f"candidate_not_approved:{candidate.entity_id}:{candidate.version_id}")
+        if candidate.artifact_ref is not None:
+            candidate_proof = proofs.get(candidate.artifact_ref)
+            if candidate_proof is None:
+                blockers.append(
+                    f"candidate_artifact_unverified:{candidate.artifact_ref.artifact_id}"
+                )
+            elif not candidate_proof.available:
+                blockers.append(
+                    f"candidate_artifact_unavailable:{candidate.artifact_ref.artifact_id}"
+                )
+
+    for duplicate_key in _duplicate_selection_authority_keys(aggregate):
+        blockers.append(f"selection_authority_duplicate:{duplicate_key}")
 
     return DeliveryReadiness(
         ready=not blockers,
@@ -435,6 +641,7 @@ def freeze_delivery(
     missing_inventory_count: int,
     preview_artifact_ref: SafeArtifactRef | None,
     export_artifact_refs: Sequence[SafeArtifactRef],
+    artifact_proofs: Sequence[ArtifactAvailabilityProof] = (),
     delivery_entity_id: str,
     delivery_version_id: str,
     created_at: str,
@@ -448,9 +655,14 @@ def freeze_delivery(
         missing_inventory_count=missing_inventory_count,
         preview_artifact_ref=preview_artifact_ref,
         export_artifact_refs=export_artifact_refs,
+        artifact_proofs=artifact_proofs,
     )
     if not readiness.ready:
         raise DeliveryNotReadyError(readiness)
+    if _active_current_deliveries(aggregate, readiness.episode_ref):
+        raise ReviewDeliveryStateError(
+            "episode already has a current locked delivery; invalidate it before freezing another"
+        )
     selections = tuple(_selection(aggregate, ref) for ref in readiness.selection_refs)
     exact_approvals = tuple(
         _latest_valid_approval(aggregate, selection).as_ref() for selection in selections
@@ -520,6 +732,61 @@ def unlock_delivery(
         evaluated_at=created_at,
         deliveries=(unlocked,),
         review_decisions=(unlock,),
+    )
+
+
+def assess_current_delivery(
+    aggregate: ProductionProjectAggregate,
+    *,
+    scope: TenantScope,
+    delivery_ref: EntityVersionRef,
+    artifact_proofs: Sequence[ArtifactAvailabilityProof] = (),
+) -> CurrentDeliveryValidity:
+    """Evaluate a historical delivery without promoting it to current truth."""
+
+    _require_scope(aggregate, scope)
+    delivery = _delivery(aggregate, delivery_ref)
+    blockers: list[str] = []
+    if not _is_latest(aggregate.deliveries, delivery.entity_id, delivery.version_id):
+        blockers.append(f"delivery_not_latest:{delivery.entity_id}:{delivery.version_id}")
+    if delivery.lifecycle_state != "locked" or delivery.review_state != "approved":
+        blockers.append(f"delivery_not_locked:{delivery.entity_id}:{delivery.version_id}")
+    active_deliveries = _active_current_deliveries(aggregate, delivery.episode_ref)
+    if len(active_deliveries) != 1 or active_deliveries[0].as_ref() != delivery.as_ref():
+        blockers.append(
+            f"delivery_not_current_authority:{delivery.entity_id}:{delivery.version_id}"
+        )
+    readiness = assess_delivery_readiness(
+        aggregate,
+        scope=scope,
+        episode_ref=delivery.episode_ref,
+        selection_refs=delivery.selection_refs,
+        missing_inventory_count=0,
+        preview_artifact_ref=delivery.preview_artifact_ref,
+        export_artifact_refs=delivery.export_artifact_refs,
+        artifact_proofs=artifact_proofs,
+    )
+    blockers.extend(readiness.blockers)
+    invalidating = {
+        "unlock",
+        "request_revision",
+        "retire",
+    }
+    tracked_refs = {delivery.as_ref(), *delivery.selection_refs}
+    for decision in aggregate.review_decisions:
+        if decision.subject_ref not in tracked_refs or decision.decision not in invalidating:
+            continue
+        if datetime.fromisoformat(decision.created_at) >= datetime.fromisoformat(
+            delivery.created_at
+        ):
+            blockers.append(
+                f"delivery_invalidated:{decision.decision}:"
+                f"{decision.subject_ref.entity_id}:{decision.subject_ref.version_id}"
+            )
+    return CurrentDeliveryValidity(
+        delivery=delivery,
+        current_valid=not blockers,
+        blockers=tuple(dict.fromkeys(blockers)),
     )
 
 
@@ -621,6 +888,140 @@ def _is_latest(records, entity_id: str, version_id: str) -> bool:
     return bool(history) and max(history, key=lambda item: item.revision).version_id == version_id
 
 
+def _active_selection_authorities(
+    aggregate: ProductionProjectAggregate,
+    *,
+    target_ref: EntityVersionRef,
+    purpose: str,
+) -> tuple[SelectedVersion, ...]:
+    latest = tuple(
+        selection
+        for selection in aggregate.selections
+        if _is_latest(
+            aggregate.selections,
+            selection.entity_id,
+            selection.version_id,
+        )
+    )
+    return tuple(
+        selection
+        for selection in latest
+        if selection.target_ref == target_ref
+        and selection.purpose == purpose
+        and selection.lifecycle_state not in ("rejected", "retired")
+    )
+
+
+def _active_current_deliveries(
+    aggregate: ProductionProjectAggregate,
+    episode_ref: EntityVersionRef,
+) -> tuple[DeliveryVersion, ...]:
+    return tuple(
+        delivery
+        for delivery in aggregate.deliveries
+        if delivery.episode_ref == episode_ref
+        and _is_latest(
+            aggregate.deliveries,
+            delivery.entity_id,
+            delivery.version_id,
+        )
+        and delivery.lifecycle_state == "locked"
+        and delivery.review_state == "approved"
+        and all(
+            _delivery_selection_is_current(aggregate, selection_ref)
+            for selection_ref in delivery.selection_refs
+        )
+        and not _delivery_has_later_invalidation(aggregate, delivery)
+    )
+
+
+def _delivery_selection_is_current(
+    aggregate: ProductionProjectAggregate,
+    selection_ref: EntityVersionRef,
+) -> bool:
+    try:
+        selection = _selection(aggregate, selection_ref)
+    except ReviewDeliveryReferenceError:
+        return False
+    return (
+        _is_latest(
+            aggregate.selections,
+            selection.entity_id,
+            selection.version_id,
+        )
+        and selection.lifecycle_state == "locked"
+        and selection.review_state == "approved"
+        and _has_valid_approval(aggregate, selection)
+    )
+
+
+def _delivery_has_later_invalidation(
+    aggregate: ProductionProjectAggregate,
+    delivery: DeliveryVersion,
+) -> bool:
+    invalidating = {"unlock", "request_revision", "retire"}
+    tracked_refs = {delivery.as_ref(), *delivery.selection_refs}
+    delivery_created_at = datetime.fromisoformat(delivery.created_at)
+    return any(
+        decision.subject_ref in tracked_refs
+        and decision.decision in invalidating
+        and datetime.fromisoformat(decision.created_at) >= delivery_created_at
+        for decision in aggregate.review_decisions
+    )
+
+
+def _require_single_selection_authority(
+    aggregate: ProductionProjectAggregate,
+    *,
+    target_ref: EntityVersionRef,
+    purpose: str,
+    allowed_entity_id: str | None = None,
+) -> None:
+    authorities = _active_selection_authorities(
+        aggregate,
+        target_ref=target_ref,
+        purpose=purpose,
+    )
+    conflicts = tuple(
+        authority
+        for authority in authorities
+        if allowed_entity_id is None or authority.entity_id != allowed_entity_id
+    )
+    if conflicts:
+        raise ReviewDeliveryStateError(
+            "exact target and purpose already have an active selection authority"
+        )
+
+
+def _duplicate_selection_authority_keys(
+    aggregate: ProductionProjectAggregate,
+) -> tuple[str, ...]:
+    grouped: dict[tuple[EntityVersionRef, str], list[SelectedVersion]] = {}
+    for selection in aggregate.selections:
+        if not _is_latest(
+            aggregate.selections,
+            selection.entity_id,
+            selection.version_id,
+        ):
+            continue
+        if selection.lifecycle_state in ("rejected", "retired"):
+            continue
+        grouped.setdefault((selection.target_ref, selection.purpose), []).append(selection)
+    return tuple(
+        f"{target.entity_type}:{target.entity_id}:{target.version_id}:{purpose}"
+        for (target, purpose), authorities in sorted(
+            grouped.items(),
+            key=lambda item: (
+                item[0][0].entity_type,
+                item[0][0].entity_id,
+                item[0][0].version_id,
+                item[0][1],
+            ),
+        )
+        if len(authorities) > 1
+    )
+
+
 def _require_selectable_candidate(candidate: AssetCandidateVersion) -> None:
     if candidate.job_state in ("queued", "running", "paused", "failed", "cancelled"):
         raise ReviewDeliveryStateError(
@@ -689,7 +1090,7 @@ def _decision(
     entity_id: str,
     version_id: str,
     subject_ref: EntityVersionRef,
-    decision: Literal["approve", "reject", "unlock"],
+    decision: Literal["approve", "reject", "request_revision", "unlock", "retire"],
     created_at: str,
     note: str,
 ) -> ReviewDecision:
@@ -737,6 +1138,33 @@ def _append(
 
 def _safe_artifact(value: SafeArtifactRef) -> SafeArtifactRef:
     return SafeArtifactRef.model_validate(value)
+
+
+def _artifact_proof_index(
+    proofs: Sequence[ArtifactAvailabilityProof],
+) -> dict[SafeArtifactRef, ArtifactAvailabilityProof]:
+    index: dict[SafeArtifactRef, ArtifactAvailabilityProof] = {}
+    for proof in proofs:
+        if not isinstance(proof, ArtifactAvailabilityProof):
+            raise ReviewDeliveryStateError(
+                "artifact proof must be an ArtifactAvailabilityProof"
+            )
+        artifact_ref = _safe_artifact(proof.artifact_ref)
+        if re.fullmatch(SAFE_ID, proof.verification_id, re.ASCII) is None:
+            raise ReviewDeliveryStateError("artifact proof verification_id must be a safe id")
+        if type(proof.available) is not bool or type(proof.playable) is not bool:
+            raise ReviewDeliveryStateError("artifact proof flags must be exact booleans")
+        if proof.playable and not proof.available:
+            raise ReviewDeliveryStateError("unavailable artifact proof cannot be playable")
+        if artifact_ref in index:
+            raise ReviewDeliveryStateError("artifact proof refs must be unique")
+        index[artifact_ref] = ArtifactAvailabilityProof(
+            artifact_ref=artifact_ref,
+            verification_id=proof.verification_id,
+            available=proof.available,
+            playable=proof.playable,
+        )
+    return index
 
 
 def _selection_digest(
@@ -790,7 +1218,9 @@ def _digest(payload: object) -> str:
 
 
 __all__ = (
+    "ArtifactAvailabilityProof",
     "CandidateComparison",
+    "CurrentDeliveryValidity",
     "DeliveryNotReadyError",
     "DeliveryReadiness",
     "EpisodeReviewDeliveryError",
@@ -799,9 +1229,12 @@ __all__ = (
     "ReviewDeliveryStateError",
     "ReviewDeliveryVersionConflictError",
     "assess_delivery_readiness",
+    "assess_current_delivery",
     "compare_candidate_versions",
     "freeze_delivery",
     "lock_selection",
+    "request_selection_revision",
+    "retire_selection",
     "restore_selection",
     "review_selection",
     "select_candidate",

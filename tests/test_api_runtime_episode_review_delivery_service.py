@@ -20,15 +20,19 @@ from apps.api.runtime_episode_domain_contract import (
     TenantScope,
 )
 from apps.api.runtime_episode_review_delivery_service import (
+    ArtifactAvailabilityProof,
     DeliveryNotReadyError,
     ReviewDeliveryReferenceError,
     ReviewDeliveryScopeError,
     ReviewDeliveryStateError,
     ReviewDeliveryVersionConflictError,
+    assess_current_delivery,
     assess_delivery_readiness,
     compare_candidate_versions,
     freeze_delivery,
     lock_selection,
+    request_selection_revision,
+    retire_selection,
     restore_selection,
     review_selection,
     select_candidate,
@@ -131,6 +135,40 @@ def _artifact(name: str, artifact_type: str = "image") -> SafeArtifactRef:
     )
 
 
+def _proof(
+    artifact_ref: SafeArtifactRef,
+    *,
+    playable: bool = False,
+    available: bool = True,
+) -> ArtifactAvailabilityProof:
+    return ArtifactAvailabilityProof(
+        artifact_ref=artifact_ref,
+        verification_id=f"verify-{artifact_ref.artifact_id}",
+        available=available,
+        playable=playable,
+    )
+
+
+def _delivery_proofs(
+    aggregate: ProductionProjectAggregate,
+    preview: SafeArtifactRef,
+    exports: tuple[SafeArtifactRef, ...] = (),
+) -> tuple[ArtifactAvailabilityProof, ...]:
+    selected_artifacts = tuple(
+        candidate.artifact_ref
+        for selection in aggregate.selections
+        for candidate in aggregate.asset_candidates
+        if selection == aggregate.selections[-1]
+        and candidate.as_ref() == selection.candidate_ref
+        and candidate.artifact_ref is not None
+    )
+    return (
+        *(_proof(ref) for ref in selected_artifacts),
+        _proof(preview, playable=True),
+        *(_proof(ref) for ref in exports),
+    )
+
+
 def _selected_v2(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate:
     return select_candidate(
         aggregate,
@@ -172,6 +210,8 @@ def _locked(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate
 
 
 def _frozen(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate:
+    preview = _artifact("preview-episode", "video")
+    exports = (_artifact("export-episode", "video"),)
     return freeze_delivery(
         aggregate,
         scope=SCOPE,
@@ -179,8 +219,9 @@ def _frozen(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate
         episode_ref=_ref(aggregate.episodes[0]),
         selection_refs=(_ref(aggregate.selections[-1]),),
         missing_inventory_count=0,
-        preview_artifact_ref=_artifact("preview-episode", "video"),
-        export_artifact_refs=(_artifact("export-episode", "video"),),
+        preview_artifact_ref=preview,
+        export_artifact_refs=exports,
+        artifact_proofs=_delivery_proofs(aggregate, preview, exports),
         delivery_entity_id="delivery-episode-1",
         delivery_version_id="delivery-episode-1.v1",
         created_at=TIMES[7],
@@ -212,6 +253,62 @@ def test_compare_v1_v2_and_reject_cross_target_versions() -> None:
         )
 
 
+def test_new_selection_rejects_stale_candidate_version_and_parallel_authority() -> None:
+    aggregate = _aggregate()
+    with pytest.raises(ReviewDeliveryVersionConflictError, match="not the latest"):
+        select_candidate(
+            aggregate,
+            scope=SCOPE,
+            expected_aggregate_version=aggregate.aggregate_version,
+            candidate_ref=_ref(aggregate.asset_candidates[0]),
+            purpose="storyboard",
+            selection_entity_id="selection-stale",
+            selection_version_id="selection-stale.v1",
+            created_at=TIMES[4],
+        )
+
+    candidate_v2 = aggregate.asset_candidates[1]
+    candidate_v3 = candidate_v2.model_copy(
+        update={
+            "version_id": "candidate-shot-1.v3",
+            "revision": 3,
+            "parent_version_id": candidate_v2.version_id,
+            "lifecycle_state": "candidate",
+            "review_state": "needs_review",
+            "content_digest": _digest("candidate-shot-v3"),
+            "artifact_ref": _artifact("artifact-shot-v3"),
+            "created_at": TIMES[3],
+        }
+    )
+    payload = aggregate.model_dump(mode="python")
+    payload["asset_candidates"] = (*aggregate.asset_candidates, candidate_v3)
+    with_v3 = ProductionProjectAggregate.model_validate(payload)
+    with pytest.raises(ReviewDeliveryVersionConflictError, match="not the latest"):
+        select_candidate(
+            with_v3,
+            scope=SCOPE,
+            expected_aggregate_version=with_v3.aggregate_version,
+            candidate_ref=_ref(candidate_v2),
+            purpose="storyboard",
+            selection_entity_id="selection-stale-v2",
+            selection_version_id="selection-stale-v2.v1",
+            created_at=TIMES[4],
+        )
+
+    selected = _selected_v2(aggregate)
+    with pytest.raises(ReviewDeliveryStateError, match="active selection authority"):
+        select_candidate(
+            selected,
+            scope=SCOPE,
+            expected_aggregate_version=selected.aggregate_version,
+            candidate_ref=_ref(selected.asset_candidates[1]),
+            purpose="storyboard",
+            selection_entity_id="selection-parallel",
+            selection_version_id="selection-parallel.v1",
+            created_at=TIMES[5],
+        )
+
+
 def test_select_v2_approve_lock_and_freeze_append_exact_history() -> None:
     original = _aggregate()
     selected = _selected_v2(original)
@@ -233,6 +330,93 @@ def test_select_v2_approve_lock_and_freeze_append_exact_history() -> None:
     )
     assert frozen.aggregate_version == 5
     assert ProductionProjectAggregate.model_validate(frozen.model_dump()) == frozen
+
+
+def test_duplicate_approve_fails_without_appending_another_revision() -> None:
+    approved = _approved(_selected_v2(_aggregate()))
+    before = approved.model_dump(mode="python")
+
+    with pytest.raises(ReviewDeliveryStateError, match="duplicate approve"):
+        review_selection(
+            approved,
+            scope=SCOPE,
+            expected_aggregate_version=approved.aggregate_version,
+            selection_ref=_ref(approved.selections[-1]),
+            decision="approve",
+            selection_version_id="selection-shot-1.v3",
+            decision_entity_id="duplicate-approve",
+            decision_version_id="duplicate-approve.v1",
+            created_at=TIMES[6],
+        )
+
+    assert approved.model_dump(mode="python") == before
+
+
+def test_parallel_selection_authorities_block_lock_and_freeze() -> None:
+    locked = _locked(_approved(_selected_v2(_aggregate())))
+    parallel = locked.selections[-1].model_copy(
+        update={
+            "entity_id": "selection-parallel",
+            "version_id": "selection-parallel.v1",
+            "revision": 1,
+            "parent_version_id": None,
+        }
+    )
+    parallel_approval = ReviewDecision(
+        **_fact("approve-selection-parallel", created_at=TIMES[6]),
+        subject_ref=_ref(parallel),
+        decision="approve",
+    )
+    payload = locked.model_dump(mode="python")
+    payload.update(
+        {
+            "selections": (*locked.selections, parallel),
+            "review_decisions": (*locked.review_decisions, parallel_approval),
+        }
+    )
+    duplicated = ProductionProjectAggregate.model_validate(payload)
+    preview = _artifact("preview-duplicate", "video")
+    proofs = _delivery_proofs(duplicated, preview)
+
+    readiness = assess_delivery_readiness(
+        duplicated,
+        scope=SCOPE,
+        episode_ref=_ref(duplicated.episodes[0]),
+        selection_refs=(_ref(duplicated.selections[-2]), _ref(parallel)),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        artifact_proofs=proofs,
+    )
+    assert any(
+        blocker.startswith("selection_authority_duplicate:")
+        for blocker in readiness.blockers
+    )
+    with pytest.raises(ReviewDeliveryStateError, match="active selection authority"):
+        lock_selection(
+            duplicated,
+            scope=SCOPE,
+            expected_aggregate_version=duplicated.aggregate_version,
+            selection_ref=_ref(duplicated.selections[-2]),
+            selection_version_id="selection-shot-1.v4",
+            decision_entity_id="lock-duplicate",
+            decision_version_id="lock-duplicate.v1",
+            created_at=TIMES[7],
+        )
+    with pytest.raises(DeliveryNotReadyError):
+        freeze_delivery(
+            duplicated,
+            scope=SCOPE,
+            expected_aggregate_version=duplicated.aggregate_version,
+            episode_ref=_ref(duplicated.episodes[0]),
+            selection_refs=(_ref(duplicated.selections[-2]), _ref(parallel)),
+            missing_inventory_count=0,
+            preview_artifact_ref=preview,
+            export_artifact_refs=(),
+            artifact_proofs=proofs,
+            delivery_entity_id="delivery-duplicate",
+            delivery_version_id="delivery-duplicate.v1",
+            created_at=TIMES[7],
+        )
 
 
 def test_reject_appends_history_without_deleting_candidate_or_selection() -> None:
@@ -311,23 +495,13 @@ def test_restore_v1_creates_new_selection_version_and_requires_new_exact_review(
 
 
 def test_changed_candidate_selection_cannot_reuse_old_approval() -> None:
-    v1_selected = select_candidate(
-        _aggregate(),
-        scope=SCOPE,
-        expected_aggregate_version=1,
-        candidate_ref=_ref(_aggregate().asset_candidates[0]),
-        purpose="storyboard",
-        selection_entity_id="selection-shot-1",
-        selection_version_id="selection-shot-1.v1",
-        created_at=TIMES[4],
-    )
-    v1_approved = _approved(v1_selected)
+    v2_approved = _approved(_selected_v2(_aggregate()))
     changed = restore_selection(
-        v1_approved,
+        v2_approved,
         scope=SCOPE,
-        expected_aggregate_version=v1_approved.aggregate_version,
-        selection_ref=_ref(v1_approved.selections[-1]),
-        historical_candidate_ref=_ref(v1_approved.asset_candidates[1]),
+        expected_aggregate_version=v2_approved.aggregate_version,
+        selection_ref=_ref(v2_approved.selections[-1]),
+        historical_candidate_ref=_ref(v2_approved.asset_candidates[0]),
         selection_version_id="selection-shot-1.v3",
         created_at=TIMES[6],
     )
@@ -503,6 +677,7 @@ def test_twenty_five_missing_inventory_blocks_delivery_without_fake_preview() ->
             missing_inventory_count=25,
             preview_artifact_ref=None,
             export_artifact_refs=(),
+            artifact_proofs=(),
             delivery_entity_id="delivery-blocked",
             delivery_version_id="delivery-blocked.v1",
             created_at=TIMES[4],
@@ -541,6 +716,7 @@ def test_delivery_blocks_when_episode_continuity_exact_selection_is_open() -> No
             missing_inventory_count=0,
             preview_artifact_ref=_artifact("preview-episode", "video"),
             export_artifact_refs=(),
+            artifact_proofs=(),
             delivery_entity_id="delivery-open-continuity",
             delivery_version_id="delivery-open-continuity.v1",
             created_at=TIMES[7],
@@ -549,6 +725,33 @@ def test_delivery_blocks_when_episode_continuity_exact_selection_is_open() -> No
 
 def test_delivery_unlock_is_append_only_and_serializes_roundtrip() -> None:
     frozen = _frozen(_locked(_approved(_selected_v2(_aggregate()))))
+    delivery = frozen.deliveries[-1]
+    proofs = _delivery_proofs(
+        frozen,
+        delivery.preview_artifact_ref,
+        delivery.export_artifact_refs,
+    )
+    assert assess_current_delivery(
+        frozen,
+        scope=SCOPE,
+        delivery_ref=_ref(delivery),
+        artifact_proofs=proofs,
+    ).current_valid
+    with pytest.raises(ReviewDeliveryStateError, match="current locked delivery"):
+        freeze_delivery(
+            frozen,
+            scope=SCOPE,
+            expected_aggregate_version=frozen.aggregate_version,
+            episode_ref=delivery.episode_ref,
+            selection_refs=delivery.selection_refs,
+            missing_inventory_count=0,
+            preview_artifact_ref=delivery.preview_artifact_ref,
+            export_artifact_refs=delivery.export_artifact_refs,
+            artifact_proofs=proofs,
+            delivery_entity_id="delivery-parallel-current",
+            delivery_version_id="delivery-parallel-current.v1",
+            created_at=TIMES[8],
+        )
     unlocked = unlock_delivery(
         frozen,
         scope=SCOPE,
@@ -565,6 +768,93 @@ def test_delivery_unlock_is_append_only_and_serializes_roundtrip() -> None:
     assert restored.review_decisions[-1].decision == "unlock"
     assert restored.review_decisions[-1].subject_ref == _ref(restored.deliveries[0])
     assert restored == unlocked
+    validity = assess_current_delivery(
+        restored,
+        scope=SCOPE,
+        delivery_ref=_ref(restored.deliveries[0]),
+        artifact_proofs=proofs,
+    )
+    assert validity.current_valid is False
+    assert validity.delivery == restored.deliveries[0]
+    assert any(blocker.startswith("delivery_not_latest:") for blocker in validity.blockers)
+    assert any("delivery_invalidated:unlock:" in blocker for blocker in validity.blockers)
+
+
+def test_selection_unlock_revision_request_and_retire_invalidate_current_delivery() -> None:
+    frozen = _frozen(_locked(_approved(_selected_v2(_aggregate()))))
+    delivery = frozen.deliveries[-1]
+    proofs = _delivery_proofs(
+        frozen,
+        delivery.preview_artifact_ref,
+        delivery.export_artifact_refs,
+    )
+
+    unlocked = unlock_selection(
+        frozen,
+        scope=SCOPE,
+        expected_aggregate_version=frozen.aggregate_version,
+        selection_ref=_ref(frozen.selections[-1]),
+        selection_version_id="selection-shot-1.v4",
+        decision_entity_id="unlock-current-selection",
+        decision_version_id="unlock-current-selection.v1",
+        created_at=TIMES[8],
+    )
+    unlock_validity = assess_current_delivery(
+        unlocked,
+        scope=SCOPE,
+        delivery_ref=_ref(delivery),
+        artifact_proofs=proofs,
+    )
+    assert unlock_validity.current_valid is False
+    assert delivery in unlocked.deliveries
+    assert any("delivery_invalidated:unlock:" in item for item in unlock_validity.blockers)
+
+    revision_requested = request_selection_revision(
+        frozen,
+        scope=SCOPE,
+        expected_aggregate_version=frozen.aggregate_version,
+        selection_ref=_ref(frozen.selections[-1]),
+        selection_version_id="selection-shot-1.v4",
+        decision_entity_id="revise-current-selection",
+        decision_version_id="revise-current-selection.v1",
+        unlock_decision_entity_id="unlock-for-revision",
+        unlock_decision_version_id="unlock-for-revision.v1",
+        created_at=TIMES[8],
+        note="continuity repair required",
+    )
+    revision_validity = assess_current_delivery(
+        revision_requested,
+        scope=SCOPE,
+        delivery_ref=_ref(delivery),
+        artifact_proofs=proofs,
+    )
+    assert revision_requested.selections[-1].review_state == "needs_review"
+    assert revision_validity.current_valid is False
+    assert any(
+        "delivery_invalidated:request_revision:" in item
+        for item in revision_validity.blockers
+    )
+
+    retired = retire_selection(
+        frozen,
+        scope=SCOPE,
+        expected_aggregate_version=frozen.aggregate_version,
+        selection_ref=_ref(frozen.selections[-1]),
+        selection_version_id="selection-shot-1.v4",
+        decision_entity_id="retire-current-selection",
+        decision_version_id="retire-current-selection.v1",
+        created_at=TIMES[8],
+        note="candidate withdrawn",
+    )
+    retire_validity = assess_current_delivery(
+        retired,
+        scope=SCOPE,
+        delivery_ref=_ref(delivery),
+        artifact_proofs=proofs,
+    )
+    assert retired.selections[-1].lifecycle_state == "retired"
+    assert retire_validity.current_valid is False
+    assert any("delivery_invalidated:retire:" in item for item in retire_validity.blockers)
 
 
 def test_unsafe_preview_or_export_ref_fails_contract_validation() -> None:
@@ -588,12 +878,87 @@ def test_unsafe_preview_or_export_ref_fails_contract_validation() -> None:
                 "content_digest": _digest("unsafe"),
             },
         )
-    assert assess_delivery_readiness(
+    preview = _artifact("safe-preview", "video")
+    export = _artifact("safe-export", "video")
+    unverified = assess_delivery_readiness(
         locked,
         scope=SCOPE,
         episode_ref=_ref(locked.episodes[0]),
         selection_refs=(_ref(locked.selections[-1]),),
         missing_inventory_count=0,
-        preview_artifact_ref=_artifact("safe-preview", "video"),
-        export_artifact_refs=(_artifact("safe-export", "video"),),
-    ).ready
+        preview_artifact_ref=preview,
+        export_artifact_refs=(export,),
+    )
+    assert unverified.ready is False
+    assert f"preview_artifact_unverified:{preview.artifact_id}" in unverified.blockers
+    assert f"export_artifact_unverified:{export.artifact_id}" in unverified.blockers
+    assert any(
+        blocker.startswith("candidate_artifact_unverified:")
+        for blocker in unverified.blockers
+    )
+    with pytest.raises(DeliveryNotReadyError) as unverified_freeze:
+        freeze_delivery(
+            locked,
+            scope=SCOPE,
+            expected_aggregate_version=locked.aggregate_version,
+            episode_ref=_ref(locked.episodes[0]),
+            selection_refs=(_ref(locked.selections[-1]),),
+            missing_inventory_count=0,
+            preview_artifact_ref=preview,
+            export_artifact_refs=(export,),
+            delivery_entity_id="delivery-unverified-artifacts",
+            delivery_version_id="delivery-unverified-artifacts.v1",
+            created_at=TIMES[7],
+        )
+    assert f"preview_artifact_unverified:{preview.artifact_id}" in (
+        unverified_freeze.value.readiness.blockers
+    )
+    assert f"export_artifact_unverified:{export.artifact_id}" in (
+        unverified_freeze.value.readiness.blockers
+    )
+    verified = assess_delivery_readiness(
+        locked,
+        scope=SCOPE,
+        episode_ref=_ref(locked.episodes[0]),
+        selection_refs=(_ref(locked.selections[-1]),),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        export_artifact_refs=(export,),
+        artifact_proofs=_delivery_proofs(locked, preview, (export,)),
+    )
+    assert verified.ready
+
+    unavailable = assess_delivery_readiness(
+        locked,
+        scope=SCOPE,
+        episode_ref=_ref(locked.episodes[0]),
+        selection_refs=(_ref(locked.selections[-1]),),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        export_artifact_refs=(export,),
+        artifact_proofs=(
+            *_delivery_proofs(locked, preview),
+            _proof(export, available=False),
+        ),
+    )
+    assert unavailable.ready is False
+    assert f"export_artifact_unavailable:{export.artifact_id}" in unavailable.blockers
+
+    not_playable_proofs = tuple(
+        _proof(item.artifact_ref, playable=False)
+        if item.artifact_ref == preview
+        else item
+        for item in _delivery_proofs(locked, preview, (export,))
+    )
+    not_playable = assess_delivery_readiness(
+        locked,
+        scope=SCOPE,
+        episode_ref=_ref(locked.episodes[0]),
+        selection_refs=(_ref(locked.selections[-1]),),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        export_artifact_refs=(export,),
+        artifact_proofs=not_playable_proofs,
+    )
+    assert not_playable.ready is False
+    assert f"preview_artifact_not_playable:{preview.artifact_id}" in not_playable.blockers
