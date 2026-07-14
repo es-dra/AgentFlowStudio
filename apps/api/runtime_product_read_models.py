@@ -557,8 +557,16 @@ def _stage_progress(
     completed_actions = {key for key, status in actions.items() if status == "completed"}
     started_actions = set(actions)
     candidate_ready = bool(run.get("candidates"))
+    # A project name is not a completed creative brief. New projects should
+    # start at the brief instead of reporting invented progress.
+    brief_evidence = bool(
+        manifest.get("source_assets")
+        or manifest.get("content_cards")
+        or tasks
+        or run
+    )
     completed = {
-        "brief": bool(manifest.get("goal")),
+        "brief": brief_evidence,
         "script": "script.write" in completed_actions,
         "canon": bool(coverage["characters"] or coverage["scenes"]),
         "storyboard": "storyboard.compose" in completed_actions or coverage["shots"] > 0,

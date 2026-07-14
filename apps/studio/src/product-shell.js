@@ -190,7 +190,7 @@ export function createProductShell(options = {}) {
 
   function deliveryPanel(delivery = {}, canon = {}) {
     const panel = surface(message("deliveryReadiness", locale), delivery.delivered ? "完成" : "");
-    const percent = delivery.delivered ? 100 : delivery.export_ready ? 80 : delivery.quality_reviewed ? 60 : delivery.candidate_selected ? 40 : 20;
+    const percent = delivery.delivered ? 100 : delivery.export_ready ? 80 : delivery.quality_reviewed ? 60 : delivery.candidate_selected ? 40 : 0;
     const readiness = node("div", "delivery-readiness");
     const meter = node("div", "delivery-meter");
     meter.appendChild(node("strong", "", `${percent}%`));
@@ -213,7 +213,10 @@ export function createProductShell(options = {}) {
 
   function projectsView() {
     const wrap = node("section", "product-section-view");
-    wrap.appendChild(viewHeading(message("projects", locale), snapshot.workspace?.projects?.length || 0));
+    wrap.appendChild(viewHeading(message("projects", locale), snapshot.workspace?.projects?.length || 0, {
+      label: locale === "zh-CN" ? "新建项目" : "New project",
+      action: () => options.onCreateProject?.(),
+    }));
     const list = node("div", "product-project-list");
     for (const project of snapshot.workspace?.projects || []) {
       const button = node("button", `project-row ${project.project_id === snapshot.project?.project_id ? "active" : ""}`);
@@ -326,6 +329,10 @@ export function createProductShell(options = {}) {
       wrap.appendChild(retry);
     } else {
       wrap.append(node("h1", "", message("empty", locale)), node("p", "", message("emptyCopy", locale)));
+      const create = node("button", "product-primary-button", locale === "zh-CN" ? "新建项目" : "New project");
+      create.type = "button";
+      create.addEventListener("click", () => options.onCreateProject?.());
+      wrap.appendChild(create);
     }
     return wrap;
   }
@@ -366,11 +373,17 @@ function surface(title, count = "", onMore = null) {
   return { wrap, body };
 }
 
-function viewHeading(title, count) {
+function viewHeading(title, count, action = null) {
   const head = node("div", "product-page-heading");
   const copy = node("div");
   copy.append(node("h1", "", title), node("p", "", `共 ${count} 项`));
   head.appendChild(copy);
+  if (action?.label && typeof action.action === "function") {
+    const button = node("button", "product-primary-button", action.label);
+    button.type = "button";
+    button.addEventListener("click", action.action);
+    head.appendChild(button);
+  }
   return head;
 }
 

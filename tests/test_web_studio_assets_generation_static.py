@@ -370,8 +370,9 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "error.status = response.status" in runtime_client
     assert "error.route = route" in runtime_client
     assert "missingPreflightRouteError" in generation_guards
-    assert "Runtime Service version is stale or not started from this branch" in generation_guards
-    assert "Restart the 8790 Runtime Service and retry" in generation_guards
+    assert "服务暂时不可用，请刷新页面后重试。" in generation_guards
+    assert "Runtime Service version is stale or not started from this branch" not in generation_guards
+    assert "Restart the 8790 Runtime Service and retry" not in generation_guards
 
 
 def test_asset_card_generation_uses_optional_fixed_asset_carry_policy() -> None:
@@ -914,7 +915,8 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     assert "/video-revisions" in runtime_client
     assert "staleRuntimeRouteMessage" in runtime_client
     assert "error.status = response.status" in runtime_client
-    assert "Restart the 8790 Runtime Service" in runtime_client
+    assert "当前功能暂时不可用，请刷新页面后重试。" in runtime_client
+    assert "Restart the 8790 Runtime Service" not in runtime_client
     assert "unconnectedLabelMatchedAssets" in generation_guards
     assert "showUnconnectedNamedAssetModal" in generation_guards
     assert "user_excluded_unconnected_named_asset" in generation_guards

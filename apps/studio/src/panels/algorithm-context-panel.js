@@ -19,7 +19,7 @@ const CORE_ALGORITHMS = [
 export function projectPipelineSection(state) {
   return algorithmSection({
     title: "系统参考",
-    tag: "折叠 trace",
+    tag: "查看制作依据",
     summary: projectSummary(state),
     steps: CORE_ALGORITHMS.map((item) => [item, projectAlgorithmStatus(state, item.id)]),
     stats: [

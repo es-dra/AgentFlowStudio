@@ -450,9 +450,9 @@ function setScriptExpansionError(store, nodeId, error) {
       completed_at: new Date().toISOString(),
     };
     node.params.generationPolicyStatus = "needs_attention";
-    node.params.generationStatusDetail = "LLM 剧本扩写未完成。";
+    node.params.generationStatusDetail = "剧本扩写未完成。";
     node.params.generationBlockedReason = message;
-    node.params.generationNextAction = "开启 LLM provider gate 后重试剧本扩写。";
+    node.params.generationNextAction = "确认生成服务可用后重试剧本扩写。";
   });
 }
 

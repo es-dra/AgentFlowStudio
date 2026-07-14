@@ -171,8 +171,7 @@ function staleRuntimeRouteMessage(response, route, body, parsed = null) {
   const missingPreflight = /\/(keyframe-generations|keyframe-local-edits|video-generations|video-revisions)\/preflight$/.test(route);
   const missingRevisionRoute = /\/video-revisions$/.test(route);
   if (!missingPreflight && !missingRevisionRoute) return "";
-  const detail = runtimeErrorMessage(response, body, parsed);
-  return `${detail}. Runtime Service route is missing for ${route}. Restart the 8790 Runtime Service from the current branch and retry.`;
+  return "当前功能暂时不可用，请刷新页面后重试。";
 }
 
 function runtimeErrorMessage(response, body, parsed = null) {
@@ -181,9 +180,7 @@ function runtimeErrorMessage(response, body, parsed = null) {
     detail = [
       parsed.message,
       parsed.field ? `字段：${parsed.field}` : "",
-      parsed.error ? `代码：${parsed.error}` : "",
       parsed.user_action ? `建议：${parsed.user_action}` : "",
-      parsed.request_id ? `请求编号：${parsed.request_id}` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -191,7 +188,7 @@ function runtimeErrorMessage(response, body, parsed = null) {
     detail = cleanTextResponseError(body, response);
   }
   const safeDetail = cleanRuntimeErrorText(detail, 220);
-  return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
+  return safeDetail || "请求暂时失败，请稍后重试。";
 }
 
 function parseRuntimeErrorPayload(response, body) {

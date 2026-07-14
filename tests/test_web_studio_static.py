@@ -189,7 +189,7 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "首页" in topbar
 
 
-def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> None:
+def test_studio_topbar_surfaces_creator_safe_service_status() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     runtime_status = (STUDIO_ROOT / "src" / "runtime-surface-status.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
@@ -206,14 +206,17 @@ def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> 
     assert "runtime.authStatus()" in runtime_status
     assert "providerGateSummary" in runtime_status
     assert "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed." in runtime_status
-    assert "Runtime service ready" in runtime_status
+    assert "创作服务已连接" in runtime_status
     assert "boundaryLabel" in runtime_status
     assert "runtimeSurfaceStatus" in topbar
     assert "runtimeStatusBadge" in topbar
     assert "safeRuntimeStatusState" in topbar
     assert "runtime-status-badge" in topbar
-    assert "runtime-status-gates" in topbar
-    assert "runtime-status-boundary" in topbar
+    assert "runtime-status-gates" not in topbar
+    assert "runtime-status-boundary" not in topbar
+    assert "Auth unknown" not in topbar
+    assert "Provider gates unknown" not in topbar
+    assert "Health only" not in topbar
     assert "data-state" in topbar or "dataset.state" in topbar
     assert ".runtime-status-badge.ready" in styles
     assert ".runtime-status-badge.unavailable" in styles
@@ -281,7 +284,7 @@ def test_prompt_optimizer_provider_errors_use_user_facing_message() -> None:
     runtime_errors = (STUDIO_ROOT / "src" / "runtime-error-utils.js").read_text(encoding="utf-8")
     optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
 
-    assert "提示词优化失败，请检查 LLM provider 配置或稍后重试。" in runtime_errors
+    assert "提示词优化失败，请检查生成服务配置或稍后重试。" in runtime_errors
     assert "provider returned infrastructure error" in runtime_errors
     assert "unable to read `request.json`" in runtime_errors
     assert "bwrap:" in runtime_errors

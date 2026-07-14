@@ -91,12 +91,11 @@ async function bootstrap() {
   await refreshRuntimeSurfaceStatus({ authState });
 
   await projectController.ensureAccessibleStartupProject();
-  await store.hydrateRuntime(runtime);
-  await syncRuntimeAssets(store, runtime);
-  await restoreCandidateSelectionsAfterLoad(store, runtime);
-  await refreshPendingKeyframeGenerations(store, runtime);
-  await projectController.refreshProjectSummaries();
-  await refreshProductOverview();
+  if (hasActiveProject()) {
+    await store.hydrateRuntime(runtime); await syncRuntimeAssets(store, runtime);
+    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
+  }
+  await projectController.refreshProjectSummaries(); await refreshProductOverview();
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
@@ -114,6 +113,7 @@ function initializeStudio(authUser) {
       await refreshProductOverview();
     },
     onRetry: refreshProductOverview,
+    onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
     formatError: safeError,

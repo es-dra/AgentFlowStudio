@@ -5,7 +5,7 @@ export function assetIdFromRef(ref) {
 }
 
 export function assetLabel(ref) {
-  return String(ref?.label || ref?.title || ref?.signature || assetIdFromRef(ref) || "资产").trim();
+  return String(ref?.label || ref?.title || ref?.signature || "未命名素材").trim();
 }
 
 export function assetTypeLabel(ref) {

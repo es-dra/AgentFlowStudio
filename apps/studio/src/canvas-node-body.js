@@ -166,33 +166,27 @@ function creativeRuntimeContractSummary(node) {
   const provider = safeSummaryObject(summary.provider_context);
   const knowledge = safeSummaryObject(summary.knowledge_context);
   const assets = safeSummaryObject(summary.asset_context);
-  const modelContext = safeSummaryObject(summary.model_call_context);
   const artifact = safeSummaryObject(summary.artifact);
   const box = document.createElement("details");
   box.className = "creative-runtime-contract-summary";
 
   const header = document.createElement("summary");
+  const generationStarted = provider.provider_calls_started === true;
   header.innerHTML = [
     `<span>${icon("sparkles", 12)}</span>`,
-    `<strong>Creative contract</strong>`,
-    `<small>${escapeHtml(summary.operation || "runtime")} / ${escapeHtml(provider.required_gate || "gate pending")}</small>`,
+    `<strong>本次制作依据</strong>`,
+    `<small>${generationStarted ? "生成已开始" : "尚未开始生成"} · ${safeCount(knowledge.rule_count)} 条规则</small>`,
   ].join("");
   box.appendChild(header);
 
   const detail = document.createElement("div");
   detail.className = "creative-runtime-contract-detail";
-  appendContractChip(detail, "contract", shortRef(summary.contract_id));
-  appendContractChip(detail, "model", shortRef(modelContext.context_id || summary.evidence_context?.model_call_context_id));
-  appendContractChip(detail, "provider", provider.provider_calls_started ? "started" : "not started");
-  appendContractChip(detail, "gate", [provider.required_gate, provider.gate_status].filter(Boolean).join(" / "));
-  appendContractChip(detail, "rules", safeCount(knowledge.rule_count));
-  appendContractChip(detail, "assets", [
-    `fixed ${safeCount(assets.fixed_asset_count)}`,
-    `draft ${safeCount(assets.draft_asset_count)}`,
-    `unresolved ${safeCount(assets.unresolved_asset_count)}`,
-  ].join(" / "));
-  appendContractChip(detail, "artifact", artifact.filename || "summary only");
-  appendContractChip(detail, "non-claims", safeArray(summary.non_claims).length);
+  appendContractChip(detail, "生成状态", generationStarted ? "已开始" : "尚未开始");
+  appendContractChip(detail, "制作规则", `${safeCount(knowledge.rule_count)} 条`);
+  appendContractChip(detail, "参考素材", `${safeCount(assets.fixed_asset_count)} 个固定 / ${safeCount(assets.draft_asset_count)} 个草稿`);
+  appendContractChip(detail, "待确认素材", `${safeCount(assets.unresolved_asset_count)} 个`);
+  appendContractChip(detail, "产物记录", artifact.filename ? "已记录" : "尚未生成");
+  appendContractChip(detail, "需人工确认", `${safeArray(summary.non_claims).length} 项`);
   box.appendChild(detail);
 
   return box;
@@ -201,7 +195,7 @@ function creativeRuntimeContractSummary(node) {
 function appendContractChip(parent, label, value) {
   const chip = document.createElement("span");
   chip.className = "creative-runtime-contract-chip";
-  chip.textContent = `${label}: ${value === 0 ? "0" : String(value || "none")}`;
+  chip.textContent = `${label}：${value === 0 ? "0" : String(value || "未记录")}`;
   parent.appendChild(chip);
 }
 
@@ -216,13 +210,6 @@ function safeArray(value) {
 function safeCount(value) {
   const count = Number(value);
   return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
-}
-
-function shortRef(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  if (text.length <= 18) return text;
-  return `${text.slice(0, 10)}...${text.slice(-6)}`;
 }
 
 function editableContentBlock(node, store, expanding) {

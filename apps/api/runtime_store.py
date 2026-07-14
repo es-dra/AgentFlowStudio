@@ -117,7 +117,7 @@ class RuntimeStore:
             return self.create_project_manifest(
                 project_id=project_id,
                 project_type="short_video_campaign",
-                goal="Runtime service project",
+                goal="未命名项目",
                 status="in_progress",
             )
         payload = read_json(path)

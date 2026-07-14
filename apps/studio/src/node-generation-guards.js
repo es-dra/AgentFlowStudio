@@ -128,8 +128,8 @@ function missingPreflightRouteError(error) {
 }
 
 function staleRuntimePreflightMessage(kind) {
-  const label = kind === "video_revision" ? "video revision" : kind === "video" ? "video" : "keyframe";
-  return `Runtime Service version is stale or not started from this branch: missing ${label} preflight route. Restart the 8790 Runtime Service and retry.`;
+  const label = kind === "video_revision" ? "视频修改" : kind === "video" ? "视频生成" : "关键帧生成";
+  return `${label}服务暂时不可用，请刷新页面后重试。`;
 }
 
 function showCarryConfirmModal(preflight, node, kind, policy = {}) {

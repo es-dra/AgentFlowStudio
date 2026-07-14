@@ -8,6 +8,7 @@ from pathlib import Path
 def test_asset_detail_source_evidence_rows_are_safe_and_local() -> None:
     script = r'''
 import { assetSourceEvidenceRows } from "./apps/studio/src/panels/asset-detail-popover.js";
+import { assetLabel } from "./apps/studio/src/asset-reference-summary.js";
 
 const unsafeSignedKey = ["signed", "url"].join("_");
 const rows = assetSourceEvidenceRows({
@@ -24,7 +25,7 @@ const rows = assetSourceEvidenceRows({
   },
 });
 
-process.stdout.write(JSON.stringify({ rows }));
+process.stdout.write(JSON.stringify({ rows, unnamedLabel: assetLabel({ asset_id: "raw-asset-id-001" }) }));
 '''
     completed = subprocess.run(
         ["node", "--input-type=module", "-e", script],
@@ -37,11 +38,18 @@ process.stdout.write(JSON.stringify({ rows }));
     rows = payload["rows"]
     serialized = json.dumps(payload, ensure_ascii=False).lower()
 
-    assert "human_gate: runtime-human-gate:demo:accepted" in rows
-    assert "asset_candidate: asset_card_candidate:main_character" in rows
-    assert "stage: asset_card_candidate_human_gate" in rows
-    assert "provider_calls_started=false" in rows
-    assert "human_creative_acceptance_claimed=false" in rows
+    assert rows == [
+        "人工审核：已记录",
+        "资产候选：已记录",
+        "来源阶段：已记录",
+        "生成服务：未调用",
+        "人工创意确认：未确认",
+    ]
+    assert "runtime-human-gate" not in serialized
+    assert "asset_card_candidate" not in serialized
+    assert "provider_calls_started" not in serialized
+    assert payload["unnamedLabel"] == "未命名素材"
+    assert "raw-asset-id-001" not in serialized
     assert "_".join(["signed", "url"]) not in serialized
     assert "local_path" not in serialized
     assert "data_base64" not in serialized
