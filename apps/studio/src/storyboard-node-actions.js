@@ -47,8 +47,8 @@ async function plannedStructuredShot(store, runtime, node) {
       source_text: scriptText || localShot?.source_text || "",
       asset_refs: assetRefs,
     };
-  } catch (error) {
-    setNodeError(store, fresh.id, `${error.message || "Runtime 资产规划失败"}，已回退为本地识别。`);
+  } catch {
+    setNodeError(store, fresh.id, "资产规划暂时不可用，已使用本地识别结果。");
     return localShot;
   }
 }

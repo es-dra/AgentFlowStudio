@@ -18,25 +18,12 @@ export function formatRuntimeError(error, fallback = "请求失败") {
       || messageForCode(code)
       || safeErrorText(payload.message, 220)
       || safeErrorText(payload.detail, 220);
-    const reason = firstSafeText(
-      payload.reason,
-      payload.raw_detail,
-      details.reason,
-      details.raw_detail,
-      details.message,
-    );
     const field = validationFieldMessage(details.fields || payload.fields || payload.detail);
     const userAction = safeErrorText(payload.user_action, 220);
-    const requestId = safeErrorText(payload.request_id || error?.requestId, 120);
-    const stage = safeErrorCode(payload.stage);
     return uniqueLines([
       message || code || fallback,
-      reason && reason !== message ? `原因：${reason}` : "",
       field ? `字段：${field}` : "",
-      code ? `代码：${code}` : "",
       userAction ? `建议：${userAction}` : "",
-      requestId ? `请求编号：${requestId}` : "",
-      stage ? `阶段：${stage}` : "",
     ]).join("\n").slice(0, 600);
   }
   const message = safeErrorText(error instanceof Error ? error.message : error, 240) || fallback;
@@ -253,7 +240,7 @@ function promptOptimizerProviderMessage(value) {
     || text.includes("failed rtm_newaddr")
     || text.includes("local command sandbox fails")
   ) {
-    return "提示词优化失败，请检查 LLM provider 配置或稍后重试。";
+    return "提示词优化失败，请检查生成服务配置或稍后重试。";
   }
   return "";
 }

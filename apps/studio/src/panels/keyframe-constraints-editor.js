@@ -25,7 +25,7 @@ export function createKeyframeConstraintsEditor(node) {
     if (fixed) wrap.append(fixed);
     const list = el("div", "keyframe-constraints-list");
     if (!constraints.rows.length) {
-      list.appendChild(el("div", "keyframe-constraints-empty", "No constraints yet."));
+      list.appendChild(el("div", "keyframe-constraints-empty", "尚未添加约束。"));
     } else {
       constraints.rows.forEach((row, index) => list.appendChild(rowEditor(row, index)));
     }
@@ -47,7 +47,7 @@ export function createKeyframeConstraintsEditor(node) {
     const enabled = document.createElement("input");
     enabled.type = "checkbox";
     enabled.checked = row.enabled;
-    enabled.title = "Enable row";
+    enabled.title = "启用此项";
     enabled.addEventListener("change", () => setConstraints(toggleKeyframeConstraintRow(constraints, row.id, enabled.checked)));
 
     const section = document.createElement("select");
@@ -64,43 +64,43 @@ export function createKeyframeConstraintsEditor(node) {
     for (const value of ["provider", "audit_only"]) {
       const option = document.createElement("option");
       option.value = value;
-      option.textContent = value === "provider" ? "Provider" : "Audit";
+      option.textContent = value === "provider" ? "参与生成" : "仅作记录";
       projection.appendChild(option);
     }
     projection.value = row.projection;
     projection.disabled = ["fixed_asset", "local_reference"].includes(row.section);
     projection.addEventListener("change", () => setConstraints(updateKeyframeConstraintRow(constraints, row.id, { projection: projection.value })));
 
-    const up = iconButton("chevronUp", "Move up");
+    const up = iconButton("chevronUp", "上移");
     up.disabled = index === 0;
     up.addEventListener("click", () => setConstraints(moveKeyframeConstraintRow(constraints, row.id, -1)));
-    const down = iconButton("chevronDown", "Move down");
+    const down = iconButton("chevronDown", "下移");
     down.disabled = index === constraints.rows.length - 1;
     down.addEventListener("click", () => setConstraints(moveKeyframeConstraintRow(constraints, row.id, 1)));
-    const remove = iconButton("trash", "Remove");
+    const remove = iconButton("trash", "删除");
     remove.addEventListener("click", () => setConstraints(removeKeyframeConstraintRow(constraints, row.id)));
 
     top.append(enabled, section, projection, up, down, remove);
     item.appendChild(top);
 
-    const text = document.createElement("textarea");
-    text.rows = 2;
-    text.value = row.text || "";
-    text.placeholder = row.section === "fixed_asset" ? "One-run fixed asset exclusion note" : "Constraint text";
-    text.addEventListener("input", () => mutateText(row.id, { text: text.value }));
-    item.appendChild(text);
+    if (row.section === "fixed_asset") {
+      item.appendChild(el("div", "keyframe-fixed-asset-summary", `本次生成不使用：${row.label || "未命名素材"}`));
+    } else {
+      const text = document.createElement("textarea");
+      text.rows = 2;
+      text.value = row.text || "";
+      text.placeholder = "填写希望画面遵循的约束";
+      text.addEventListener("input", () => mutateText(row.id, { text: text.value }));
+      item.appendChild(text);
+    }
 
-    if (row.section === "fixed_asset" || row.section === "local_reference") {
+    if (row.section === "local_reference") {
       const meta = el("div", "keyframe-constraint-meta");
-      const assetId = document.createElement("input");
-      assetId.value = row.asset_id || "";
-      assetId.placeholder = "asset_id";
-      assetId.addEventListener("input", () => mutateText(row.id, { asset_id: assetId.value }));
       const label = document.createElement("input");
       label.value = row.label || "";
-      label.placeholder = "label";
+      label.placeholder = "参考素材名称";
       label.addEventListener("input", () => mutateText(row.id, { label: label.value }));
-      meta.append(assetId, label);
+      meta.append(label);
       item.appendChild(meta);
     }
 
@@ -109,11 +109,11 @@ export function createKeyframeConstraintsEditor(node) {
 
   function toolbar() {
     const bar = el("div", "keyframe-constraints-toolbar");
-    const addProvider = el("button", "ghost-btn", "Add constraint");
-    addProvider.innerHTML = `${icon("plus", 13)}<span>Add constraint</span>`;
+    const addProvider = el("button", "ghost-btn", "添加约束");
+    addProvider.innerHTML = `${icon("plus", 13)}<span>添加约束</span>`;
     addProvider.addEventListener("click", () => setConstraints(addKeyframeConstraintRow(constraints, { section: "character" })));
-    const addLocal = el("button", "ghost-btn", "Add local ref");
-    addLocal.innerHTML = `${icon("plus", 13)}<span>Add local ref</span>`;
+    const addLocal = el("button", "ghost-btn", "添加本地参考");
+    addLocal.innerHTML = `${icon("plus", 13)}<span>添加本地参考</span>`;
     addLocal.addEventListener("click", () => setConstraints(addKeyframeConstraintRow(constraints, {
       section: "local_reference",
       projection: "audit_only",
@@ -140,8 +140,8 @@ function header(constraints) {
   const head = el("div", "keyframe-constraints-head");
   const activeRows = constraints.rows.filter((row) => row.enabled && row.projection === "provider").length;
   const fixedRows = fixedAssetExclusionRows(constraints).length;
-  head.appendChild(el("strong", "", "Keyframe constraints"));
-  head.appendChild(el("small", "", `${activeRows} provider rows / ${fixedRows} one-run exclusions`));
+  head.appendChild(el("strong", "", "关键帧约束"));
+  head.appendChild(el("small", "", `${activeRows} 条生成约束 / ${fixedRows} 项本次排除`));
   return head;
 }
 
@@ -158,7 +158,7 @@ function fixedAssetPicker(node, constraints, setConstraints) {
     input.addEventListener("change", () => {
       setConstraints(upsertFixedAssetExclusion(constraints, asset, input.checked));
     });
-    row.append(input, el("span", "", asset.label || asset.asset_id), el("small", "", asset.asset_id));
+    row.append(input, el("span", "", asset.label || "未命名素材"));
     wrap.appendChild(row);
   }
   return wrap;
@@ -176,7 +176,7 @@ function upsertFixedAssetExclusion(constraints, asset, enabled) {
     enabled,
     asset_id: asset.asset_id,
     label: asset.label,
-    text: `Exclude fixed asset ${asset.label || asset.asset_id} for the next run`,
+    text: `本次生成不使用${asset.label || "未命名素材"}`,
   });
 }
 

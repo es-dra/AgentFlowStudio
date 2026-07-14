@@ -58,7 +58,12 @@ def test_product_overview_allows_auth_disabled_local_runtime(tmp_path, monkeypat
 
     project = client.get("/projects/local-project/product-overview")
     assert project.status_code == 200, project.text
-    assert project.json()["project"]["project_id"] == "local-project"
+    product = project.json()["project"]
+    assert product["project_id"] == "local-project"
+    assert product["progress_percent"] == 0
+    assert product["current_stage"] == "创作简报"
+    assert product["next_action"] == "继续创作简报"
+    assert product["stages"][0] == {"key": "brief", "label": "创作简报", "state": "in_progress"}
 
 
 def test_product_overview_is_authenticated_owner_scoped_and_safe(tmp_path, monkeypatch) -> None:

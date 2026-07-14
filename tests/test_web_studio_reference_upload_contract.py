@@ -210,12 +210,10 @@ def test_reference_upload_runtime_error_payloads_render_safe_actionable_text() -
     result = payload["result"]
     assert "图片上传失败" in result
     assert "请求参数校验失败。" in result
-    assert "原因：文件内容不是 PNG 或 JPEG" in result
     assert "字段：上传图片内容（Field required / missing）" in result
-    assert "代码：request_validation_failed" in result
     assert "建议：请重新选择 PNG 或 JPEG 图片。" in result
-    assert "请求编号：req_safe_001" in result
-    assert "阶段：request_validation" in result
+    for diagnostic in ("原因：", "代码：", "请求编号：", "阶段：", "req_safe_001", "request_validation_failed"):
+        assert diagnostic not in result
     assert "文件类型不支持，请选择 PNG 或 JPEG。" in payload["stringError"]
 
     serialized = json.dumps(payload, ensure_ascii=False)

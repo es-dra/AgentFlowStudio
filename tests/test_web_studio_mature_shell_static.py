@@ -63,7 +63,7 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
         assert marker in source
     algorithm_panel = (STUDIO_ROOT / "src" / "panels" / "algorithm-context-panel.js").read_text(encoding="utf-8")
     assert 'title: "系统参考"' in algorithm_panel
-    assert 'tag: "折叠 trace"' in algorithm_panel
+    assert 'tag: "查看制作依据"' in algorithm_panel
     assert "生成时自动记录上下文、资产和证据" in algorithm_panel
     for marker in (
         ".algorithm-console",

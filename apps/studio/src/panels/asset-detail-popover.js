@@ -27,7 +27,7 @@ function renderAssetDetail(pop, store, runtime, asset, assetId, visualAssetId = 
     pop.appendChild(el("div", "asset-detail-empty", "未找到资产详情"));
     return;
   }
-  pop.appendChild(el("div", "asset-detail-title", asset.label || asset.title || asset.asset_id || assetId || "未命名资产"));
+  pop.appendChild(el("div", "asset-detail-title", asset.label || asset.title || "未命名素材"));
   pop.appendChild(detailRow("状态", statusLabel(asset)));
   pop.appendChild(detailRow("类型", assetTypeLabel(asset)));
   pop.appendChild(detailRow("签名", asset.signature || asset.safe_summary || "未记录"));
@@ -193,11 +193,11 @@ export function assetSourceEvidenceRows(asset) {
   const evidence = asset?.source_evidence;
   if (!evidence || typeof evidence !== "object") return [];
   return [
-    evidence.source_human_gate_id ? `human_gate: ${safeEvidenceText(evidence.source_human_gate_id)}` : "",
-    evidence.source_asset_card_candidate_id ? `asset_candidate: ${safeEvidenceText(evidence.source_asset_card_candidate_id)}` : "",
-    evidence.source_stage ? `stage: ${safeEvidenceText(evidence.source_stage)}` : "",
-    "provider_calls_started" in evidence ? `provider_calls_started=${evidence.provider_calls_started === true ? "true" : "false"}` : "",
-    "human_creative_acceptance_claimed" in evidence ? `human_creative_acceptance_claimed=${evidence.human_creative_acceptance_claimed === true ? "true" : "false"}` : "",
+    evidence.source_human_gate_id ? "人工审核：已记录" : "",
+    evidence.source_asset_card_candidate_id ? "资产候选：已记录" : "",
+    evidence.source_stage ? "来源阶段：已记录" : "",
+    "provider_calls_started" in evidence ? `生成服务：${evidence.provider_calls_started === true ? "已调用" : "未调用"}` : "",
+    "human_creative_acceptance_claimed" in evidence ? `人工创意确认：${evidence.human_creative_acceptance_claimed === true ? "已确认" : "未确认"}` : "",
   ].filter(Boolean);
 }
 
@@ -246,8 +246,4 @@ function assetTypeLabel(asset) {
 
 function isFixedAsset(asset) {
   return ["fixed", "ready", ""].includes(String(asset?.status || asset?.asset_status || ""));
-}
-
-function safeEvidenceText(value) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 160);
 }

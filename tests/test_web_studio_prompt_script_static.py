@@ -557,14 +557,20 @@ process.stdout.write(JSON.stringify({ textRendered, imageRendered }));
     payload = json.loads(completed.stdout)
 
     for rendered in (payload["textRendered"], payload["imageRendered"]):
-        assert "Creative contract" in rendered
-        assert "prompt_optimization / AFS_ALLOW_REMOTE_LLM" in rendered
-        assert "provider: not started" in rendered
-        assert "gate: AFS_ALLOW_REMOTE_LLM / blocked" in rendered
-        assert "rules: 3" in rendered
-        assert "assets: fixed 1 / draft 0 / unresolved 0" in rendered
-        assert "artifact: creative_runtime_contract.json" in rendered
-        assert "non-claims: 3" in rendered
+        assert "本次制作依据" in rendered
+        assert "尚未开始生成 · 3 条规则" in rendered
+        assert "生成状态：尚未开始" in rendered
+        assert "制作规则：3 条" in rendered
+        assert "参考素材：1 个固定 / 0 个草稿" in rendered
+        assert "待确认素材：0 个" in rendered
+        assert "产物记录：已记录" in rendered
+        assert "需人工确认：3 项" in rendered
+        assert "Creative contract" not in rendered
+        assert "prompt_optimization" not in rendered
+        assert "AFS_ALLOW_REMOTE_LLM" not in rendered
+        assert "provider" not in rendered.lower()
+        assert "crtc_prompt_text_001" not in rendered
+        assert "mctx_prompt_text_001" not in rendered
         assert "provider_raw_response" not in rendered
 
 
@@ -838,7 +844,8 @@ process.stdout.write(JSON.stringify(state.nodes.text_1));
     assert node["status"] == "error"
     assert node["params"]["scriptExpansionState"]["status"] == "failed"
     assert node["params"]["generationPolicyStatus"] == "needs_attention"
-    assert "remote_llm_gate_closed" in node["params"]["generationBlockedReason"]
+    assert node["params"]["generationBlockedReason"] == "提示词优化失败，请检查生成服务配置或稍后重试。"
+    assert "remote_llm_gate_closed" not in node["params"]["generationBlockedReason"]
     assert node["params"].get("scriptInputMode") != "idea_expanded_script_fallback"
     assert "片名：《" not in node["prompt"]
 

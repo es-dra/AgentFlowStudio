@@ -4,7 +4,7 @@ const RUNTIME_STATUS_BOUNDARY_VISIBLE = "Health only";
 export function initialRuntimeSurfaceStatus() {
   return {
     state: "checking",
-    label: "Runtime checking",
+    label: "正在连接创作服务",
     authLabel: "Auth unknown",
     providerGateLabel: "Provider gates unknown",
     boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
@@ -16,7 +16,7 @@ export function checkingRuntimeSurfaceStatus(currentStatus = null) {
   return {
     ...(currentStatus || initialRuntimeSurfaceStatus()),
     state: "checking",
-    label: "Runtime checking",
+    label: "正在连接创作服务",
     detail: "Checking Runtime Service health and auth boundary.",
   };
 }
@@ -29,7 +29,7 @@ export async function loadRuntimeSurfaceStatus(runtime, { authState = null, form
   } catch (error) {
     return {
       state: "unavailable",
-      label: "Runtime offline",
+      label: "创作服务暂时不可用",
       authLabel: "Auth unknown",
       providerGateLabel: "Provider gates unknown",
       boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
@@ -66,7 +66,7 @@ function runtimeSurfaceStatusFromHealth(health, authState) {
   const statusText = String(health?.status || health?.service_health?.status || "unknown");
   return {
     state: serviceReady ? (authUnknown ? "attention" : "ready") : "attention",
-    label: serviceReady ? "Runtime service ready" : "Runtime attention",
+    label: serviceReady ? "创作服务已连接" : "创作服务需要检查",
     authLabel,
     providerGateLabel,
     boundaryLabel: RUNTIME_STATUS_BOUNDARY_VISIBLE,
