@@ -69,6 +69,9 @@ CAMERA_MOTION_LABELS = {
     "rack_focus": "焦点转移",
     "shallow_depth_of_field": "浅景深",
     "deep_focus": "深焦",
+    "slight_rise": "轻微上升",
+    "rise": "上升运动",
+    "rising": "上升运动",
     "slow_motion": "慢动作",
     "camera_shake": "镜头震动",
     "shake": "镜头震动",
@@ -92,6 +95,34 @@ FOCUS_TARGET_LABELS = {
     "background": "背景",
     "sword": "剑",
 }
+
+CAMERA_MOTION_LABEL_ORDER = (
+    "固定机位",
+    "三脚架固定",
+    "手持轻晃",
+    "跟拍移动",
+    "跟随拍摄",
+    "缓慢推近",
+    "缓慢拉远",
+    "轻微上升",
+    "上升运动",
+    "向上摇镜",
+    "向下摇镜",
+    "俯仰摇镜",
+    "向左横摇",
+    "向右横摇",
+    "快速甩镜",
+    "横摇",
+    "升镜",
+    "降镜",
+    "环绕运动",
+    "弧线环绕",
+    "浅景深",
+    "深焦",
+    "焦点转移",
+    "慢动作",
+    "镜头震动",
+)
 
 LIGHT_ATMOSPHERE_RULES = (
     (("high_contrast", "chiaroscuro"), "高反差明暗对照"),
@@ -292,7 +323,7 @@ def _localized_camera_motion(value: Any, fallback: str) -> str:
     text = _clean(value)
     if not text:
         return str(fallback)
-    if _has_cjk(text):
+    if _has_cjk(text) and not _has_latin(text):
         return _localize_display_text(text)
     parts = [part.strip() for part in re.split(r"[,;，；、]+", text) if part.strip()]
     localized: list[str] = []
@@ -315,6 +346,9 @@ def _camera_motion_labels_for_part(value: str) -> list[str]:
     target = _focus_target_label(key)
     if target:
         labels.append(f"焦点锁定{target}")
+    mimic = _mimicked_motion_label(value)
+    if mimic:
+        labels.append(mimic)
     return labels
 
 
@@ -330,7 +364,34 @@ def _compact_camera_motion_labels(labels: list[str]) -> list[str]:
     }
     if any(label in compact for label in specific_pans):
         compact = [label for label in compact if label != CAMERA_MOTION_LABELS["pan"]]
-    return compact
+    if CAMERA_MOTION_LABELS["slight_rise"] in compact:
+        compact = [label for label in compact if label != CAMERA_MOTION_LABELS["rise"]]
+    return sorted(compact, key=_camera_motion_label_order)
+
+
+def _camera_motion_label_order(label: str) -> tuple[int, int, str]:
+    if label.startswith("焦点锁定"):
+        return (len(CAMERA_MOTION_LABEL_ORDER), 0, label)
+    if label.startswith("模拟"):
+        return (len(CAMERA_MOTION_LABEL_ORDER) + 1, 0, label)
+    try:
+        return (CAMERA_MOTION_LABEL_ORDER.index(label), 0, label)
+    except ValueError:
+        return (len(CAMERA_MOTION_LABEL_ORDER) + 2, 0, label)
+
+
+def _mimicked_motion_label(value: str) -> str:
+    match = re.search(
+        r"mimick(?:ing)?\s*([\u4e00-\u9fffA-Za-z0-9_-]+)?(?:'s|’s)?\s*(jump|leap)",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return ""
+    subject = str(match.group(1) or "").strip()
+    if subject:
+        return f"模拟{subject}跳跃"
+    return "模拟跳跃动作"
 
 
 def _focus_target_label(key: str) -> str:

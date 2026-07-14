@@ -86,3 +86,45 @@ def test_storyboard_provider_parser_localizes_lighting_sound_and_compacts_camera
     assert "high-contrast" not in serialized
     assert "thunder rumble" not in serialized
     assert "俯仰摇镜" not in shot["camera_motion"]
+
+
+def test_storyboard_provider_parser_localizes_mixed_english_chinese_camera_motion() -> None:
+    payload = {
+        "shots": [
+            {
+                "shot_id": "shot_03",
+                "index": 3,
+                "duration": "2.2s",
+                "description": "@阿团 @厨房。低角度跟拍：阿团踮脚跃起，后腿绷直，小臂肌肉线条清晰。",
+                "shot_size": "medium_shot",
+                "light_atmosphere": "暖色主光",
+                "camera_motion": "handheld slight rise mimicking阿团's jump",
+                "dialogue": "无明确对白",
+                "sound": "环境底噪，动作音随画面同步",
+                "source_span": {"text": "阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。"},
+                "asset_refs": [
+                    {
+                        "label": "阿团",
+                        "asset_type": "character",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                    {
+                        "label": "厨房",
+                        "asset_type": "scene",
+                        "status": "mentioned",
+                        "source": "explicit",
+                    },
+                ],
+            }
+        ]
+    }
+
+    shots = shots_from_provider_text(
+        json.dumps(payload, ensure_ascii=False),
+        source_script_text="阿团踮脚跃起，指尖触到橱柜顶层麦片罐底部。",
+    )
+
+    assert shots[0]["camera_motion"] == "手持轻晃，轻微上升，模拟阿团跳跃"
+    assert "handheld" not in json.dumps(shots[0], ensure_ascii=False)
+    assert "mimicking" not in json.dumps(shots[0], ensure_ascii=False)
