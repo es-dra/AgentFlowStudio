@@ -83,10 +83,11 @@ production frontend structure is selected.
 
 ## Research conclusion
 
-Current Chinese and global products already offer combinations of script
-breakdown, asset libraries, multi-agent generation, canvas workflows, and
-review/version tooling. AFS should not differentiate by canvas presence or
-agent count. The open product opportunity is one visible chain from object
-change to affected shots, creator scope decision, recoverable version update,
-review evidence, and delivery traceability.
-
+The traceable findings and current-capability gaps are maintained in the
+[Phase 1 evidence matrix](research/AFS_PHASE1_EVIDENCE_MATRIX.md). The three
+prototype structures use the same
+[Phase 2 evaluation protocol](AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md).
+AFS should not differentiate by canvas presence or agent count. The open
+product opportunity is one visible chain from object change to affected shots,
+creator scope decision, recoverable version update, review evidence, and
+delivery traceability.

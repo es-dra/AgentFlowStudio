@@ -18,6 +18,8 @@ claims need explicit gates and matching evidence.
 - [Contributor onboarding](CONTRIBUTOR_ONBOARDING.md)
 - [AOS current state](AOS_CURRENT_STATE.md)
 - [Single-episode loop Program](AFS_EPISODE_LOOP_PROGRAM.md)
+- [Phase 1 evidence matrix](research/AFS_PHASE1_EVIDENCE_MATRIX.md)
+- [Phase 2 same-task evaluation protocol](AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md)
 - [Company operating projection](company_operating_model.md)
 - [GFR execution projection](GFR_EXECUTION_PROJECTION.md)
 - [Current architecture](current_architecture.md)
