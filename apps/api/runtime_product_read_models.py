@@ -4,6 +4,11 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 
+from agentflow_studio.production.representative_episode_media import (
+    RepresentativeEpisodeMediaError,
+    revalidate_authoritative_media,
+    safe_media_projection,
+)
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_production_models import canonical_json_digest, checkpoint_digest
 from apps.api.runtime_store import RuntimeStore
@@ -117,7 +122,7 @@ def _project_overview(
     ]
     latest_run = max(runs, key=lambda item: str(item.get("updated_at") or ""), default={})
     studio_meta = _studio_meta(store, project_id)
-    coverage = _canonical_coverage(latest_run)
+    coverage = _canonical_coverage(store, project_id, latest_run)
     decisions = _decision_inbox(crew, latest_run)
     crew_summary = _crew_summary(crew)
     delivery = _delivery_summary(latest_run)
@@ -304,7 +309,7 @@ def _crew_summary(crew: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _canonical_coverage(run: dict[str, Any]) -> dict[str, Any]:
+def _canonical_coverage(store: RuntimeStore, project_id: str, run: dict[str, Any]) -> dict[str, Any]:
     empty = {
         "status_label": "0/15",
         "episode_title": "",
@@ -417,7 +422,7 @@ def _canonical_coverage(run: dict[str, Any]) -> dict[str, Any]:
             },
         })
     audio_readiness = audio.get("readiness") if isinstance(audio.get("readiness"), dict) else {}
-    return {
+    result = {
         "status_label": "15/15",
         "episode_title": _safe_text(canon.get("episode_title"), 160),
         "episode_version_id": _safe_text(binding.get("episode_version_id"), 160),
@@ -458,6 +463,49 @@ def _canonical_coverage(run: dict[str, Any]) -> dict[str, Any]:
         "propagation_complete": binding.get("propagation_complete") is True,
         "readiness": "制作素材已齐" if readiness.get("all_assets_ready") is True else "制作素材待补齐",
     }
+    media = run.get("representative_episode_media")
+    media_projection = safe_media_projection(None)
+    if isinstance(media, dict):
+        media_root = (
+            store.production_run_path(project_id, str(run.get("run_id") or "")).parent
+            / "representative_episode_media"
+        )
+        try:
+            revalidate_authoritative_media(binding, media, media_root)
+        except RepresentativeEpisodeMediaError:
+            media_projection = {
+                **safe_media_projection(None),
+                "status": "blocked",
+                "continuity_status": "blocked",
+            }
+        else:
+            media_projection = safe_media_projection(media)
+    result["media_delivery"] = media_projection
+    if media_projection.get("accepted_count") == 25:
+        result["pending_media_count"] = 0
+        result["all_assets_ready"] = True
+        result["readiness"] = "25/25 制作素材已接纳"
+        result["audio"] = {
+            "covered_shot_count": 15,
+            "total_shot_count": 15,
+            "pending_asset_count": 0,
+            "all_audio_ready": True,
+            "status": "音频已齐",
+        }
+        for item in result["timeline"]:
+            item["media"] = {
+                "required_count": int(item["media"]["required_count"]),
+                "ready_count": int(item["media"]["required_count"]),
+                "pending_count": 0,
+                "all_ready": True,
+                "status": "素材已齐",
+            }
+            item["audio"] = {
+                "covered": True,
+                "pending_asset_count": 0,
+                "status": "音频已齐",
+            }
+    return result
 
 
 def _delivery_summary(run: dict[str, Any]) -> dict[str, Any]:

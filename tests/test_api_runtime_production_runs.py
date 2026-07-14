@@ -10,12 +10,40 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.production.vertical_slice import CharacterSeed, DeterministicProductionSlice, ProjectIP
 from apps.api import runtime_store as runtime_store_module
-from apps.api.runtime_production_models import canonical_json_digest
+from apps.api.runtime_production_models import (
+    RepresentativeEpisodeMediaAssemblyRequest,
+    RepresentativeEpisodeMediaIntakeRequest,
+    canonical_json_digest,
+)
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_representative_episode_media_contract_exposes_only_bounded_authenticated_inputs() -> None:
+    intake_schema = RepresentativeEpisodeMediaIntakeRequest.model_json_schema()
+    assembly_schema = RepresentativeEpisodeMediaAssemblyRequest.model_json_schema()
+    assert intake_schema["additionalProperties"] is False
+    assert assembly_schema["additionalProperties"] is False
+    assert intake_schema["properties"]["assets"]["minItems"] == 25
+    assert intake_schema["properties"]["assets"]["maxItems"] == 25
+    assert set(intake_schema["properties"]) == {
+        "schema_version",
+        "idempotency_key",
+        "expected_checkpoint_version",
+        "expected_binding_digest",
+        "expected_episode_version_id",
+        "assets",
+    }
+    assert set(assembly_schema["properties"]) == {
+        "schema_version",
+        "idempotency_key",
+        "expected_checkpoint_version",
+        "expected_binding_digest",
+        "expected_media_manifest_sha256",
+    }
 
 
 def _digest(value: str) -> str:

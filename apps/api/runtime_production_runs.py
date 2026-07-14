@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,8 +10,16 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
+from agentflow_studio.production.representative_episode_media import (
+    RepresentativeEpisodeMediaError,
+    admit_authoritative_media,
+    assemble_authoritative_episode,
+    revalidate_authoritative_media,
+    safe_media_projection,
+)
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_generated_image_assets import resolve_generated_candidate_authority
 from apps.api.runtime_production_models import (
@@ -25,6 +34,8 @@ from apps.api.runtime_production_models import (
     ProductionQualityReviewRequest,
     ProductionRunCreateRequest,
     RepresentativeEpisodeBindingRequest,
+    RepresentativeEpisodeMediaAssemblyRequest,
+    RepresentativeEpisodeMediaIntakeRequest,
     canonical_json_digest,
     checkpoint_digest,
 )
@@ -81,6 +92,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                 "quality_reviews": [],
                 "exports": [],
                 "representative_episode_binding": None,
+                "representative_episode_media": None,
                 "lineage": [
                     {
                         "source_ref": candidate.parent_job_id,
@@ -115,6 +127,186 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             store.write_production_run(project_id, run)
             return _run_response(run, idempotent_replay=False)
 
+    @app.get("/projects/{project_id}/production-runs/{run_id}/representative-episode-media")
+    def get_representative_episode_media(
+        project_id: str,
+        run_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
+        media = run.get("representative_episode_media")
+        if not isinstance(media, dict):
+            raise HTTPException(status_code=404, detail="representative episode media not found")
+        return {
+            "project_id": project_id,
+            "run_id": run_id,
+            "media": _media_run_projection(media),
+            "checkpoint": dict(run["checkpoint"]),
+        }
+
+    @app.post("/projects/{project_id}/production-runs/{run_id}/representative-episode-media/intake")
+    def intake_representative_episode_media(
+        project_id: str,
+        run_id: str,
+        body: RepresentativeEpisodeMediaIntakeRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        request_digest = canonical_json_digest(body.model_dump(mode="json"))
+        media_root = _representative_episode_media_root(store, project_id, run_id)
+        with exclusive_file_lock(store.production_run_lock_path(project_id)):
+            run = _load_owned_run(store, project_id, run_id, owner_user_id)
+            if _mutation_is_replay(run, "representative_episode_media_intake", body.idempotency_key, request_digest):
+                return _run_response(run, idempotent_replay=True)
+            _require_checkpoint_version(run, body.expected_checkpoint_version)
+            binding = _current_episode_binding(run)
+            _require_media_binding_identity(
+                binding,
+                expected_binding_digest=body.expected_binding_digest,
+                expected_episode_version_id=body.expected_episode_version_id,
+            )
+            if isinstance(run.get("representative_episode_media"), dict):
+                raise HTTPException(status_code=409, detail="representative episode media already admitted")
+            try:
+                media = admit_authoritative_media(
+                    binding,
+                    [item.model_dump(mode="json") for item in body.assets],
+                    media_root,
+                    project_id=project_id,
+                    run_id=run_id,
+                )
+            except RepresentativeEpisodeMediaError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            run["representative_episode_media"] = media
+            run.setdefault("lineage", []).append(
+                {
+                    "source_ref": binding["binding_digest"],
+                    "target_ref": media["manifest_sha256"],
+                    "relation": "canonical_episode_binding_admitted_controlled_media",
+                }
+            )
+            _record_mutation_idempotency(
+                run,
+                "representative_episode_media_intake",
+                body.idempotency_key,
+                request_digest,
+            )
+            _advance_checkpoint(run)
+            try:
+                store.write_production_run(project_id, run)
+            except Exception:
+                shutil.rmtree(media_root, ignore_errors=True)
+                raise
+            return _run_response(run, idempotent_replay=False)
+
+    @app.post("/projects/{project_id}/production-runs/{run_id}/representative-episode-media/assemble")
+    def assemble_representative_episode_media(
+        project_id: str,
+        run_id: str,
+        body: RepresentativeEpisodeMediaAssemblyRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        request_digest = canonical_json_digest(body.model_dump(mode="json"))
+        media_root = _representative_episode_media_root(store, project_id, run_id)
+        with exclusive_file_lock(store.production_run_lock_path(project_id)):
+            run = _load_owned_run(store, project_id, run_id, owner_user_id)
+            if _mutation_is_replay(run, "representative_episode_media_assembly", body.idempotency_key, request_digest):
+                return _run_response(run, idempotent_replay=True)
+            _require_checkpoint_version(run, body.expected_checkpoint_version)
+            binding = _current_episode_binding(run)
+            _require_media_binding_identity(
+                binding,
+                expected_binding_digest=body.expected_binding_digest,
+                expected_episode_version_id="ep-rainlight-001-v2",
+            )
+            media = run.get("representative_episode_media")
+            if not isinstance(media, dict):
+                raise HTTPException(status_code=409, detail="all authoritative media must be admitted before assembly")
+            if media.get("manifest_sha256") != body.expected_media_manifest_sha256:
+                raise HTTPException(status_code=409, detail="representative episode media manifest changed")
+            if isinstance(media.get("delivery"), dict):
+                raise HTTPException(status_code=409, detail="representative episode technical delivery already exists")
+            try:
+                delivery = assemble_authoritative_episode(binding, media, media_root)
+            except RepresentativeEpisodeMediaError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            media["delivery"] = delivery
+            run.setdefault("lineage", []).append(
+                {
+                    "source_ref": media["manifest_sha256"],
+                    "target_ref": delivery["episode_sha256"],
+                    "relation": "controlled_media_assembled_as_technical_episode_delivery",
+                }
+            )
+            _record_mutation_idempotency(
+                run,
+                "representative_episode_media_assembly",
+                body.idempotency_key,
+                request_digest,
+            )
+            _advance_checkpoint(run)
+            write_json(media_root / "media_manifest.json", media)
+            store.write_production_run(project_id, run)
+            return _run_response(run, idempotent_replay=False)
+
+    @app.get(
+        "/projects/{project_id}/production-runs/{run_id}/"
+        "representative-episode-media/assets/{asset_id}/preview"
+    )
+    def representative_episode_media_preview(
+        project_id: str,
+        run_id: str,
+        asset_id: str,
+        request: Request,
+    ) -> FileResponse:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
+        media = run.get("representative_episode_media")
+        if not isinstance(media, dict) or safe_id(asset_id) != asset_id:
+            raise HTTPException(status_code=404, detail="controlled media preview not found")
+        assets = revalidate_authoritative_media(
+            _current_episode_binding(run), media, _representative_episode_media_root(store, project_id, run_id)
+        )
+        asset = next((item for item in assets if item.get("asset_id") == asset_id), None)
+        if not asset:
+            raise HTTPException(status_code=404, detail="controlled media preview not found")
+        path = _safe_media_file(_representative_episode_media_root(store, project_id, run_id), asset["relative_ref"])
+        return FileResponse(
+            path,
+            media_type=asset["mime_type"],
+            filename=f"preview{path.suffix}",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
+    @app.get(
+        "/projects/{project_id}/production-runs/{run_id}/"
+        "representative-episode-media/delivery/preview"
+    )
+    def representative_episode_delivery_preview(
+        project_id: str,
+        run_id: str,
+        request: Request,
+    ) -> FileResponse:
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
+        media = run.get("representative_episode_media")
+        delivery = media.get("delivery") if isinstance(media, dict) and isinstance(media.get("delivery"), dict) else {}
+        if delivery.get("assembly_complete") is not True:
+            raise HTTPException(status_code=404, detail="technical episode delivery not found")
+        path = _representative_episode_media_root(store, project_id, run_id) / "delivery" / "episode.mp4"
+        if not path.is_file() or _file_sha256(path) != delivery.get("episode_sha256"):
+            raise HTTPException(status_code=409, detail="technical episode delivery integrity mismatch")
+        return FileResponse(
+            path,
+            media_type="video/mp4",
+            filename="episode-preview.mp4",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
     @app.get("/projects/{project_id}/production-runs")
     def list_production_runs(project_id: str, request: Request) -> dict[str, Any]:
         owner_user_id = _require_project_owner(store, auth, request, project_id)
@@ -123,6 +315,16 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             _require_run_owner(run, owner_user_id)
             _validate_checkpoint(run)
             _validate_export_artifacts(store, project_id, run)
+            media = run.get("representative_episode_media")
+            if isinstance(media, dict):
+                try:
+                    revalidate_authoritative_media(
+                        _current_episode_binding(run),
+                        media,
+                        _representative_episode_media_root(store, project_id, str(run.get("run_id") or "")),
+                    )
+                except RepresentativeEpisodeMediaError as exc:
+                    raise HTTPException(status_code=409, detail=str(exc)) from exc
         return {
             "project_id": project_id,
             "production_runs": [_production_run_read_projection(store, project_id, run) for run in runs],
@@ -131,13 +333,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
     @app.get("/projects/{project_id}/production-runs/{run_id}")
     def get_production_run(project_id: str, run_id: str, request: Request) -> dict[str, Any]:
         owner_user_id = _require_project_owner(store, auth, request, project_id)
-        try:
-            run = store.load_production_run(project_id, run_id)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail="production run not found") from exc
-        _require_run_owner(run, owner_user_id)
-        _validate_checkpoint(run)
-        _validate_export_artifacts(store, project_id, run)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
         return _run_response(_production_run_read_projection(store, project_id, run))
 
     @app.get("/projects/{project_id}/production-runs/{run_id}/representative-episode-binding")
@@ -567,6 +763,16 @@ def _load_owned_run(
     _require_run_owner(run, owner_user_id)
     _validate_checkpoint(run)
     _validate_export_artifacts(store, project_id, run)
+    media = run.get("representative_episode_media")
+    if isinstance(media, dict):
+        try:
+            revalidate_authoritative_media(
+                _current_episode_binding(run),
+                media,
+                _representative_episode_media_root(store, project_id, run_id),
+            )
+        except RepresentativeEpisodeMediaError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     return run
 
 
@@ -728,8 +934,16 @@ def _run_response(
     idempotent_replay: bool | None = None,
     export: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    projected = deepcopy(run)
+    if (
+        isinstance(projected.get("representative_episode_media"), dict)
+        and projected["representative_episode_media"].get("schema_version")
+    ):
+        projected["representative_episode_media"] = _media_run_projection(
+            projected["representative_episode_media"]
+        )
     payload: dict[str, Any] = {
-        "production_run": run,
+        "production_run": projected,
         "studio_binding": _studio_binding(run),
     }
     if idempotent_replay is not None:
@@ -745,6 +959,10 @@ def _production_run_read_projection(
     run: dict[str, Any],
 ) -> dict[str, Any]:
     projected = deepcopy(run)
+    if isinstance(projected.get("representative_episode_media"), dict):
+        projected["representative_episode_media"] = _media_run_projection(
+            projected["representative_episode_media"]
+        )
     candidates = projected.get("candidates")
     if not isinstance(candidates, list):
         return projected
@@ -891,6 +1109,82 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _current_episode_binding(run: dict[str, Any]) -> dict[str, Any]:
+    binding = run.get("representative_episode_binding")
+    if not isinstance(binding, dict):
+        raise HTTPException(status_code=409, detail="representative episode binding is required")
+    if str(binding.get("canon_digest") or "") != canonical_json_digest(binding.get("episode_canon")):
+        raise HTTPException(status_code=409, detail="representative episode canon integrity mismatch")
+    binding_core = {
+        key: value
+        for key, value in binding.items()
+        if key not in {"binding_digest", "bound_by_user_id", "bound_at"}
+    }
+    if str(binding.get("binding_digest") or "") != canonical_json_digest(binding_core):
+        raise HTTPException(status_code=409, detail="representative episode binding integrity mismatch")
+    return binding
+
+
+def _require_media_binding_identity(
+    binding: dict[str, Any],
+    *,
+    expected_binding_digest: str,
+    expected_episode_version_id: str,
+) -> None:
+    if binding.get("binding_digest") != expected_binding_digest:
+        raise HTTPException(status_code=409, detail="representative episode binding changed")
+    if binding.get("episode_version_id") != expected_episode_version_id:
+        raise HTTPException(status_code=409, detail="representative episode version changed")
+    if binding.get("propagation_complete") is not True:
+        raise HTTPException(status_code=409, detail="downstream episode propagation is incomplete")
+
+
+def _representative_episode_media_root(
+    store: RuntimeStore,
+    project_id: str,
+    run_id: str,
+) -> Path:
+    root = store.production_run_path(project_id, run_id).parent.resolve()
+    media_root = (root / "representative_episode_media").resolve()
+    if root not in media_root.parents:
+        raise HTTPException(status_code=409, detail="representative episode media root is unsafe")
+    return media_root
+
+
+def _safe_media_file(root: Path, relative_ref: str) -> Path:
+    relative = Path(str(relative_ref or ""))
+    if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+        raise HTTPException(status_code=409, detail="controlled media ref is unsafe")
+    path = (root.resolve() / relative).resolve()
+    if root.resolve() not in path.parents:
+        raise HTTPException(status_code=409, detail="controlled media ref escapes its project")
+    return path
+
+
+def _media_run_projection(media: dict[str, Any]) -> dict[str, Any]:
+    safe = safe_media_projection(media)
+    safe["manifest_sha256"] = str(media.get("manifest_sha256") or "")
+    safe["episode_version_id"] = str(media.get("episode_version_id") or "")
+    safe["assets"] = [
+        {
+            "ordinal": int(item.get("ordinal") or 0),
+            "asset_id": str(item.get("asset_id") or ""),
+            "revision_id": str(item.get("revision_id") or ""),
+            "category": str(item.get("category") or ""),
+            "media_kind": str(item.get("media_kind") or ""),
+            "mime_type": str(item.get("mime_type") or ""),
+            "sha256": str(item.get("sha256") or ""),
+            "safe_preview": {
+                "media_kind": str(item.get("media_kind") or ""),
+                "preview_url": str(item.get("safe_preview_url") or ""),
+            },
+        }
+        for item in media.get("assets") or []
+        if isinstance(item, dict)
+    ]
+    return safe
 
 
 def _studio_binding(run: dict[str, Any]) -> dict[str, Any]:

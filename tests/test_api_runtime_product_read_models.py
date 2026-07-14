@@ -5,6 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
+from tools.afs_representative_episode_media import prepare_provider_free_media_delivery
 from tools.studio_production_delivery_browser_qa import prepare_provider_free_delivery_qa
 
 
@@ -194,3 +195,48 @@ def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_
         f"/projects/{seed['project_id']}/product-overview",
         headers=other_headers,
     ).status_code == 403
+
+
+def test_product_overview_projects_safe_media_readiness_and_technical_delivery(tmp_path, monkeypatch) -> None:
+    seed = prepare_provider_free_media_delivery(tmp_path)
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "delivery-qa-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    login = client.post("/auth/login", json={"email": seed["email"], "password": seed["password"]})
+    headers = {"Authorization": f"Bearer {login.json()['session_token']}"}
+
+    response = client.get(f"/projects/{seed['project_id']}/product-overview", headers=headers)
+    assert response.status_code == 200, response.text
+    canon = response.json()["project"]["canonical_state"]
+    assert canon["pending_media_count"] == 0
+    assert canon["all_assets_ready"] is True
+    assert canon["readiness"] == "25/25 制作素材已接纳"
+    assert all(item["media"]["status"] == "素材已齐" for item in canon["timeline"])
+    assert all(item["audio"]["status"] == "音频已齐" for item in canon["timeline"])
+    assert canon["media_delivery"] == {
+        "status": "media_ready",
+        "accepted_count": 25,
+        "required_count": 25,
+        "visual_count": 21,
+        "audio_count": 4,
+        "continuity_status": "structural_checked",
+        "continuity_checks": [
+            {"label": "规范版本一致", "status": "structural_checked"},
+            {"label": "十五镜时间线", "status": "structural_checked"},
+            {"label": "角色场景与镜头素材", "status": "structural_checked"},
+            {"label": "对白音乐音效与母版", "status": "structural_checked"},
+        ],
+        "assembly_status": "technical_qa_passed",
+        "delivery_preview_url": (
+            f"/projects/{seed['project_id']}/production-runs/{seed['run_id']}/"
+            "representative-episode-media/delivery/preview"
+        ),
+        "duration_seconds": 135,
+        "shot_count": 15,
+        "representative_content_proof": "not_started",
+        "creative_media_quality": "not_evaluated",
+        "human_acceptance": "not_evaluated",
+    }
+    encoded = json.dumps(response.json()["project"], ensure_ascii=False)
+    for forbidden in ("relative_ref", "provider_url", "probe", "stderr", "data_base64", "asset-shot-001-motion"):
+        assert forbidden not in encoded

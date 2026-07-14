@@ -1,5 +1,14 @@
 import { productionDeliveryUnavailableChecks } from "./production-delivery-view.js";
 import { selectedDeliverySubmission } from "./review-delivery-state.js";
+import {
+  authToken,
+  runtimeBaseUrl,
+  runtimeMediaUrl,
+  saveAuthToken,
+} from "./runtime-client.js";
+
+const canonicalPreviewObjectUrls = new Set();
+const canonicalPreviewRequests = new Set();
 
 const QUALITY_FIELDS = [
   ["story_intent_preserved", "叙事意图", "确认故事重点、情绪走向和信息层级没有偏离。", "narrative"],
@@ -9,6 +18,7 @@ const QUALITY_FIELDS = [
 ];
 
 export function renderReviewDeliveryWorkspace(root, state, handlers = {}) {
+  releaseCanonicalDeliveryPreviews();
   root.replaceChildren();
   root.dataset.state = state.stale ? "stale" : state.phase;
   const shell = el("div", "review-shell");
@@ -185,6 +195,7 @@ function buildEpisodeCanon(state) {
     canonMetric("下游确认", canon.propagation_complete ? "已完成" : "待制作团队确认", canon.propagation_complete),
   );
   section.appendChild(metrics);
+  section.appendChild(buildCanonicalMediaBoard(canon.media_delivery));
 
   const canonDetails = el("div", "canon-identity-grid");
   canonDetails.append(
@@ -198,6 +209,137 @@ function buildEpisodeCanon(state) {
   for (const shot of canon.shots) timeline.appendChild(shotCanonCard(shot));
   section.appendChild(timeline);
   return section;
+}
+
+function buildCanonicalMediaBoard(media) {
+  const board = el("section", "canonical-media-board");
+  board.setAttribute("aria-labelledby", "canonical-media-heading");
+  const head = el("header", "canonical-media-head");
+  const copy = el("div");
+  const title = el("h3", "", "规范媒体与技术交付");
+  title.id = "canonical-media-heading";
+  copy.append(
+    title,
+    el("p", "", "素材必须与当前第 2 版规范、十五镜顺序和责任链一致；结构检查不等于内容质量验收。"),
+  );
+  const ready = media?.accepted_count === 25;
+  head.append(copy, el("span", `media-intake-status ${ready ? "ready" : "pending"}`, ready ? "25/25 已接纳" : `${media?.accepted_count || 0}/25 待接纳`));
+  board.appendChild(head);
+
+  const metrics = el("div", "canonical-media-metrics");
+  metrics.append(
+    canonMetric("角色/场景/镜头", ready ? `${media.visual_count}/21 已接纳` : "等待规范素材", ready && media.visual_count === 21),
+    canonMetric("对白/音乐/音效/母版", ready ? `${media.audio_count}/4 已接纳` : "等待音频素材", ready && media.audio_count === 4),
+    canonMetric("结构连续性", continuityLabel(media?.continuity_status), media?.continuity_status === "structural_checked"),
+    canonMetric("技术成片", media?.assembly_status === "technical_qa_passed" ? "135 秒技术检查通过" : "素材齐备后可组装", media?.assembly_status === "technical_qa_passed"),
+  );
+  board.appendChild(metrics);
+
+  if (media?.continuity_checks?.length) {
+    const checks = el("ul", "canonical-continuity-list");
+    checks.setAttribute("aria-label", "规范媒体结构连续性检查");
+    for (const item of media.continuity_checks) {
+      const row = el("li", item.status === "structural_checked" ? "checked" : "blocked");
+      row.append(el("strong", "", item.label), el("span", "", continuityLabel(item.status)));
+      checks.appendChild(row);
+    }
+    board.appendChild(checks);
+  }
+
+  if (media?.delivery_preview_url && media?.assembly_status === "technical_qa_passed") {
+    const preview = el("video", "canonical-delivery-preview");
+    preview.controls = true;
+    preview.preload = "metadata";
+    preview.setAttribute("aria-label", "本集 135 秒技术交付预览");
+    preview.dataset.previewState = "loading";
+    board.appendChild(preview);
+    void hydrateCanonicalDeliveryPreview(preview, media.delivery_preview_url);
+  }
+  board.appendChild(el("p", "media-evidence-note", "当前仅证明媒体接纳、结构连续性与技术组装机制；代表性内容质量、人工验收和商业验证尚未开始。"));
+  return board;
+}
+
+export async function hydrateCanonicalDeliveryPreview(preview, route, dependencies = {}) {
+  const readToken = dependencies.authToken || authToken;
+  const resolveMediaUrl = dependencies.runtimeMediaUrl || runtimeMediaUrl;
+  const readRuntimeBaseUrl = dependencies.runtimeBaseUrl || runtimeBaseUrl;
+  const persistToken = dependencies.saveAuthToken || saveAuthToken;
+  const fetchImpl = dependencies.fetch || globalThis.fetch;
+  const urlApi = dependencies.URL || globalThis.URL;
+  const eventTarget = dependencies.eventTarget || globalThis.window;
+  const abortController = dependencies.abortController || new AbortController();
+  const raw = String(route || "").trim();
+  const resolved = resolveMediaUrl(raw);
+  const token = readToken();
+  if (!preview || !token || !safeCanonicalDeliveryRoute(raw, resolved, readRuntimeBaseUrl())) {
+    if (preview) preview.dataset.previewState = "unavailable";
+    return "";
+  }
+  canonicalPreviewRequests.add(abortController);
+  try {
+    const response = await fetchImpl(resolved, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      signal: abortController.signal,
+    });
+    if (response.status === 401) {
+      persistToken("");
+      preview.dataset.previewState = "session_expired";
+      try {
+        eventTarget?.dispatchEvent(new CustomEvent("afs:auth-session-expired", {
+          detail: { route: raw, status: 401 },
+        }));
+      } catch {
+        // Tests may execute without a browser CustomEvent implementation.
+      }
+      return "";
+    }
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (!response.ok || !contentType.startsWith("video/")) {
+      preview.dataset.previewState = "unavailable";
+      return "";
+    }
+    const blob = await response.blob();
+    if (abortController.signal.aborted) return "";
+    const objectUrl = urlApi.createObjectURL(blob);
+    canonicalPreviewObjectUrls.add(objectUrl);
+    preview.src = objectUrl;
+    preview.dataset.previewState = "ready";
+    preview.load?.();
+    return objectUrl;
+  } catch {
+    if (!abortController.signal.aborted) preview.dataset.previewState = "unavailable";
+    return "";
+  } finally {
+    canonicalPreviewRequests.delete(abortController);
+  }
+}
+
+export function releaseCanonicalDeliveryPreviews(dependencies = {}) {
+  const urlApi = dependencies.URL || globalThis.URL;
+  for (const request of canonicalPreviewRequests) request.abort();
+  canonicalPreviewRequests.clear();
+  for (const objectUrl of canonicalPreviewObjectUrls) urlApi.revokeObjectURL(objectUrl);
+  canonicalPreviewObjectUrls.clear();
+}
+
+function safeCanonicalDeliveryRoute(raw, resolved, base) {
+  if (!raw.startsWith("/projects/") || raw.startsWith("//") || !resolved || !base) return false;
+  try {
+    const resolvedUrl = new URL(resolved);
+    const baseUrl = new URL(base);
+    return resolvedUrl.origin === baseUrl.origin
+      && resolvedUrl.pathname.startsWith("/projects/")
+      && resolvedUrl.pathname.endsWith("/representative-episode-media/delivery/preview");
+  } catch {
+    return false;
+  }
+}
+
+function continuityLabel(value) {
+  if (value === "structural_checked") return "结构已核对";
+  if (value === "blocked") return "存在结构阻塞";
+  return "尚未评估";
 }
 
 function canonMetric(label, value, passed = false) {
