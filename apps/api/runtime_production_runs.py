@@ -392,6 +392,14 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                         "actual_package_sha256": current_digest or None,
                     },
                 )
+            if isinstance(run.get("representative_episode_media"), dict):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "representative_episode_media_locked",
+                        "message": "create a new production run before binding a different episode canon",
+                    },
+                )
 
             timestamp = _now()
             episode_canon = _persisted_episode_canon(body)

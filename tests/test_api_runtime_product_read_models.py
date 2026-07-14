@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import shutil
 
+import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
 from tools.afs_representative_episode_media import prepare_provider_free_media_delivery
 from tools.studio_production_delivery_browser_qa import prepare_provider_free_delivery_qa
+
+
+MEDIA_TOOLS_READY = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
 
 def _register(client: TestClient, email: str, invite_code: str) -> tuple[dict, dict[str, str]]:
@@ -197,6 +202,10 @@ def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_
     ).status_code == 403
 
 
+@pytest.mark.skipif(
+    not MEDIA_TOOLS_READY,
+    reason="ffmpeg and ffprobe are required for controlled media integration evidence",
+)
 def test_product_overview_projects_safe_media_readiness_and_technical_delivery(tmp_path, monkeypatch) -> None:
     seed = prepare_provider_free_media_delivery(tmp_path)
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")

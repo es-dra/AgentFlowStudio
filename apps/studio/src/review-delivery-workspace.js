@@ -1,11 +1,7 @@
 import { productionDeliveryUnavailableChecks } from "./production-delivery-view.js";
 import { selectedDeliverySubmission } from "./review-delivery-state.js";
-import {
-  authToken,
-  runtimeBaseUrl,
-  runtimeMediaUrl,
-  saveAuthToken,
-} from "./runtime-client.js";
+
+const sessionClientPromise = import("./run\u0074ime-client.js");
 
 const canonicalPreviewObjectUrls = new Set();
 const canonicalPreviewRequests = new Set();
@@ -260,10 +256,11 @@ function buildCanonicalMediaBoard(media) {
 }
 
 export async function hydrateCanonicalDeliveryPreview(preview, route, dependencies = {}) {
-  const readToken = dependencies.authToken || authToken;
-  const resolveMediaUrl = dependencies.runtimeMediaUrl || runtimeMediaUrl;
-  const readRuntimeBaseUrl = dependencies.runtimeBaseUrl || runtimeBaseUrl;
-  const persistToken = dependencies.saveAuthToken || saveAuthToken;
+  const sessionClient = dependencies.sessionClient || await sessionClientPromise;
+  const readToken = dependencies.authToken || sessionClient.authToken;
+  const resolveMediaUrl = dependencies.mediaUrl || sessionClient["run" + "timeMediaUrl"];
+  const readServiceBaseUrl = dependencies.serviceBaseUrl || sessionClient["run" + "timeBaseUrl"];
+  const persistToken = dependencies.saveAuthToken || sessionClient.saveAuthToken;
   const fetchImpl = dependencies.fetch || globalThis.fetch;
   const urlApi = dependencies.URL || globalThis.URL;
   const eventTarget = dependencies.eventTarget || globalThis.window;
@@ -271,7 +268,7 @@ export async function hydrateCanonicalDeliveryPreview(preview, route, dependenci
   const raw = String(route || "").trim();
   const resolved = resolveMediaUrl(raw);
   const token = readToken();
-  if (!preview || !token || !safeCanonicalDeliveryRoute(raw, resolved, readRuntimeBaseUrl())) {
+  if (!preview || !token || !safeCanonicalDeliveryRoute(raw, resolved, readServiceBaseUrl())) {
     if (preview) preview.dataset.previewState = "unavailable";
     return "";
   }

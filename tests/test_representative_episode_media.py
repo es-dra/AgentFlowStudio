@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.production.representative_episode_media import (
     RepresentativeEpisodeMediaError,
+    _validate_probe,
+    assemble_authoritative_episode,
     derive_authoritative_inventory,
     safe_media_projection,
 )
@@ -23,6 +26,13 @@ from tools.studio_production_delivery_browser_qa import (
     QA_PASSWORD,
     _qa_environment,
     prepare_provider_free_delivery_qa,
+)
+
+
+MEDIA_TOOLS_READY = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+requires_media_tools = pytest.mark.skipif(
+    not MEDIA_TOOLS_READY,
+    reason="ffmpeg and ffprobe are required for controlled media integration evidence",
 )
 
 
@@ -61,6 +71,7 @@ def test_inventory_is_server_derived_exact_v2_and_caller_cannot_reorder(tmp_path
         derive_authoritative_inventory(stale)
 
 
+@requires_media_tools
 def test_authenticated_media_intake_is_atomic_idempotent_reload_safe_and_isolated(tmp_path: Path, monkeypatch) -> None:
     seed = prepare_provider_free_delivery_qa(tmp_path)
     route = f"/projects/{seed['project_id']}/production-runs/{seed['run_id']}"
@@ -154,6 +165,7 @@ def test_authenticated_media_intake_is_atomic_idempotent_reload_safe_and_isolate
             assert client.get(preview_url, headers=other_headers).status_code == 403
 
 
+@requires_media_tools
 def test_media_hash_tamper_fails_closed_on_reload(tmp_path: Path) -> None:
     seed = prepare_provider_free_media_delivery(tmp_path, assemble=False)
     store = RuntimeStore(tmp_path)
@@ -172,6 +184,7 @@ def test_media_hash_tamper_fails_closed_on_reload(tmp_path: Path) -> None:
         assert "hash revalidation" in response.text
 
 
+@requires_media_tools
 def test_complete_media_assembles_only_after_25_of_25_and_preserves_nonclaims(tmp_path: Path) -> None:
     result = prepare_provider_free_media_delivery(tmp_path)
     assert result["media_accepted_count"] == 25
@@ -220,3 +233,47 @@ def test_complete_media_assembles_only_after_25_of_25_and_preserves_nonclaims(tm
             "creative_media_quality": "not_evaluated",
             "human_acceptance": "not_evaluated",
         }
+
+
+def test_declared_video_and_audio_mime_require_matching_probed_containers() -> None:
+    with pytest.raises(RepresentativeEpisodeMediaError, match="video MIME and probed container"):
+        _validate_probe(
+            {},
+            "video",
+            "video/mp4",
+            {
+                "format": {"format_name": "mpegts", "duration": "9"},
+                "streams": [{"codec_type": "video", "codec_name": "h264", "width": 640, "height": 360}],
+            },
+        )
+    with pytest.raises(RepresentativeEpisodeMediaError, match="audio MIME and probed container"):
+        _validate_probe(
+            {},
+            "audio",
+            "audio/wav",
+            {
+                "format": {"format_name": "aiff", "duration": "135"},
+                "streams": [
+                    {"codec_type": "audio", "codec_name": "pcm_s16le", "sample_rate": "48000", "channels": 1}
+                ],
+            },
+        )
+
+
+@requires_media_tools
+def test_assembly_removes_partial_delivery_when_technical_qa_raises(tmp_path: Path, monkeypatch) -> None:
+    seed = prepare_provider_free_media_delivery(tmp_path, assemble=False)
+    store = RuntimeStore(tmp_path)
+    run = store.load_production_run(seed["project_id"], seed["run_id"])
+    media_root = store.production_run_path(seed["project_id"], seed["run_id"]).parent / "representative_episode_media"
+
+    def fail_qa(*_args, **_kwargs):
+        raise RepresentativeEpisodeMediaError("transient technical QA failure")
+
+    monkeypatch.setattr(
+        "agentflow_studio.production.representative_episode_media._run_technical_qa_utf8",
+        fail_qa,
+    )
+    with pytest.raises(RepresentativeEpisodeMediaError, match="transient technical QA failure"):
+        assemble_authoritative_episode(run["representative_episode_binding"], run["representative_episode_media"], media_root)
+    assert not (media_root / "delivery").exists()

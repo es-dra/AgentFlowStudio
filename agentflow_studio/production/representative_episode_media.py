@@ -328,23 +328,26 @@ def assemble_authoritative_episode(
     output_dir = root_path / "delivery"
     if output_dir.exists():
         raise RepresentativeEpisodeMediaError("authoritative assembly output already exists")
-    result = assemble_episode(
-        spec_path,
-        output_dir,
-        ffmpeg_executable=ffmpeg_executable,
-        ffprobe_executable=ffprobe_executable,
-    )
-    qa_path = output_dir / "technical_qa.json"
-    qa = _run_technical_qa_utf8(
-        Path(result["episode"]),
-        Path(result["manifest"]),
-        qa_path,
-        ffprobe_executable=ffprobe_executable,
-        ffmpeg_executable=ffmpeg_executable,
-    )
-    if qa.get("status") != "pass":
+    try:
+        result = assemble_episode(
+            spec_path,
+            output_dir,
+            ffmpeg_executable=ffmpeg_executable,
+            ffprobe_executable=ffprobe_executable,
+        )
+        qa_path = output_dir / "technical_qa.json"
+        qa = _run_technical_qa_utf8(
+            Path(result["episode"]),
+            Path(result["manifest"]),
+            qa_path,
+            ffprobe_executable=ffprobe_executable,
+            ffmpeg_executable=ffmpeg_executable,
+        )
+        if qa.get("status") != "pass":
+            raise RepresentativeEpisodeMediaError("technical episode QA did not pass")
+    except Exception:
         shutil.rmtree(output_dir, ignore_errors=True)
-        raise RepresentativeEpisodeMediaError("technical episode QA did not pass")
+        raise
     delivery = {
         "status": "technical_qa_passed",
         "assembly_complete": True,
@@ -468,7 +471,7 @@ def _decode_base64(value: str) -> bytes:
 def _probe_and_decode(path: Path, media_kind: str, ffprobe: str, ffmpeg: str) -> dict[str, Any]:
     probe_command = [
         ffprobe, "-v", "error", "-print_format", "json", "-show_entries",
-        "stream=codec_type,codec_name,duration,width,height,sample_rate,channels:format=duration", str(path),
+        "stream=codec_type,codec_name,duration,width,height,sample_rate,channels:format=duration,format_name", str(path),
     ]
     probe = _run(probe_command, timeout=30)
     if probe.returncode != 0:
@@ -489,6 +492,12 @@ def _validate_probe(slot: dict[str, Any], media_kind: str, mime_type: str, probe
     streams = [item for item in probe.get("streams") or [] if isinstance(item, dict)]
     video = [item for item in streams if item.get("codec_type") == "video"]
     audio = [item for item in streams if item.get("codec_type") == "audio"]
+    probe_format = probe.get("format") if isinstance(probe.get("format"), dict) else {}
+    format_names = {
+        value.strip().lower()
+        for value in str(probe_format.get("format_name") or "").split(",")
+        if value.strip()
+    }
     if media_kind == "image":
         expected_codec = "png" if mime_type == "image/png" else "mjpeg"
         if len(video) != 1 or audio or video[0].get("codec_name") != expected_codec:
@@ -496,6 +505,8 @@ def _validate_probe(slot: dict[str, Any], media_kind: str, mime_type: str, probe
         if int(video[0].get("width") or 0) < 320 or int(video[0].get("height") or 0) < 180:
             raise RepresentativeEpisodeMediaError("image dimensions are below the controlled minimum")
     elif media_kind == "video":
+        if mime_type != "video/mp4" or "mp4" not in format_names:
+            raise RepresentativeEpisodeMediaError("video MIME and probed container do not agree")
         if len(video) != 1 or audio or video[0].get("codec_name") not in {"h264", "hevc", "vp9", "av1"}:
             raise RepresentativeEpisodeMediaError("video must contain one supported visual stream and no audio")
         if int(video[0].get("width") or 0) < 320 or int(video[0].get("height") or 0) < 180:
@@ -504,6 +515,8 @@ def _validate_probe(slot: dict[str, Any], media_kind: str, mime_type: str, probe
         if duration is None or duration + PROBE_TOLERANCE_SECONDS < Decimal("9"):
             raise RepresentativeEpisodeMediaError("shot video is shorter than the canonical shot duration")
     else:
+        if mime_type != "audio/wav" or "wav" not in format_names:
+            raise RepresentativeEpisodeMediaError("audio MIME and probed container do not agree")
         if video or len(audio) != 1 or audio[0].get("codec_name") not in {"pcm_s16le", "pcm_s24le", "pcm_f32le"}:
             raise RepresentativeEpisodeMediaError("audio must be one supported WAV stream")
         if int(audio[0].get("sample_rate") or 0) != 48_000 or int(audio[0].get("channels") or 0) != 1:

@@ -982,8 +982,8 @@ const urlApi = {
 };
 const dependencies = {
   authToken: () => "session-token",
-  runtimeBaseUrl: () => "http://127.0.0.1:8876",
-  runtimeMediaUrl: (value) => `http://127.0.0.1:8876${value}`,
+  serviceBaseUrl: () => "http://127.0.0.1:8876",
+  mediaUrl: (value) => `http://127.0.0.1:8876${value}`,
   saveAuthToken: (value) => tokens.push(value),
   URL: urlApi,
   eventTarget: { dispatchEvent: (event) => events.push({ type: event.type, detail: event.detail }) },
@@ -1017,7 +1017,7 @@ let unsafeFetches = 0;
 const unsafePreview = { dataset: {} };
 await hydrateCanonicalDeliveryPreview(unsafePreview, "https://provider.invalid/signed", {
   ...dependencies,
-  runtimeMediaUrl: (value) => value,
+  mediaUrl: (value) => value,
   fetch: async () => { unsafeFetches += 1; throw new Error("must not fetch"); },
 });
 
