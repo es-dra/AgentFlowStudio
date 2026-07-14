@@ -536,6 +536,59 @@ def test_episode_safe_artifact_projection_roundtrips_through_frozen_store(
     assert frozen.asset_candidates[0].artifact_ref.model_dump(mode="json") == expected_ref
 
 
+def test_v01_wire_payload_gets_v011_operation_membership_defaults(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    assert client.post(
+        "/projects",
+        json={"project_id": PROJECT_ID, "goal": "Wire compatibility"},
+    ).status_code == 200
+    aggregate = _aggregate_with_safe_artifact()
+    shot = aggregate["shots"][0]
+    shot_ref = {
+        "entity_type": "shot",
+        "entity_id": shot["entity_id"],
+        "version_id": shot["version_id"],
+    }
+    proposal = {
+        "entity_type": "agent_proposal",
+        "entity_id": "proposal-001",
+        "version_id": "proposal-001-v1",
+        "revision": 1,
+        "parent_version_id": None,
+        "lifecycle_state": "draft",
+        "review_state": "not_requested",
+        "content_digest": _digest("proposal-001-v1"),
+        "scope": aggregate["scope"],
+        "created_at": "2026-07-15T08:06:00+00:00",
+        "source_refs": [],
+        "target_ref": shot_ref,
+        "impact_refs": [shot_ref],
+        "action": "inspect_continuity",
+        "decision_state": "accepted",
+    }
+    aggregate["agent_proposals"] = [proposal]
+    assert "source_proposal_ref" not in shot
+    assert "applied_refs" not in proposal
+
+    created = client.put(
+        ROUTE,
+        headers={"Idempotency-Key": "v011-defaults"},
+        json=_replace_body(aggregate, expected=0),
+    )
+    loaded = client.get(ROUTE)
+
+    assert created.status_code == 200, created.text
+    assert loaded.status_code == 200, loaded.text
+    assert created.json()["aggregate"]["shots"][0]["source_proposal_ref"] is None
+    assert created.json()["aggregate"]["agent_proposals"][0]["applied_refs"] == []
+    assert loaded.json()["aggregate"]["shots"][0]["source_proposal_ref"] is None
+    assert loaded.json()["aggregate"]["agent_proposals"][0]["applied_refs"] == []
+
+
 def test_auth_off_uses_explicit_local_scope_and_keeps_project_binding(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -641,3 +694,7 @@ def test_openapi_uses_unique_episode_projection_components(tmp_path: Path) -> No
     assert operation["put"]["responses"]["200"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/EpisodeAggregateWriteResponse"
     }
+    assert "source_proposal_ref" in schemas["ShotVersion"]["properties"]
+    assert "source_proposal_ref" not in schemas["ShotVersion"].get("required", [])
+    assert "applied_refs" in schemas["AgentProposal"]["properties"]
+    assert "applied_refs" not in schemas["AgentProposal"].get("required", [])
