@@ -774,18 +774,151 @@ process.stdout.write(JSON.stringify({
     assert payload["unselectedPosts"] == 0
 
 
+def test_review_delivery_projects_and_renders_authoritative_fifteen_shot_canon() -> None:
+    payload = _node_json(
+        r'''
+import { composeReviewDeliveryState, createReviewDeliveryState } from "./apps/studio/src/review-delivery-state.js";
+import { renderReviewDeliveryWorkspace } from "./apps/studio/src/review-delivery-workspace.js";
+
+function makeElement(tagName) {
+  const element = {
+    tagName: String(tagName || "").toUpperCase(), children: [], dataset: {}, attributes: {}, className: "",
+    textContent: "", disabled: false, checked: false, value: "", tabIndex: 0,
+    appendChild(child) { this.children.push(child); return child; },
+    append(...children) { children.forEach((child) => this.appendChild(child)); },
+    replaceChildren(...children) { this.children = []; this.append(...children); },
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    addEventListener() {},
+    querySelector(selector) {
+      const className = selector.startsWith(".") ? selector.slice(1) : "";
+      if (className && String(this.className).split(/\s+/).includes(className)) return this;
+      for (const child of this.children) { const found = child.querySelector?.(selector); if (found) return found; }
+      return null;
+    },
+  };
+  element.classList = { add: (...names) => { element.className = [element.className, ...names].filter(Boolean).join(" "); } };
+  Object.defineProperty(element, "innerText", { get() {
+    return [this.textContent, ...this.children.map((child) => child.innerText || child.textContent || "")]
+      .filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  }});
+  return element;
+}
+function countClass(element, className) {
+  const own = String(element?.className || "").split(/\s+/).includes(className) ? 1 : 0;
+  return own + (element?.children || []).reduce((sum, child) => sum + countClass(child, className), 0);
+}
+globalThis.document = { createElement: makeElement };
+
+const digest = (char) => char.repeat(64);
+const timeline = Array.from({ length: 15 }, (_, index) => ({
+  shot_number: index + 1,
+  label: `第 ${String(index + 1).padStart(2, "0")} 镜`,
+  version_id: `shot-${String(index + 1).padStart(3, "0")}-v1`,
+  start_seconds: index * 9,
+  end_seconds: (index + 1) * 9,
+  scene: index < 5 ? "雨巷" : index < 10 ? "档案塔" : "黎明屋顶",
+  characters: ["林遥", "小七", "余馆长"],
+  visual_action: `第 ${index + 1} 镜的明确叙事动作`,
+  dialogue: [{ speaker: "林遥", text: "继续守住这盏灯。" }],
+  camera: "宽幅镜头",
+  motion: "缓慢推进",
+  continuity: "保持角色服装、雨势与灯光连续。",
+  media: { required_count: 5, ready_count: 0, pending_count: 5, all_ready: false, status: "素材待补齐" },
+  audio: { covered: true, pending_asset_count: 4, status: "音频待制作" },
+}));
+const canonicalState = {
+  status_label: "15/15", episode_title: "《雨灯失窃案》第一集：最后一盏引魂灯",
+  episode_version_id: "ep-rainlight-001-v1", package_sha256: digest("a"), canon_digest: digest("b"),
+  checkpoint_version: 3, duration_seconds: 135, characters: 3, scenes: 3, shots: 15, audio_items: 4,
+  character_versions: ["林遥", "小七", "余馆长"].map((name, index) => ({ name, version_id: `character-${index + 1}-v1`, continuity: ["造型连续"] })),
+  scene_versions: ["雨巷", "档案塔", "黎明屋顶"].map((name, index) => ({ name, version_id: `scene-${index + 1}-v1`, continuity: ["空间与光线连续"] })),
+  timeline,
+  audio: { covered_shot_count: 15, total_shot_count: 15, pending_asset_count: 4, all_audio_ready: false, status: "音频待制作" },
+  pending_media_count: 25, all_assets_ready: false, propagation_complete: false, readiness: "制作素材待补齐",
+};
+const run = { checkpoint: { version: 3 }, candidates: [], creator_decisions: [], quality_reviews: [], exports: [] };
+const project = { name: "雨灯制作项目", episode: "第 01 集", current_stage: "分镜", canonical_state: canonicalState };
+const state = composeReviewDeliveryState({
+  workspace: { projects: [{ project_id: "afs-rainlight-project", name: "雨灯制作项目" }] },
+  project,
+  runsPayload: { production_runs: [run] },
+  projectId: "afs-rainlight-project",
+});
+state.authUser = { user_id: "creator-001", display_name: "主创" };
+const root = makeElement("div");
+renderReviewDeliveryWorkspace(root, state, {});
+
+const lifecycle = createReviewDeliveryState();
+lifecycle.setIdentity({ user_id: "creator-001" });
+lifecycle.publish({ phase: "ready", episodeCanon: state.episodeCanon, projectId: "afs-rainlight-project" });
+const staleToken = lifecycle.beginAction("refresh");
+lifecycle.clearIdentity();
+const latePublished = lifecycle.finishAction(staleToken, { episodeCanon: state.episodeCanon });
+
+const mismatched = composeReviewDeliveryState({
+  workspace: {}, project, runsPayload: { production_runs: [{ ...run, checkpoint: { version: 4 } }] },
+  projectId: "afs-rainlight-project",
+});
+process.stdout.write(JSON.stringify({
+  text: root.innerText,
+  shotCards: countClass(root, "episode-shot-card"),
+  canonReady: state.episodeCanon?.shots?.length === 15,
+  rawDigestVisible: root.innerText.includes(digest("a")) || root.innerText.includes(digest("b")),
+  rawIdVisible: root.innerText.includes("shot-001") || root.innerText.includes("ep-rainlight-001-v1"),
+  clearedCanon: lifecycle.get().episodeCanon,
+  clearedProject: lifecycle.get().projectId,
+  latePublished,
+  mismatchCanon: mismatched.episodeCanon,
+}));
+'''
+    )
+
+    assert payload["canonReady"] is True
+    assert payload["shotCards"] == 15
+    assert "15/15 镜已绑定" in payload["text"]
+    assert "第 01 镜" in payload["text"] and "第 15 镜" in payload["text"]
+    assert "00:00–00:09" in payload["text"] and "02:06–02:15" in payload["text"]
+    assert "保持角色服装、雨势与灯光连续" in payload["text"]
+    assert "素材待补齐" in payload["text"]
+    assert "音频待制作" in payload["text"]
+    assert payload["rawDigestVisible"] is False
+    assert payload["rawIdVisible"] is False
+    assert payload["clearedCanon"] is None
+    assert payload["clearedProject"] == ""
+    assert payload["latePublished"] is False
+    assert payload["mismatchCanon"] is None
+
+
+def test_review_delivery_canon_mobile_contract_has_single_column_and_no_raw_diagnostics() -> None:
+    source = (STUDIO / "src" / "review-delivery-workspace.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "review-delivery.css").read_text(encoding="utf-8")
+
+    assert "本集制作规范" in source
+    assert "15/15 镜已绑定" in source
+    assert "镜头顺序、版本、连续性与音频覆盖均来自当前项目的服务器制作记录" in source
+    assert "package_sha256" not in source
+    assert "canon_digest" not in source
+    assert ".episode-shot-timeline" in styles
+    assert "grid-template-columns: minmax(0, 1fr)" in styles
+    assert "overflow-wrap: anywhere" in styles
+
+
 def test_provider_free_authenticated_browser_fixture_restores_candidate_authority(tmp_path: Path) -> None:
     seed = prepare_provider_free_delivery_qa(tmp_path)
 
     assert seed["candidate_count"] == 2
     assert seed["selected_candidate_id"] == "candidate_002"
     assert str(seed["selected_revision_id"]).startswith("revision-")
+    assert seed["episode_version_id"] == "ep-rainlight-001-v1"
+    assert seed["canon_shot_count"] == 15
+    assert seed["canon_checkpoint_version"] == 2
     assert seed["provider_calls_started"] is False
     assert seed["evidence_boundary"] == "provider-free deterministic UI/runtime verification only"
     assert seed["browser_preflight"] == {
         "ready": True,
         "missing_candidate_authority_fields": [],
         "persisted_candidate_count": 2,
+        "authoritative_canon_ready": True,
         "stop_reason": "",
     }
 
@@ -808,6 +941,10 @@ def test_provider_free_authenticated_browser_fixture_restores_candidate_authorit
     assert run.status_code == 200
     assert run.json()["production_run"]["selected_revision"]["candidate_id"] == "candidate_002"
     assert run.json()["production_run"]["quality_reviews"] == []
+    canon = run.json()["production_run"]["representative_episode_binding"]["episode_canon"]
+    assert len(canon["shots"]) == 15
+    assert canon["shots"][0]["start_seconds"] == 0
+    assert canon["shots"][-1]["end_seconds"] == 135
     candidates = state.json()["state"]["nodes"][seed["node_id"]]["params"]["candidatePreviewUrls"]
     assert len(candidates) == 2
     assert all(item["preview_url"].endswith("/preview") for item in candidates)

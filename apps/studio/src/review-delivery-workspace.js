@@ -85,6 +85,7 @@ function buildWorkspace(state, handlers) {
   main.tabIndex = -1;
   main.append(buildPageHeading(state, handlers));
   if (state.stale || state.writeError || state.notice) main.append(buildNotice(state, handlers));
+  main.append(buildEpisodeCanon(state));
 
   const layout = el("div", "review-layout");
   const stage = el("section", "review-stage");
@@ -103,6 +104,119 @@ function buildWorkspace(state, handlers) {
   layout.append(stage, aside);
   main.appendChild(layout);
   return main;
+}
+
+function buildEpisodeCanon(state) {
+  const canon = state.episodeCanon;
+  const section = el("section", "episode-canon-board");
+  section.setAttribute("aria-labelledby", "episode-canon-heading");
+  const header = el("header", "episode-canon-head");
+  const copy = el("div");
+  const title = el("h2", "", "本集制作规范");
+  title.id = "episode-canon-heading";
+  copy.append(
+    title,
+    el("p", "", canon
+      ? "镜头顺序、版本、连续性与音频覆盖均来自当前项目的服务器制作记录。"
+      : "本集尚未绑定权威制作规范，镜头与素材状态不会被推断为已完成。"),
+  );
+  header.append(copy, el("span", "canon-status", canon ? "15/15 镜已绑定" : "等待绑定"));
+  section.appendChild(header);
+  if (!canon) {
+    const empty = el("div", "canon-empty");
+    empty.setAttribute("role", "status");
+    empty.append(el("strong", "", "制作规范暂不可用"), el("span", "", "请先在当前项目中建立本集角色、场景、镜头与音频版本。"));
+    section.appendChild(empty);
+    return section;
+  }
+
+  const metrics = el("div", "canon-metrics");
+  metrics.append(
+    canonMetric("本集版本", versionLabel(canon.episode_version_id)),
+    canonMetric("镜头时长", `${canon.duration_seconds} 秒 · 15 镜`),
+    canonMetric("画面素材", canon.all_assets_ready ? "已齐" : `${canon.pending_media_count} 项待补齐`, canon.all_assets_ready),
+    canonMetric("音频覆盖", canon.audio.all_audio_ready ? "15/15 已齐" : `15/15 已规划 · ${canon.audio.pending_asset_count} 项待制作`, canon.audio.all_audio_ready),
+    canonMetric("下游确认", canon.propagation_complete ? "已完成" : "待制作团队确认", canon.propagation_complete),
+  );
+  section.appendChild(metrics);
+
+  const canonDetails = el("div", "canon-identity-grid");
+  canonDetails.append(
+    canonIdentityGroup("角色设定", canon.characters),
+    canonIdentityGroup("场景设定", canon.scenes),
+  );
+  section.appendChild(canonDetails);
+
+  const timeline = el("ol", "episode-shot-timeline");
+  timeline.setAttribute("aria-label", "本集十五镜制作时间线");
+  for (const shot of canon.shots) timeline.appendChild(shotCanonCard(shot));
+  section.appendChild(timeline);
+  return section;
+}
+
+function canonMetric(label, value, passed = false) {
+  const item = el("div", `canon-metric ${passed ? "ready" : "pending"}`);
+  item.append(el("span", "", label), el("strong", "", value));
+  return item;
+}
+
+function canonIdentityGroup(title, items) {
+  const group = el("section", "canon-identity-group");
+  group.appendChild(el("h3", "", title));
+  const list = el("ul");
+  for (const item of items) {
+    const row = el("li");
+    row.append(
+      el("strong", "", item.name || "待命名"),
+      el("span", "", versionLabel(item.version_id)),
+      el("small", "", item.continuity[0] || "连续性要求待补充"),
+    );
+    list.appendChild(row);
+  }
+  group.appendChild(list);
+  return group;
+}
+
+function shotCanonCard(shot) {
+  const card = el("li", "episode-shot-card");
+  const head = el("header", "shot-card-head");
+  const title = el("div");
+  title.append(
+    el("strong", "", shot.label),
+    el("span", "shot-time", `${formatTime(shot.start_seconds)}–${formatTime(shot.end_seconds)}`),
+  );
+  head.append(title, el("span", "shot-version", versionLabel(shot.version_id)));
+  const context = el("p", "shot-context", `${shot.scene || "场景待确认"} · ${shot.characters.join("、") || "角色待确认"}`);
+  const action = el("p", "shot-action", shot.visual_action || "画面动作待补充");
+  const craft = el("dl", "shot-craft");
+  craft.append(
+    definition("镜头", shot.camera || "待确认"),
+    definition("运动", shot.motion || "待确认"),
+    definition("连续性", shot.continuity),
+  );
+  const statuses = el("div", "shot-statuses");
+  statuses.append(
+    el("span", shot.media.all_ready ? "shot-chip ready" : "shot-chip pending", shot.media.status),
+    el("span", shot.audio.status === "音频已齐" ? "shot-chip ready" : "shot-chip pending", shot.audio.status),
+  );
+  card.append(head, context, action, craft, statuses);
+  return card;
+}
+
+function definition(term, description) {
+  const wrap = el("div");
+  wrap.append(el("dt", "", term), el("dd", "", description));
+  return wrap;
+}
+
+function formatTime(seconds) {
+  const safe = Math.max(0, Math.trunc(Number(seconds) || 0));
+  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function versionLabel(value) {
+  const match = String(value || "").match(/-v(\d+)$/i);
+  return match ? `第 ${Number(match[1])} 版` : "当前批准版本";
 }
 
 function buildPageHeading(state, handlers) {

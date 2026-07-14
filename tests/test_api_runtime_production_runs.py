@@ -108,10 +108,29 @@ def _episode_binding_payload(run: dict, **updates) -> dict:
     package_path = REPO_ROOT / "examples" / "representative_episode" / "episode_package.json"
     package = json.loads(package_path.read_text(encoding="utf-8"))
     arbitration = package["domain_crew_execution_plan"]["creator_arbitration"]
+    character_versions = {
+        item["character_id"]: item["current_version_id"] for item in package["characters"]
+    }
+    scene_versions = {
+        item["scene_id"]: item["current_version_id"] for item in package["scenes"]
+    }
+    assets = {item["asset_id"]: item for item in package["asset_manifest"]}
+
+    def asset_ref(asset_id: str) -> dict:
+        item = assets[asset_id]
+        return {
+            "asset_id": item["asset_id"],
+            "current_revision_id": item["current_revision_id"],
+            "status": item["status"],
+            "provider_needed": item["provider_needed"],
+        }
+
+    audio = package["audio_plan"]
     payload = {
         "schema_version": "afs_representative_episode_binding.v0.1",
         "idempotency_key": "bind-rainlight-episode-v1",
         "expected_checkpoint_version": run["checkpoint"]["version"],
+        "expected_subject_digest": run["subject_digest"],
         "expected_package_sha256": None,
         "package_sha256": hashlib.sha256(package_path.read_bytes()).hexdigest(),
         "package_project_id": package["project"]["project_id"],
@@ -139,14 +158,73 @@ def _episode_binding_payload(run: dict, **updates) -> dict:
             for item in package["shots"]
         ],
         "asset_refs": [
-            {
-                "asset_id": item["asset_id"],
-                "current_revision_id": item["current_revision_id"],
-                "status": item["status"],
-                "provider_needed": item["provider_needed"],
-            }
+            asset_ref(item["asset_id"])
             for item in package["asset_manifest"]
         ],
+        "episode_canon": {
+            "episode_title": package["project"]["title"],
+            "episode_version_id": package["project"]["current_version_id"],
+            "duration_seconds": package["project"]["duration_seconds"],
+            "characters": [
+                {
+                    "entity_id": item["character_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "name": item["name"],
+                    "appearance": item["appearance"],
+                    "continuity_constraints": item["continuity_constraints"],
+                }
+                for item in package["characters"]
+            ],
+            "scenes": [
+                {
+                    "entity_id": item["scene_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "name": item["name"],
+                    "description": item["description"],
+                    "style_constraints": item["style_constraints"],
+                }
+                for item in package["scenes"]
+            ],
+            "shots": [
+                {
+                    "ordinal": index,
+                    "entity_id": item["shot_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "start_seconds": item["start_seconds"],
+                    "end_seconds": item["end_seconds"],
+                    "scene_ref": {
+                        "entity_id": item["scene_id"],
+                        "current_approved_version_id": scene_versions[item["scene_id"]],
+                    },
+                    "character_refs": [
+                        {
+                            "entity_id": character_id,
+                            "current_approved_version_id": character_versions[character_id],
+                        }
+                        for character_id in item["character_refs"]
+                    ],
+                    "required_asset_ids": item["required_asset_ids"],
+                    "visual_action": item["script"]["visual_action"],
+                    "dialogue": item["script"]["dialogue"],
+                    "camera": item["camera"],
+                    "motion": item["motion"],
+                    "continuity_note": item["continuity_note"],
+                    "quality_target": item["quality_target"],
+                }
+                for index, item in enumerate(package["shots"], start=1)
+            ],
+            "audio": {
+                "coverage_shot_refs": audio["coverage_shot_refs"],
+                "dialogue_asset_ref": asset_ref(audio["dialogue_asset_id"]),
+                "music_asset_ref": asset_ref(audio["music_asset_id"]),
+                "sfx_asset_ref": asset_ref(audio["sfx_asset_id"]),
+                "master_asset_ref": asset_ref(audio["master_asset_id"]),
+                "dialogue_direction": audio["dialogue_direction"],
+                "music_direction": audio["music_direction"],
+                "sfx_direction": audio["sfx_direction"],
+                "mix_requirements": audio["mix_requirements"],
+            },
+        },
         "pending_media_count": sum(item["status"] == "missing" for item in package["asset_manifest"]),
         "creator_decision_ref": arbitration["creator_decision_ref"],
         "authoritative_affected_task_refs": arbitration["authoritative_affected_task_refs"],
@@ -213,6 +291,9 @@ def test_representative_episode_package_binding_is_authenticated_persisted_and_s
 
     bound = client.put(route, json=payload, headers=headers)
     replayed = client.put(route, json=payload, headers=headers)
+    conflicting_replay_payload = _episode_binding_payload(run)
+    conflicting_replay_payload["episode_canon"]["shots"][0]["continuity_note"] = "冲突的连续性要求"
+    conflicting_replay = client.put(route, json=conflicting_replay_payload, headers=headers)
     loaded = client.get(route, headers=headers)
 
     assert bound.status_code == 200, bound.text
@@ -221,7 +302,7 @@ def test_representative_episode_package_binding_is_authenticated_persisted_and_s
     assert binding["package_sha256"] == payload["package_sha256"]
     assert binding["episode_id"] == "ep-rainlight-001"
     assert binding["episode_version_id"] == "ep-rainlight-001-v1"
-    assert binding["counts"] == {"characters": 3, "scenes": 3, "shots": 15, "assets": 25}
+    assert binding["counts"] == {"characters": 3, "scenes": 3, "shots": 15, "assets": 25, "audio_items": 4}
     assert binding["asset_readiness"] == {
         "ready_count": 0,
         "pending_media_count": 25,
@@ -232,6 +313,23 @@ def test_representative_episode_package_binding_is_authenticated_persisted_and_s
     assert len(binding["scene_refs"]) == 3
     assert len(binding["shot_refs"]) == 15
     assert all(ref["current_approved_version_id"].endswith("-v1") for ref in binding["shot_refs"])
+    assert binding["subject_digest"] == run["subject_digest"]
+    assert len(binding["canon_digest"]) == 64
+    canon = binding["episode_canon"]
+    assert canon["episode_title"] == "《雨灯失窃案》第一集：最后一盏引魂灯"
+    assert canon["duration_seconds"] == 135
+    assert [item["entity_id"] for item in canon["shots"]] == [f"shot-{index:03d}" for index in range(1, 16)]
+    assert [(item["start_seconds"], item["end_seconds"]) for item in canon["shots"]] == [
+        ((index - 1) * 9, index * 9) for index in range(1, 16)
+    ]
+    assert all(item["audio_coverage"]["covered"] is True for item in canon["shots"])
+    assert all(item["audio_coverage"]["status"] == "pending" for item in canon["shots"])
+    assert canon["audio"]["readiness"] == {
+        "asset_count": 4,
+        "ready_count": 0,
+        "pending_count": 4,
+        "all_audio_ready": False,
+    }
     assert binding["creator_decision_ref"] == "creator-decision-episode-v1"
     assert len(binding["authoritative_affected_task_refs"]) == 8
     assert len(binding["downstream_reconfirmations"]) == 8
@@ -239,6 +337,8 @@ def test_representative_episode_package_binding_is_authenticated_persisted_and_s
     assert len(binding["binding_digest"]) == 64
     assert replayed.status_code == 200
     assert replayed.json()["idempotent_replay"] is True
+    assert conflicting_replay.status_code == 409
+    assert "idempotency conflict" in conflicting_replay.text
     assert loaded.status_code == 200
     assert loaded.json()["representative_episode_binding"] == binding
     assert loaded.json()["checkpoint"] == bound.json()["production_run"]["checkpoint"]
@@ -247,12 +347,16 @@ def test_representative_episode_package_binding_is_authenticated_persisted_and_s
         "authoritative_source": "runtime_production_run_checkpoint",
         "package_sha256": payload["package_sha256"],
         "binding_digest": binding["binding_digest"],
+        "canon_digest": binding["canon_digest"],
         "episode_id": "ep-rainlight-001",
+        "episode_title": "《雨灯失窃案》第一集：最后一盏引魂灯",
         "episode_version_id": "ep-rainlight-001-v1",
+        "duration_seconds": 135,
         "character_count": 3,
         "scene_count": 3,
         "shot_count": 15,
         "asset_count": 25,
+        "audio_item_count": 4,
         "pending_media_count": 25,
         "provider_needed_count": 25,
         "all_assets_ready": False,
@@ -298,6 +402,18 @@ def test_representative_episode_binding_rejects_stale_checkpoint_digest_and_fore
     )
     assert stale_checkpoint.status_code == 409
     assert stale_checkpoint.json()["detail"]["error"] == "stale_production_checkpoint"
+
+    changed_subject = client.put(
+        route,
+        json=_episode_binding_payload(
+            run,
+            idempotency_key="bind-subject-conflict",
+            expected_subject_digest=_digest("another-run-subject"),
+        ),
+        headers=headers,
+    )
+    assert changed_subject.status_code == 409
+    assert changed_subject.json()["detail"]["error"] == "representative_episode_subject_conflict"
 
     bound = client.put(route, json=_episode_binding_payload(run), headers=headers)
     assert bound.status_code == 200, bound.text
@@ -353,11 +469,45 @@ def test_representative_episode_binding_rejects_incomplete_or_inconsistent_inven
     missing_reconfirmation["downstream_reconfirmations"] = missing_reconfirmation["downstream_reconfirmations"][:-1]
     unsafe_task_ref = _episode_binding_payload(run, idempotency_key="bind-unsafe-task-ref")
     unsafe_task_ref["authoritative_affected_task_refs"][0] = "../foreign-task"
+    reordered = _episode_binding_payload(run, idempotency_key="bind-reordered-shots")
+    reordered["episode_canon"]["shots"][0], reordered["episode_canon"]["shots"][1] = (
+        reordered["episode_canon"]["shots"][1],
+        reordered["episode_canon"]["shots"][0],
+    )
+    timeline_gap = _episode_binding_payload(run, idempotency_key="bind-timeline-gap")
+    timeline_gap["episode_canon"]["shots"][1]["start_seconds"] = 10
+    duplicate_shot = _episode_binding_payload(run, idempotency_key="bind-duplicate-shot")
+    duplicate_shot["episode_canon"]["shots"][1]["entity_id"] = "shot-001"
+    stale_version = _episode_binding_payload(run, idempotency_key="bind-stale-version")
+    stale_version["episode_canon"]["shots"][0]["current_approved_version_id"] = "shot-001-v2"
+    foreign_scene = _episode_binding_payload(run, idempotency_key="bind-foreign-scene")
+    foreign_scene["episode_canon"]["shots"][0]["scene_ref"] = {
+        "entity_id": "scene-foreign",
+        "current_approved_version_id": "scene-foreign-v1",
+    }
+    incomplete_audio = _episode_binding_payload(run, idempotency_key="bind-incomplete-audio")
+    incomplete_audio["episode_canon"]["audio"]["coverage_shot_refs"].pop()
+    foreign_asset = _episode_binding_payload(run, idempotency_key="bind-foreign-asset")
+    foreign_asset["episode_canon"]["shots"][0]["required_asset_ids"][0] = "asset-foreign"
 
-    assert client.put(route, json=incomplete, headers=headers).status_code == 422
-    assert client.put(route, json=mismatched, headers=headers).status_code == 422
-    assert client.put(route, json=missing_reconfirmation, headers=headers).status_code == 422
-    assert client.put(route, json=unsafe_task_ref, headers=headers).status_code == 422
+    for invalid in (
+        incomplete,
+        mismatched,
+        missing_reconfirmation,
+        unsafe_task_ref,
+        reordered,
+        timeline_gap,
+        duplicate_shot,
+        stale_version,
+        foreign_scene,
+        incomplete_audio,
+        foreign_asset,
+    ):
+        assert client.put(route, json=invalid, headers=headers).status_code == 422
+    unchanged = client.get(f"/projects/{project_id}/production-runs/{run['run_id']}", headers=headers)
+    assert unchanged.status_code == 200
+    assert unchanged.json()["production_run"]["checkpoint"] == run["checkpoint"]
+    assert unchanged.json()["production_run"]["representative_episode_binding"] is None
 
 
 def test_create_list_get_and_idempotent_replay_persist_checkpoint(tmp_path, monkeypatch) -> None:

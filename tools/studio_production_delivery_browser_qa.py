@@ -21,9 +21,10 @@ from fastapi.testclient import TestClient
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
+from agentflow_studio.production.representative_episode import validate_representative_episode
 
 
-PROJECT_ID = "studio-production-delivery-qa"
+PROJECT_ID = "afs-rainlight-project"
 NODE_ID = "image_delivery_qa_001"
 JOB_ID = "job_delivery_qa_001"
 RUN_ID = "production_delivery_qa_001"
@@ -87,6 +88,16 @@ def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
         )
         run_response.raise_for_status()
         run = run_response.json()["production_run"]
+        validated = validate_representative_episode(
+            REPO_ROOT / "examples" / "representative_episode" / "episode_package.json"
+        )
+        binding_response = client.put(
+            f"/projects/{PROJECT_ID}/production-runs/{RUN_ID}/representative-episode-binding",
+            json=_episode_binding_payload(run, validated.package, validated.package_sha256),
+            headers=headers,
+        )
+        binding_response.raise_for_status()
+        run = binding_response.json()["production_run"]
         selected = candidates[1]
         decision_response = client.post(
             f"/projects/{PROJECT_ID}/production-runs/{RUN_ID}/creator-decisions",
@@ -140,12 +151,16 @@ def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
             "selected_candidate_id": selected["candidate_id"],
             "selected_revision_id": selected_run["selected_revision"]["revision_id"],
             "candidate_count": len(candidates),
+            "episode_version_id": run["representative_episode_binding"]["episode_version_id"],
+            "canon_shot_count": len(run["representative_episode_binding"]["episode_canon"]["shots"]),
+            "canon_checkpoint_version": run["checkpoint"]["version"],
             "provider_calls_started": False,
             "evidence_boundary": "provider-free deterministic UI/runtime verification only",
             "browser_preflight": {
                 "ready": not missing_authority_fields,
                 "missing_candidate_authority_fields": missing_authority_fields,
                 "persisted_candidate_count": len(persisted_candidates),
+                "authoritative_canon_ready": len(run["representative_episode_binding"]["episode_canon"]["shots"]) == 15,
                 "stop_reason": (
                     "authenticated Studio state cannot restore selectable candidate authority"
                     if missing_authority_fields
@@ -153,6 +168,119 @@ def prepare_provider_free_delivery_qa(runtime_root: Path) -> dict[str, object]:
                 ),
             },
         }
+
+
+def _episode_binding_payload(run: dict[str, object], package: dict[str, object], package_sha256: str) -> dict[str, object]:
+    project = package["project"]
+    characters = package["characters"]
+    scenes = package["scenes"]
+    shots = package["shots"]
+    assets = package["asset_manifest"]
+    audio = package["audio_plan"]
+    crew_plan = package["domain_crew_execution_plan"]
+    arbitration = crew_plan["creator_arbitration"]
+    character_versions = {item["character_id"]: item["current_version_id"] for item in characters}
+    scene_versions = {item["scene_id"]: item["current_version_id"] for item in scenes}
+    assets_by_id = {item["asset_id"]: item for item in assets}
+
+    def asset_ref(asset_id: str) -> dict[str, object]:
+        item = assets_by_id[asset_id]
+        return {
+            "asset_id": item["asset_id"],
+            "current_revision_id": item["current_revision_id"],
+            "status": item["status"],
+            "provider_needed": item["provider_needed"],
+        }
+
+    return {
+        "schema_version": "afs_representative_episode_binding.v0.1",
+        "idempotency_key": "bind-rainlight-delivery-qa-v1",
+        "expected_checkpoint_version": run["checkpoint"]["version"],
+        "expected_subject_digest": run["subject_digest"],
+        "expected_package_sha256": None,
+        "package_sha256": package_sha256,
+        "package_project_id": project["project_id"],
+        "episode_id": project["episode_id"],
+        "episode_version_id": project["current_version_id"],
+        "character_refs": [
+            {"entity_id": item["character_id"], "current_approved_version_id": item["current_version_id"]}
+            for item in characters
+        ],
+        "scene_refs": [
+            {"entity_id": item["scene_id"], "current_approved_version_id": item["current_version_id"]}
+            for item in scenes
+        ],
+        "shot_refs": [
+            {"entity_id": item["shot_id"], "current_approved_version_id": item["current_version_id"]}
+            for item in shots
+        ],
+        "asset_refs": [asset_ref(item["asset_id"]) for item in assets],
+        "episode_canon": {
+            "episode_title": project["title"],
+            "episode_version_id": project["current_version_id"],
+            "duration_seconds": project["duration_seconds"],
+            "characters": [
+                {
+                    "entity_id": item["character_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "name": item["name"],
+                    "appearance": item["appearance"],
+                    "continuity_constraints": item["continuity_constraints"],
+                }
+                for item in characters
+            ],
+            "scenes": [
+                {
+                    "entity_id": item["scene_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "name": item["name"],
+                    "description": item["description"],
+                    "style_constraints": item["style_constraints"],
+                }
+                for item in scenes
+            ],
+            "shots": [
+                {
+                    "ordinal": index,
+                    "entity_id": item["shot_id"],
+                    "current_approved_version_id": item["current_version_id"],
+                    "start_seconds": item["start_seconds"],
+                    "end_seconds": item["end_seconds"],
+                    "scene_ref": {
+                        "entity_id": item["scene_id"],
+                        "current_approved_version_id": scene_versions[item["scene_id"]],
+                    },
+                    "character_refs": [
+                        {"entity_id": ref, "current_approved_version_id": character_versions[ref]}
+                        for ref in item["character_refs"]
+                    ],
+                    "required_asset_ids": item["required_asset_ids"],
+                    "visual_action": item["script"]["visual_action"],
+                    "dialogue": item["script"]["dialogue"],
+                    "camera": item["camera"],
+                    "motion": item["motion"],
+                    "continuity_note": item["continuity_note"],
+                    "quality_target": item["quality_target"],
+                }
+                for index, item in enumerate(shots, start=1)
+            ],
+            "audio": {
+                "coverage_shot_refs": audio["coverage_shot_refs"],
+                "dialogue_asset_ref": asset_ref(audio["dialogue_asset_id"]),
+                "music_asset_ref": asset_ref(audio["music_asset_id"]),
+                "sfx_asset_ref": asset_ref(audio["sfx_asset_id"]),
+                "master_asset_ref": asset_ref(audio["master_asset_id"]),
+                "dialogue_direction": audio["dialogue_direction"],
+                "music_direction": audio["music_direction"],
+                "sfx_direction": audio["sfx_direction"],
+                "mix_requirements": audio["mix_requirements"],
+            },
+        },
+        "pending_media_count": sum(item["status"] == "missing" for item in assets),
+        "creator_decision_ref": arbitration["creator_decision_ref"],
+        "authoritative_affected_task_refs": arbitration["authoritative_affected_task_refs"],
+        "downstream_reconfirmations": crew_plan["downstream_reconfirmations"],
+    }
 
 
 def _write_candidates(store: RuntimeStore) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
