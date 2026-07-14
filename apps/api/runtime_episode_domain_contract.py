@@ -667,6 +667,26 @@ class ProductionProjectAggregate(EpisodeContractModel):
                     raise ValueError("applied shot must only replace the exact continuity ref")
 
         for shot in self.shots:
+            if shot.parent_version_id is not None:
+                parent_ref = EntityVersionRef(
+                    entity_type="shot",
+                    entity_id=shot.entity_id,
+                    version_id=shot.parent_version_id,
+                )
+                parent_shot = require(parent_ref, ("shot",))
+                continuity_changed = (
+                    shot.continuity_refs
+                    != parent_shot.continuity_refs  # type: ignore[attr-defined]
+                )
+                if continuity_changed and shot.source_proposal_ref is None:
+                    raise ValueError(
+                        "shot continuity change requires an exact source proposal"
+                    )
+                if not continuity_changed and shot.source_proposal_ref is not None:
+                    raise ValueError(
+                        "shot with unchanged continuity cannot claim a source proposal"
+                    )
+
             if shot.source_proposal_ref is None:
                 continue
             proposal = proposal_index.get(shot.source_proposal_ref)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,10 @@ from apps.api.runtime_episode_domain_contract import (
     TenantScope,
     is_lifecycle_transition_allowed,
 )
-from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore
+from apps.api.runtime_episode_domain_store import (
+    AggregateNotFoundError,
+    EpisodeDomainAggregateStore,
+)
 
 
 NOW = "2026-07-15T20:30:00+00:00"
@@ -838,6 +842,106 @@ def test_application_rejects_cropped_added_and_duplicate_membership() -> None:
         ProductionProjectAggregate(**{
             **aggregate.model_dump(),
             "agent_proposals": (duplicate,),
+        })
+
+
+def test_continuity_changed_successor_cannot_be_orphaned_by_coordinated_membership_crop() -> None:
+    aggregate = build_applied_continuity_operation(
+        selected_shot_ids=("shot-1", "shot-2")
+    )
+    proposal = aggregate.agent_proposals[0]
+    cropped = proposal.model_copy(update={"applied_refs": proposal.applied_refs[:1]})
+    orphan = aggregate.shots[-1].model_copy(update={"source_proposal_ref": None})
+
+    with pytest.raises(
+        ValidationError,
+        match="continuity change requires an exact source proposal",
+    ):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots[:-1], orphan),
+            "agent_proposals": (cropped,),
+        })
+
+
+def test_orphaned_continuity_change_fails_json_and_store_before_persist(tmp_path: Path) -> None:
+    aggregate = build_applied_continuity_operation(
+        selected_shot_ids=("shot-1", "shot-2")
+    )
+    payload = aggregate.model_dump(mode="json")
+    payload["agent_proposals"][0]["applied_refs"] = payload["agent_proposals"][0][
+        "applied_refs"
+    ][:1]
+    payload["shots"][-1]["source_proposal_ref"] = None
+
+    with pytest.raises(
+        ValidationError,
+        match="continuity change requires an exact source proposal",
+    ):
+        ProductionProjectAggregate.model_validate_json(json.dumps(payload))
+
+    store = EpisodeDomainAggregateStore(tmp_path)
+    snapshot = store.snapshot_path(
+        org_id=aggregate.scope.org_id,
+        project_id=aggregate.scope.project_id,
+    )
+    with pytest.raises(
+        ValidationError,
+        match="continuity change requires an exact source proposal",
+    ):
+        store.save(  # type: ignore[arg-type]
+            payload,
+            expected_aggregate_version=0,
+            idempotency_key="orphaned-continuity-change",
+            payload_digest=digest("orphaned-continuity-change"),
+        )
+    assert not snapshot.exists()
+
+    restarted = EpisodeDomainAggregateStore(tmp_path)
+    with pytest.raises(AggregateNotFoundError, match="does not exist"):
+        restarted.load(
+            org_id=aggregate.scope.org_id,
+            project_id=aggregate.scope.project_id,
+        )
+
+
+def test_source_proposal_backlink_is_rejected_when_continuity_is_unchanged() -> None:
+    aggregate = build_aggregate()
+    parent = aggregate.shots[0]
+    proposal = AgentProposal(
+        **common(
+            aggregate.scope,
+            "proposal-noop",
+            lifecycle="draft",
+            review="not_requested",
+            created_at=LATER,
+        ),
+        target_ref=ref(aggregate.continuity_states[0]),
+        impact_refs=(ref(parent),),
+        action="inspect_continuity",
+        decision_state="accepted",
+    )
+    ordinary_revision = parent.model_copy(
+        update={
+            "version_id": "shot-1.v2",
+            "revision": 2,
+            "parent_version_id": parent.version_id,
+            "lifecycle_state": "candidate",
+            "review_state": "needs_review",
+            "created_at": LATER,
+            "content_digest": digest("shot-1-ordinary-revision"),
+            "source_proposal_ref": ref(proposal),
+        }
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="unchanged continuity cannot claim a source proposal",
+    ):
+        ProductionProjectAggregate(**{
+            **aggregate.model_dump(),
+            "shots": (*aggregate.shots, ordinary_revision),
+            "agent_proposals": (proposal,),
         })
 
 

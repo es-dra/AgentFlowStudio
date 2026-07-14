@@ -116,6 +116,14 @@ the target exact continuity ref. Scene, sequence, duration, and source evidence
 remain unchanged. Every successor re-enters `candidate + needs_review`; applying
 a proposal cannot silently preserve approval or lock state.
 
+The parent-to-successor edge is also validated independently of those declared
+memberships. Every non-initial shot resolves its exact parent shot. Any change
+to `continuity_refs` requires an exact `source_proposal_ref`, and the successor
+must occur in that proposal revision's `applied_refs`. Conversely, a successor
+whose continuity refs are unchanged cannot claim a continuity-operation
+backlink. Coordinated removal of both an applied ref and its shot backlink
+therefore leaves an invalid orphan rather than rewriting operation history.
+
 Proposal states have separate meanings:
 
 - `pending`, `accepted`, `partially_accepted`, and `rejected` express a creator
