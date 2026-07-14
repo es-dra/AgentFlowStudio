@@ -173,6 +173,15 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             if _mutation_is_replay(run, "representative_episode_binding", body.idempotency_key, request_digest):
                 return _run_response(run, idempotent_replay=True)
             _require_checkpoint_version(run, body.expected_checkpoint_version)
+            if body.expected_subject_digest != str(run.get("subject_digest") or ""):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "representative_episode_subject_conflict",
+                        "expected_subject_digest": body.expected_subject_digest,
+                        "actual_subject_digest": str(run.get("subject_digest") or ""),
+                    },
+                )
             if body.package_project_id != project_id:
                 raise HTTPException(status_code=409, detail="representative episode package belongs to another project")
             current = run.get("representative_episode_binding")
@@ -189,12 +198,18 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                 )
 
             timestamp = _now()
+            episode_canon = _persisted_episode_canon(body)
+            canon_digest = canonical_json_digest(episode_canon)
             binding_core = {
                 "schema_version": REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION,
                 "package_sha256": body.package_sha256,
                 "package_project_id": body.package_project_id,
+                "subject_digest": body.expected_subject_digest,
                 "episode_id": body.episode_id,
                 "episode_version_id": body.episode_version_id,
+                "episode_title": episode_canon["episode_title"],
+                "canon_digest": canon_digest,
+                "episode_canon": episode_canon,
                 "character_refs": [item.model_dump(mode="json") for item in body.character_refs],
                 "scene_refs": [item.model_dump(mode="json") for item in body.scene_refs],
                 "shot_refs": [item.model_dump(mode="json") for item in body.shot_refs],
@@ -204,6 +219,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                     "scenes": len(body.scene_refs),
                     "shots": len(body.shot_refs),
                     "assets": len(body.asset_refs),
+                    "audio_items": 4,
                 },
                 "asset_readiness": {
                     "ready_count": sum(item.status == "ready" for item in body.asset_refs),
@@ -226,12 +242,26 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                         "relation": "package_defined_episode_version",
                     },
                     {
+                        "source_ref": canon_digest,
+                        "target_ref": body.episode_version_id,
+                        "relation": "safe_canon_defined_episode_version",
+                    },
+                    {
                         "source_ref": body.creator_decision_ref,
                         "target_ref": body.episode_version_id,
                         "relation": "creator_decision_approved_episode_version",
                     },
                 ],
             }
+            if isinstance(current, dict) and str(current.get("binding_digest") or ""):
+                binding_core["previous_binding_digest"] = str(current["binding_digest"])
+                binding_core["lineage"].append(
+                    {
+                        "source_ref": str(current["binding_digest"]),
+                        "target_ref": canon_digest,
+                        "relation": "previous_episode_binding_superseded_by_safe_canon",
+                    }
+                )
             binding = {
                 **binding_core,
                 "binding_digest": canonical_json_digest(binding_core),
@@ -478,6 +508,43 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             _advance_checkpoint(run)
             store.write_production_run(project_id, run)
             return _run_response(run, idempotent_replay=False, export=export)
+
+
+def _persisted_episode_canon(body: RepresentativeEpisodeBindingRequest) -> dict[str, Any]:
+    canon = body.episode_canon.model_dump(mode="json")
+    assets_by_id = {
+        item.asset_id: item.model_dump(mode="json") for item in body.asset_refs
+    }
+    audio = canon["audio"]
+    audio_asset_ids = [
+        audio["dialogue_asset_ref"]["asset_id"],
+        audio["music_asset_ref"]["asset_id"],
+        audio["sfx_asset_ref"]["asset_id"],
+        audio["master_asset_ref"]["asset_id"],
+    ]
+    pending_audio_count = sum(assets_by_id[item]["status"] != "ready" for item in audio_asset_ids)
+    audio["readiness"] = {
+        "asset_count": len(audio_asset_ids),
+        "ready_count": len(audio_asset_ids) - pending_audio_count,
+        "pending_count": pending_audio_count,
+        "all_audio_ready": pending_audio_count == 0,
+    }
+    audio_coverage = set(audio["coverage_shot_refs"])
+    for shot in canon["shots"]:
+        required_assets = [assets_by_id[item] for item in shot["required_asset_ids"]]
+        pending_media_count = sum(item["status"] != "ready" for item in required_assets)
+        shot["asset_readiness"] = {
+            "required_count": len(required_assets),
+            "ready_count": len(required_assets) - pending_media_count,
+            "pending_media_count": pending_media_count,
+            "all_required_assets_ready": pending_media_count == 0,
+        }
+        shot["audio_coverage"] = {
+            "covered": shot["entity_id"] in audio_coverage,
+            "status": "ready" if pending_audio_count == 0 else "pending",
+            "pending_audio_asset_count": pending_audio_count,
+        }
+    return canon
 
 
 def _find_creation_idempotency(store: RuntimeStore, project_id: str, idempotency_key: str) -> dict[str, Any] | None:
@@ -858,17 +925,22 @@ def _episode_studio_summary(binding: dict[str, Any]) -> dict[str, Any]:
         return {}
     counts = binding.get("counts") if isinstance(binding.get("counts"), dict) else {}
     readiness = binding.get("asset_readiness") if isinstance(binding.get("asset_readiness"), dict) else {}
+    canon = binding.get("episode_canon") if isinstance(binding.get("episode_canon"), dict) else {}
     lineage = [item for item in binding.get("lineage") or [] if isinstance(item, dict)]
     return {
         "authoritative_source": "runtime_production_run_checkpoint",
         "package_sha256": str(binding.get("package_sha256") or ""),
         "binding_digest": str(binding.get("binding_digest") or ""),
+        "canon_digest": str(binding.get("canon_digest") or ""),
         "episode_id": str(binding.get("episode_id") or ""),
+        "episode_title": str(binding.get("episode_title") or ""),
         "episode_version_id": str(binding.get("episode_version_id") or ""),
+        "duration_seconds": int(canon.get("duration_seconds") or 0),
         "character_count": int(counts.get("characters") or 0),
         "scene_count": int(counts.get("scenes") or 0),
         "shot_count": int(counts.get("shots") or 0),
         "asset_count": int(counts.get("assets") or 0),
+        "audio_item_count": int(counts.get("audio_items") or 0),
         "pending_media_count": int(readiness.get("pending_media_count") or 0),
         "provider_needed_count": int(readiness.get("provider_needed_count") or 0),
         "all_assets_ready": readiness.get("all_assets_ready") is True,

@@ -9,6 +9,7 @@ const EMPTY = Object.freeze({
   project: null,
   projectId: "",
   run: null,
+  episodeCanon: null,
   candidates: [],
   focusedCandidateId: "",
   selectedCandidateId: "",
@@ -60,6 +61,7 @@ export function createReviewDeliveryState(onChange = () => {}) {
       projectId,
       project: null,
       run: null,
+      episodeCanon: null,
       candidates: [],
       reviewSnapshot: null,
       deliverySnapshot: null,
@@ -110,6 +112,7 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, pr
       project,
       projectId,
       run: null,
+      episodeCanon: null,
       candidates: [],
       focusedCandidateId: "",
       selectedCandidateId: "",
@@ -143,12 +146,14 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, pr
   }
   const quality = qualityProjection(run, selectedRevision, rejected);
   const exports = exactExports(run, selectedRevision, rejected);
+  const episodeCanon = episodeCanonProjection(project?.canonical_state, run);
   return {
     phase: "ready",
     workspace,
     project,
     projectId,
     run,
+    episodeCanon,
     candidates,
     focusedCandidateId,
     selectedCandidateId,
@@ -160,6 +165,100 @@ export function composeReviewDeliveryState({ workspace, project, runsPayload, pr
     rejected,
     notice: "",
     error: "",
+  };
+}
+
+function episodeCanonProjection(value, run) {
+  const canon = objectValue(value);
+  const checkpoint = objectValue(run?.checkpoint);
+  const timeline = Array.isArray(canon.timeline) ? canon.timeline : [];
+  const characters = Array.isArray(canon.character_versions) ? canon.character_versions : [];
+  const scenes = Array.isArray(canon.scene_versions) ? canon.scene_versions : [];
+  const audio = objectValue(canon.audio);
+  if (canon.status_label !== "15/15"
+    || canon.shots !== 15
+    || canon.characters !== 3
+    || canon.scenes !== 3
+    || canon.audio_items !== 4
+    || canon.duration_seconds !== 135
+    || canon.checkpoint_version !== checkpoint.version
+    || !safeDigest(canon.package_sha256)
+    || !safeDigest(canon.canon_digest)
+    || !safeToken(canon.episode_version_id)
+    || timeline.length !== 15
+    || characters.length !== 3
+    || scenes.length !== 3
+    || audio.covered_shot_count !== 15
+    || audio.total_shot_count !== 15) return null;
+  const shots = [];
+  for (const [index, item] of timeline.entries()) {
+    const media = objectValue(item?.media);
+    const shotAudio = objectValue(item?.audio);
+    if (item?.shot_number !== index + 1
+      || item?.start_seconds !== index * 9
+      || item?.end_seconds !== (index + 1) * 9
+      || !safeToken(item?.version_id)
+      || !safeText(item?.continuity, 500)
+      || !["素材已齐", "素材待补齐"].includes(media.status)
+      || !["音频已齐", "音频待制作"].includes(shotAudio.status)
+      || typeof media.pending_count !== "number"
+      || typeof shotAudio.pending_asset_count !== "number") return null;
+    shots.push({
+      shot_number: index + 1,
+      label: safeText(item.label, 40) || `第 ${String(index + 1).padStart(2, "0")} 镜`,
+      version_id: safeToken(item.version_id),
+      start_seconds: item.start_seconds,
+      end_seconds: item.end_seconds,
+      scene: safeText(item.scene, 80),
+      characters: (Array.isArray(item.characters) ? item.characters : []).map((entry) => safeText(entry, 80)).filter(Boolean),
+      visual_action: safeText(item.visual_action, 500),
+      dialogue: (Array.isArray(item.dialogue) ? item.dialogue : []).map((entry) => ({
+        speaker: safeText(entry?.speaker, 80),
+        text: safeText(entry?.text, 240),
+      })).filter((entry) => entry.speaker && entry.text),
+      camera: safeText(item.camera, 240),
+      motion: safeText(item.motion, 240),
+      continuity: safeText(item.continuity, 500),
+      media: {
+        status: media.status,
+        pending_count: Math.max(0, Math.trunc(media.pending_count)),
+        all_ready: media.all_ready === true,
+      },
+      audio: {
+        status: shotAudio.status,
+        pending_asset_count: Math.max(0, Math.trunc(shotAudio.pending_asset_count)),
+        covered: shotAudio.covered === true,
+      },
+    });
+  }
+  return {
+    status_label: "15/15",
+    episode_title: safeText(canon.episode_title, 160),
+    episode_version_id: safeToken(canon.episode_version_id),
+    checkpoint_version: canon.checkpoint_version,
+    duration_seconds: 135,
+    shots,
+    characters: characters.map((item) => ({
+      name: safeText(item?.name, 80),
+      version_id: safeToken(item?.version_id),
+      continuity: (Array.isArray(item?.continuity) ? item.continuity : []).map((entry) => safeText(entry, 240)).filter(Boolean),
+    })),
+    scenes: scenes.map((item) => ({
+      name: safeText(item?.name, 80),
+      version_id: safeToken(item?.version_id),
+      continuity: (Array.isArray(item?.continuity) ? item.continuity : []).map((entry) => safeText(entry, 240)).filter(Boolean),
+    })),
+    audio: {
+      covered_shot_count: 15,
+      total_shot_count: 15,
+      pending_asset_count: Math.max(0, Math.trunc(audio.pending_asset_count || 0)),
+      all_audio_ready: audio.all_audio_ready === true,
+      status: audio.status === "音频已齐" ? "音频已齐" : "音频待制作",
+    },
+    pending_media_count: Math.max(0, Math.trunc(canon.pending_media_count || 0)),
+    all_assets_ready: canon.all_assets_ready === true,
+    propagation_complete: canon.propagation_complete === true,
+    readiness: canon.all_assets_ready === true ? "制作素材已齐" : "制作素材待补齐",
   };
 }
 
@@ -298,6 +397,10 @@ function safeDigest(value) {
 function safeDate(value) {
   const date = new Date(String(value || ""));
   return Number.isNaN(date.valueOf()) ? "时间未记录" : date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function safeText(value, limit) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
 }
 
 function objectValue(value) {

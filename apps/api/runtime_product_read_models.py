@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 
 from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_production_models import canonical_json_digest, checkpoint_digest
 from apps.api.runtime_store import RuntimeStore
 
 
@@ -234,17 +235,158 @@ def _crew_summary(crew: dict[str, Any]) -> dict[str, Any]:
 
 
 def _canonical_coverage(run: dict[str, Any]) -> dict[str, Any]:
+    empty = {
+        "status_label": "0/15",
+        "episode_title": "",
+        "episode_version_id": "",
+        "package_sha256": "",
+        "canon_digest": "",
+        "checkpoint_version": 0,
+        "duration_seconds": 0,
+        "characters": 0,
+        "scenes": 0,
+        "shots": 0,
+        "audio_items": 0,
+        "character_versions": [],
+        "scene_versions": [],
+        "timeline": [],
+        "audio": {
+            "covered_shot_count": 0,
+            "total_shot_count": 15,
+            "pending_asset_count": 0,
+            "all_audio_ready": False,
+            "status": "尚未绑定",
+        },
+        "pending_media_count": 0,
+        "all_assets_ready": False,
+        "propagation_complete": False,
+        "readiness": "尚未绑定本集制作规范",
+    }
+    checkpoint = run.get("checkpoint") if isinstance(run.get("checkpoint"), dict) else {}
+    if not checkpoint or str(checkpoint.get("state_digest") or "") != checkpoint_digest(run):
+        return empty
     binding = run.get("representative_episode_binding") if isinstance(run.get("representative_episode_binding"), dict) else {}
     counts = binding.get("counts") if isinstance(binding.get("counts"), dict) else {}
     readiness = binding.get("asset_readiness") if isinstance(binding.get("asset_readiness"), dict) else {}
+    canon = binding.get("episode_canon") if isinstance(binding.get("episode_canon"), dict) else {}
+    shots = [item for item in canon.get("shots") or [] if isinstance(item, dict)]
+    characters = [item for item in canon.get("characters") or [] if isinstance(item, dict)]
+    scenes = [item for item in canon.get("scenes") or [] if isinstance(item, dict)]
+    audio = canon.get("audio") if isinstance(canon.get("audio"), dict) else {}
+    if (
+        not canon
+        or str(binding.get("canon_digest") or "") != canonical_json_digest(canon)
+        or int(counts.get("characters") or 0) != 3
+        or int(counts.get("scenes") or 0) != 3
+        or int(counts.get("shots") or 0) != 15
+        or int(counts.get("audio_items") or 0) != 4
+        or len(characters) != 3
+        or len(scenes) != 3
+        or len(shots) != 15
+    ):
+        return empty
+    for index, shot in enumerate(shots, start=1):
+        if (
+            int(shot.get("ordinal") or 0) != index
+            or str(shot.get("entity_id") or "") != f"shot-{index:03d}"
+            or shot.get("start_seconds") != (index - 1) * 9
+            or shot.get("end_seconds") != index * 9
+        ):
+            return empty
+    scene_names = {
+        str(item.get("entity_id") or ""): _safe_text(item.get("name"), 80)
+        for item in scenes
+    }
+    character_names = {
+        str(item.get("entity_id") or ""): _safe_text(item.get("name"), 80)
+        for item in characters
+    }
+    timeline = []
+    for shot in shots:
+        media = shot.get("asset_readiness") if isinstance(shot.get("asset_readiness"), dict) else {}
+        audio_coverage = shot.get("audio_coverage") if isinstance(shot.get("audio_coverage"), dict) else {}
+        scene_ref = shot.get("scene_ref") if isinstance(shot.get("scene_ref"), dict) else {}
+        dialogue = [item for item in shot.get("dialogue") or [] if isinstance(item, dict)]
+        character_refs = [item for item in shot.get("character_refs") or [] if isinstance(item, dict)]
+        timeline.append({
+            "shot_number": int(shot["ordinal"]),
+            "label": f"第 {int(shot['ordinal']):02d} 镜",
+            "version_id": _safe_text(shot.get("current_approved_version_id"), 160),
+            "start_seconds": int(shot["start_seconds"]),
+            "end_seconds": int(shot["end_seconds"]),
+            "scene": scene_names.get(str(scene_ref.get("entity_id") or ""), "场景待确认"),
+            "characters": [
+                character_names.get(str(item.get("entity_id") or ""), "角色待确认")
+                for item in character_refs
+            ],
+            "visual_action": _safe_text(shot.get("visual_action"), 500),
+            "dialogue": [
+                {
+                    "speaker": (
+                        "旁白" if str(item.get("speaker_ref") or "") == "narrator"
+                        else character_names.get(str(item.get("speaker_ref") or ""), "角色")
+                    ),
+                    "text": _safe_text(item.get("text"), 240),
+                }
+                for item in dialogue
+            ],
+            "camera": _safe_text(shot.get("camera"), 240),
+            "motion": _safe_text(shot.get("motion"), 240),
+            "continuity": _safe_text(shot.get("continuity_note"), 500),
+            "media": {
+                "required_count": int(media.get("required_count") or 0),
+                "ready_count": int(media.get("ready_count") or 0),
+                "pending_count": int(media.get("pending_media_count") or 0),
+                "all_ready": media.get("all_required_assets_ready") is True,
+                "status": "素材已齐" if media.get("all_required_assets_ready") is True else "素材待补齐",
+            },
+            "audio": {
+                "covered": audio_coverage.get("covered") is True,
+                "pending_asset_count": int(audio_coverage.get("pending_audio_asset_count") or 0),
+                "status": "音频已齐" if audio_coverage.get("status") == "ready" else "音频待制作",
+            },
+        })
+    audio_readiness = audio.get("readiness") if isinstance(audio.get("readiness"), dict) else {}
     return {
+        "status_label": "15/15",
+        "episode_title": _safe_text(canon.get("episode_title"), 160),
+        "episode_version_id": _safe_text(binding.get("episode_version_id"), 160),
+        "package_sha256": _safe_text(binding.get("package_sha256"), 64),
+        "canon_digest": _safe_text(binding.get("canon_digest"), 64),
+        "checkpoint_version": int(checkpoint.get("version") or 0),
+        "duration_seconds": int(canon.get("duration_seconds") or 0),
         "characters": int(counts.get("characters") or 0),
         "scenes": int(counts.get("scenes") or 0),
         "shots": int(counts.get("shots") or 0),
         "audio_items": int(counts.get("audio_items") or 0),
+        "character_versions": [
+            {
+                "name": _safe_text(item.get("name"), 80),
+                "version_id": _safe_text(item.get("current_approved_version_id"), 160),
+                "continuity": [_safe_text(value, 240) for value in item.get("continuity_constraints") or []],
+            }
+            for item in characters
+        ],
+        "scene_versions": [
+            {
+                "name": _safe_text(item.get("name"), 80),
+                "version_id": _safe_text(item.get("current_approved_version_id"), 160),
+                "continuity": [_safe_text(value, 240) for value in item.get("style_constraints") or []],
+            }
+            for item in scenes
+        ],
+        "timeline": timeline,
+        "audio": {
+            "covered_shot_count": len(audio.get("coverage_shot_refs") or []),
+            "total_shot_count": 15,
+            "pending_asset_count": int(audio_readiness.get("pending_count") or 0),
+            "all_audio_ready": audio_readiness.get("all_audio_ready") is True,
+            "status": "音频已齐" if audio_readiness.get("all_audio_ready") is True else "音频待制作",
+        },
         "pending_media_count": int(readiness.get("pending_media_count") or 0),
         "all_assets_ready": readiness.get("all_assets_ready") is True,
         "propagation_complete": binding.get("propagation_complete") is True,
+        "readiness": "制作素材已齐" if readiness.get("all_assets_ready") is True else "制作素材待补齐",
     }
 
 

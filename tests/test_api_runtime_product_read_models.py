@@ -5,6 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
+from tools.studio_production_delivery_browser_qa import prepare_provider_free_delivery_qa
 
 
 def _register(client: TestClient, email: str, invite_code: str) -> tuple[dict, dict[str, str]]:
@@ -112,3 +113,64 @@ def test_product_overview_has_chinese_empty_and_recovery_models(tmp_path, monkey
     assert payload["projects"] == []
     assert payload["decision_count"] == 0
     assert payload["blocked_count"] == 0
+
+
+def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_path, monkeypatch) -> None:
+    seed = prepare_provider_free_delivery_qa(tmp_path)
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "delivery-qa-invite,canon-other-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    login = client.post(
+        "/auth/login",
+        json={"email": seed["email"], "password": seed["password"]},
+    )
+    assert login.status_code == 200, login.text
+    headers = {"Authorization": f"Bearer {login.json()['session_token']}"}
+
+    response = client.get(f"/projects/{seed['project_id']}/product-overview", headers=headers)
+    assert response.status_code == 200, response.text
+    canon = response.json()["project"]["canonical_state"]
+    assert canon["status_label"] == "15/15"
+    assert canon["episode_title"] == "《雨灯失窃案》第一集：最后一盏引魂灯"
+    assert canon["episode_version_id"] == "ep-rainlight-001-v1"
+    assert canon["duration_seconds"] == 135
+    assert canon["checkpoint_version"] == 3
+    assert (canon["characters"], canon["scenes"], canon["shots"], canon["audio_items"]) == (3, 3, 15, 4)
+    assert len(canon["character_versions"]) == 3
+    assert len(canon["scene_versions"]) == 3
+    assert [item["shot_number"] for item in canon["timeline"]] == list(range(1, 16))
+    assert [(item["start_seconds"], item["end_seconds"]) for item in canon["timeline"]] == [
+        ((index - 1) * 9, index * 9) for index in range(1, 16)
+    ]
+    assert all(item["version_id"].endswith("-v1") for item in canon["timeline"])
+    assert all(item["continuity"] for item in canon["timeline"])
+    assert all(item["media"]["status"] == "素材待补齐" for item in canon["timeline"])
+    assert all(item["audio"]["status"] == "音频待制作" for item in canon["timeline"])
+    assert canon["audio"] == {
+        "covered_shot_count": 15,
+        "total_shot_count": 15,
+        "pending_asset_count": 4,
+        "all_audio_ready": False,
+        "status": "音频待制作",
+    }
+    assert canon["pending_media_count"] == 25
+    assert canon["readiness"] == "制作素材待补齐"
+    encoded = json.dumps(canon, ensure_ascii=False)
+    assert "required_asset_ids" not in encoded
+    assert "entity_id" not in encoded
+    assert "provider_needed" not in encoded
+    assert "D:\\" not in encoded and "/opt/" not in encoded
+
+    reloaded = TestClient(create_runtime_app(runtime_root=tmp_path)).get(
+        f"/projects/{seed['project_id']}/product-overview",
+        headers=headers,
+    )
+    assert reloaded.status_code == 200, reloaded.text
+    assert reloaded.json()["project"]["canonical_state"] == canon
+
+    other, other_headers = _register(client, "canon-other@example.com", "canon-other-invite")
+    assert other["user"]["user_id"] not in encoded
+    assert client.get(
+        f"/projects/{seed['project_id']}/product-overview",
+        headers=other_headers,
+    ).status_code == 403

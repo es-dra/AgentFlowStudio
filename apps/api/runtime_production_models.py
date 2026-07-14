@@ -178,12 +178,183 @@ class EpisodeReconfirmationEvidenceRef(ProductionContractModel):
     status: Literal["required_pending", "reconfirmed"]
 
 
+class EpisodeDialogueLine(ProductionContractModel):
+    speaker_ref: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    text: str = Field(min_length=1, max_length=240)
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+
+class EpisodeCharacterCanonRecord(ProductionContractModel):
+    entity_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    current_approved_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    name: str = Field(min_length=1, max_length=80)
+    appearance: str = Field(min_length=1, max_length=400)
+    continuity_constraints: list[str] = Field(min_length=1, max_length=12)
+
+    @field_validator("name", "appearance")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+    @field_validator("continuity_constraints")
+    @classmethod
+    def validate_constraints(cls, values: list[str]) -> list[str]:
+        cleaned = [_safe_public_text(value) for value in values]
+        if any(not value.strip() or len(value) > 240 for value in cleaned):
+            raise ValueError("character continuity constraints must be safe concise text")
+        if len(cleaned) != len(set(cleaned)):
+            raise ValueError("character continuity constraints must be unique")
+        return cleaned
+
+
+class EpisodeSceneCanonRecord(ProductionContractModel):
+    entity_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    current_approved_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=400)
+    style_constraints: list[str] = Field(min_length=1, max_length=12)
+
+    @field_validator("name", "description")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+    @field_validator("style_constraints")
+    @classmethod
+    def validate_constraints(cls, values: list[str]) -> list[str]:
+        cleaned = [_safe_public_text(value) for value in values]
+        if any(not value.strip() or len(value) > 240 for value in cleaned):
+            raise ValueError("scene style constraints must be safe concise text")
+        if len(cleaned) != len(set(cleaned)):
+            raise ValueError("scene style constraints must be unique")
+        return cleaned
+
+
+class EpisodeShotCanonRecord(ProductionContractModel):
+    ordinal: int = Field(ge=1, le=15, strict=True)
+    entity_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    current_approved_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    start_seconds: int = Field(ge=0, le=126, strict=True)
+    end_seconds: int = Field(ge=9, le=135, strict=True)
+    scene_ref: EpisodeEntityVersionRef
+    character_refs: list[EpisodeEntityVersionRef] = Field(min_length=3, max_length=3)
+    required_asset_ids: list[str] = Field(min_length=1, max_length=12)
+    visual_action: str = Field(min_length=1, max_length=500)
+    dialogue: list[EpisodeDialogueLine] = Field(min_length=1, max_length=8)
+    camera: str = Field(min_length=1, max_length=240)
+    motion: str = Field(min_length=1, max_length=240)
+    continuity_note: str = Field(min_length=1, max_length=500)
+    quality_target: str = Field(min_length=1, max_length=500)
+
+    @field_validator("visual_action", "camera", "motion", "continuity_note", "quality_target")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+    @field_validator("required_asset_ids")
+    @classmethod
+    def validate_required_assets(cls, values: list[str]) -> list[str]:
+        _require_unique_strings(values, "shot asset")
+        return values
+
+    @model_validator(mode="after")
+    def duration_is_exactly_nine_seconds(self) -> "EpisodeShotCanonRecord":
+        if self.end_seconds - self.start_seconds != 9:
+            raise ValueError("representative episode shots must be exactly nine seconds")
+        return self
+
+
+class EpisodeAudioCanon(ProductionContractModel):
+    coverage_shot_refs: list[str] = Field(min_length=15, max_length=15)
+    dialogue_asset_ref: EpisodeAssetReadinessRef
+    music_asset_ref: EpisodeAssetReadinessRef
+    sfx_asset_ref: EpisodeAssetReadinessRef
+    master_asset_ref: EpisodeAssetReadinessRef
+    dialogue_direction: str = Field(min_length=1, max_length=500)
+    music_direction: str = Field(min_length=1, max_length=500)
+    sfx_direction: str = Field(min_length=1, max_length=500)
+    mix_requirements: str = Field(min_length=1, max_length=500)
+
+    @field_validator("coverage_shot_refs")
+    @classmethod
+    def validate_coverage(cls, values: list[str]) -> list[str]:
+        _require_unique_strings(values, "audio coverage shot")
+        return values
+
+    @field_validator("dialogue_direction", "music_direction", "sfx_direction", "mix_requirements")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+
+class RepresentativeEpisodeCanon(ProductionContractModel):
+    episode_title: str = Field(min_length=1, max_length=160)
+    episode_version_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
+    duration_seconds: int = Field(ge=135, le=135, strict=True)
+    characters: list[EpisodeCharacterCanonRecord] = Field(min_length=3, max_length=3)
+    scenes: list[EpisodeSceneCanonRecord] = Field(min_length=3, max_length=3)
+    shots: list[EpisodeShotCanonRecord] = Field(min_length=15, max_length=15)
+    audio: EpisodeAudioCanon
+
+    @field_validator("episode_title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        return _safe_public_text(value)
+
+    @model_validator(mode="after")
+    def exact_rainlight_canon_is_consistent(self) -> "RepresentativeEpisodeCanon":
+        _require_unique_refs(self.characters, "entity_id", "character canon")
+        _require_unique_refs(self.scenes, "entity_id", "scene canon")
+        _require_unique_refs(self.shots, "entity_id", "shot canon")
+        character_versions = {
+            item.entity_id: item.current_approved_version_id for item in self.characters
+        }
+        scene_versions = {item.entity_id: item.current_approved_version_id for item in self.scenes}
+        expected_character_refs = list(character_versions.items())
+        shot_ids: list[str] = []
+        for index, shot in enumerate(self.shots, start=1):
+            expected_shot_id = f"shot-{index:03d}"
+            if shot.ordinal != index or shot.entity_id != expected_shot_id:
+                raise ValueError("shot canon must preserve the exact ordered shot-001 through shot-015 inventory")
+            if shot.start_seconds != (index - 1) * 9 or shot.end_seconds != index * 9:
+                raise ValueError("shot canon timeline must be contiguous from 0 through 135 seconds")
+            if scene_versions.get(shot.scene_ref.entity_id) != shot.scene_ref.current_approved_version_id:
+                raise ValueError("shot canon contains a foreign or stale scene version ref")
+            actual_character_refs = [
+                (item.entity_id, item.current_approved_version_id) for item in shot.character_refs
+            ]
+            if actual_character_refs != expected_character_refs:
+                raise ValueError("shot canon must preserve the exact ordered character version refs")
+            if any(
+                line.speaker_ref != "narrator" and line.speaker_ref not in character_versions
+                for line in shot.dialogue
+            ):
+                raise ValueError("shot canon contains a foreign dialogue speaker")
+            shot_ids.append(shot.entity_id)
+        if self.audio.coverage_shot_refs != shot_ids:
+            raise ValueError("audio coverage must preserve the exact ordered fifteen-shot inventory")
+        audio_asset_ids = [
+            self.audio.dialogue_asset_ref.asset_id,
+            self.audio.music_asset_ref.asset_id,
+            self.audio.sfx_asset_ref.asset_id,
+            self.audio.master_asset_ref.asset_id,
+        ]
+        if len(audio_asset_ids) != len(set(audio_asset_ids)):
+            raise ValueError("audio canon asset refs must be unique")
+        return self
+
+
 class RepresentativeEpisodeBindingRequest(ProductionContractModel):
     schema_version: Literal["afs_representative_episode_binding.v0.1"] = (
         REPRESENTATIVE_EPISODE_BINDING_SCHEMA_VERSION
     )
     idempotency_key: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
     expected_checkpoint_version: int = Field(ge=1, strict=True)
+    expected_subject_digest: str = Field(pattern=SHA256_PATTERN)
     expected_package_sha256: str | None = Field(default=None, pattern=SHA256_PATTERN)
     package_sha256: str = Field(pattern=SHA256_PATTERN)
     package_project_id: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
@@ -193,6 +364,7 @@ class RepresentativeEpisodeBindingRequest(ProductionContractModel):
     scene_refs: list[EpisodeEntityVersionRef] = Field(min_length=3, max_length=3)
     shot_refs: list[EpisodeEntityVersionRef] = Field(min_length=15, max_length=15)
     asset_refs: list[EpisodeAssetReadinessRef] = Field(min_length=25, max_length=25)
+    episode_canon: RepresentativeEpisodeCanon
     pending_media_count: int = Field(ge=0, le=25, strict=True)
     creator_decision_ref: str = Field(pattern=SAFE_IDENTIFIER_PATTERN)
     authoritative_affected_task_refs: list[str] = Field(min_length=1, max_length=32)
@@ -214,6 +386,46 @@ class RepresentativeEpisodeBindingRequest(ProductionContractModel):
             raise ValueError("downstream reconfirmation evidence must cover every authoritative affected task")
         if any(item.approved_version_id != self.episode_version_id for item in self.downstream_reconfirmations):
             raise ValueError("downstream reconfirmation evidence must target the exact episode version")
+        if self.episode_canon.episode_version_id != self.episode_version_id:
+            raise ValueError("episode canon version must equal the bound episode version")
+        expected_character_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.character_refs
+        ]
+        actual_character_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.episode_canon.characters
+        ]
+        if actual_character_refs != expected_character_refs:
+            raise ValueError("episode canon character versions must match the authoritative inventory")
+        expected_scene_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.scene_refs
+        ]
+        actual_scene_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.episode_canon.scenes
+        ]
+        if actual_scene_refs != expected_scene_refs:
+            raise ValueError("episode canon scene versions must match the authoritative inventory")
+        expected_shot_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.shot_refs
+        ]
+        actual_shot_refs = [
+            (item.entity_id, item.current_approved_version_id) for item in self.episode_canon.shots
+        ]
+        if actual_shot_refs != expected_shot_refs:
+            raise ValueError("episode canon shot versions must match the authoritative inventory")
+        assets_by_id = {item.asset_id: item.model_dump(mode="json") for item in self.asset_refs}
+        required_asset_ids = {
+            asset_id for shot in self.episode_canon.shots for asset_id in shot.required_asset_ids
+        }
+        audio_refs = (
+            self.episode_canon.audio.dialogue_asset_ref,
+            self.episode_canon.audio.music_asset_ref,
+            self.episode_canon.audio.sfx_asset_ref,
+            self.episode_canon.audio.master_asset_ref,
+        )
+        if not required_asset_ids.issubset(assets_by_id):
+            raise ValueError("episode canon contains a foreign shot asset ref")
+        if any(assets_by_id.get(item.asset_id) != item.model_dump(mode="json") for item in audio_refs):
+            raise ValueError("episode audio canon must match the authoritative asset inventory")
         return self
 
 
@@ -270,9 +482,15 @@ __all__ = (
     "ProductionQualityChecklist",
     "ProductionQualityReviewRequest",
     "ProductionRunCreateRequest",
+    "EpisodeAudioCanon",
     "EpisodeAssetReadinessRef",
+    "EpisodeCharacterCanonRecord",
+    "EpisodeDialogueLine",
     "EpisodeEntityVersionRef",
     "EpisodeReconfirmationEvidenceRef",
+    "EpisodeSceneCanonRecord",
+    "EpisodeShotCanonRecord",
+    "RepresentativeEpisodeCanon",
     "RepresentativeEpisodeBindingRequest",
     "SafeArtifactRef",
     "canonical_json_digest",
