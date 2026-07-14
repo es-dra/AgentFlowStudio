@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_episode_domain_contract import ProductionProjectAggregate
@@ -305,34 +306,109 @@ def test_integrity_failure_is_fail_closed_and_sanitized(tmp_path: Path, monkeypa
     assert "traceback" not in lowered
 
 
-def test_unsafe_private_paths_are_rejected_and_never_projected(tmp_path: Path, monkeypatch) -> None:
-    client, owner, _ = _auth_client(tmp_path, monkeypatch)
-    user_id = owner["user"]["user_id"]
-    unsafe = _aggregate(PROJECT_ID, user_id, user_id, title=r"D:\private\episode.json")
+@pytest.mark.parametrize(
+    ("case", "unsafe_value"),
+    (
+        ("windows-drive", r"E:\private\episode.json"),
+        ("windows-drive-lower", r"e:/private/episode.json"),
+        ("windows-drive-encoded", "%45%3A%5Cprivate%5Cepisode.json"),
+        ("windows-drive-double-encoded", "%2545%253A%255Cprivate%255Cepisode.json"),
+        ("unc", r"\\server\share\episode.json"),
+        ("posix", "/home/afs/private/episode.json"),
+        ("file-uri", "file:///home/afs/private/episode.json"),
+        ("file-uri-mixed-case", "FiLe://server/share/episode.json"),
+        ("signed-url", "https://cdn.example/episode.png?X-Amz-Signature=secret"),
+        ("signed-url-lower", "https://cdn.example/episode.png?x-amz-signature=secret"),
+        ("signed-url-mixed", "https://cdn.example/episode.png?X-aMz-SiGnAtUrE=secret"),
+        ("signed-url-key-encoded", "https://cdn.example/episode.png?X-Amz-%53ignature=secret"),
+        (
+            "signed-url-encoded",
+            "https%3A%2F%2Fcdn.example%2Fepisode.png%3FX-Amz-Signature%3Dsecret",
+        ),
+        ("azure-signed-url", "https://cdn.example/episode.png?sv=1&sig=secret"),
+        ("token-url", "https://cdn.example/episode.png?access_token=secret"),
+    ),
+)
+def test_unsafe_projection_matrix_is_rejected_and_never_returned(
+    tmp_path: Path,
+    monkeypatch,
+    case: str,
+    unsafe_value: str,
+) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    assert client.post(
+        "/projects",
+        json={"project_id": PROJECT_ID, "goal": "Local safety test"},
+    ).status_code == 200
+    unsafe = _aggregate(PROJECT_ID, LOCAL_ORG_ID, LOCAL_ACTOR_ID, title=unsafe_value)
     aggregate_store = EpisodeDomainAggregateStore(tmp_path)
 
     rejected = client.put(
         ROUTE,
-        headers=_headers(owner, "unsafe-create"),
+        headers={"Idempotency-Key": f"unsafe-{case}"},
         json=_replace_body(unsafe, expected=0),
     )
 
     assert rejected.status_code == 422
     assert _error(rejected) == "episode_aggregate_unsafe_payload"
-    assert not aggregate_store.snapshot_path(org_id=user_id, project_id=PROJECT_ID).exists()
+    assert unsafe_value not in rejected.text
+    assert not aggregate_store.snapshot_path(org_id=LOCAL_ORG_ID, project_id=PROJECT_ID).exists()
 
     aggregate_store.save(
         ProductionProjectAggregate.model_validate(unsafe),
         expected_aggregate_version=0,
-        idempotency_key="direct-unsafe-create",
-        payload_digest=_digest("direct-unsafe-create"),
+        idempotency_key=f"direct-{case}",
+        payload_digest=_digest(f"direct-{case}"),
     )
-    failed_read = client.get(ROUTE, headers=_headers(owner))
+    failed_read = client.get(ROUTE)
     assert failed_read.status_code == 500
     assert _error(failed_read) == "episode_aggregate_integrity_failed"
-    lowered = failed_read.text.lower()
-    assert "d:\\private" not in lowered
-    assert "episode.json" not in lowered
+    assert unsafe_value not in failed_read.text
+
+
+def test_projection_safety_preserves_ordinary_text_and_relative_artifact_url(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    assert client.post(
+        "/projects",
+        json={"project_id": PROJECT_ID, "goal": "Local positive safety test"},
+    ).status_code == 200
+    aggregate = _aggregate(
+        PROJECT_ID,
+        LOCAL_ORG_ID,
+        LOCAL_ACTOR_ID,
+        title="File: 雨灯失窃案中的剧情道具清单",
+    )
+    relative_url = "assets/episode-001/preview.mp4?variant=small"
+    aggregate["provider_contracts"] = [
+        {
+            "provider_id": "local-preview",
+            "surface": relative_url,
+            "training_use": "prohibited",
+            "no_training_supported": True,
+            "retention_days": 0,
+            "deletion_api_supported": True,
+            "withdrawal_supported": True,
+            "region": "local",
+            "subprocessors_documented": True,
+        }
+    ]
+
+    created = client.put(
+        ROUTE,
+        headers={"Idempotency-Key": "safe-relative-url"},
+        json=_replace_body(aggregate, expected=0),
+    )
+    loaded = client.get(ROUTE)
+
+    assert created.status_code == 200, created.text
+    assert loaded.status_code == 200, loaded.text
+    assert loaded.json()["aggregate"]["projects"][0]["title"] == aggregate["projects"][0]["title"]
+    assert loaded.json()["aggregate"]["provider_contracts"][0]["surface"] == relative_url
 
 
 def test_auth_off_uses_explicit_local_scope_and_keeps_project_binding(tmp_path: Path, monkeypatch) -> None:

@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 from typing import Annotated, Any
+from urllib.parse import unquote
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,12 +22,40 @@ from apps.api.runtime_episode_domain_store import (
     EpisodeDomainStoreError,
 )
 from apps.api.runtime_errors import safe_error_detail
-from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
+from apps.api.runtime_store import RuntimeStore
 
 
 LOCAL_ORG_ID = "local-runtime"
 LOCAL_ACTOR_ID = "local-creator"
 _SAFE_ID_RE = re.compile(SAFE_ID, re.ASCII)
+_WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+_FILE_URI_RE = re.compile(r"^file:(?://|[\\/]|[A-Za-z]:[\\/])", re.IGNORECASE)
+_URL_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
+_URL_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$")
+_SIGNED_QUERY_KEYS = frozenset(
+    {
+        "access-token",
+        "authorization",
+        "auth-token",
+        "awsaccesskeyid",
+        "credential",
+        "googleaccessid",
+        "jwt",
+        "key-pair-id",
+        "sig",
+        "signature",
+        "signed-token",
+        "token",
+        "x-amz-credential",
+        "x-amz-security-token",
+        "x-amz-signature",
+        "x-goog-credential",
+        "x-goog-security-token",
+        "x-goog-signature",
+        "x-ms-signature",
+        "x-ms-token",
+    }
+)
 
 
 class EpisodeAggregateReplaceRequest(BaseModel):
@@ -254,7 +283,7 @@ def _safe_aggregate_payload(
 ) -> dict[str, Any]:
     payload = aggregate.model_dump(mode="json")
     try:
-        reject_unsafe_payload(payload)
+        _reject_unsafe_projection(payload)
     except ValueError as exc:
         _raise_api_error(
             request,
@@ -270,6 +299,65 @@ def _safe_aggregate_payload(
             cause=exc,
         )
     return payload
+
+
+def _reject_unsafe_projection(value: Any) -> None:
+    if isinstance(value, dict):
+        for item in value.values():
+            _reject_unsafe_projection(item)
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            _reject_unsafe_projection(item)
+        return
+    if not isinstance(value, str):
+        return
+    decoded = _decoded_string(value).strip()
+    if (
+        _WINDOWS_ABSOLUTE_PATH_RE.match(decoded)
+        or decoded.startswith("\\\\")
+        or decoded.startswith("//")
+        or decoded.startswith("/")
+        or _FILE_URI_RE.match(decoded)
+        or _url_has_signed_credentials(decoded)
+    ):
+        raise ValueError("unsafe projection string")
+
+
+def _decoded_string(value: str) -> str:
+    decoded = value
+    for _ in range(3):
+        candidate = unquote(decoded)
+        if candidate == decoded:
+            break
+        decoded = candidate
+    return decoded
+
+
+def _url_has_signed_credentials(value: str) -> bool:
+    if "?" not in value:
+        return False
+    prefix, query = value.split("?", 1)
+    if not _looks_like_url(prefix):
+        return False
+    query = query.split("#", 1)[0]
+    for parameter in re.split(r"[&;]", query):
+        raw_key = parameter.split("=", 1)[0]
+        key = _decoded_string(raw_key).strip().casefold().replace("_", "-")
+        if key in _SIGNED_QUERY_KEYS:
+            return True
+    return False
+
+
+def _looks_like_url(prefix: str) -> bool:
+    if not prefix or any(character.isspace() for character in prefix):
+        return False
+    return bool(
+        _URL_SCHEME_RE.match(prefix)
+        or prefix.startswith(("./", "../", "/", "//"))
+        or "/" in prefix
+        or _URL_HOST_RE.fullmatch(prefix)
+    )
 
 
 def _raise_store_error(
