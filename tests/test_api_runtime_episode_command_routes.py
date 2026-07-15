@@ -467,7 +467,7 @@ def test_selection_unlock_is_typed_append_only_and_restart_recoverable(
     locked_ref = _ref(aggregate.selections[-1])
     before = client.get(route.removesuffix(COMMAND_SUFFIX))
     assert before.status_code == 200
-    private_marker = "Creator reopened C:/private/customer/secret.mov for review."
+    private_marker = "Creator reopened /OPT/afs/private/secret.mov for review."
 
     unsafe = _post(
         client,

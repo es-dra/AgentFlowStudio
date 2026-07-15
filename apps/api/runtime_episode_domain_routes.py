@@ -43,6 +43,7 @@ _POSIX_PRIVATE_ABSOLUTE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9._~:/-])"
     r"/(?:home|Users|root|opt|var|tmp|private|mnt|srv|etc|run|test|data|workspace)"
     r"(?:/|\\)",
+    re.IGNORECASE,
 )
 _FILE_URI_RE = re.compile(
     r"(?<![A-Za-z0-9+.-])file:(?://|[\\/]|[A-Za-z]:[\\/])",

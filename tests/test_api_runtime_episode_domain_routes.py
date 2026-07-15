@@ -485,6 +485,7 @@ def test_unsafe_projection_matrix_is_rejected_and_never_returned(
         r"Creator reopened \\server\share\secret.mov for review.",
         "Creator reopened //server/share/secret.mov for review.",
         "Creator reopened /opt/afs/private/secret.mov for review.",
+        "Creator reopened /OPT/afs/private/secret.mov for review.",
         "Creator reopened file:///home/afs/private/secret.mov for review.",
         "Creator reopened https://cdn.example/item?X-Amz-Signature=secret for review.",
         "Creator reopened https%253A%252F%252Fcdn.example%252Fitem"
@@ -504,6 +505,7 @@ def test_projection_sanitizer_scans_embedded_private_locations(unsafe_value: str
         "Use ./assets/episode-001/preview.mp4?variant=small for review.",
         "Use https://cdn.example/episode.png?variant=small for review.",
         "Use https://cdn.example/home/preview.mp4?variant=small for review.",
+        "Use https://cdn.example/opt/preview.mp4?variant=small for review.",
         "Compare choices A/B before review.",
         "Drive C: contains no shared path here.",
     ),
