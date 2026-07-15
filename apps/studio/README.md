@@ -27,7 +27,7 @@
 http://127.0.0.1:8790/studio/
 ```
 
-单集生产工作区是同一静态树下的正式子路径，不替换现有画布入口：
+单集生产工作区是同一静态树下的 review/recovery candidate 子路径，不替换现有画布入口，也不代表完整 AI 原生生产控制面：
 
 ```text
 http://127.0.0.1:8790/studio/episode-workspace/?project=<project_id>&episode=<episode_id>&version=<episode_version_id>

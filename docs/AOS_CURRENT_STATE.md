@@ -26,11 +26,14 @@ business validation from repository/document changes.
 The active product program is the creator-controlled single-episode production
 loop in [AFS_EPISODE_LOOP_PROGRAM.md](AFS_EPISODE_LOOP_PROGRAM.md). The existing
 canvas and representative-episode paths are implementation inputs, not the
-authority for the new domain fact chain. The selected frontend direction is a
-Project/Episode shell with a storyboard-centered default workspace and contextual
-inspector. Hybrid informs the information architecture; Guided is limited to
-next action, recovery, and natural error handling. This direction is decided and
-must not be reopened as a prototype vote.
+authority for the new domain fact chain. The implemented Project/Episode shell,
+storyboard workspace, and contextual inspector are retained as a
+`review_and_recovery_workspace_candidate`: they prove authenticated fact review,
+typed mutations, and recovery, but not the complete AI-native production control
+surface from creator intent through Agent decomposition/parallel execution,
+progress/cost/blockers, and artifact writeback. The candidate is not final
+frontend authority. Await the next control-thread Task Packet; do not reopen a
+simple canvas-versus-non-canvas vote or invent another direction locally.
 
 ## Local Repo Surface
 

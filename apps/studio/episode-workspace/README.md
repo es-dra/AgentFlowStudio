@@ -1,6 +1,6 @@
 # Episode workspace
 
-Production Studio sub-route for the selected single-episode information architecture:
+Authenticated `review_and_recovery_workspace_candidate` for the single-episode fact chain:
 
 ```text
 Project / Episode shell
@@ -14,6 +14,12 @@ authenticated Runtime static tree at:
 ```text
 /studio/episode-workspace/?project=<project_id>&episode=<episode_id>&version=<version_id>
 ```
+
+This candidate does not yet provide the complete AI-native production control
+surface from creator intent through Agent decomposition/parallel execution,
+progress/cost/blockers, and artifact writeback. It is retained as review/recovery
+evidence while the control thread prepares a new Task Packet; it must not be treated
+as final frontend authority or used to reopen a simple canvas/non-canvas vote.
 
 It reads the exact creator-safe workspace projection, sends typed commands with one
 durable `Idempotency-Key`, and stores UI-only recovery state under the
