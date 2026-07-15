@@ -465,6 +465,32 @@ def test_selection_unlock_is_typed_append_only_and_restart_recoverable(
     aggregate = _locked(_approved(_selected_v2(review_episode())))
     client, route = _bootstrap(tmp_path, aggregate)
     locked_ref = _ref(aggregate.selections[-1])
+    before = client.get(route.removesuffix(COMMAND_SUFFIX))
+    assert before.status_code == 200
+    private_marker = "C:/private/customer/secret.mov"
+
+    unsafe = _post(
+        client,
+        route,
+        "unlock-selection",
+        {
+            "action": "selection.unlock",
+            "expected_aggregate_version": 1,
+            "selection_ref": locked_ref,
+            "selection_version_id": "selection-shot-1.v4",
+            "decision_entity_id": "unlock-selection-v3",
+            "decision_version_id": "unlock-selection-v3.v1",
+            "created_at": TIMES[7],
+            "note": private_marker,
+        },
+    )
+    assert unsafe.status_code == 422
+    assert _error(unsafe) == "episode_aggregate_unsafe_payload"
+    assert private_marker not in unsafe.text
+
+    unchanged = client.get(route.removesuffix(COMMAND_SUFFIX))
+    assert unchanged.status_code == 200
+    assert unchanged.json() == before.json()
 
     unlocked = _post(
         client,

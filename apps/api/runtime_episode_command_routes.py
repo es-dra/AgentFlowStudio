@@ -273,6 +273,16 @@ def register_runtime_episode_command_routes(
                 )
             else:
                 changed = _execute_command(aggregate, scope=scope, command=body)
+                # Safety is part of the mutation boundary, not only the response
+                # projection. Reject unsafe creator text before the atomic store
+                # can advance the aggregate or record an idempotency receipt.
+                _safe_aggregate_payload(
+                    changed,
+                    request=request,
+                    project_id=project_id,
+                    status_code=422,
+                    stage="episode_command_validation",
+                )
                 result = aggregate_store.save(
                     changed,
                     expected_aggregate_version=body.expected_aggregate_version,
