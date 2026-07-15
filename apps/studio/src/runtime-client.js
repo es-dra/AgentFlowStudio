@@ -655,6 +655,40 @@ export function createRuntimeClient(projectId = "studio-local-001") {
         headers: { "Idempotency-Key": idempotencyKey },
       });
     },
+    getProductionControl() {
+      return requestJson(`/projects/${encoded}/production-control`);
+    },
+    recordProductionControlMission(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/production-control/mission`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    saveProductionControlPlan(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/production-control/plan`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    approveProductionControlPlan(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/production-control/plan/approve`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    runProductionControlAction(runId, payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/production-control/runs/${encodeURIComponent(runId)}/actions`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    rebuildProductionControl() {
+      return requestJson(`/projects/${encoded}/production-control/integrity/rebuild`, { method: "POST" });
+    },
     spriteChat(payload) {
       return requestJson(`/projects/${encoded}/sprite/chat`, { method: "POST", payload });
     },
