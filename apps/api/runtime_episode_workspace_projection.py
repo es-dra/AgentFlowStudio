@@ -43,33 +43,29 @@ class WorkspaceProjectionStateError(EpisodeWorkspaceProjectionError):
     pass
 
 
-_WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
-_FILE_URI_RE = re.compile(r"^file:(?://|[\\/]|[A-Za-z]:[\\/])", re.IGNORECASE)
-_URL_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
-_URL_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$")
-_SIGNED_QUERY_KEYS = frozenset(
-    {
-        "access-token",
-        "authorization",
-        "auth-token",
-        "awsaccesskeyid",
-        "credential",
-        "googleaccessid",
-        "jwt",
-        "key-pair-id",
-        "sig",
-        "signature",
-        "signed-token",
-        "token",
-        "x-amz-credential",
-        "x-amz-security-token",
-        "x-amz-signature",
-        "x-goog-credential",
-        "x-goog-security-token",
-        "x-goog-signature",
-        "x-ms-signature",
-        "x-ms-token",
-    }
+_WINDOWS_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\)[^\s<>\"']+"
+)
+_PRIVATE_POSIX_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9:])/(?:"
+    r"app|etc|home|media|mnt|opt|private|root|srv|test|tmp|users|usr|var|workspace"
+    r")(?=/|\b)",
+    re.IGNORECASE,
+)
+_FILE_URI_RE = re.compile(
+    r"file:(?://|[\\/]|[A-Za-z]:[\\/])",
+    re.IGNORECASE,
+)
+_CREDENTIAL_ASSIGNMENT_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:"
+    r"api[-_]?key|apikey|access[-_]?token|authorization|auth[-_]?token|"
+    r"awsaccesskeyid|client[-_]?secret|credential|googleaccessid|jwt|"
+    r"key[-_]?pair[-_]?id|password|secret|sig|signature|signed[-_]?token|token|"
+    r"x[-_]amz[-_](?:credential|security[-_]token|signature)|"
+    r"x[-_]goog[-_](?:credential|security[-_]token|signature)|"
+    r"x[-_]ms[-_](?:signature|token)"
+    r")\s*=",
+    re.IGNORECASE,
 )
 
 
@@ -175,7 +171,7 @@ def build_episode_workspace_projection(
         sorted({item.job_id for item in candidates if item.job_id is not None})
     )
     delivery = _delivery_projection(canonical, episode, missing_asset_count)
-    next_action = _next_action(shots, shot_rows, selection_by_target, episode)
+    next_action = _next_action(shots, shot_rows)
     project = _project_for_episode(canonical, episode)
     series = _series_for_episode(canonical, episode)
 
@@ -358,7 +354,8 @@ def _shot_projection(
     relevant_proposals = tuple(
         item
         for item in proposals
-        if shot.as_ref() in item.impact_refs
+        if item.target_ref == shot.as_ref()
+        or shot.as_ref() in item.impact_refs
         or shot.as_ref() in item.applied_refs
         or item.target_ref in shot.continuity_refs
     )
@@ -505,36 +502,23 @@ def _candidate_status(item: AssetCandidateVersion) -> str:
 def _next_action(
     shots: tuple[ShotVersion, ...],
     rows: list[dict[str, Any]],
-    selections: dict[EntityVersionRef, tuple[SelectedVersion, ...]],
-    episode: EpisodeVersion,
 ) -> dict[str, Any] | None:
-    if not shots:
-        return None
     for shot, row in zip(shots, rows, strict=True):
-        if row["blocking"]:
-            return {
-                "action": "resolve_shot_review",
-                "label": f"处理镜头 {shot.sequence} 的待审核内容",
-                "subject_ref": _ref(shot.as_ref()),
-            }
-    for shot in shots:
-        approved = any(
-            item.lifecycle_state in ("approved", "locked") and item.review_state == "approved"
-            for item in selections.get(shot.as_ref(), ())
+        adopt = next(
+            (
+                item
+                for item in row["allowed_actions"]
+                if item["action"] == "adopt_candidate"
+            ),
+            None,
         )
-        if not approved:
+        if adopt is not None and adopt["enabled"] is True:
             return {
-                "action": "select_approved_candidate",
-                "label": f"为镜头 {shot.sequence} 选择已审核候选",
+                "action": "adopt_candidate",
+                "label": f"为镜头 {shot.sequence} 采用已审核候选",
                 "subject_ref": _ref(shot.as_ref()),
             }
-    return {
-        "action": "check_delivery",
-        "label": "检查单集交付条件",
-        # The workspace keeps a concrete shot focus while the action targets the episode.
-        "subject_ref": _ref(shots[-1].as_ref()),
-        "episode_ref": _ref(episode.as_ref()),
-    }
+    return None
 
 
 def _delivery_projection(
@@ -640,14 +624,12 @@ def _reject_unsafe_visible_value(value: Any) -> None:
         return
     if not isinstance(value, str):
         return
-    decoded = _decoded_string(value).strip()
+    decoded = _decoded_string(value).replace("&amp;", "&").strip()
     if (
-        _WINDOWS_ABSOLUTE_PATH_RE.match(decoded)
-        or decoded.startswith("\\\\")
-        or decoded.startswith("//")
-        or decoded.startswith("/")
-        or _FILE_URI_RE.match(decoded)
-        or _url_has_signed_credentials(decoded)
+        _WINDOWS_ABSOLUTE_PATH_RE.search(decoded)
+        or _PRIVATE_POSIX_PATH_RE.search(decoded)
+        or _FILE_URI_RE.search(decoded)
+        or _CREDENTIAL_ASSIGNMENT_RE.search(decoded)
     ):
         raise ValueError("unsafe workspace projection string")
 
@@ -660,32 +642,6 @@ def _decoded_string(value: str) -> str:
             break
         decoded = candidate
     return decoded
-
-
-def _url_has_signed_credentials(value: str) -> bool:
-    if "?" not in value:
-        return False
-    prefix, query = value.split("?", 1)
-    if not _looks_like_url(prefix):
-        return False
-    query = query.split("#", 1)[0]
-    for parameter in re.split(r"[&;]", query):
-        raw_key = parameter.split("=", 1)[0]
-        key = _decoded_string(raw_key).strip().casefold().replace("_", "-")
-        if key in _SIGNED_QUERY_KEYS:
-            return True
-    return False
-
-
-def _looks_like_url(prefix: str) -> bool:
-    if not prefix or any(character.isspace() for character in prefix):
-        return False
-    return bool(
-        _URL_SCHEME_RE.match(prefix)
-        or prefix.startswith(("./", "../", "/", "//"))
-        or "/" in prefix
-        or _URL_HOST_RE.fullmatch(prefix)
-    )
 
 
 __all__ = (

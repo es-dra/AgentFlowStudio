@@ -9,7 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_episode_domain_contract import (
+    AgentProposal,
     AssetCandidateVersion,
+    ContinuityStateVersion,
     EpisodeVersion,
     ProductionProjectAggregate,
     ProjectDataPolicy,
@@ -19,6 +21,7 @@ from apps.api.runtime_episode_domain_contract import (
     SeriesVersion,
     ShotVersion,
     TenantScope,
+    ReviewDecision,
 )
 from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore
 from apps.api.runtime_episode_workspace_projection import (
@@ -273,6 +276,66 @@ def test_known_missing_candidate_counts_one_not_rainlight_fixture_default() -> N
     assert projection["workspace"]["delivery"]["missing_asset_count"] == 1
 
 
+def test_next_action_is_none_when_no_creator_action_is_enabled() -> None:
+    projection = _projection(_aggregate(shot_count=1))
+
+    shot = projection["workspace"]["shots"][0]
+    adopt = next(
+        item for item in shot["allowed_actions"] if item["action"] == "adopt_candidate"
+    )
+    assert adopt["enabled"] is False
+    assert projection["workspace"]["next_action"] is None
+    assert projection["workspace"]["recovery"] is None
+    assert "active_shot_ref" not in projection["workspace"]
+
+
+def test_next_action_does_not_point_at_later_shot_when_exact_blocker_is_earlier() -> None:
+    projection = _projection(_aggregate(shot_count=3))
+
+    shot_1, shot_2, _ = projection["workspace"]["shots"]
+    assert shot_2["prior_shot_blockers"][0]["shot_ref"] == shot_1["ref"]
+    assert shot_2["review_state"] == "not_requested"
+    assert projection["workspace"]["next_action"] is None
+
+
+def test_next_action_matches_a_real_enabled_adopt_action() -> None:
+    aggregate = _aggregate(shot_count=1)
+    candidate_common = _common(aggregate.scope, "candidate-approved")
+    candidate_common.update(
+        lifecycle_state="approved",
+        review_state="approved",
+    )
+    candidate = AssetCandidateVersion(
+        **candidate_common,
+        target_ref=aggregate.shots[0].as_ref(),
+        artifact_ref=SafeArtifactRef(
+            artifact_id="artifact-approved",
+            artifact_type="image",
+            content_digest=_digest("artifact-approved"),
+        ),
+        job_id="job-approved",
+        job_state="succeeded",
+    )
+    with_candidate = ProductionProjectAggregate.model_validate(
+        {
+            **aggregate.model_dump(mode="python"),
+            "asset_candidates": (candidate,),
+        }
+    )
+
+    projection = _projection(with_candidate)
+    shot = projection["workspace"]["shots"][0]
+    adopt = next(
+        item for item in shot["allowed_actions"] if item["action"] == "adopt_candidate"
+    )
+    assert adopt["enabled"] is True
+    assert projection["workspace"]["next_action"] == {
+        "action": "adopt_candidate",
+        "label": "为镜头 1 采用已审核候选",
+        "subject_ref": shot["ref"],
+    }
+
+
 def test_stale_episode_ref_and_ambiguous_sequence_fail_closed() -> None:
     aggregate = _aggregate(shot_count=2)
     episode_v1 = aggregate.episodes[0]
@@ -335,6 +398,12 @@ def test_actor_scope_drift_fails_closed() -> None:
         "file:///home/afs/private/episode.json",
         "https://cdn.example/shot.png?X-Amz-%53ignature=secret",
         "https%3A%2F%2Fcdn.example%2Fshot.png%3Faccess_token%3Dsecret",
+        "参考 https://cdn.example/shot.png?X-Amz-Signature=secret",
+        "参考 https://api.example/render?api_key=sk-live-secret",
+        "请查看 /home/afs/private/episode.json 的说明",
+        "请查看 %2Fhome%2Fafs%2Fprivate%2Fepisode.json 的说明",
+        "请查看 /etc/afs/runtime.conf 的说明",
+        "请查看 /test/afs/private/episode.json 的说明",
     ),
 )
 def test_unsafe_visible_text_fails_closed(unsafe_text: str) -> None:
@@ -345,10 +414,52 @@ def test_unsafe_visible_text_fails_closed(unsafe_text: str) -> None:
 
 
 def test_ordinary_creator_text_and_unsigned_url_are_preserved() -> None:
-    title = "参考 https://example.com/storyboard-guide 的镜头说明"
+    title = "参考 https://example.com/home/storyboard?variant=small 的镜头说明"
     projection = _projection(_aggregate(project_title=title))
 
     assert projection["aggregate"]["projects"][0]["title"] == title
+
+
+@pytest.mark.parametrize("field", ("continuity", "review_note", "proposal_action"))
+def test_all_creator_visible_text_surfaces_use_the_same_secret_scan(field: str) -> None:
+    aggregate = _aggregate(shot_count=1)
+    unsafe_text = "说明 https://api.example/render?API_KEY=sk-live-secret"
+    payload = aggregate.model_dump(mode="python")
+    if field == "continuity":
+        continuity = ContinuityStateVersion(
+            **_common(aggregate.scope, "continuity-1"),
+            subject_type="character",
+            subject_id="character-1",
+            identity_baseline=(unsafe_text,),
+        )
+        payload["continuity_states"] = (continuity,)
+        payload["shots"] = (
+            aggregate.shots[0].model_copy(
+                update={"continuity_refs": (continuity.as_ref(),)}
+            ),
+        )
+    elif field == "review_note":
+        payload["review_decisions"] = (
+            ReviewDecision(
+                **_common(aggregate.scope, "review-1"),
+                subject_ref=aggregate.shots[0].as_ref(),
+                decision="request_revision",
+                note=unsafe_text,
+            ),
+        )
+    else:
+        payload["agent_proposals"] = (
+            AgentProposal(
+                **_common(aggregate.scope, "proposal-1"),
+                target_ref=aggregate.shots[0].as_ref(),
+                action=unsafe_text,
+                decision_state="pending",
+            ),
+        )
+    unsafe = ProductionProjectAggregate.model_validate(payload)
+
+    with pytest.raises(WorkspaceProjectionStateError, match="signed credential"):
+        _projection(unsafe)
 
 
 def test_authenticated_workspace_route_enforces_owner_and_exact_episode_ref(
@@ -380,6 +491,8 @@ def test_authenticated_workspace_route_enforces_owner_and_exact_episode_ref(
     assert stale.status_code == 409
     assert _error(stale) == "episode_workspace_reference_conflict"
     assert stale.json()["detail"]["retryable"] is True
+    assert loaded.json()["workspace"]["next_action"] is None
+    assert loaded.json()["workspace"]["recovery"] is None
 
     restarted = TestClient(create_runtime_app(runtime_root=tmp_path))
     recovered = restarted.get(_route(), headers=_headers(owner))
@@ -412,6 +525,52 @@ def test_route_fails_closed_on_corrupt_snapshot_without_leaking_storage_path(
     assert "episode_aggregates" not in lowered
     assert "snapshot.json" not in lowered
     assert "d:\\private" not in lowered
+
+
+@pytest.mark.parametrize(
+    ("unsafe_title", "forbidden_fragments"),
+    (
+        (
+            "参考 https://cdn.example/shot.png?X-Amz-Signature=route-secret",
+            ("route-secret", "x-amz-signature", "cdn.example"),
+        ),
+        (
+            "参考 https://api.example/render?api_key=sk-live-route-secret",
+            ("sk-live-route-secret", "api_key", "api.example"),
+        ),
+        (
+            "请查看 /home/afs/private/episode.json 的说明",
+            ("episode.json", "/home/afs", "private"),
+        ),
+    ),
+)
+def test_authenticated_route_rejects_embedded_secret_without_echo(
+    tmp_path: Path,
+    monkeypatch,
+    unsafe_title: str,
+    forbidden_fragments: tuple[str, ...],
+) -> None:
+    client, owner, _ = _auth_client(tmp_path, monkeypatch)
+    owner_id = owner["user"]["user_id"]
+    aggregate = _aggregate(
+        scope=TenantScope(org_id=owner_id, project_id=PROJECT_ID, actor_id=owner_id),
+        project_title=unsafe_title,
+    )
+    _store_aggregate(tmp_path, aggregate)
+
+    first = client.get(_route(), headers=_headers(owner))
+    second = client.get(_route(), headers=_headers(owner))
+
+    assert first.status_code == 500
+    first_detail = first.json()["detail"]
+    second_detail = second.json()["detail"]
+    assert {key: value for key, value in first_detail.items() if key != "request_id"} == {
+        key: value for key, value in second_detail.items() if key != "request_id"
+    }
+    assert _error(first) == "episode_workspace_integrity_failed"
+    lowered = first.text.lower()
+    for fragment in forbidden_fragments:
+        assert fragment.lower() not in lowered
 
 
 def test_runtime_openapi_contains_workspace_get_without_mutation_route(tmp_path: Path) -> None:
