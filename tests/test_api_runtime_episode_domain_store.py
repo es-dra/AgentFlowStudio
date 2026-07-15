@@ -88,6 +88,7 @@ def test_atomic_roundtrip_and_exact_restart_recovery(tmp_path: Path) -> None:
 
     assert result.aggregate == aggregate
     assert result.replayed is False
+    assert result.ledger_event_id
     assert result.aggregate_sha256 == _digest(
         json.dumps(
             aggregate.model_dump(mode="json"),
@@ -100,6 +101,11 @@ def test_atomic_roundtrip_and_exact_restart_recovery(tmp_path: Path) -> None:
         org_id=ORG_ID,
         project_id=PROJECT_ID,
     ) == aggregate
+    envelope = json.loads(store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID).read_text(encoding="utf-8"))
+    assert envelope["ledger_projection"]["event_count"] == 1
+    assert envelope["ledger_projection"]["aggregate_version"] == 1
+    assert envelope["ledger_projection"]["aggregate_sha256"] == envelope["aggregate_sha256"]
+    assert envelope["outbox_records"][0]["event_id"] == envelope["ledger_events"][0]["event_id"]
     assert not list(store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID).parent.glob("*.tmp"))
 
 
@@ -173,6 +179,8 @@ def test_idempotent_replay_survives_restart_and_changed_payload_conflicts(tmp_pa
     assert replay.replayed is True
     assert replay.aggregate == original.aggregate
     assert replay.aggregate_sha256 == original.aggregate_sha256
+    envelope = json.loads(store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID).read_text(encoding="utf-8"))
+    assert envelope["ledger_projection"]["event_count"] == 1
     with pytest.raises(AggregateIdempotencyConflictError, match="different payload"):
         restarted.save(
             _aggregate(2),
@@ -275,4 +283,71 @@ def test_retired_project_allows_retirement_then_rejects_new_writes_but_replays(t
 
 def test_missing_snapshot_is_explicit(tmp_path: Path) -> None:
     with pytest.raises(AggregateNotFoundError):
+        EpisodeDomainAggregateStore(tmp_path).load(org_id=ORG_ID, project_id=PROJECT_ID)
+
+
+def test_mutation_ledger_appends_and_rebuild_projection_matches_snapshot(tmp_path: Path) -> None:
+    store = EpisodeDomainAggregateStore(tmp_path)
+    store.save(
+        _aggregate(1),
+        expected_aggregate_version=0,
+        idempotency_key="create-v1",
+        payload_digest=_digest("create-v1"),
+    )
+    store.save(
+        _aggregate(2),
+        expected_aggregate_version=1,
+        idempotency_key="update-v2",
+        payload_digest=_digest("update-v2"),
+    )
+
+    path = store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID)
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    assert [item["sequence"] for item in envelope["ledger_events"]] == [1, 2]
+    assert envelope["ledger_events"][1]["previous_event_digest"] == envelope["ledger_events"][0]["integrity_digest"]
+    assert len(envelope["outbox_records"]) == 2
+    assert envelope["ledger_projection"]["event_count"] == 2
+    assert envelope["ledger_projection"]["aggregate_version"] == 2
+    assert EpisodeDomainAggregateStore(tmp_path).load(org_id=ORG_ID, project_id=PROJECT_ID).aggregate_version == 2
+
+
+def test_mutation_ledger_tamper_fails_closed(tmp_path: Path) -> None:
+    store = EpisodeDomainAggregateStore(tmp_path)
+    store.save(
+        _aggregate(1),
+        expected_aggregate_version=0,
+        idempotency_key="create-v1",
+        payload_digest=_digest("create-v1"),
+    )
+    path = store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID)
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    envelope["ledger_events"][0]["aggregate_version"] = 99
+    body = {key: value for key, value in envelope.items() if key != "envelope_sha256"}
+    envelope["envelope_sha256"] = hashlib.sha256(
+        json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    path.write_text(json.dumps(envelope, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(AggregateIntegrityError, match="event id"):
+        EpisodeDomainAggregateStore(tmp_path).load(org_id=ORG_ID, project_id=PROJECT_ID)
+
+
+def test_atomic_outbox_drift_fails_closed(tmp_path: Path) -> None:
+    store = EpisodeDomainAggregateStore(tmp_path)
+    store.save(
+        _aggregate(1),
+        expected_aggregate_version=0,
+        idempotency_key="create-v1",
+        payload_digest=_digest("create-v1"),
+    )
+    path = store.snapshot_path(org_id=ORG_ID, project_id=PROJECT_ID)
+    envelope = json.loads(path.read_text(encoding="utf-8"))
+    envelope["outbox_records"] = []
+    body = {key: value for key, value in envelope.items() if key != "envelope_sha256"}
+    envelope["envelope_sha256"] = hashlib.sha256(
+        json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    path.write_text(json.dumps(envelope, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(AggregateIntegrityError, match="outbox"):
         EpisodeDomainAggregateStore(tmp_path).load(org_id=ORG_ID, project_id=PROJECT_ID)

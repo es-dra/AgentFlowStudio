@@ -46,6 +46,7 @@ from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_ro
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
+from apps.api.runtime_creator_golden_trial import register_runtime_creator_golden_trial_routes
 from apps.api.runtime_feedback_candidate import register_runtime_feedback_candidate_routes
 from apps.api.runtime_human_gate import register_runtime_human_gate_routes
 from apps.api.runtime_keyframe_local_edit import register_runtime_keyframe_local_edit_routes
@@ -359,6 +360,7 @@ def create_runtime_app(
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_production_run_routes(app, store, auth)
     register_runtime_production_control_routes(app, store, auth)
+    register_runtime_creator_golden_trial_routes(app, store, auth)
     register_runtime_domain_crew_routes(app, store, auth)
     register_runtime_episode_domain_routes(app, store, auth)
     register_runtime_episode_command_routes(app, store, auth)

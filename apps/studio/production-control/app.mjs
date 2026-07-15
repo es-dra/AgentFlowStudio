@@ -7,6 +7,7 @@ const params = new URLSearchParams(window.location.search);
 let projectId = safeProjectId(params.get("project")) || "";
 let runtime = projectId ? createRuntimeClient(projectId) : createRuntimeClient();
 let control = null;
+let trial = null;
 let user = null;
 let busy = false;
 let notice = "";
@@ -16,6 +17,7 @@ const tabs = [
   ["mission", "目标"],
   ["plan", "计划"],
   ["cockpit", "制作"],
+  ["trial", "图像试验"],
   ["artifacts", "素材"],
   ["review", "审片"],
 ];
@@ -51,9 +53,11 @@ function syncRouteState() {
 
 function statusLabel(value) {
   return {
+    empty: "未开始",
     missing: "未开始",
     recorded: "已记录",
     proposed: "待批准",
+    planned: "待批准",
     approved: "已批准",
     running: "进行中",
     queued: "排队",
@@ -61,6 +65,9 @@ function statusLabel(value) {
     retrying: "重试中",
     blocked: "阻塞",
     completed: "完成",
+    succeeded: "完成",
+    partially_complete: "部分完成",
+    awaiting_review: "等待审核",
     cancelled: "取消",
     active: "可执行",
     paused: "暂停",
@@ -191,6 +198,7 @@ function renderHeader() {
 function renderActiveTab() {
   if (activeTab === "plan") return renderPlan();
   if (activeTab === "cockpit") return renderCockpit();
+  if (activeTab === "trial") return renderTrial();
   if (activeTab === "artifacts") return renderArtifacts();
   if (activeTab === "review") return renderReview();
   return renderMission();
@@ -255,6 +263,57 @@ function renderCockpit() {
         ${button("complete", "完成", "check")}
       </div>
     </article>`).join("")}
+  </section>`;
+}
+
+function renderTrial() {
+  const currentTrial = trial || { status: "empty", event_count: 0, dispatches: {}, target_shot_ids: ["shot-001", "shot-002", "shot-003"], admission_receipts: [], non_claims: [] };
+  const targetShots = currentTrial.target_shot_ids?.length ? currentTrial.target_shot_ids : ["shot-001", "shot-002", "shot-003"];
+  const dispatches = currentTrial.dispatches || {};
+  const canRecord = currentTrial.status === "empty";
+  const canApprove = currentTrial.status === "planned";
+  const canDispatch = currentTrial.status === "approved" || currentTrial.status === "running";
+  return `<section class="work-surface trial-surface">
+    <header>
+      <h2>三镜头图像试验</h2>
+      <p>仅调度 3 个图像/关键帧外部生成候选；不包含大模型脚本、视频、音频、导出、媒体质检、创作者验收或商业验证。金额只作合成准入上限，不代表真实账单。</p>
+    </header>
+    <div class="trial-grid">
+      <article>
+        <span>状态</span>
+        <strong>${statusLabel(currentTrial.status)}</strong>
+        <small>${currentTrial.event_count || 0} 次记录 · ${currentTrial.provider_dispatch_count || 0} 次外部调度</small>
+      </article>
+      <article>
+        <span>合成准入上限</span>
+        <strong>${moneyLabel(currentTrial.project_ceiling)}</strong>
+        <small>单镜头合成估算 ${moneyLabel(currentTrial.estimated_unit_cost)} · 真实账单未核验</small>
+      </article>
+      <article>
+        <span>人类门</span>
+        <strong>${currentTrial.waiting_human ? "等待确认" : "已记录当前决策"}</strong>
+        <small>媒体质量、人类接受、商业验证分开标记</small>
+      </article>
+    </div>
+    <div class="shot-trial-list">
+      ${targetShots.map((shotId) => {
+        const dispatch = dispatches[shotId] || {};
+        const writeback = dispatch.episode_writeback || {};
+        return `<article>
+          <strong>${escapeHtml(shotLabel(shotId))}</strong>
+          <span>${statusLabel(writeback.status || dispatch.status || "missing")}</span>
+          <small>${gateLabel(dispatch.provider_gate)} · ${writeback.human_review_state === "needs_review" ? "待人工审片" : "未写回候选"}</small>
+        </article>`;
+      }).join("")}
+    </div>
+    <div class="form-actions">
+      <button type="button" data-action="trial-mission" ${!canRecord || busy ? "disabled" : ""}>${icon("bookmark", 16)}冻结图像试验</button>
+      <button type="button" data-action="trial-approve" ${!canApprove || busy ? "disabled" : ""}>${icon("check", 16)}批准试验</button>
+      <button type="button" class="primary" data-action="trial-dispatch" ${!canDispatch || busy ? "disabled" : ""}>${icon("play", 16)}调度下一镜头</button>
+    </div>
+    <footer class="trial-nonclaims">
+      ${(currentTrial.non_claims || []).map((item) => `<span>${escapeHtml(nonClaimLabel(item))}</span>`).join("")}
+    </footer>
   </section>`;
 }
 
@@ -361,7 +420,29 @@ function nonClaimLabel(value) {
     not_generated_media_qa: "未进行生成媒体质检",
     not_human_acceptance: "未完成创作者验收",
     not_business_validation: "未进行商业验证",
+    "provider smoke is separate from media quality": "外部服务冒烟与媒体质量分开",
+    "human acceptance is not claimed": "未声明人类接受",
+    "business validation is not claimed": "未声明商业验证",
+    "actual provider billing is not proven by this route": "真实账单需另行核对",
   }[value] || "仍需后续确认";
+}
+
+function moneyLabel(value) {
+  if (!value) return "未设置";
+  const amount = Number(value.amount || 0);
+  const currency = value.currency || "USD";
+  return amount > 0 ? `${currency} ${amount.toFixed(2)}` : "未设置";
+}
+
+function gateLabel(value) {
+  if (!value || !value.status) return "未调度";
+  if (value.status === "ready") return "外部服务门禁已开启";
+  if (value.status === "blocked") return "外部服务门禁关闭";
+  return statusLabel(value.status);
+}
+
+function shotLabel(value) {
+  return `镜头 ${String(value || "").replace("shot-", "")}`;
 }
 
 function refLabel(ref) {
@@ -392,6 +473,9 @@ function bindApp() {
   app.querySelector('[data-form="mission"]')?.addEventListener("submit", onMission);
   app.querySelector('[data-form="plan"]')?.addEventListener("submit", onPlan);
   app.querySelector('[data-action="approve-plan"]')?.addEventListener("click", onApprovePlan);
+  app.querySelector('[data-action="trial-mission"]')?.addEventListener("click", onTrialMission);
+  app.querySelector('[data-action="trial-approve"]')?.addEventListener("click", onTrialApprove);
+  app.querySelector('[data-action="trial-dispatch"]')?.addEventListener("click", onTrialDispatch);
   app.querySelector('[data-action="rebuild"]')?.addEventListener("click", onRebuild);
   app.querySelectorAll("[data-run-action]").forEach((button) => button.addEventListener("click", () => {
     const runId = button.closest("[data-run]")?.dataset.run;
@@ -480,6 +564,42 @@ async function onApprovePlan() {
   );
 }
 
+async function onTrialMission() {
+  await mutateTrial(
+    runtime.recordCreatorGoldenTrialMission({
+      objective: control?.mission?.objective || "制作一个三镜头的创作者主导 AI 原生制片系统样片。",
+      constraints: ["保持三镜头连续性。", "生成后等待人类审核。"],
+      project_ceiling_amount: 25,
+      estimated_unit_cost_amount: 3,
+      currency: "USD",
+      created_at: new Date().toISOString(),
+    }, commandKey("trial-mission")),
+    "3 镜头图像试验已冻结",
+  );
+}
+
+async function onTrialApprove() {
+  await mutateTrial(
+    runtime.approveCreatorGoldenTrial({
+      expected_event_count: trial?.event_count || 0,
+      created_at: new Date().toISOString(),
+    }, commandKey("trial-approve")),
+    "试验计划已批准，下一步可以调度外部生成服务",
+  );
+}
+
+async function onTrialDispatch() {
+  await mutateTrial(
+    runtime.dispatchCreatorGoldenTrialNext({
+      expected_event_count: trial?.event_count || 0,
+      provider_service_id: "image_relay",
+      estimated_cost_amount: 0.1,
+      generated_at: new Date().toISOString(),
+    }, commandKey("trial-dispatch")),
+    "下一镜头调度结果已记录",
+  );
+}
+
 async function runAction(runId, action) {
   if (!runId || !action) return;
   await mutate(
@@ -513,6 +633,16 @@ async function mutate(promise, message, nextTab) {
   }, "命令失败");
 }
 
+async function mutateTrial(promise, message) {
+  await guarded(async () => {
+    const result = await promise;
+    trial = result.trial;
+    notice = message;
+    activeTab = "trial";
+    renderApp();
+  }, "图像试验命令失败");
+}
+
 async function guarded(fn, fallback) {
   if (busy) return;
   busy = true;
@@ -544,11 +674,16 @@ async function refresh(render = true) {
   }
   runtime = createRuntimeClient(projectId);
   try {
-    const payload = await runtime.getProductionControl();
+    const [payload, trialPayload] = await Promise.all([
+      runtime.getProductionControl(),
+      runtime.getCreatorGoldenTrial().catch(() => null),
+    ]);
     control = payload.control;
+    trial = trialPayload?.trial || null;
     if (render) renderApp();
   } catch (error) {
     control = null;
+    trial = null;
     notice = error?.message || "";
     renderProjectSetup();
   }

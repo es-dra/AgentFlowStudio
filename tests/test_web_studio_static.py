@@ -106,9 +106,17 @@ def test_studio_production_control_entry_is_linked_without_replacing_canvas() ->
     assert 'href="/studio/"' in app
     assert "画布" in app
     assert "故事板 / 审片" in app
+    assert "三镜头图像试验" in app
+    assert "冻结图像试验" in app
+    assert "不包含大模型脚本、视频、音频、导出、媒体质检、创作者验收或商业验证" in app
+    assert "Provider gate" not in app
+    assert "Provider smoke" not in app
+    assert "调度下一镜头" in app
     assert "外部生成未启用" in app
     assert "strong-password-123" not in app
     assert "getProductionControl()" in runtime_client
+    assert "getCreatorGoldenTrial()" in runtime_client
+    assert "dispatchCreatorGoldenTrialNext" in runtime_client
     assert "recordProductionControlMission" in runtime_client
     assert "approveProductionControlPlan" in runtime_client
 
