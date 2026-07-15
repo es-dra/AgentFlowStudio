@@ -99,6 +99,7 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     assert payload["trial"]["admission_receipts"]
     assert payload["trial"]["dispatches"]["shot-001"]["episode_writeback"]["human_review_state"] == "needs_review"
     assert payload["trial"]["dispatches"]["shot-001"]["episode_writeback"]["control_provenance_status"] == "not_written_by_adapter_cache"
+    assert "production_run_id" not in payload["trial"]["dispatches"]["shot-001"]
     assert calls == ["shot-001"]
 
     replay = _post(

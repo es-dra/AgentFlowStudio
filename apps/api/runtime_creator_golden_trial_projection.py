@@ -56,7 +56,6 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
             dispatches[str(event["shot_id"])] = {
                 "status": "running",
                 "provider_attempt_id": event.get("provider_attempt_id"),
-                "production_run_id": event.get("production_run_id"),
                 "provider_service_id": event.get("provider_service_id"),
                 "estimated_cost": event.get("estimated_cost"),
                 "provider_calls_started": True,

@@ -78,7 +78,6 @@ def record_provider_start(
         {
             "event_type": "provider_attempt.started",
             "provider_attempt_id": provider_attempt_id,
-            "production_run_id": object_id("production-run", idempotency_key, next_shot_id),
             "shot_id": next_shot_id,
             "capability": body.capability,
             "provider_service_id": safe_id(body.provider_service_id),
