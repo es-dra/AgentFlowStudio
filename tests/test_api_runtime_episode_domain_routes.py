@@ -266,7 +266,7 @@ def test_server_computed_digest_rejects_changed_payload_for_same_key(tmp_path: P
     assert _error(conflict) == "episode_aggregate_idempotency_conflict"
 
 
-def test_compare_and_swap_rejects_stale_expected_version(tmp_path: Path, monkeypatch) -> None:
+def test_whole_aggregate_put_rejects_non_bootstrap_payload(tmp_path: Path, monkeypatch) -> None:
     client, owner, _ = _auth_client(tmp_path, monkeypatch)
     user_id = owner["user"]["user_id"]
     assert client.put(
@@ -285,8 +285,7 @@ def test_compare_and_swap_rejects_stale_expected_version(tmp_path: Path, monkeyp
     )
 
     assert stale.status_code == 409
-    assert _error(stale) == "episode_aggregate_version_conflict"
-    assert stale.json()["detail"]["retryable"] is True
+    assert _error(stale) == "episode_aggregate_bootstrap_only"
 
 
 def test_cross_tenant_access_is_denied(tmp_path: Path, monkeypatch) -> None:
@@ -347,7 +346,7 @@ def test_missing_aggregate_is_explicit_for_existing_project(tmp_path: Path, monk
     assert _error(response) == "episode_aggregate_not_found"
 
 
-def test_retired_aggregate_rejects_new_write(tmp_path: Path, monkeypatch) -> None:
+def test_bootstrap_only_put_prevents_service_gate_bypass(tmp_path: Path, monkeypatch) -> None:
     client, owner, _ = _auth_client(tmp_path, monkeypatch)
     user_id = owner["user"]["user_id"]
     assert client.put(
@@ -356,23 +355,17 @@ def test_retired_aggregate_rejects_new_write(tmp_path: Path, monkeypatch) -> Non
         json=_replace_body(_aggregate(PROJECT_ID, user_id, user_id), expected=0),
     ).status_code == 200
     retirement = _aggregate(PROJECT_ID, user_id, user_id, aggregate_version=2, retired=True)
-    assert client.put(
+    bypass = client.put(
         ROUTE,
         headers=_headers(owner, "retire-v2"),
         json=_replace_body(retirement, expected=1),
-    ).status_code == 200
-
-    rejected = client.put(
-        ROUTE,
-        headers=_headers(owner, "after-retirement"),
-        json=_replace_body(
-            _aggregate(PROJECT_ID, user_id, user_id, aggregate_version=3, retired=True),
-            expected=2,
-        ),
     )
 
-    assert rejected.status_code == 409
-    assert _error(rejected) == "episode_aggregate_retired"
+    assert bypass.status_code == 409
+    assert _error(bypass) == "episode_aggregate_bootstrap_only"
+    loaded = client.get(ROUTE, headers=_headers(owner)).json()
+    assert loaded["aggregate_version"] == 1
+    assert loaded["aggregate"]["projects"][-1]["lifecycle_state"] == "draft"
 
 
 def test_integrity_failure_is_fail_closed_and_sanitized(tmp_path: Path, monkeypatch) -> None:
@@ -655,6 +648,8 @@ def test_idempotency_header_is_required_and_openapi_exposes_no_store_internals(
     assert missing_header.status_code == 422
     schema = client.app.openapi()
     operation = schema["paths"]["/projects/{project_id}/episode-production-aggregate"]["put"]
+    assert operation["summary"] == "Bootstrap Episode Production Aggregate"
+    assert "typed /commands endpoint" in operation["description"]
     idempotency = next(item for item in operation["parameters"] if item["name"] == "Idempotency-Key")
     assert idempotency["required"] is True
     serialized = json.dumps(schema, ensure_ascii=False).lower()

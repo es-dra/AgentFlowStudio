@@ -165,6 +165,12 @@ def register_runtime_episode_domain_routes(
     @app.put(
         "/projects/{project_id}/episode-production-aggregate",
         response_model=EpisodeAggregateWriteResponse,
+        summary="Bootstrap Episode Production Aggregate",
+        description=(
+            "Creates aggregate version 1 from expected version 0. Later mutations "
+            "must use the typed /commands endpoint; whole-aggregate replacement is "
+            "rejected after bootstrap."
+        ),
     )
     def replace_episode_production_aggregate(
         project_id: str,
@@ -177,6 +183,18 @@ def register_runtime_episode_domain_routes(
         )
         scope = _require_project_scope(store, auth, request, project_id)
         _require_exact_aggregate_scope(aggregate, scope, request=request)
+        if body.expected_aggregate_version != 0 or aggregate.aggregate_version != 1:
+            _raise_api_error(
+                request,
+                project_id,
+                status_code=409,
+                error="episode_aggregate_bootstrap_only",
+                message=(
+                    "Whole-episode replacement is only available for the initial "
+                    "bootstrap. Use a typed episode command for later changes."
+                ),
+                stage="episode_aggregate_bootstrap",
+            )
         _safe_aggregate_payload(
             aggregate,
             request=request,

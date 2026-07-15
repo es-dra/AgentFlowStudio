@@ -376,7 +376,7 @@ def test_reset_is_a_native_confirmation_and_current_get_only_wave_cannot_mutate(
     assert "sendCommand" not in app
 
 
-def test_get_only_dependency_matches_current_route_and_openapi_boundary() -> None:
+def test_get_only_candidate_stays_read_only_while_typed_command_api_is_documented() -> None:
     api = _read("api-client.mjs")
     readme = _read("README.md")
     openapi_path = ROOT / "docs" / "openapi" / "afs-runtime-service.openapi.json"
@@ -387,7 +387,9 @@ def test_get_only_dependency_matches_current_route_and_openapi_boundary() -> Non
     assert 'method: "POST"' not in api
     assert "This Wave is GET-only" in readme
     assert "does not prove a production vertical slice" in readme
-    assert not any(path.endswith("/episode-production-aggregate/commands") for path in documented_paths)
+    command_path = "/projects/{project_id}/episode-production-aggregate/commands"
+    assert set(documented_paths[command_path]) == {"post"}
+    assert "EpisodeCommand" in str(documented_paths[command_path]["post"])
     aggregate_methods = set(
         documented_paths.get("/projects/{project_id}/episode-production-aggregate", {})
     )
@@ -398,7 +400,7 @@ def test_get_only_dependency_matches_current_route_and_openapi_boundary() -> Non
         for path in (ROOT / "apps" / "api").glob("*.py")
     )
     assert '"/projects/{project_id}/episode-production-aggregate"' in api_route_sources
-    assert "episode-production-aggregate/commands" not in api_route_sources
+    assert '"/projects/{project_id}/episode-production-aggregate/commands"' in api_route_sources
 
 
 def test_candidate_sources_have_no_common_utf8_mojibake_sequences() -> None:
