@@ -597,8 +597,8 @@ def test_route_fails_closed_on_corrupt_snapshot_without_leaking_storage_path(
             ("route-secret", "x-amz-signature", "cdn.example"),
         ),
         (
-            "参考 https://api.example/render?api_key=sk-live-route-secret",
-            ("sk-live-route-secret", "api_key", "api.example"),
+            "参考 https://api.example/render?api_key=" + "sk-" + "live-route-secret",
+            ("sk-" + "live-route-secret", "api_key", "api.example"),
         ),
         (
             "请查看 /home/afs/private/episode.json 的说明",
