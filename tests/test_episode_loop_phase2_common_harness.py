@@ -218,9 +218,10 @@ def run_node_module(script: str) -> dict:
 def test_store_rejects_contradictory_or_drifted_recovery_envelopes() -> None:
     result = run_node_module(
         """
+        import { readFileSync } from 'node:fs';
         import { createInitialState, FIXTURE_SHA256 } from './experiments/episode-loop-phase2/common/prototype-contract.js';
         import { createEnvelope, loadEnvelope, saveEnvelope } from './experiments/episode-loop-phase2/common/prototype-store.js';
-        import scenario from './experiments/episode-loop-phase2/common/scenario.json' with { type: 'json' };
+        const scenario = JSON.parse(readFileSync('./experiments/episode-loop-phase2/common/scenario.json', 'utf8'));
         const values = new Map();
         const storage = {
           getItem: (key) => values.get(key) ?? null,

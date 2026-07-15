@@ -105,8 +105,8 @@ def test_studio_production_control_entry_is_linked_without_replacing_canvas() ->
     assert "/studio/production-control/" in topbar
     assert 'href="/studio/"' in app
     assert "画布" in app
-    assert "故事板 / 审核" in app
-    assert "提供方已关闭 · 没有 LLM 调用" in app
+    assert "故事板 / 审片" in app
+    assert "外部生成未启用" in app
     assert "strong-password-123" not in app
     assert "getProductionControl()" in runtime_client
     assert "recordProductionControlMission" in runtime_client

@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.production_control.harness import AtomicCommitError, ProductionControlHarness
+from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore, EpisodeDomainStoreError
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -41,7 +43,11 @@ def _create_project(client: TestClient, headers: dict[str, str], project_id: str
     response = client.post(
         "/projects",
         headers=headers,
-        json={"project_id": project_id, "goal": "Production control vertical slice"},
+        json={
+            "project_id": project_id,
+            "project_type": "studio_episode_production",
+            "goal": "Production control vertical slice",
+        },
     )
     assert response.status_code == 200, response.text
 
@@ -74,6 +80,32 @@ def _action(
     )
 
 
+def _approve_default_plan(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
+    mission = {
+        "expected_version": 0,
+        "objective": "制作一集可审片的故事板。",
+        "constraints": ["本轮不调用外部生成服务。"],
+        "created_at": STAMP,
+    }
+    assert _post(client, f"/projects/{PROJECT_ID}/production-control/mission", headers, "mission-1", mission).status_code == 200
+    assert _post(
+        client,
+        f"/projects/{PROJECT_ID}/production-control/plan",
+        headers,
+        "plan-1",
+        {"expected_version": 1, "created_at": STAMP},
+    ).status_code == 200
+    approved = _post(
+        client,
+        f"/projects/{PROJECT_ID}/production-control/plan/approve",
+        headers,
+        "approve-1",
+        {"expected_version": 2, "created_at": STAMP},
+    )
+    assert approved.status_code == 200, approved.text
+    return approved.json()["control"]
+
+
 def test_production_control_vertical_slice_is_authenticated_recoverable_and_provider_free(
     tmp_path: Path,
     monkeypatch,
@@ -86,8 +118,8 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
 
     mission = {
         "expected_version": 0,
-        "objective": "Mission to delivery through provider-free production control.",
-        "constraints": ["Provider calls remain closed.", "Unchanged shots stay protected."],
+        "objective": "制作一集可审片、可返工、可锁版的故事板。",
+        "constraints": ["本轮不调用外部生成服务。", "未受影响镜头保持不变。"],
         "created_at": STAMP,
     }
     response = _post(client, f"/projects/{PROJECT_ID}/production-control/mission", headers, "mission-1", mission)
@@ -179,8 +211,10 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
     control = writeback.json()["control"]
     assert len(control["artifacts"]) == 1
     assert control["continuity"]["shot_local_rework_protected"] is True
+    assert control["artifacts"][0]["affected_ref"]["object_id"] == "shot-002"
+    assert control["artifacts"][0]["candidate_ref"]["object_id"].startswith("candidate-run-002-")
     protected = control["artifacts"][0]["protected_refs"]
-    assert {item["object_id"] for item in protected} == {"shot-002", "shot-003"}
+    assert {item["object_id"] for item in protected} == {"shot-001", "shot-003"}
     replay_writeback = _action(client, headers, "run-002", "writeback-1", version, "writeback")
     assert replay_writeback.status_code == 200, replay_writeback.text
     assert len(replay_writeback.json()["control"]["artifacts"]) == 1
@@ -191,21 +225,22 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
     assert rebuild.json()["provider_dispatch_count"] == 0
 
     workspace = client.get(
-        f"/projects/{PROJECT_ID}/episodes/episode-production-control/versions/episode-production-control-v1/workspace",
+        f"/projects/{PROJECT_ID}/episodes/episode-001/versions/episode-001-v1/workspace",
         headers=headers,
     )
     assert workspace.status_code == 200, workspace.text
     assert workspace.json()["schema_version"] == "afs_episode_workspace_projection.v0.1"
     assert workspace.json()["workspace"]["truth"]["shot_count"] == 3
-    assert workspace.json()["workspace"]["shots"][0]["production_state"] == "rework"
     assert workspace.json()["workspace"]["shots"][1]["ref"]["version_id"] == "shot-002-v1"
+    assert workspace.json()["workspace"]["shots"][1]["candidates"][0]["ref"]["entity_id"].startswith("candidate-run-002-")
+    assert workspace.json()["workspace"]["shots"][0]["candidates"] == []
     review_action = next(
         action
-        for action in workspace.json()["workspace"]["shots"][0]["allowed_actions"]
-        if action["action"] == "review_shot"
+        for action in workspace.json()["workspace"]["shots"][1]["allowed_actions"]
+        if action["action"] == "adopt_candidate"
     )
     assert review_action["enabled"] is False
-    assert "只读" in review_action["reason"]
+    assert review_action["blocked_by"][0]["entity_id"] == "shot-001"
 
     restarted_client = TestClient(create_runtime_app(runtime_root=tmp_path))
     recovered = restarted_client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
@@ -215,6 +250,183 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
 
     foreign = client.get(f"/projects/{PROJECT_ID}/production-control", headers=_headers(other))
     assert foreign.status_code == 403
+
+
+def test_production_control_writeback_requires_episode_facts_before_ledger_commit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+
+    snapshot = EpisodeDomainAggregateStore(tmp_path).snapshot_path(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    snapshot.unlink()
+
+    mission = {
+        "expected_version": 0,
+        "objective": "制作一集可审片的故事板。",
+        "constraints": ["本轮不调用外部生成服务。"],
+        "created_at": STAMP,
+    }
+    assert _post(client, f"/projects/{PROJECT_ID}/production-control/mission", headers, "mission-1", mission).status_code == 200
+    assert _post(client, f"/projects/{PROJECT_ID}/production-control/plan", headers, "plan-1", {"expected_version": 1, "created_at": STAMP}).status_code == 200
+    approved = _post(
+        client,
+        f"/projects/{PROJECT_ID}/production-control/plan/approve",
+        headers,
+        "approve-1",
+        {"expected_version": 2, "created_at": STAMP},
+    )
+    assert approved.status_code == 200, approved.text
+    version = approved.json()["control"]["version"]
+
+    writeback = _action(client, headers, "run-001", "writeback-1", version, "writeback")
+    assert writeback.status_code == 409
+    assert writeback.json()["detail"]["error"] == "production_control_state_conflict"
+
+    control = client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    assert control.status_code == 200, control.text
+    assert control.json()["control"]["version"] == version
+    assert control.json()["control"]["artifacts"] == []
+
+
+def test_writeback_finalize_failure_hides_artifact_and_same_key_replay_completes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    control = _approve_default_plan(client, headers)
+
+    original_save = EpisodeDomainAggregateStore.save
+    failures = {"remaining": 1}
+
+    def fail_finalize_once(
+        self: EpisodeDomainAggregateStore,
+        aggregate,
+        *,
+        expected_aggregate_version: int,
+        idempotency_key: str,
+        payload_digest: str,
+    ):
+        if idempotency_key.endswith("-episode-asset-candidate-finalize") and failures["remaining"]:
+            failures["remaining"] -= 1
+            raise EpisodeDomainStoreError("injected finalize failure")
+        return original_save(
+            self,
+            aggregate,
+            expected_aggregate_version=expected_aggregate_version,
+            idempotency_key=idempotency_key,
+            payload_digest=payload_digest,
+        )
+
+    monkeypatch.setattr(EpisodeDomainAggregateStore, "save", fail_finalize_once)
+    version = control["version"]
+    failed = _action(client, headers, "run-001", "writeback-1", version, "writeback")
+    assert failed.status_code == 409
+    assert failed.json()["detail"]["error"] == "production_control_state_conflict"
+
+    readback = client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    assert readback.status_code == 200, readback.text
+    assert readback.json()["control"]["artifacts"] == []
+    aggregate = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    candidates = [
+        item
+        for item in aggregate.asset_candidates
+        if item.entity_id.startswith("candidate-run-001-")
+    ]
+    assert len({item.entity_id for item in candidates}) == 1
+    assert max(candidates, key=lambda item: item.revision).lifecycle_state == "candidate"
+
+    replay = _action(client, headers, "run-001", "writeback-1", version, "writeback")
+    assert replay.status_code == 200, replay.text
+    assert len(replay.json()["control"]["artifacts"]) == 1
+    aggregate = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    candidates = [
+        item
+        for item in aggregate.asset_candidates
+        if item.entity_id.startswith("candidate-run-001-")
+    ]
+    assert len({item.entity_id for item in candidates}) == 1
+    latest = max(candidates, key=lambda item: item.revision)
+    assert latest.lifecycle_state == "approved"
+    assert latest.review_state == "approved"
+    assert latest.control_provenance is not None
+
+
+def test_writeback_ledger_failure_after_episode_draft_replays_without_duplicate_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    control = _approve_default_plan(client, headers)
+
+    original_write_commit = ProductionControlHarness._write_commit_envelope
+    failures = {"remaining": 1}
+
+    def fail_ledger_once(self: ProductionControlHarness, *args, **kwargs):
+        if failures["remaining"]:
+            failures["remaining"] -= 1
+            raise AtomicCommitError("injected ledger failure")
+        return original_write_commit(self, *args, **kwargs)
+
+    monkeypatch.setattr(ProductionControlHarness, "_write_commit_envelope", fail_ledger_once)
+    version = control["version"]
+    failed = _action(client, headers, "run-001", "writeback-1", version, "writeback")
+    assert failed.status_code == 500
+    assert failed.json()["detail"]["error"] == "production_control_commit_failed"
+
+    readback = client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    assert readback.status_code == 200, readback.text
+    assert readback.json()["control"]["artifacts"] == []
+    aggregate = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    candidates = [
+        item
+        for item in aggregate.asset_candidates
+        if item.entity_id.startswith("candidate-run-001-")
+    ]
+    assert len({item.entity_id for item in candidates}) == 1
+    latest = max(candidates, key=lambda item: item.revision)
+    assert latest.lifecycle_state == "candidate"
+    assert latest.job_state == "running"
+    assert latest.control_provenance is None
+
+    replay = _action(client, headers, "run-001", "writeback-1", version, "writeback")
+    assert replay.status_code == 200, replay.text
+    assert len(replay.json()["control"]["artifacts"]) == 1
+    aggregate = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    candidates = [
+        item
+        for item in aggregate.asset_candidates
+        if item.entity_id.startswith("candidate-run-001-")
+    ]
+    assert len({item.entity_id for item in candidates}) == 1
+    latest = max(candidates, key=lambda item: item.revision)
+    assert latest.lifecycle_state == "approved"
+    assert latest.job_state == "succeeded"
+    assert latest.control_provenance is not None
 
 
 def test_production_control_ledger_integrity_rejects_duplicate_sequence_and_outbox_drift(

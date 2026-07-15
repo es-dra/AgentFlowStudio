@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -42,6 +43,7 @@ from agentflow_studio.production_control.contract import (
     SelectiveRevisionRequest,
 )
 from agentflow_studio.production_control.harness import (
+    AtomicCommitError,
     AuthorizationError,
     IdempotencyConflictError,
     LedgerIntegrityError,
@@ -53,7 +55,26 @@ from agentflow_studio.production_control.harness import (
     rebuild_projection,
 )
 from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_episode_bootstrap import (
+    BOOTSTRAP_EPISODE_ID,
+    BOOTSTRAP_EPISODE_VERSION_ID,
+)
+from apps.api.runtime_episode_domain_contract import (
+    AssetCandidateVersion,
+    ControlObjectRef,
+    EntityVersionRef,
+    ProductionControlProvenance,
+    ProductionProjectAggregate,
+    ReviewDecision,
+    SafeArtifactRef,
+    TenantScope,
+)
 from apps.api.runtime_episode_domain_routes import _require_project_scope
+from apps.api.runtime_episode_domain_store import (
+    AggregateNotFoundError,
+    EpisodeDomainAggregateStore,
+    EpisodeDomainStoreError,
+)
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload, safe_id
 
@@ -141,7 +162,7 @@ def register_runtime_production_control_routes(
     def get_production_control(project_id: str, request: Request) -> dict[str, Any]:
         scope, actor = _control_identity(project_id, request, store, auth)
         with _locked_harness(store, project_id, scope, actor) as harness:
-            return {"control": _read_model(harness)}
+            return {"control": _read_model(harness, store)}
 
     @app.post("/projects/{project_id}/production-control/mission")
     def record_mission(
@@ -161,7 +182,7 @@ def register_runtime_production_control_routes(
                     rule=text,
                 )
                 for index, text in enumerate(
-                    body.constraints or ("Provider gates remain closed.",),
+                    body.constraints or ("本轮不调用外部生成服务。",),
                     start=1,
                 )
             )
@@ -191,7 +212,7 @@ def register_runtime_production_control_routes(
                     expected_version=body.expected_version,
                 )
             )
-            return {"control": _read_model(harness), "receipt": receipt.model_dump(mode="json")}
+            return {"control": _read_model(harness, store), "receipt": receipt.model_dump(mode="json")}
 
     @app.post("/projects/{project_id}/production-control/plan")
     def propose_or_revise_plan(
@@ -296,7 +317,7 @@ def register_runtime_production_control_routes(
                     refs=refs,
                 )
             )
-            return {"control": _read_model(harness), "receipt": receipt.model_dump(mode="json")}
+            return {"control": _read_model(harness, store), "receipt": receipt.model_dump(mode="json")}
 
     @app.post("/projects/{project_id}/production-control/plan/approve")
     def approve_plan(
@@ -369,7 +390,7 @@ def register_runtime_production_control_routes(
                     ),
                 )
             )
-            return {"control": _read_model(harness), "receipt": receipt.model_dump(mode="json")}
+            return {"control": _read_model(harness, store), "receipt": receipt.model_dump(mode="json")}
 
     @app.post("/projects/{project_id}/production-control/runs/{run_id}/actions")
     def run_action(
@@ -390,8 +411,24 @@ def register_runtime_production_control_routes(
         scope, actor = _control_identity(project_id, request, store, auth)
         _guard_safe_body(body)
         with _locked_harness(store, project_id, scope, actor) as harness:
-            receipts = _execute_run_action(harness, actor, run_id, body, idempotency_key)
-            return {"control": _read_model(harness), "receipts": [item.model_dump(mode="json") for item in receipts]}
+            receipts = _execute_run_action(store, harness, actor, run_id, body, idempotency_key)
+            episode_writeback = None
+            if body.action == "writeback":
+                episode_writeback = _apply_episode_asset_candidate_writeback(
+                    store,
+                    harness,
+                    actor,
+                    run_id=run_id,
+                    idempotency_key=idempotency_key,
+                    created_at=body.created_at,
+                )
+            payload = {
+                "control": _read_model(harness, store),
+                "receipts": [item.model_dump(mode="json") for item in receipts],
+            }
+            if episode_writeback is not None:
+                payload["episode_writeback"] = episode_writeback
+            return payload
 
     @app.post("/projects/{project_id}/production-control/integrity/rebuild")
     def rebuild_integrity(project_id: str, request: Request) -> dict[str, Any]:
@@ -429,7 +466,7 @@ def build_production_control_episode_workspace_projection(
         harness = ProductionControlHarness.load(path, _grants(actor), {actor.actor_id: actor})
     if harness.scope != scope:
         return None
-    model = _read_model(harness)
+    model = _read_model(harness, store)
     workspace = model["workspace_entry"]
     if (
         episode_id != workspace["episode_id"]
@@ -440,6 +477,7 @@ def build_production_control_episode_workspace_projection(
 
 
 def _execute_run_action(
+    store: RuntimeStore,
     harness: ProductionControlHarness,
     actor: ActorIdentity,
     run_id: str,
@@ -555,6 +593,14 @@ def _execute_run_action(
     elif body.action == "provider_gate":
         receipts.append(_execute_provider_gate(harness, actor, run_ref, body, idempotency_key, version))
     elif body.action == "writeback":
+        _ensure_episode_asset_candidate_draft(
+            store,
+            harness,
+            actor,
+            run_ref=run_ref,
+            idempotency_key=idempotency_key,
+            created_at=body.created_at,
+        )
         receipts.extend(_execute_writeback_sequence(harness, actor, run, run_ref, body, idempotency_key, version))
     else:
         raise StateConflictError("unsupported run action")
@@ -625,21 +671,12 @@ def _execute_writeback_sequence(
     task_ref = _task_ref_for_run(run)
     attempt_ref = harness.projection.run_attempts[run_ref.object_id][-1]
     token = _command_token(idempotency_key)
-    affected = ExactObjectRef(scope=harness.scope, object_type="shot", object_id="shot-001", revision_id="shot-001-v1")
-    successor = ExactObjectRef(scope=harness.scope, object_type="shot", object_id="shot-001", revision_id=f"shot-001-{token}")
-    protected = (
-        ExactObjectRef(scope=harness.scope, object_type="shot", object_id="shot-002", revision_id="shot-002-v1"),
-        ExactObjectRef(scope=harness.scope, object_type="shot", object_id="shot-003", revision_id="shot-003-v1"),
-    )
-    proposal = ExactObjectRef(scope=harness.scope, object_type="agent_proposal", object_id=f"continuity-proposal-{token}", revision_id=f"continuity-proposal-{token}-v1")
-    adapter = EpisodeArtifactAdapterRequest(
-        mode="shot_successor",
-        predecessor_ref=affected,
-        successor_ref=successor,
-        protected_exact_refs=protected,
-        existing_typed_operation="continuity.apply_proposal",
-        continuity_source_proposal_ref=proposal,
-    )
+    adapter = _asset_candidate_adapter_for_run(harness, run_ref, idempotency_key)
+    if adapter.predecessor_ref is None:
+        raise StateConflictError("episode writeback requires a target shot")
+    affected = adapter.predecessor_ref
+    successor = adapter.successor_ref
+    protected = adapter.protected_exact_refs
     artifact_digest = digest(
         {
             "artifact": idempotency_key,
@@ -676,11 +713,11 @@ def _execute_writeback_sequence(
     impact = ImpactAssessment(
         identity=_identity(harness.scope, f"impact-{run_ref.object_id}-{token}", created_at=_stamp(body.created_at)),
         revision_request_ref=exact_ref("selective_revision_request", revision_request),
-        affected_exact_refs=(successor,),
+        affected_exact_refs=(affected,),
         preserved_exact_refs=protected,
         assessment_digest=digest(
             {
-                "affected": successor.model_dump(mode="json"),
+                "affected": affected.model_dump(mode="json"),
                 "preserved": [item.model_dump(mode="json") for item in protected],
             }
         ),
@@ -709,7 +746,205 @@ def _execute_writeback_sequence(
     return receipts
 
 
-def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
+def _ensure_episode_asset_candidate_draft(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+    actor: ActorIdentity,
+    *,
+    run_ref: ExactObjectRef,
+    idempotency_key: str,
+    created_at: str,
+) -> None:
+    adapter = _asset_candidate_adapter_for_run(harness, run_ref, idempotency_key)
+    if adapter.predecessor_ref is None:
+        raise StateConflictError("episode writeback requires a target shot")
+    scope, aggregate = _load_episode_aggregate_for_writeback(store, harness, actor)
+    target_ref = _entity_ref(adapter.predecessor_ref)
+    protected_refs = tuple(_entity_ref(ref) for ref in adapter.protected_exact_refs)
+    candidate_ref = _entity_ref(adapter.successor_ref)
+    existing = _latest_candidate_by_entity(aggregate, candidate_ref.entity_id)
+    if existing is not None:
+        if existing.control_provenance is not None:
+            return
+        if existing.as_ref() == candidate_ref and existing.lifecycle_state == "candidate":
+            return
+        raise StateConflictError("episode candidate writeback identity is already used")
+    if any(item.as_ref() == candidate_ref for item in aggregate.asset_candidates):
+        return
+    _require_latest_refs(aggregate, (target_ref, *protected_refs))
+    draft = AssetCandidateVersion(
+        entity_id=candidate_ref.entity_id,
+        version_id=candidate_ref.version_id,
+        revision=1,
+        parent_version_id=None,
+        lifecycle_state="candidate",
+        review_state="needs_review",
+        content_digest=digest(
+            {
+                "operation": "production_control_episode_asset_candidate_draft",
+                "target_ref": target_ref.model_dump(mode="json"),
+                "candidate_ref": candidate_ref.model_dump(mode="json"),
+                "run_ref": run_ref.model_dump(mode="json"),
+            }
+        ),
+        scope=scope,
+        created_at=_max_stamp(aggregate.evaluated_at, _stamp(created_at)),
+        target_ref=target_ref,
+        artifact_ref=None,
+        job_id=f"job-draft-{candidate_ref.entity_id}",
+        job_state="running",
+        control_provenance=None,
+    )
+    payload = aggregate.model_dump(mode="python")
+    payload.update(
+        {
+            "aggregate_version": aggregate.aggregate_version + 1,
+            "evaluated_at": draft.created_at,
+            "asset_candidates": (*aggregate.asset_candidates, draft),
+        }
+    )
+    updated = ProductionProjectAggregate.model_validate(payload)
+    try:
+        EpisodeDomainAggregateStore(store.root).save(
+            updated,
+            expected_aggregate_version=aggregate.aggregate_version,
+            idempotency_key=f"{idempotency_key}-episode-asset-candidate-draft",
+            payload_digest=digest(
+                {
+                    "operation": "production_control_episode_asset_candidate_draft",
+                    "candidate": draft.model_dump(mode="json"),
+                    "expected_aggregate_version": aggregate.aggregate_version,
+                }
+            ),
+        )
+    except EpisodeDomainStoreError as exc:
+        raise StateConflictError("episode production draft candidate could not be saved") from exc
+
+
+def _apply_episode_asset_candidate_writeback(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+    actor: ActorIdentity,
+    *,
+    run_id: str,
+    idempotency_key: str,
+    created_at: str,
+) -> dict[str, Any]:
+    token = _command_token(idempotency_key)
+    writeback = _writeback_by_id(harness, f"writeback-{run_id}-{token}")
+    adapter = writeback.adapter_request
+    if adapter.mode != "asset_candidate" or adapter.predecessor_ref is None:
+        raise StateConflictError("episode writeback requires an asset candidate adapter")
+    scope, aggregate = _load_episode_aggregate_for_writeback(store, harness, actor)
+    aggregate_store = EpisodeDomainAggregateStore(store.root)
+
+    target_ref = _entity_ref(adapter.predecessor_ref)
+    protected_refs = tuple(_entity_ref(ref) for ref in adapter.protected_exact_refs)
+    candidate_ref = _entity_ref(adapter.successor_ref)
+    latest = _latest_candidate_by_entity(aggregate, candidate_ref.entity_id)
+    if latest is not None and latest.control_provenance is not None:
+        return {
+            "status": "already_applied",
+            "aggregate_version": aggregate.aggregate_version,
+            "candidate_ref": latest.as_ref().model_dump(mode="json"),
+            "target_ref": target_ref.model_dump(mode="json"),
+            "protected_refs": [ref.model_dump(mode="json") for ref in protected_refs],
+        }
+    if latest is None or latest.as_ref() != candidate_ref or latest.lifecycle_state != "candidate":
+        raise StateConflictError("episode writeback draft candidate is missing")
+
+    _require_latest_refs(aggregate, (target_ref, *protected_refs))
+    stamp = _next_stamp(aggregate.evaluated_at, _stamp(created_at))
+    candidate = AssetCandidateVersion(
+        entity_id=candidate_ref.entity_id,
+        version_id=f"{candidate_ref.entity_id}-v2",
+        revision=latest.revision + 1,
+        parent_version_id=latest.version_id,
+        lifecycle_state="approved",
+        review_state="approved",
+        content_digest=digest(
+            {
+                "artifact_id": writeback.artifact_id,
+                "artifact_digest": writeback.artifact_digest,
+                "target_ref": target_ref.model_dump(mode="json"),
+                "writeback_ref": exact_ref("artifact_writeback", writeback).model_dump(mode="json"),
+            }
+        ),
+        scope=scope,
+        created_at=stamp,
+        target_ref=target_ref,
+        artifact_ref=SafeArtifactRef(
+            artifact_id=writeback.artifact_id,
+            artifact_type="storyboard",
+            content_digest=writeback.artifact_digest,
+        ),
+        job_id=f"job-{writeback.identity.object_id}",
+        job_state="succeeded",
+        control_provenance=ProductionControlProvenance(
+            plan_task_ref=_control_ref(writeback.plan_task_ref),
+            run_ref=_control_ref(writeback.run_ref),
+            attempt_ref=_control_ref(writeback.attempt_ref),
+            writeback_ref=_control_ref(exact_ref("artifact_writeback", writeback)),
+            affected_refs=(target_ref,),
+            protected_refs=protected_refs,
+        ),
+    )
+    approval = ReviewDecision(
+        entity_id=f"review-{candidate_ref.entity_id}",
+        version_id=f"review-{candidate_ref.entity_id}-v1",
+        revision=1,
+        parent_version_id=None,
+        lifecycle_state="approved",
+        review_state="approved",
+        content_digest=digest(
+            {
+                "operation": "production_control_episode_asset_candidate_approval",
+                "candidate_ref": candidate.as_ref().model_dump(mode="json"),
+                "writeback_ref": exact_ref("artifact_writeback", writeback).model_dump(mode="json"),
+            }
+        ),
+        scope=scope,
+        created_at=stamp,
+        subject_ref=candidate.as_ref(),
+        decision="approve",
+        note="Production control receipt closed for this deterministic candidate.",
+    )
+    payload = aggregate.model_dump(mode="python")
+    payload.update(
+        {
+            "aggregate_version": aggregate.aggregate_version + 1,
+            "evaluated_at": stamp,
+            "asset_candidates": (*aggregate.asset_candidates, candidate),
+            "review_decisions": (*aggregate.review_decisions, approval),
+        }
+    )
+    updated = ProductionProjectAggregate.model_validate(payload)
+    try:
+        result = aggregate_store.save(
+            updated,
+            expected_aggregate_version=aggregate.aggregate_version,
+            idempotency_key=f"{idempotency_key}-episode-asset-candidate-finalize",
+            payload_digest=digest(
+                {
+                    "operation": "production_control_episode_asset_candidate_finalize",
+                    "candidate": candidate.model_dump(mode="json"),
+                    "approval": approval.model_dump(mode="json"),
+                    "expected_aggregate_version": aggregate.aggregate_version,
+                }
+            ),
+        )
+    except EpisodeDomainStoreError as exc:
+        raise StateConflictError("episode production writeback could not be saved") from exc
+    return {
+        "status": "applied" if not result.replayed else "replayed",
+        "aggregate_version": result.aggregate.aggregate_version,
+        "candidate_ref": candidate.as_ref().model_dump(mode="json"),
+        "target_ref": target_ref.model_dump(mode="json"),
+        "protected_refs": [ref.model_dump(mode="json") for ref in protected_refs],
+    }
+
+
+def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = None) -> dict[str, Any]:
     mission_revision = _latest_model(harness, "mission_revision", MissionRevision)
     plan_revision = _latest_model(harness, "plan_revision", PlanRevision)
     plan = _latest_model(harness, "production_plan", ProductionPlan)
@@ -718,6 +953,7 @@ def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
     writebacks = _records(harness, "artifact_writeback")
     impacts = _records(harness, "impact_assessment")
     gates = _records(harness, "provider_gate_decision")
+    confirmed_writeback_refs = _confirmed_episode_writeback_refs(store, harness) if store is not None else None
     task_by_ref = {
         _ref_key(_ref("plan_task", PlanTask.model_validate(item))): PlanTask.model_validate(item)
         for item in task_records
@@ -737,7 +973,7 @@ def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
                 "control_state": harness.projection.run_control.get(run.identity.object_id, run.control_state),
                 "attempt_count": len(attempts),
                 "latest_attempt_id": attempts[-1].object_id if attempts else "",
-                "simulated_cost_label": "¥0 · provider closed",
+                "simulated_cost_label": "¥0 · 外部生成未启用",
                 "waiting_human": run.identity.object_id in harness.projection.open_human_requests,
                 "blocked": run.identity.object_id in harness.projection.blockers,
             }
@@ -747,8 +983,13 @@ def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
     protected_refs: list[dict[str, str]] = []
     for item in writebacks:
         writeback = ArtifactWriteback.model_validate(item)
+        if confirmed_writeback_refs is not None and _control_ref_key(
+            _control_ref(exact_ref("artifact_writeback", writeback))
+        ) not in confirmed_writeback_refs:
+            continue
         adapter = writeback.adapter_request
-        affected_refs.append(adapter.successor_ref.model_dump(mode="json"))
+        affected_ref = _writeback_affected_ref(adapter)
+        affected_refs.append(affected_ref.model_dump(mode="json"))
         protected_refs.extend(ref.model_dump(mode="json") for ref in adapter.protected_exact_refs)
         artifacts.append(
             {
@@ -756,7 +997,8 @@ def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
                 "task_id": writeback.plan_task_ref.object_id,
                 "run_id": writeback.run_ref.object_id,
                 "attempt_id": writeback.attempt_ref.object_id,
-                "affected_ref": adapter.successor_ref.model_dump(mode="json"),
+                "affected_ref": affected_ref.model_dump(mode="json"),
+                "candidate_ref": adapter.successor_ref.model_dump(mode="json"),
                 "predecessor_ref": adapter.predecessor_ref.model_dump(mode="json") if adapter.predecessor_ref else None,
                 "protected_refs": [ref.model_dump(mode="json") for ref in adapter.protected_exact_refs],
                 "operation": adapter.existing_typed_operation,
@@ -827,9 +1069,12 @@ def _read_model(harness: ProductionControlHarness) -> dict[str, Any]:
             ],
         },
         "workspace_entry": {
-            "episode_id": "episode-production-control",
-            "episode_version_id": "episode-production-control-v1",
-            "href": f"/studio/episode-workspace/?project={harness.scope.project_id}&episode=episode-production-control&version=episode-production-control-v1",
+            "episode_id": BOOTSTRAP_EPISODE_ID,
+            "episode_version_id": BOOTSTRAP_EPISODE_VERSION_ID,
+            "href": (
+                f"/studio/episode-workspace/?project={harness.scope.project_id}"
+                f"&episode={BOOTSTRAP_EPISODE_ID}&version={BOOTSTRAP_EPISODE_VERSION_ID}"
+            ),
         },
         "recovery": {
             "ledger_rebuildable": True,
@@ -868,7 +1113,7 @@ def _episode_workspace_projection(model: dict[str, Any]) -> dict[str, Any]:
                     "entity_id": project_id,
                     "version_id": f"{project_id}-v1",
                     "revision": 1,
-                    "title": "Production Control",
+                    "title": "制片项目",
                     "data_policy": {
                         "visibility": "private",
                         "training_use": "denied_by_default",
@@ -884,11 +1129,11 @@ def _episode_workspace_projection(model: dict[str, Any]) -> dict[str, Any]:
                     "entity_id": "series-production-control",
                     "version_id": "series-production-control-v1",
                     "revision": 1,
-                    "title": "Production Control",
+                    "title": "制片系列",
                 }
             ],
-            "episodes": [{**episode_ref, "revision": 1, "title": "AI-native Production Control"}],
-            "scenes": [{**scene_ref, "revision": 1, "sequence": 1, "title": "Production Cockpit"}],
+            "episodes": [{**episode_ref, "revision": 1, "title": "第一集制作计划"}],
+            "scenes": [{**scene_ref, "revision": 1, "sequence": 1, "title": "制作场景"}],
             "shots": [
                 {
                     "entity_type": "shot",
@@ -904,7 +1149,7 @@ def _episode_workspace_projection(model: dict[str, Any]) -> dict[str, Any]:
         },
         "workspace": {
             "episode_ref": episode_ref,
-            "scenes": [{"ref": scene_ref, "sequence": 1, "title": "Production Cockpit"}],
+            "scenes": [{"ref": scene_ref, "sequence": 1, "title": "制作场景"}],
             "shots": shots,
             "next_action": {"label": "检查生产控制交付读回", "shot_ref": shots[0]["ref"]} if shots else None,
             "recovery": {"source": "production_control_ledger", "event_count": model["event_count"]},
@@ -975,9 +1220,9 @@ def _workspace_shots(model: dict[str, Any]) -> list[dict[str, Any]]:
                 "prior_shot_blockers": [],
                 "allowed_actions": [
                     {"action": "inspect", "enabled": True, "reason": "", "blocked_by": []},
-                    {"action": "review_shot", "enabled": False, "reason": "生产控制投影只读，请回到生产控制页追加写回。", "blocked_by": []},
+                    {"action": "review_shot", "enabled": False, "reason": "请回到制片工作台写回候选素材。", "blocked_by": []},
                     {"action": "reassign_scene", "enabled": False, "reason": "生产控制投影只读。", "blocked_by": []},
-                    {"action": "apply_continuity", "enabled": False, "reason": "请回到生产控制页追加写回。", "blocked_by": []},
+                    {"action": "apply_continuity", "enabled": False, "reason": "请回到制片工作台写回候选素材。", "blocked_by": []},
                     {"action": "adopt_candidate", "enabled": False, "reason": "没有候选素材。", "blocked_by": []},
                     {"action": "review_selection", "enabled": False, "reason": "没有选版。", "blocked_by": []},
                     {"action": "lock_selection", "enabled": False, "reason": "没有选版。", "blocked_by": []},
@@ -1010,6 +1255,7 @@ def _locked_harness(
             VersionConflictError,
             IdempotencyConflictError,
             StateConflictError,
+            AtomicCommitError,
             LedgerIntegrityError,
             ValidationError,
             ValueError,
@@ -1083,13 +1329,13 @@ def _new_plan(
     )
     budget = BudgetEnvelope(
         identity=_identity(scope, "budget-main", created_at=stamp),
-        estimated=MoneyRange(
-            currency="CNY",
-            minimum=0,
-            maximum=max_budget,
-            unit="provider-closed-simulated-batch",
-            assumption="Deterministic provider-free scheduling; remote calls remain zero.",
-        ),
+            estimated=MoneyRange(
+                currency="CNY",
+                minimum=0,
+                maximum=max_budget,
+                unit="deterministic-production-batch",
+                assumption="本轮使用确定性制作流程，外部生成调用保持为零。",
+            ),
         max_budget=max_budget,
     )
     estimate = CostEstimate(
@@ -1109,8 +1355,8 @@ def _new_plan(
 
 def _task_specs(rows: tuple[PlanTaskRequest, ...]) -> tuple[PlanTaskSpec, ...]:
     source = rows or (
-        PlanTaskRequest(title="拆解镜头", boundary="拆解 Mission 为局部镜头与连续性检查。"),
-        PlanTaskRequest(title="生成候选", boundary="在 provider 关闭状态下生成确定性候选与成本标签。"),
+        PlanTaskRequest(title="拆解镜头", boundary="拆解制作目标为局部镜头与连续性检查。"),
+        PlanTaskRequest(title="生成候选", boundary="生成本轮确定性候选，并标清预算与影响范围。"),
         PlanTaskRequest(title="审核交付", boundary="汇总写回、连续性和交付读回证据。"),
     )
     specs = [
@@ -1263,6 +1509,186 @@ def _ref_key(ref: ExactObjectRef) -> str:
     return f"{ref.object_type}:{ref.object_id}:{ref.revision_id}"
 
 
+def _writeback_by_id(harness: ProductionControlHarness, object_id: str) -> ArtifactWriteback:
+    for item in _records(harness, "artifact_writeback"):
+        writeback = ArtifactWriteback.model_validate(item)
+        if writeback.identity.object_id == object_id:
+            return writeback
+    raise StateConflictError("artifact writeback was not committed")
+
+
+def _writeback_affected_ref(adapter: EpisodeArtifactAdapterRequest) -> ExactObjectRef:
+    if adapter.mode == "asset_candidate" and adapter.predecessor_ref is not None:
+        return adapter.predecessor_ref
+    return adapter.successor_ref
+
+
+def _asset_candidate_adapter_for_run(
+    harness: ProductionControlHarness,
+    run_ref: ExactObjectRef,
+    idempotency_key: str,
+) -> EpisodeArtifactAdapterRequest:
+    token = _command_token(idempotency_key)
+    shot_index = _run_shot_index(run_ref.object_id)
+    affected = ExactObjectRef(
+        scope=harness.scope,
+        object_type="shot",
+        object_id=f"shot-{shot_index:03d}",
+        revision_id=f"shot-{shot_index:03d}-v1",
+    )
+    successor = ExactObjectRef(
+        scope=harness.scope,
+        object_type="asset_candidate",
+        object_id=f"candidate-{run_ref.object_id}-{token}",
+        revision_id=f"candidate-{run_ref.object_id}-{token}-v1",
+    )
+    protected = tuple(
+        ExactObjectRef(
+            scope=harness.scope,
+            object_type="shot",
+            object_id=f"shot-{index:03d}",
+            revision_id=f"shot-{index:03d}-v1",
+        )
+        for index in range(1, 4)
+        if index != shot_index
+    )
+    return EpisodeArtifactAdapterRequest(
+        mode="asset_candidate",
+        predecessor_ref=affected,
+        successor_ref=successor,
+        protected_exact_refs=protected,
+        existing_typed_operation="asset_candidate.create_version",
+    )
+
+
+def _load_episode_aggregate_for_writeback(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+    actor: ActorIdentity,
+) -> tuple[TenantScope, ProductionProjectAggregate]:
+    scope = TenantScope(
+        org_id=harness.scope.org_id,
+        project_id=harness.scope.project_id,
+        actor_id=actor.actor_id,
+    )
+    aggregate_store = EpisodeDomainAggregateStore(store.root)
+    try:
+        aggregate = aggregate_store.load(org_id=scope.org_id, project_id=scope.project_id)
+    except AggregateNotFoundError as exc:
+        raise StateConflictError(
+            "episode production facts are missing; create a Studio production project first"
+        ) from exc
+    except EpisodeDomainStoreError as exc:
+        raise StateConflictError("episode production facts failed integrity checks") from exc
+    if aggregate.scope != scope:
+        raise StateConflictError("episode production scope does not match production control scope")
+    return scope, aggregate
+
+
+def _confirmed_episode_writeback_refs(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+) -> set[str]:
+    try:
+        aggregate = EpisodeDomainAggregateStore(store.root).load(
+            org_id=harness.scope.org_id,
+            project_id=harness.scope.project_id,
+        )
+    except EpisodeDomainStoreError:
+        return set()
+    confirmed: set[str] = set()
+    latest: dict[str, AssetCandidateVersion] = {}
+    for candidate in aggregate.asset_candidates:
+        current = latest.get(candidate.entity_id)
+        if current is None or candidate.revision > current.revision:
+            latest[candidate.entity_id] = candidate
+    for candidate in latest.values():
+        provenance = candidate.control_provenance
+        if (
+            provenance is not None
+            and candidate.lifecycle_state in ("approved", "locked")
+            and candidate.review_state == "approved"
+        ):
+            confirmed.add(_control_ref_key(provenance.writeback_ref))
+    return confirmed
+
+
+def _latest_candidate_by_entity(
+    aggregate: ProductionProjectAggregate,
+    entity_id: str,
+) -> AssetCandidateVersion | None:
+    matches = [item for item in aggregate.asset_candidates if item.entity_id == entity_id]
+    if not matches:
+        return None
+    return max(matches, key=lambda item: item.revision)
+
+
+def _run_shot_index(run_id: str) -> int:
+    match = re.fullmatch(r"run-(\d+)", run_id)
+    if match is None:
+        raise StateConflictError("run id cannot be mapped to a shot")
+    index = int(match.group(1))
+    if index < 1 or index > 3:
+        raise StateConflictError("Wave 1 writeback expects one of the first three runs")
+    return index
+
+
+def _entity_ref(ref: ExactObjectRef) -> EntityVersionRef:
+    if ref.object_type not in {"shot", "continuity_state", "asset_candidate"}:
+        raise StateConflictError("writeback reference cannot be mapped to episode facts")
+    return EntityVersionRef(
+        entity_type=ref.object_type,  # type: ignore[arg-type]
+        entity_id=ref.object_id,
+        version_id=ref.revision_id,
+    )
+
+
+def _control_ref(ref: ExactObjectRef) -> ControlObjectRef:
+    return ControlObjectRef(
+        object_type=ref.object_type,
+        object_id=ref.object_id,
+        revision_id=ref.revision_id,
+    )
+
+
+def _control_ref_key(ref: ControlObjectRef) -> str:
+    return f"{ref.object_type}:{ref.object_id}:{ref.revision_id}"
+
+
+def _require_latest_refs(
+    aggregate: ProductionProjectAggregate,
+    refs: tuple[EntityVersionRef, ...],
+) -> None:
+    for ref in refs:
+        if ref.entity_type == "shot":
+            collection = aggregate.shots
+        elif ref.entity_type == "continuity_state":
+            collection = aggregate.continuity_states
+        else:
+            raise StateConflictError("writeback affected/protected refs must be shots or continuity facts")
+        matches = [item for item in collection if item.entity_id == ref.entity_id]
+        if not matches:
+            raise StateConflictError("writeback target ref does not resolve in episode facts")
+        latest = max(matches, key=lambda item: item.revision)
+        if latest.as_ref() != ref:
+            raise StateConflictError("episode facts changed; reload before writing back")
+
+
+def _max_stamp(first: str, second: str) -> str:
+    first_value = datetime.fromisoformat(_stamp(first))
+    second_value = datetime.fromisoformat(_stamp(second))
+    return (first_value if first_value >= second_value else second_value).isoformat()
+
+
+def _next_stamp(first: str, second: str) -> str:
+    first_value = datetime.fromisoformat(_stamp(first))
+    second_value = datetime.fromisoformat(_stamp(second))
+    value = first_value if first_value >= second_value else second_value
+    if value <= first_value:
+        value = first_value + timedelta(microseconds=1)
+    return value.isoformat()
+
+
 def _task_ref_for_run(run: ProductionRun) -> ExactObjectRef:
     return run.task_ref
 
@@ -1326,6 +1752,15 @@ def _raise_exception(project_id: str, exc: Exception) -> None:
             "production_control_state_conflict",
             "This command is not valid for the current production state.",
             "state",
+            cause=exc,
+        )
+    if isinstance(exc, AtomicCommitError):
+        _raise_control_error(
+            project_id,
+            500,
+            "production_control_commit_failed",
+            "Production control command could not be saved.",
+            "commit",
             cause=exc,
         )
     if isinstance(exc, LedgerIntegrityError):

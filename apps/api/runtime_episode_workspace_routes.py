@@ -21,9 +21,6 @@ from apps.api.runtime_episode_workspace_projection import (
     WorkspaceProjectionReferenceError,
     build_episode_workspace_projection,
 )
-from apps.api.runtime_production_control import (
-    build_production_control_episode_workspace_projection,
-)
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_store import RuntimeStore
 
@@ -71,16 +68,6 @@ def register_runtime_episode_workspace_routes(
         try:
             aggregate = aggregate_store.load(org_id=scope.org_id, project_id=project_id)
         except AggregateNotFoundError as exc:
-            fallback = build_production_control_episode_workspace_projection(
-                store,
-                project_id=project_id,
-                org_id=scope.org_id,
-                actor_id=scope.actor_id,
-                episode_id=episode_id,
-                episode_version_id=episode_version_id,
-            )
-            if fallback is not None:
-                return fallback
             _raise_store_error(exc, project_id=project_id)
         except EpisodeDomainStoreError as exc:
             _raise_store_error(exc, project_id=project_id)

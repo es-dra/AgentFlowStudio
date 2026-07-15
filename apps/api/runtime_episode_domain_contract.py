@@ -51,6 +51,21 @@ class SafeArtifactRef(EpisodeContractModel):
     content_digest: str = Field(pattern=SHA256)
 
 
+class ControlObjectRef(EpisodeContractModel):
+    object_type: str = Field(pattern=SAFE_ID)
+    object_id: str = Field(pattern=SAFE_ID)
+    revision_id: str = Field(pattern=SAFE_ID)
+
+
+class ProductionControlProvenance(EpisodeContractModel):
+    plan_task_ref: ControlObjectRef
+    run_ref: ControlObjectRef
+    attempt_ref: ControlObjectRef
+    writeback_ref: ControlObjectRef
+    affected_refs: tuple[EntityVersionRef, ...] = Field(min_length=1, max_length=128)
+    protected_refs: tuple[EntityVersionRef, ...] = Field(default_factory=tuple, max_length=128)
+
+
 class SourceEvidenceRef(EpisodeContractModel):
     source_id: str = Field(pattern=SAFE_ID)
     scope: TenantScope
@@ -236,6 +251,7 @@ class AssetCandidateVersion(VersionedFact):
     artifact_ref: SafeArtifactRef | None = None
     job_id: str | None = Field(default=None, pattern=SAFE_ID)
     job_state: JobState | None = None
+    control_provenance: ProductionControlProvenance | None = None
 
     @model_validator(mode="after")
     def job_fields_are_paired(self) -> "AssetCandidateVersion":
@@ -532,6 +548,16 @@ class ProductionProjectAggregate(EpisodeContractModel):
                     raise ValueError("continuity asset selection must target the exact continuity version")
         for item in self.asset_candidates:
             require(item.target_ref, ("shot", "continuity_state"))
+            if item.control_provenance is not None:
+                if item.target_ref not in item.control_provenance.affected_refs:
+                    raise ValueError("candidate control provenance must name its exact target as affected")
+                if item.target_ref in item.control_provenance.protected_refs:
+                    raise ValueError("candidate target cannot also be protected")
+                for ref in (
+                    *item.control_provenance.affected_refs,
+                    *item.control_provenance.protected_refs,
+                ):
+                    require(ref, ("shot", "continuity_state"))
         for item in self.selections:
             target = require(item.target_ref, ("shot", "continuity_state"))
             candidate = require(item.candidate_ref, ("asset_candidate",))

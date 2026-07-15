@@ -198,7 +198,8 @@ def test_product_javascript_has_no_representative_fixture_or_invented_media_clai
     ):
         assert forbidden not in source
     assert "服务未提供镜头脚本文本" in source
-    assert "服务未提供 artifact availability proof" in source
+    assert "服务还没有确认预览可播放" in source
+    assert "artifact availability proof" not in source
 
 
 def test_ui_state_restores_exact_identity_mode_focus_scroll_and_pending_key() -> None:
