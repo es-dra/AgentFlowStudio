@@ -89,6 +89,11 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     payload = dispatch.json()
     assert payload["provider_calls_started"] is True
     assert payload["receipt"]["episode_writeback"]["status"] == "written"
+    assert payload["receipt"]["cost_receipt"]["receipt_kind"] == "synthetic_admission"
+    assert payload["receipt"]["cost_receipt"]["actual_cost"]["status"] == "unknown_unverified"
+    assert payload["trial"]["adapter_authority"]["trial_ledger_role"] == "discardable_experiment_adapter_cache"
+    assert "cost" + "_receipts" not in payload["trial"]
+    assert payload["trial"]["admission_receipts"]
     assert payload["trial"]["dispatches"]["shot-001"]["episode_writeback"]["human_review_state"] == "needs_review"
     assert calls == ["shot-001"]
 
@@ -122,6 +127,153 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     assert candidate["artifact_ref"]["artifact_type"] == "image_keyframe"
     assert candidate["job_state"] == "succeeded"
     assert candidate["review_state"] == "needs_review"
+    assert candidate["control_provenance"]["affected_refs"][0]["entity_id"] == "shot-001"
+
+
+def test_creator_golden_trial_uses_stored_unit_estimate_and_blocks_lowball_dispatch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "lowball-owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers, "golden-lowball")
+    calls: list[str] = []
+
+    def fake_dispatch(*_args, shot_id: str, provider_attempt_id: str, **_kwargs):
+        calls.append(shot_id)
+        digest = hashlib.sha256(f"{shot_id}:{provider_attempt_id}".encode("utf-8")).hexdigest()
+        return {
+            "status": "succeeded",
+            "job_id": f"fake-job-{shot_id}",
+            "provider_gate": {"status": "ready", "required_gate": "AFS_ALLOW_REMOTE_IMAGE"},
+            "provider_calls_started": True,
+            "safe_manifest": {"status": "succeeded", "provider_raw_response_stored": False},
+            "candidate_previews": [],
+            "selected_artifact_ref": {
+                "artifact_id": f"fake-artifact-{shot_id}",
+                "artifact_type": "image_keyframe",
+                "content_digest": digest,
+            },
+        }
+
+    monkeypatch.setattr(runtime_creator_golden_trial, "_dispatch_image_keyframe", fake_dispatch)
+    mission = _post(
+        client,
+        "/projects/golden-lowball/creator-golden-trial/mission",
+        headers,
+        "mission-1",
+        _mission(project_ceiling_amount=0.15, estimated_unit_cost_amount=0.1),
+    )
+    approve = _post(
+        client,
+        "/projects/golden-lowball/creator-golden-trial/approve",
+        headers,
+        "approve-1",
+        {"expected_event_count": mission.json()["trial"]["event_count"], "created_at": STAMP},
+    )
+    first = _post(
+        client,
+        "/projects/golden-lowball/creator-golden-trial/dispatch-next",
+        headers,
+        "dispatch-1",
+        {
+            "expected_event_count": approve.json()["trial"]["event_count"],
+            "estimated_cost_amount": 0.01,
+            "generated_at": STAMP,
+        },
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["provider_calls_started"] is True
+    second = _post(
+        client,
+        "/projects/golden-lowball/creator-golden-trial/dispatch-next",
+        headers,
+        "dispatch-2",
+        {
+            "expected_event_count": first.json()["trial"]["event_count"],
+            "estimated_cost_amount": 0.01,
+            "generated_at": "2026-07-15T09:00:01+00:00",
+        },
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["provider_calls_started"] is False
+    assert second.json()["receipt"]["reason"] == "budget_ceiling"
+    assert calls == ["shot-001"]
+
+
+def test_creator_golden_trial_blocks_second_key_while_attempt_is_running(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "running-owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers, "golden-running")
+    calls: list[str] = []
+    nested: dict[str, Any] = {}
+
+    def fake_dispatch(*_args, shot_id: str, provider_attempt_id: str, **_kwargs):
+        calls.append(shot_id)
+        if len(calls) == 1:
+            current = client.get("/projects/golden-running/creator-golden-trial", headers=headers)
+            assert current.status_code == 200, current.text
+            nested["response"] = _post(
+                client,
+                "/projects/golden-running/creator-golden-trial/dispatch-next",
+                headers,
+                "dispatch-2",
+                {
+                    "expected_event_count": current.json()["trial"]["event_count"],
+                    "estimated_cost_amount": 0.1,
+                    "generated_at": "2026-07-15T09:00:01+00:00",
+                },
+            )
+        digest = hashlib.sha256(f"{shot_id}:{provider_attempt_id}".encode("utf-8")).hexdigest()
+        return {
+            "status": "succeeded",
+            "job_id": f"fake-job-{shot_id}",
+            "provider_gate": {"status": "ready", "required_gate": "AFS_ALLOW_REMOTE_IMAGE"},
+            "provider_calls_started": True,
+            "safe_manifest": {"status": "succeeded", "provider_raw_response_stored": False},
+            "candidate_previews": [],
+            "selected_artifact_ref": {
+                "artifact_id": f"fake-artifact-{shot_id}",
+                "artifact_type": "image_keyframe",
+                "content_digest": digest,
+            },
+        }
+
+    monkeypatch.setattr(runtime_creator_golden_trial, "_dispatch_image_keyframe", fake_dispatch)
+    mission = _post(
+        client,
+        "/projects/golden-running/creator-golden-trial/mission",
+        headers,
+        "mission-1",
+        _mission(project_ceiling_amount=1.0, estimated_unit_cost_amount=0.1),
+    )
+    approve = _post(
+        client,
+        "/projects/golden-running/creator-golden-trial/approve",
+        headers,
+        "approve-1",
+        {"expected_event_count": mission.json()["trial"]["event_count"], "created_at": STAMP},
+    )
+    dispatch = _post(
+        client,
+        "/projects/golden-running/creator-golden-trial/dispatch-next",
+        headers,
+        "dispatch-1",
+        {
+            "expected_event_count": approve.json()["trial"]["event_count"],
+            "estimated_cost_amount": 0.1,
+            "generated_at": STAMP,
+        },
+    )
+    assert dispatch.status_code == 200, dispatch.text
+    assert calls == ["shot-001"]
+    assert nested["response"].status_code == 200
+    assert nested["response"].json()["provider_calls_started"] is False
 
 
 def test_creator_golden_trial_budget_ceiling_blocks_without_provider_call(

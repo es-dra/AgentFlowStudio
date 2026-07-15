@@ -74,22 +74,29 @@ def register_runtime_creator_golden_trial_routes(
                     project_id,
                     status_code=409,
                     error="creator_golden_trial_already_started",
-                    message="Creator Golden Trial already has a mission.",
+                    message="Creator Golden Trial already has an adapter configuration.",
                     stage="mission",
                 )
             event = {
-                "event_type": "mission.recorded",
+                "event_type": "adapter_config.recorded",
                 "objective": body.objective,
                 "constraints": list(body.constraints),
+                "ledger_role": "discardable_experiment_adapter_cache",
+                "authoritative_control_source": "production-control",
+                "authoritative_media_source": "episode-production-aggregate",
+                "owns_mission_plan_run_attempt_cost": False,
                 "project_ceiling": {
                     "amount": body.project_ceiling_amount,
                     "currency": body.currency,
+                    "basis": "synthetic_admission_ceiling",
+                    "actual_provider_billing_verified": False,
                 },
                 "estimated_unit_cost": {
                     "amount": body.estimated_unit_cost_amount,
                     "currency": body.currency,
-                    "basis": "project_request",
+                    "basis": "synthetic_admission_estimate",
                     "actual_cost_claimed": False,
+                    "actual_provider_billing_verified": False,
                 },
                 "target_shot_ids": ["shot-001", "shot-002", "shot-003"],
                 "created_at": stamp(body.created_at),
@@ -131,8 +138,11 @@ def register_runtime_creator_golden_trial_routes(
                     stage="approve",
                 )
             event = {
-                "event_type": "human_decision.recorded",
-                "decision": "approve_plan",
+                "event_type": "adapter_approval.recorded",
+                "decision": "approve_adapter_dispatch",
+                "decision_scope": "adapter_dispatch_only",
+                "ledger_role": "discardable_experiment_adapter_cache",
+                "authoritative_control_source": "production-control",
                 "actor_ref": scope.actor_id,
                 "created_at": stamp(body.created_at),
             }

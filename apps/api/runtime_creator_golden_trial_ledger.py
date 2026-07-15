@@ -157,7 +157,11 @@ def next_open_shot_id(ledger: dict[str, Any]) -> str | None:
     for shot_id in ledger.get("target_shot_ids") or TRIAL_SHOT_IDS:
         dispatch = dispatches.get(shot_id) or {}
         writeback = dispatch.get("episode_writeback") or {}
-        if writeback.get("status") not in {"written", "replayed"} and dispatch.get("status") != "blocked":
+        if writeback.get("status") in {"written", "replayed"}:
+            continue
+        if dispatch:
+            return None
+        if dispatch.get("status") != "blocked":
             return str(shot_id)
     return None
 
@@ -165,6 +169,13 @@ def next_open_shot_id(ledger: dict[str, Any]) -> str | None:
 def estimated_unit_cost(ledger: dict[str, Any]) -> float:
     estimate = ledger.get("estimated_unit_cost") or {}
     return float(estimate.get("amount") or 0)
+
+
+def effective_estimated_cost(ledger: dict[str, Any], caller_estimate: float | None) -> float:
+    stored = estimated_unit_cost(ledger)
+    if caller_estimate is None:
+        return stored
+    return max(stored, float(caller_estimate))
 
 
 def reserved_cost_amount(ledger: dict[str, Any]) -> float:
@@ -189,6 +200,8 @@ def budget_gate(ledger: dict[str, Any], estimate: float) -> dict[str, Any]:
         "ceiling": ceiling,
         "reserved": reserved,
         "estimate": estimate,
+        "ceiling_kind": "synthetic_admission_ceiling",
+        "actual_cost_status": "unknown_unverified",
     }
 
 
@@ -209,9 +222,16 @@ def cost_receipt(
 ) -> dict[str, Any]:
     return {
         "receipt_id": object_id("cost-receipt", provider_attempt_id, status),
+        "receipt_kind": "synthetic_admission",
         "provider_attempt_id": provider_attempt_id,
         "status": status,
+        "admission_ceiling_kind": "synthetic",
         "estimated_cost": money(amount, ledger),
+        "actual_cost": {
+            "status": "unknown_unverified",
+            "amount": None,
+            "currency": str((ledger.get("project_ceiling") or {}).get("currency") or DEFAULT_CURRENCY),
+        },
         "actual_cost_claimed": actual_cost_claimed,
         "actual_provider_billing_verified": False,
     }
@@ -244,6 +264,7 @@ __all__ = (
     "budget_gate",
     "complete_idempotency",
     "cost_receipt",
+    "effective_estimated_cost",
     "estimated_unit_cost",
     "idempotency_replay_or_conflict",
     "load_or_init_ledger",

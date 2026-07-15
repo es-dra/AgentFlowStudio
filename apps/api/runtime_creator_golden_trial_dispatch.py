@@ -14,13 +14,15 @@ from apps.api.runtime_creator_golden_trial_dispatch_steps import (
 )
 from apps.api.runtime_creator_golden_trial_ledger import (
     budget_gate,
-    estimated_unit_cost,
+    complete_idempotency,
+    effective_estimated_cost,
     idempotency_replay_or_conflict,
     load_or_init_ledger,
     next_open_shot_id,
     raise_trial_error,
     require_event_count,
     trial_lock,
+    write_ledger,
 )
 from apps.api.runtime_creator_golden_trial_projection import trial_response
 from apps.api.runtime_episode_domain_contract import TenantScope
@@ -70,7 +72,7 @@ def dispatch_creator_golden_next_command(
             complete_idempotency(ledger, idempotency_key, body_fingerprint, response)
             write_ledger(store, project_id, ledger)
             return response
-        estimate = body.estimated_cost_amount or estimated_unit_cost(ledger)
+        estimate = effective_estimated_cost(ledger, body.estimated_cost_amount)
         gate = budget_gate(ledger, estimate)
         if not gate["allowed"]:
             return record_budget_block(

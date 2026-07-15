@@ -17,7 +17,7 @@ const tabs = [
   ["mission", "目标"],
   ["plan", "计划"],
   ["cockpit", "制作"],
-  ["trial", "真媒体"],
+  ["trial", "图像试验"],
   ["artifacts", "素材"],
   ["review", "审片"],
 ];
@@ -267,7 +267,7 @@ function renderCockpit() {
 }
 
 function renderTrial() {
-  const currentTrial = trial || { status: "empty", event_count: 0, dispatches: {}, target_shot_ids: ["shot-001", "shot-002", "shot-003"], cost_receipts: [], non_claims: [] };
+  const currentTrial = trial || { status: "empty", event_count: 0, dispatches: {}, target_shot_ids: ["shot-001", "shot-002", "shot-003"], admission_receipts: [], non_claims: [] };
   const targetShots = currentTrial.target_shot_ids?.length ? currentTrial.target_shot_ids : ["shot-001", "shot-002", "shot-003"];
   const dispatches = currentTrial.dispatches || {};
   const canRecord = currentTrial.status === "empty";
@@ -275,8 +275,8 @@ function renderTrial() {
   const canDispatch = currentTrial.status === "approved" || currentTrial.status === "running";
   return `<section class="work-surface trial-surface">
     <header>
-      <h2>Creator Golden Content Trial</h2>
-      <p>冻结一个 3 镜头真媒体纵切：先设成本上限，再经人工批准，最后按镜头调度 Provider。生成成功后只写入待审核候选，不自动验收。</p>
+      <h2>三镜头图像试验</h2>
+      <p>仅调度 3 个图像/关键帧 Provider 候选；不包含 LLM 脚本、视频、音频、导出、媒体 QA、人类接受或商业验证。金额只作合成准入上限，不代表真实账单。</p>
     </header>
     <div class="trial-grid">
       <article>
@@ -285,9 +285,9 @@ function renderTrial() {
         <small>${currentTrial.event_count || 0} 次记录 · ${currentTrial.provider_dispatch_count || 0} 次外部调度</small>
       </article>
       <article>
-        <span>项目上限</span>
+        <span>合成准入上限</span>
         <strong>${moneyLabel(currentTrial.project_ceiling)}</strong>
-        <small>单镜头估算 ${moneyLabel(currentTrial.estimated_unit_cost)}</small>
+        <small>单镜头合成估算 ${moneyLabel(currentTrial.estimated_unit_cost)} · 真实账单未核验</small>
       </article>
       <article>
         <span>人类门</span>
@@ -307,7 +307,7 @@ function renderTrial() {
       }).join("")}
     </div>
     <div class="form-actions">
-      <button type="button" data-action="trial-mission" ${!canRecord || busy ? "disabled" : ""}>${icon("bookmark", 16)}冻结 3 镜头试验</button>
+      <button type="button" data-action="trial-mission" ${!canRecord || busy ? "disabled" : ""}>${icon("bookmark", 16)}冻结图像试验</button>
       <button type="button" data-action="trial-approve" ${!canApprove || busy ? "disabled" : ""}>${icon("check", 16)}批准试验</button>
       <button type="button" class="primary" data-action="trial-dispatch" ${!canDispatch || busy ? "disabled" : ""}>${icon("play", 16)}调度下一镜头</button>
     </div>
@@ -569,12 +569,12 @@ async function onTrialMission() {
     runtime.recordCreatorGoldenTrialMission({
       objective: control?.mission?.objective || "制作一个三镜头的创作者主导 AI 原生制片系统样片。",
       constraints: ["保持三镜头连续性。", "生成后等待人类审核。"],
-      project_ceiling_amount: 1,
-      estimated_unit_cost_amount: 0.1,
+      project_ceiling_amount: 25,
+      estimated_unit_cost_amount: 3,
       currency: "USD",
       created_at: new Date().toISOString(),
     }, commandKey("trial-mission")),
-    "3 镜头真媒体试验已冻结",
+    "3 镜头图像试验已冻结",
   );
 }
 
@@ -640,7 +640,7 @@ async function mutateTrial(promise, message) {
     notice = message;
     activeTab = "trial";
     renderApp();
-  }, "真媒体试验命令失败");
+  }, "图像试验命令失败");
 }
 
 async function guarded(fn, fallback) {

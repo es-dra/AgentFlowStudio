@@ -106,8 +106,9 @@ def test_studio_production_control_entry_is_linked_without_replacing_canvas() ->
     assert 'href="/studio/"' in app
     assert "画布" in app
     assert "故事板 / 审片" in app
-    assert "Creator Golden Content Trial" in app
-    assert "冻结 3 镜头试验" in app
+    assert "三镜头图像试验" in app
+    assert "冻结图像试验" in app
+    assert "不包含 LLM 脚本、视频、音频、导出、媒体 QA、人类接受或商业验证" in app
     assert "调度下一镜头" in app
     assert "外部生成未启用" in app
     assert "strong-password-123" not in app

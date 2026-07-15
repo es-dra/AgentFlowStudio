@@ -19,22 +19,23 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
     estimated_unit_cost = {"amount": 0.0, "currency": DEFAULT_CURRENCY, "basis": "missing"}
     dispatches: dict[str, dict[str, Any]] = {}
     provider_dispatch_count = 0
-    cost_receipts: list[dict[str, Any]] = []
+    admission_receipts: list[dict[str, Any]] = []
     human_decisions: list[dict[str, Any]] = []
     for event in events:
         event_type = event.get("event_type")
-        if event_type == "mission.recorded":
+        if event_type == "adapter_config.recorded":
             status = "planned"
             objective = str(event.get("objective") or "")
             target_shot_ids = [str(item) for item in event.get("target_shot_ids") or TRIAL_SHOT_IDS]
             project_ceiling = dict(event.get("project_ceiling") or project_ceiling)
             estimated_unit_cost = dict(event.get("estimated_unit_cost") or estimated_unit_cost)
-        elif event_type == "human_decision.recorded":
-            if event.get("decision") == "approve_plan":
+        elif event_type == "adapter_approval.recorded":
+            if event.get("decision") in {"approve_plan", "approve_adapter_dispatch"}:
                 status = "approved"
             human_decisions.append(
                 {
                     "decision": event.get("decision"),
+                    "decision_scope": event.get("decision_scope") or "adapter_dispatch_only",
                     "actor_ref": event.get("actor_ref"),
                     "created_at": event.get("created_at"),
                 }
@@ -51,7 +52,7 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
             status = "running"
             receipt = dict(event.get("cost_receipt") or {})
             if receipt:
-                cost_receipts.append(receipt)
+                admission_receipts.append(receipt)
             dispatches[str(event["shot_id"])] = {
                 "status": "running",
                 "provider_attempt_id": event.get("provider_attempt_id"),
@@ -64,7 +65,7 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
             provider_dispatch_count += 1 if event.get("provider_calls_started") else 0
             receipt = dict(event.get("cost_receipt") or {})
             if receipt:
-                cost_receipts.append(receipt)
+                admission_receipts.append(receipt)
             shot_id = str(event["shot_id"])
             dispatches[shot_id] = {
                 **dispatches.get(shot_id, {}),
@@ -108,7 +109,7 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
     ledger["estimated_unit_cost"] = estimated_unit_cost
     ledger["dispatches"] = dispatches
     ledger["provider_dispatch_count"] = provider_dispatch_count
-    ledger["cost_receipts"] = cost_receipts
+    ledger["admission_receipts"] = admission_receipts
     ledger["human_decisions"] = human_decisions
     ledger["projection_digest"] = digest(
         {
@@ -116,7 +117,7 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
             "event_count": len(events),
             "target_shot_ids": target_shot_ids,
             "dispatches": dispatches,
-            "cost_receipts": cost_receipts,
+            "admission_receipts": admission_receipts,
             "human_decisions": human_decisions,
         }
     )
@@ -135,15 +136,28 @@ def public_trial(ledger: dict[str, Any]) -> dict[str, Any]:
         "target_shot_ids": ledger.get("target_shot_ids") or list(TRIAL_SHOT_IDS),
         "project_ceiling": ledger.get("project_ceiling") or {},
         "estimated_unit_cost": ledger.get("estimated_unit_cost") or {},
+        "synthetic_admission_ceiling": ledger.get("project_ceiling") or {},
+        "synthetic_unit_estimate": ledger.get("estimated_unit_cost") or {},
         "dispatches": ledger.get("dispatches") or {},
         "provider_dispatch_count": ledger.get("provider_dispatch_count") or 0,
-        "cost_receipts": ledger.get("cost_receipts") or [],
+        "admission_receipts": ledger.get("admission_receipts") or [],
         "human_decisions": ledger.get("human_decisions") or [],
+        "actual_cost_status": "unknown_unverified",
+        "actual_provider_receipt_status": "unknown_unverified",
+        "adapter_authority": {
+            "trial_ledger_role": "discardable_experiment_adapter_cache",
+            "authoritative_control_source": "production-control",
+            "authoritative_media_source": "episode-production-aggregate",
+            "owns_mission_plan_run_attempt_cost": False,
+            "owns_media_acceptance_or_delivery": False,
+        },
         "waiting_human": ledger.get("status") in {"planned", "awaiting_review"},
         "media_quality_status": "not_evaluated",
         "human_acceptance_status": "not_requested",
         "business_validation_status": "not_claimed",
         "non_claims": [
+            "this trial ledger is a discardable adapter cache, not the production control source of truth",
+            "configured ceiling and unit estimates are synthetic admission limits, not verified provider pricing",
             "provider smoke is separate from media quality",
             "human acceptance is not claimed",
             "business validation is not claimed",
