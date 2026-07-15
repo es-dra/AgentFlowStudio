@@ -368,6 +368,21 @@ def apply_event(projection: Projection, event: ProjectEvent) -> None:
                 _validate_scope(evidence, projection.scope)
                 if not evidence:
                     raise StateConflictError("blocked run requires clearance evidence")
+                blocker_ref = projection.blockers.get(run_ref.object_id)
+                if blocker_ref is None:
+                    raise StateConflictError("blocked run has no exact blocker")
+                blocker = projection.get(blocker_ref)
+                required_evidence = {
+                    ExactObjectRef.model_validate(value)
+                    for value in blocker["clearance_evidence_refs"]
+                }
+                if set(evidence) != required_evidence:
+                    raise StateConflictError("clearance evidence must exactly satisfy the active blocker")
+                if any(
+                    ref.object_type in CONTROL_OBJECT_TYPES and not projection.has(ref)
+                    for ref in evidence
+                ):
+                    raise StateConflictError("control-domain clearance evidence must resolve exactly")
                 projection.blockers.pop(run_ref.object_id, None)
             if current == "waiting-human" and target == "running" and run_ref.object_id in projection.open_human_requests:
                 raise StateConflictError("waiting-human run requires an exact recorded decision")
@@ -398,6 +413,9 @@ def apply_event(projection: Projection, event: ProjectEvent) -> None:
                 raise StateConflictError("duplicate provider charge identity")
             if not projection.has(entry.run_ref) or not projection.has(entry.attempt_ref):
                 raise StateConflictError("cost must bind exact run and attempt")
+            attempt = projection.get(entry.attempt_ref)
+            if ExactObjectRef.model_validate(attempt["run_ref"]) != entry.run_ref:
+                raise StateConflictError("cost attempt must belong to the exact run")
             projection.register("cost_entry", entry)
             projection.charge_fingerprints.add(entry.charge_fingerprint)
         elif event.event_type == "ProviderGateEvaluated":
@@ -424,6 +442,13 @@ def apply_event(projection: Projection, event: ProjectEvent) -> None:
             refs = (registration.plan_task_ref, registration.run_ref, registration.attempt_ref)
             if not all(projection.has(ref) for ref in refs):
                 raise StateConflictError("candidate provenance must resolve exactly")
+            run = projection.get(registration.run_ref)
+            attempt = projection.get(registration.attempt_ref)
+            if (
+                ExactObjectRef.model_validate(run["task_ref"]) != registration.plan_task_ref
+                or ExactObjectRef.model_validate(attempt["run_ref"]) != registration.run_ref
+            ):
+                raise StateConflictError("candidate provenance crosses task, run, or attempt boundary")
             if registration.artifact_id in projection.registered_artifact_ids:
                 raise StateConflictError("duplicate artifact candidate identity")
             projection.register("artifact_candidate_registration", registration)
@@ -437,6 +462,10 @@ def apply_event(projection: Projection, event: ProjectEvent) -> None:
                 raise StateConflictError("writeback must bind exact candidate registration")
             registration = projection.get(writeback.candidate_registration_ref)
             if (
+                ExactObjectRef.model_validate(registration["plan_task_ref"]) != writeback.plan_task_ref
+                or ExactObjectRef.model_validate(registration["run_ref"]) != writeback.run_ref
+                or ExactObjectRef.model_validate(registration["attempt_ref"]) != writeback.attempt_ref
+                or
                 registration["artifact_id"] != writeback.artifact_id
                 or registration["artifact_digest"] != writeback.artifact_digest
                 or registration["adapter_request"] != writeback.adapter_request.model_dump(mode="json")
@@ -460,8 +489,16 @@ def apply_event(projection: Projection, event: ProjectEvent) -> None:
             assessment = ImpactAssessment.model_validate(payload["impact_assessment"])
             if not projection.has(assessment.revision_request_ref):
                 raise StateConflictError("impact assessment must bind exact revision request")
+            request = projection.get(assessment.revision_request_ref)
+            protected_refs = {
+                ExactObjectRef.model_validate(value) for value in request["protected_exact_refs"]
+            }
             if not set(assessment.preserved_exact_refs).isdisjoint(assessment.affected_exact_refs):
                 raise StateConflictError("impact cannot both affect and preserve an exact ref")
+            if protected_refs & set(assessment.affected_exact_refs):
+                raise StateConflictError("impact cannot affect a protected exact ref")
+            if not protected_refs.issubset(assessment.preserved_exact_refs):
+                raise StateConflictError("impact must preserve every protected exact ref")
             projection.register("impact_assessment", assessment)
         else:
             raise LedgerIntegrityError(f"unsupported event type: {event.event_type}")
@@ -489,6 +526,30 @@ COMMAND_CAPABILITIES = {
     "impact.assess": "revision.write",
 }
 
+CONTROL_OBJECT_TYPES = {
+    "mission",
+    "mission_revision",
+    "reference_constraint",
+    "production_plan",
+    "plan_revision",
+    "plan_task",
+    "plan_approval_decision",
+    "agent_assignment",
+    "production_run",
+    "run_attempt",
+    "budget_envelope",
+    "cost_estimate",
+    "cost_entry",
+    "provider_gate_decision",
+    "blocker",
+    "human_decision_request",
+    "human_decision",
+    "artifact_candidate_registration",
+    "artifact_writeback",
+    "selective_revision_request",
+    "impact_assessment",
+}
+
 
 class ProductionControlHarness:
     """Deterministic, provider-free contract harness; not a production database."""
@@ -497,11 +558,17 @@ class ProductionControlHarness:
         self,
         scope: ProjectScope,
         actor_capabilities: dict[str, set[str]],
+        actor_identities: dict[str, ActorIdentity],
         *,
         file_path: Path | None = None,
     ) -> None:
         self.scope = scope
         self.actor_capabilities = {key: set(value) for key, value in actor_capabilities.items()}
+        self.actor_identities = dict(actor_identities)
+        if set(self.actor_capabilities) != set(self.actor_identities):
+            raise AuthorizationError("actor identities and capability grants must have identical keys")
+        if any(key != identity.actor_id for key, identity in self.actor_identities.items()):
+            raise AuthorizationError("actor grant key must equal exact actor identity")
         self.file_path = file_path
         self.events: tuple[ProjectEvent, ...] = ()
         self.outbox: tuple[OutboxRecord, ...] = ()
@@ -575,16 +642,25 @@ class ProductionControlHarness:
         if command.scope != self.scope:
             raise AuthorizationError("foreign organization or project rejected")
         allowed = self.actor_capabilities.get(command.actor.actor_id)
+        expected_actor = self.actor_identities.get(command.actor.actor_id)
         required = COMMAND_CAPABILITIES.get(command.command_type)
-        if allowed is None or required is None or command.capability != required or required not in allowed:
+        if (
+            allowed is None
+            or expected_actor != command.actor
+            or required is None
+            or command.capability != required
+            or required not in allowed
+        ):
             raise AuthorizationError("actor or capability is not authorized")
         _validate_scope(command.exact_object_refs, self.scope)
         if command.budget_authorization is not None:
             _validate_scope((command.budget_authorization.budget_envelope_ref,), self.scope)
         if command.command_type == "plan.approve" and command.budget_authorization is None:
             raise AuthorizationError("plan approval requires exact budget authorization")
-        if command.command_type == "provider.evaluate" and command.provider_authorization is None:
-            raise AuthorizationError("provider evaluation requires explicit closed-or-open authorization")
+        if command.command_type == "provider.evaluate" and (
+            command.provider_authorization is None or command.budget_authorization is None
+        ):
+            raise AuthorizationError("provider evaluation requires provider and budget authorization")
         if command.causation_id != command.command_id and command.causation_id not in {
             event.event_id for event in self.events
         }:
@@ -660,6 +736,23 @@ class ProductionControlHarness:
             task_refs = tuple(exact_ref("plan_task", task) for task in tasks)
             if len(task_refs) != len(set(task_refs)) or set(task_refs) != set(decision.approved_task_refs):
                 raise StateConflictError("approval decision and unique task batch must match exactly")
+            plan_revision = PlanRevision.model_validate(self.projection.get(decision.plan_revision_ref))
+            task_ref_by_id = {task.identity.object_id: exact_ref("plan_task", task) for task in tasks}
+            spec_by_id = {spec.task_id: spec for spec in plan_revision.task_specs}
+            if set(task_ref_by_id) != set(spec_by_id):
+                raise StateConflictError("approval task stable identities must match the plan revision")
+            for task in tasks:
+                spec = spec_by_id[task.identity.object_id]
+                expected_dependencies = tuple(
+                    task_ref_by_id[dependency_id] for dependency_id in spec.dependency_task_ids
+                )
+                if (
+                    task.plan_revision_ref != decision.plan_revision_ref
+                    or task.boundary != spec.boundary
+                    or task.capability != spec.capability
+                    or task.dependency_refs != expected_dependencies
+                ):
+                    raise StateConflictError("approval task content must match the immutable plan specification")
             budget_auth = command.budget_authorization
             assert budget_auth is not None
             if budget_auth.budget_envelope_ref != decision.budget_envelope_ref:
@@ -708,7 +801,9 @@ class ProductionControlHarness:
         if command.command_type == "provider.evaluate":
             decision = ProviderGateDecision.model_validate(payload["provider_gate_decision"])
             auth = command.provider_authorization
+            budget_auth = command.budget_authorization
             assert auth is not None
+            assert budget_auth is not None
             if (
                 auth.capability != decision.capability
                 or auth.authorized != decision.capability_authorized
@@ -717,6 +812,14 @@ class ProductionControlHarness:
                 or auth.authorization_ref != decision.authorization_ref
             ):
                 raise AuthorizationError("provider decision must match exact command authorization")
+            budget = BudgetEnvelope.model_validate(self.projection.get(decision.budget_envelope_ref))
+            if (
+                budget_auth.budget_envelope_ref != decision.budget_envelope_ref
+                or budget_auth.currency != budget.estimated.currency
+                or budget_auth.admitted_amount > budget.max_budget
+                or (decision.budget_admitted and budget_auth.admitted_amount <= 0)
+            ):
+                raise AuthorizationError("provider decision must match exact budget admission")
             return [(
                 "ProviderGateEvaluated",
                 {"provider_gate_decision": decision.model_dump(mode="json")},
@@ -871,6 +974,7 @@ class ProductionControlHarness:
         cls,
         file_path: Path,
         actor_capabilities: dict[str, set[str]],
+        actor_identities: dict[str, ActorIdentity],
     ) -> "ProductionControlHarness":
         try:
             raw = json.loads(file_path.read_text(encoding="utf-8"))
@@ -884,18 +988,30 @@ class ProductionControlHarness:
                 raise LedgerIntegrityError("ledger tail anchor or digest mismatch")
             verify_events(scope, events)
             event_ids = {event.event_id for event in events}
-            if len(outbox) != len(events) or {item.event_id for item in outbox} != event_ids:
+            expected_outbox = tuple(cls._outbox_for(event) for event in events)
+            if outbox != expected_outbox:
                 raise LedgerIntegrityError("ledger and outbox are not an atomic one-to-one commit")
-            for item in outbox:
-                event = next(event for event in events if event.event_id == item.event_id)
-                if item.scope != scope or item.payload_digest != digest(event.payload):
-                    raise LedgerIntegrityError("outbox payload or scope mismatch")
             receipts: dict[str, tuple[str, CommandReceipt]] = {}
             for key, value in raw["receipts"].items():
                 receipt = CommandReceipt.model_validate(value["receipt"])
-                if receipt.idempotency_key != key or not set(receipt.event_ids).issubset(event_ids):
+                semantic_digest = value["semantic_digest"]
+                _validate_scope(receipt.result_refs, scope)
+                expected_receipt_id = digest(
+                    {
+                        "scope": scope.model_dump(mode="json"),
+                        "idempotency_key": key,
+                        "semantic_digest": semantic_digest,
+                        "version": receipt.accepted_version,
+                    }
+                )
+                if (
+                    receipt.idempotency_key != key
+                    or semantic_digest != receipt.command_digest
+                    or receipt.receipt_id != expected_receipt_id
+                    or not set(receipt.event_ids).issubset(event_ids)
+                ):
                     raise LedgerIntegrityError("receipt does not bind committed events")
-                receipts[key] = (value["semantic_digest"], receipt)
+                receipts[key] = (semantic_digest, receipt)
             receipt_by_id = {receipt.receipt_id: receipt for _, receipt in receipts.values()}
             if len(receipt_by_id) != len(receipts):
                 raise LedgerIntegrityError("receipt ids must be unique")
@@ -909,6 +1025,8 @@ class ProductionControlHarness:
                 receipt = receipt_by_id[receipt_id]
                 if tuple(event.event_id for event in group) != receipt.event_ids:
                     raise LedgerIntegrityError("receipt event membership is not exact and ordered")
+                if receipt.accepted_version != group[0].project_version:
+                    raise LedgerIntegrityError("receipt version does not match its command batch")
                 if any(
                     event.correlation_id != group[0].correlation_id
                     or event.causation_id != group[0].causation_id
@@ -927,7 +1045,7 @@ class ProductionControlHarness:
             raise
         except Exception as exc:
             raise LedgerIntegrityError("corrupt or truncated file harness rejected") from exc
-        harness = cls(scope, actor_capabilities, file_path=file_path)
+        harness = cls(scope, actor_capabilities, actor_identities, file_path=file_path)
         harness.events = events
         harness.outbox = outbox
         harness._receipts = receipts

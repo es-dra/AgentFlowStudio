@@ -283,26 +283,28 @@ def start_run(
     harness: ProductionControlHarness,
     actor: ActorIdentity,
     task: PlanTask,
+    *,
+    suffix: str = "1",
 ) -> dict[str, object]:
     assignment = AgentAssignment(
-        identity=identity(harness.scope, "assignment-1"),
+        identity=identity(harness.scope, f"assignment-{suffix}"),
         task_ref=exact_ref("plan_task", task),
-        agent_id="agent-deterministic-1",
+        agent_id=f"agent-deterministic-{suffix}",
         capability="deterministic.harness",
     )
     run_ref = ExactObjectRef(
         scope=harness.scope,
         object_type="production_run",
-        object_id="run-1",
-        revision_id="run-1-v1",
+        object_id=f"run-{suffix}",
+        revision_id=f"run-{suffix}-v1",
     )
     attempt = RunAttempt(
-        identity=identity(harness.scope, "attempt-1"),
+        identity=identity(harness.scope, f"attempt-{suffix}"),
         run_ref=run_ref,
         attempt_number=1,
     )
     run = ProductionRun(
-        identity=identity(harness.scope, "run-1"),
+        identity=identity(harness.scope, f"run-{suffix}"),
         task_ref=exact_ref("plan_task", task),
         assignment_ref=exact_ref("agent_assignment", assignment),
         execution_state="running",
@@ -320,7 +322,7 @@ def start_run(
             "run.start",
             "run.execute",
             payload,
-            "run-start-1",
+            f"run-start-{suffix}",
             refs=(exact_ref("plan_task", task),),
         )
     )
@@ -332,7 +334,7 @@ def test_plan_approve_is_atomic_and_replay_safe(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor)
     receipt = data["approval_receipt"]
     assert receipt == harness.execute(data["approval_command"])
@@ -366,7 +368,7 @@ def test_plan_revision_is_immutable_and_old_head_cannot_be_approved(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor, execute_approval=False)
     old_plan = data["plan"]
     old_revision = data["plan_revision"]
@@ -419,12 +421,74 @@ def test_plan_revision_is_immutable_and_old_head_cannot_be_approved(
         harness.execute(data["approval_command"].model_copy(update={"expected_version": harness.projection.version}))
 
 
+def test_plan_approval_tasks_must_match_frozen_specs(
+    scope: ProjectScope,
+    actor: ActorIdentity,
+    capabilities: dict[str, set[str]],
+) -> None:
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
+    data = bootstrap_to_approved_plan(harness, actor, execute_approval=False)
+    rogue_tasks = tuple(
+        PlanTask(
+            identity=identity(scope, f"rogue-{index}"),
+            plan_revision_ref=exact_ref("plan_revision", data["plan_revision"]),
+            boundary=f"Unapproved boundary {index}",
+            capability="deterministic.harness",
+        )
+        for index in range(1, 4)
+    )
+    decision = PlanApprovalDecision(
+        identity=identity(scope, "rogue-approval"),
+        plan_revision_ref=exact_ref("plan_revision", data["plan_revision"]),
+        decision="approved",
+        approved_task_refs=tuple(exact_ref("plan_task", task) for task in rogue_tasks),
+        budget_envelope_ref=exact_ref("budget_envelope", data["budget"]),
+    )
+    before = harness.projection.state_digest
+    with pytest.raises(StateConflictError, match="stable identities"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "plan.approve",
+                "plan.approve",
+                {
+                    "decision": decision.model_dump(mode="json"),
+                    "tasks": [task.model_dump(mode="json") for task in rogue_tasks],
+                },
+                "rogue-approval",
+                refs=(decision.plan_revision_ref,),
+                budget_authorization=data["approval_command"].budget_authorization,
+            )
+        )
+    assert harness.projection.state_digest == before
+    drifted_tasks = list(data["tasks"])
+    drifted_tasks[0] = drifted_tasks[0].model_copy(update={"boundary": "Changed after proposal"})
+    with pytest.raises(StateConflictError, match="immutable plan specification"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "plan.approve",
+                "plan.approve",
+                {
+                    "decision": data["decision"].model_dump(mode="json"),
+                    "tasks": [task.model_dump(mode="json") for task in drifted_tasks],
+                },
+                "drifted-approval",
+                refs=(data["decision"].plan_revision_ref,),
+                budget_authorization=data["approval_command"].budget_authorization,
+            )
+        )
+    assert harness.projection.state_digest == before
+
+
 def test_approval_failure_rolls_back_events_projection_receipt_and_outbox(
     scope: ProjectScope,
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor, execute_approval=False)
     before = (harness.events, harness.outbox, harness.projection.state_digest, dict(harness._receipts))
     with pytest.raises(AtomicCommitError):
@@ -510,7 +574,7 @@ def test_scope_actor_refs_and_payload_conflicts_fail_closed(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     foreign_scope = ProjectScope(org_id="org-2", project_id="project-1")
     foreign_ref = ExactObjectRef(
         scope=foreign_scope,
@@ -537,6 +601,22 @@ def test_scope_actor_refs_and_payload_conflicts_fail_closed(
     intruder = ActorIdentity(actor_id="intruder", actor_type="human", authority_ref="none")
     with pytest.raises(AuthorizationError):
         harness.execute(command(harness, intruder, "mission.record", "mission.write", payload, "intruder"))
+    spoofed_authority = ActorIdentity(
+        actor_id=actor.actor_id,
+        actor_type="agent",
+        authority_ref="different-authority",
+    )
+    with pytest.raises(AuthorizationError):
+        harness.execute(
+            command(
+                harness,
+                spoofed_authority,
+                "mission.record",
+                "mission.write",
+                payload,
+                "spoofed-authority",
+            )
+        )
 
 
 def test_waiting_human_blocked_control_and_retry_boundaries(
@@ -544,7 +624,7 @@ def test_waiting_human_blocked_control_and_retry_boundaries(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor)
     run_data = start_run(harness, actor, data["tasks"][0])
     run_ref = exact_ref("production_run", run_data["run"])
@@ -625,12 +705,7 @@ def test_waiting_human_blocked_control_and_retry_boundaries(
         command(harness, actor, "run.transition", "run.execute", resume_payload, "resume-after-decision", refs=(run_ref,))
     )
 
-    clearance_ref = ExactObjectRef(
-        scope=scope,
-        object_type="reference_constraint",
-        object_id="clearance-evidence",
-        revision_id="clearance-evidence-v1",
-    )
+    clearance_ref = data["tasks"][0].plan_revision_ref
     blocker = Blocker(
         identity=identity(scope, "blocker-1"),
         run_ref=run_ref,
@@ -658,6 +733,24 @@ def test_waiting_human_blocked_control_and_retry_boundaries(
                 "run.execute",
                 {"run_ref": run_ref.model_dump(mode="json"), "target_state": "running", "clearance_evidence_refs": []},
                 "blocked-no-clearance",
+                refs=(run_ref,),
+            )
+        )
+    with pytest.raises(StateConflictError, match="active blocker"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "run.transition",
+                "run.execute",
+                {
+                    "run_ref": run_ref.model_dump(mode="json"),
+                    "target_state": "running",
+                    "clearance_evidence_refs": [
+                        exact_ref("plan_task", data["tasks"][0]).model_dump(mode="json")
+                    ],
+                },
+                "blocked-wrong-clearance",
                 refs=(run_ref,),
             )
         )
@@ -752,7 +845,7 @@ def test_cost_writeback_provenance_and_shot7_shot8_protection(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor)
     task = data["tasks"][0]
     run_data = start_run(harness, actor, task)
@@ -875,12 +968,118 @@ def test_cost_writeback_provenance_and_shot7_shot8_protection(
         )
 
 
+def test_cost_and_artifact_provenance_cannot_cross_run_boundaries(
+    scope: ProjectScope,
+    actor: ActorIdentity,
+    capabilities: dict[str, set[str]],
+) -> None:
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
+    data = bootstrap_to_approved_plan(harness, actor)
+    run_one = start_run(harness, actor, data["tasks"][0], suffix="one")
+    run_two = start_run(harness, actor, data["tasks"][1], suffix="two")
+    run_one_ref = exact_ref("production_run", run_one["run"])
+    attempt_two_ref = exact_ref("run_attempt", run_two["attempt"])
+    crossed_cost = CostEntry(
+        identity=identity(scope, "crossed-cost"),
+        run_ref=run_one_ref,
+        attempt_ref=attempt_two_ref,
+        kind="actual",
+        amount=1,
+        currency="CNY",
+        charge_fingerprint=DIGEST_A,
+    )
+    with pytest.raises(StateConflictError, match="exact run"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "cost.record",
+                "budget.record",
+                {"cost_entry": crossed_cost.model_dump(mode="json")},
+                "crossed-cost",
+                refs=(run_one_ref, attempt_two_ref),
+            )
+        )
+
+    candidate = ExactObjectRef(
+        scope=scope,
+        object_type="asset_candidate",
+        object_id="crossed-candidate",
+        revision_id="crossed-candidate-v1",
+    )
+    adapter = EpisodeArtifactAdapterRequest(
+        mode="asset_candidate",
+        successor_ref=candidate,
+        existing_typed_operation="asset_candidate.create_version",
+    )
+    crossed_registration = ArtifactCandidateRegistration(
+        identity=identity(scope, "crossed-registration"),
+        plan_task_ref=exact_ref("plan_task", data["tasks"][0]),
+        run_ref=run_one_ref,
+        attempt_ref=attempt_two_ref,
+        artifact_id="crossed-artifact",
+        artifact_digest=DIGEST_B,
+        adapter_request=adapter,
+    )
+    with pytest.raises(StateConflictError, match="crosses task, run, or attempt"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "artifact.register",
+                "artifact.write",
+                {"registration": crossed_registration.model_dump(mode="json")},
+                "crossed-registration",
+            )
+        )
+
+    valid_registration = crossed_registration.model_copy(
+        update={
+            "identity": identity(scope, "valid-registration"),
+            "attempt_ref": exact_ref("run_attempt", run_one["attempt"]),
+        }
+    )
+    harness.execute(
+        command(
+            harness,
+            actor,
+            "artifact.register",
+            "artifact.write",
+            {"registration": valid_registration.model_dump(mode="json")},
+            "valid-registration",
+        )
+    )
+    crossed_writeback = ArtifactWriteback(
+        identity=identity(scope, "crossed-writeback"),
+        candidate_registration_ref=exact_ref(
+            "artifact_candidate_registration", valid_registration
+        ),
+        plan_task_ref=exact_ref("plan_task", data["tasks"][1]),
+        run_ref=exact_ref("production_run", run_two["run"]),
+        attempt_ref=attempt_two_ref,
+        artifact_id=valid_registration.artifact_id,
+        artifact_digest=valid_registration.artifact_digest,
+        adapter_request=valid_registration.adapter_request,
+    )
+    with pytest.raises(StateConflictError, match="preserve registered artifact"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "artifact.writeback",
+                "artifact.write",
+                {"writeback": crossed_writeback.model_dump(mode="json")},
+                "crossed-writeback",
+            )
+        )
+
+
 def test_selective_revision_and_impact_preserve_exact_refs(
     scope: ProjectScope,
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor)
     task = data["tasks"][0]
     run_data = start_run(harness, actor, task)
@@ -924,6 +1123,24 @@ def test_selective_revision_and_impact_preserve_exact_refs(
         source_writeback_ref=exact_ref("artifact_writeback", writeback),
     )
     harness.execute(command(harness, actor, "selective_revision.request", "revision.write", {"revision_request": request.model_dump(mode="json")}, "revision-request-1"))
+    invalid_assessment = ImpactAssessment(
+        identity=identity(scope, "impact-invalid"),
+        revision_request_ref=exact_ref("selective_revision_request", request),
+        affected_exact_refs=(shot8,),
+        preserved_exact_refs=(shot7,),
+        assessment_digest=DIGEST_A,
+    )
+    with pytest.raises(StateConflictError, match="protected exact ref"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "impact.assess",
+                "revision.write",
+                {"impact_assessment": invalid_assessment.model_dump(mode="json")},
+                "impact-invalid",
+            )
+        )
     assessment = ImpactAssessment(
         identity=identity(scope, "impact-1"),
         revision_request_ref=exact_ref("selective_revision_request", request),
@@ -940,7 +1157,7 @@ def test_provider_gate_defaults_closed_and_dispatch_is_always_zero(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     data = bootstrap_to_approved_plan(harness, actor)
     run_data = start_run(harness, actor, data["tasks"][0])
     decision = ProviderGateDecision(
@@ -964,6 +1181,12 @@ def test_provider_gate_defaults_closed_and_dispatch_is_always_zero(
             "provider.evaluate",
             {"provider_gate_decision": decision.model_dump(mode="json")},
             "provider-gate-closed",
+            budget_authorization=BudgetAuthorization(
+                budget_envelope_ref=decision.budget_envelope_ref,
+                admitted_amount=data["budget"].max_budget,
+                currency=data["budget"].estimated.currency,
+                authorization_ref="provider-budget-admission-1",
+            ),
             provider_authorization=ProviderAuthorization(
                 capability="image.generate",
                 authorized=False,
@@ -974,6 +1197,39 @@ def test_provider_gate_defaults_closed_and_dispatch_is_always_zero(
     )
     assert harness.provider_dispatch_count == 0
     assert all(event.event_type != "ProviderDispatched" for event in harness.events)
+    allowed = ProviderGateDecision(
+        identity=identity(scope, "provider-gate-allowed"),
+        run_ref=decision.run_ref,
+        budget_envelope_ref=decision.budget_envelope_ref,
+        capability="image.generate",
+        capability_authorized=True,
+        budget_admitted=True,
+        privacy_policy_satisfied=True,
+        no_training_policy_satisfied=True,
+        allowed=True,
+        authorization_ref="provider-authorization-allowed",
+        privacy_policy_ref="privacy-policy-v1",
+        no_training_policy_ref="no-training-policy-v1",
+    )
+    with pytest.raises(AuthorizationError, match="budget authorization"):
+        harness.execute(
+            command(
+                harness,
+                actor,
+                "provider.evaluate",
+                "provider.evaluate",
+                {"provider_gate_decision": allowed.model_dump(mode="json")},
+                "provider-gate-no-budget",
+                provider_authorization=ProviderAuthorization(
+                    capability="image.generate",
+                    authorized=True,
+                    privacy_policy_satisfied=True,
+                    no_training_policy_satisfied=True,
+                    authorization_ref="provider-authorization-allowed",
+                ),
+            )
+        )
+    assert harness.provider_dispatch_count == 0
     with pytest.raises(ValidationError):
         ProviderGateDecision(
             identity=identity(scope, "provider-gate-invalid"),
@@ -997,10 +1253,12 @@ def test_file_safe_restart_rebuild_and_corruption_fail_closed(
     capabilities: dict[str, set[str]],
 ) -> None:
     path = tmp_path / "production-control.json"
-    harness = ProductionControlHarness(scope, capabilities, file_path=path)
+    harness = ProductionControlHarness(
+        scope, capabilities, {actor.actor_id: actor}, file_path=path
+    )
     data = bootstrap_to_approved_plan(harness, actor)
     original_bytes = path.read_bytes()
-    loaded = ProductionControlHarness.load(path, capabilities)
+    loaded = ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
     assert loaded.projection.state_digest == harness.projection.state_digest
     assert loaded.projection.canonical_state() == rebuild_projection(scope, loaded.events).canonical_state()
     assert loaded.execute(data["approval_command"]) == data["approval_receipt"]
@@ -1011,14 +1269,37 @@ def test_file_safe_restart_rebuild_and_corruption_fail_closed(
     payload["events"] = payload["events"][:-1]
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(LedgerIntegrityError):
-        ProductionControlHarness.load(path, capabilities)
+        ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
+
+    path.write_bytes(original_bytes)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["outbox"][0]["event_type"] = "PlanApproved"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LedgerIntegrityError):
+        ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
+
+    path.write_bytes(original_bytes)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    first_receipt = next(iter(payload["receipts"].values()))
+    first_receipt["receipt"]["accepted_version"] += 1
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LedgerIntegrityError):
+        ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
+
+    path.write_bytes(original_bytes)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    first_receipt = next(iter(payload["receipts"].values()))
+    first_receipt["receipt"]["result_refs"][0]["scope"]["org_id"] = "foreign-org"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(LedgerIntegrityError):
+        ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
 
     path.write_bytes(original_bytes)
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["events"][0]["payload"]["mission"]["identity"]["scope"]["org_id"] = "foreign-org"
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(LedgerIntegrityError):
-        ProductionControlHarness.load(path, capabilities)
+        ProductionControlHarness.load(path, capabilities, {actor.actor_id: actor})
 
 
 def test_concurrent_same_version_approvals_commit_exactly_one_batch(
@@ -1026,7 +1307,7 @@ def test_concurrent_same_version_approvals_commit_exactly_one_batch(
     actor: ActorIdentity,
     capabilities: dict[str, set[str]],
 ) -> None:
-    harness = ProductionControlHarness(scope, capabilities)
+    harness = ProductionControlHarness(scope, capabilities, {actor.actor_id: actor})
     constraint = ReferenceConstraint(identity=identity(scope, "c1"), constraint_type="story", rule="fixed")
     revision = MissionRevision(identity=identity(scope, "mr1"), objective="test", reference_constraint_refs=(exact_ref("reference_constraint", constraint),))
     mission = Mission(identity=identity(scope, "m1"), head_revision_ref=exact_ref("mission_revision", revision))

@@ -63,7 +63,7 @@ The gateway contract is fail closed:
 - same key with a different canonical intent is an idempotency conflict;
 - receipt lookup occurs before CAS so a successful stale replay is safe;
 - a new command with a stale `expected_version` is rejected;
-- foreign org, project, actor, capability, nested exact ref, or unresolved
+- foreign org, project, complete ActorIdentity/authority, capability, nested exact ref, or unresolved
   causation is rejected;
 - new writes against known locked, retired, cancelled, or terminal control
   objects are rejected, while exact replay of a prior success remains valid;
@@ -91,8 +91,10 @@ one receipt
 one matching outbox record per event
 ```
 
-The decision's exact task refs must equal the task batch. Two tasks, duplicate
-stable IDs, foreign refs, budget mismatch, stale CAS, or any staged failure
+The decision's exact task refs must equal the task batch, and every task's
+stable ID, boundary, capability, and dependency graph must equal its immutable
+PlanRevision specification. Two tasks, duplicate stable IDs, foreign refs,
+budget mismatch, stale CAS, or any staged failure
 rejects the entire batch. No projection may expose an approved plan without
 all approved tasks.
 
@@ -124,7 +126,8 @@ Cancel preserves all attempts, costs, artifacts, receipts, and provenance.
 options, exact impact refs, and a timezone-qualified deadline. Resuming
 requires an exact HumanDecision selecting an offered option and acknowledging
 impact. `blocked` requires an owner and exact clearance evidence; returning to
-queued or running requires explicit clearance evidence.
+queued or running requires the exact evidence declared by the active Blocker,
+with control-domain evidence resolving in the ledger.
 
 ## Budget and provider gate
 
@@ -133,7 +136,8 @@ maximum budget. Cost records remain separate as `estimated`, `committed`, or
 `actual`. Stable cost identity and charge fingerprint prevent a retry or a new
 command key from recording the same charge twice.
 
-ProviderGateDecision is allowed only when all of these are true:
+ProviderGateDecision is allowed only when the command carries a matching exact
+BudgetAuthorization and all of these are true:
 
 ```text
 capability authorization
@@ -185,7 +189,10 @@ On load it rejects:
 - foreign scope, sequence gaps, reorder, duplicate event ID, or broken hash;
 - batch truncation, event deletion, or receipt/event membership mismatch;
 - tail count/hash/digest mismatch;
-- missing, duplicate, foreign, or payload-divergent outbox records;
+- missing, reordered, duplicate, foreign, identity/type-divergent, or
+  payload-divergent outbox records;
+- receipt scope, version, semantic/command digest, deterministic receipt ID,
+  result-ref, or batch-membership mismatch;
 - a projection digest that does not rebuild from zero;
 - any non-zero provider dispatch count.
 
@@ -221,7 +228,9 @@ The contract does not create a second continuity, review, or delivery truth.
 Artifact writeback is command/event-only. UI code and external agents may not
 write the episode aggregate directly. Every registration and writeback carries
 exact PlanTask, ProductionRun, and RunAttempt provenance plus a safe artifact
-ID and digest.
+ID and digest. The Task must own the Run, the Attempt must belong to that Run,
+and final writeback provenance must exactly equal candidate-registration
+provenance. CostEntry enforces the same Run-to-Attempt ownership.
 
 The adapter interface has two modes:
 
@@ -239,7 +248,9 @@ For continuity, the adapter must preserve the frozen complete predicted
 identity, name its exact parent, and re-enter `candidate + needs_review` under
 the existing service rules.
 
-Protected refs are explicit. In the conformance scenario, a Shot7 writeback or
+Protected refs are explicit. ImpactAssessment cannot mark a protected ref as
+affected and must include every protected ref in its preserved set. In the
+conformance scenario, a Shot7 writeback or
 typed successor must prove that Shot8's exact ref and history are unchanged.
 The adapter may emit the existing exact output ref in its receipt/outbox result
 but may not duplicate AgentProposal, ReviewDecision, DeliveryVersion, or
