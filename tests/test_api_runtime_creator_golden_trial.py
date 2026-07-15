@@ -93,6 +93,13 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     assert payload["receipt"]["episode_writeback"]["status"] == "written"
     assert payload["receipt"]["cost_receipt"]["receipt_kind"] == "synthetic_admission"
     assert payload["receipt"]["cost_receipt"]["actual_cost"]["status"] == "unknown_unverified"
+    boundary = payload["receipt"]["production_control_boundary"]
+    assert boundary["trial_ledger_role"] == "discardable_experiment_adapter_cache"
+    assert boundary["creates_production_control_objects"] is False
+    assert boundary["created_production_control_run_id"] is None
+    assert boundary["created_production_control_attempt_id"] is None
+    assert boundary["created_production_control_cost_receipt_id"] is None
+    assert payload["receipt"]["cost_receipt"]["production_control_boundary"] == boundary
     assert payload["trial"]["adapter_authority"]["trial_ledger_role"] == "discardable_experiment_adapter_cache"
     assert payload["trial"]["adapter_authority"]["creates_production_control_objects"] is False
     assert "cost" + "_receipts" not in payload["trial"]
@@ -204,6 +211,8 @@ def test_creator_golden_trial_uses_stored_unit_estimate_and_blocks_lowball_dispa
     assert second.status_code == 200, second.text
     assert second.json()["provider_calls_started"] is False
     assert second.json()["receipt"]["reason"] == "budget_ceiling"
+    assert second.json()["receipt"]["production_control_boundary"]["creates_production_control_objects"] is False
+    assert second.json()["receipt"]["production_control_boundary"]["created_production_control_run_id"] is None
     assert calls == ["shot-001"]
 
 

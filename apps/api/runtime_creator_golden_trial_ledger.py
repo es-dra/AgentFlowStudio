@@ -234,6 +234,19 @@ def cost_receipt(
         },
         "actual_cost_claimed": actual_cost_claimed,
         "actual_provider_billing_verified": False,
+        "production_control_boundary": production_control_boundary(),
+    }
+
+
+def production_control_boundary() -> dict[str, Any]:
+    return {
+        "trial_ledger_role": "discardable_experiment_adapter_cache",
+        "authoritative_control_source": "production-control",
+        "creates_production_control_objects": False,
+        "created_production_control_run_id": None,
+        "created_production_control_attempt_id": None,
+        "created_production_control_cost_receipt_id": None,
+        "production_control_writeback_status": "not_written_by_adapter_cache",
     }
 
 

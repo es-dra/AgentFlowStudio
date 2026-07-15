@@ -10,6 +10,7 @@ from apps.api.runtime_creator_golden_trial_ledger import (
     load_or_init_ledger,
     mark_idempotency_pending,
     money,
+    production_control_boundary,
     reserved_cost_amount,
     trial_lock,
     write_ledger,
@@ -54,6 +55,7 @@ def record_budget_block(
             "reason": "budget_ceiling",
             "provider_calls_started": False,
             "estimated_cost": event["estimated_cost"],
+            "production_control_boundary": production_control_boundary(),
         },
     )
     complete_idempotency(ledger, idempotency_key, body_fingerprint, response)
@@ -206,6 +208,7 @@ def complete_dispatch(
                 "provider_calls_started": bool(dispatch_result.get("provider_calls_started")),
                 "episode_writeback": episode_writeback,
                 "control_writeback_status": "not_written_by_adapter_cache",
+                "production_control_boundary": production_control_boundary(),
                 "cost_receipt": cost_receipt(
                     provider_attempt_id,
                     status="recorded" if dispatch_result.get("provider_calls_started") else "estimated",
