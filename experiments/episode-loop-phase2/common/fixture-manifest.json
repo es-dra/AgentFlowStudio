@@ -18,6 +18,10 @@
     "path": "docs/AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md",
     "sha256": "c76d6d7e2fefd7169c83472f897efa9ac0108f14dfc7d4345a5b157e7b0112f3"
   },
+  "evaluation_result": {
+    "path": "docs/AFS_EPISODE_LOOP_PHASE2_EVALUATION_RESULT.md",
+    "sha256": "5a216402f0b59b57370f39b2826b54cfdc389b0a5c759de096e3f524ee1c6d6d"
+  },
   "fixtures": [
     {
       "path": "examples/representative_episode/episode_package.json",

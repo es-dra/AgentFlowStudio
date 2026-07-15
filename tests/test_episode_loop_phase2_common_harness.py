@@ -36,6 +36,7 @@ def test_manifest_freezes_contract_research_protocol_and_fixtures() -> None:
         manifest["domain_contract_artifact"],
         manifest["evidence_matrix"],
         manifest["evaluation_protocol"],
+        manifest["evaluation_result"],
         *manifest["fixtures"],
     ):
         path = ROOT / entry["path"]
@@ -165,6 +166,32 @@ def test_protocol_names_exact_heads_without_reopening_the_structure_vote() -> No
         assert revision in protocol
     assert "Hybrid shell and Storyboard-centered workspace" in protocol
     assert "must not output a winner" in protocol
+
+
+def test_evaluation_result_records_per_variant_validity_without_a_new_vote() -> None:
+    result = (ROOT / "docs" / "AFS_EPISODE_LOOP_PHASE2_EVALUATION_RESULT.md").read_text(
+        encoding="utf-8"
+    )
+    compact_result = " ".join(result.split())
+
+    for revision in (
+        "a704a1cc1ba69e745d185ea3098209eaa419bee5",
+        "9edd03f68e9e5c77819985e2ffc4605fc75d4332",
+        "3346f5d4813d2e87a0abf113e73f9757a9eb5531",
+    ):
+        assert revision in result
+    assert "A | Guided repair" in result
+    assert "B | Storyboard" in result
+    assert "C | Hybrid" in result
+    assert result.count("`evidence_valid`") == 1
+    assert result.count("`evidence_invalid`") == 2
+    assert "Browser is not available: iab" in result
+    assert "Playwright fallback" in result
+    assert "Initial active Shot 7 did not match next Shot 6" in compact_result
+    assert "mutation succeeded before Shot 6/7 completion" in compact_result
+    assert "did not explicitly state the authoritative right-shoulder lamp-buckle fact" in compact_result
+    assert "does not select a winner" in compact_result
+    assert "not a new architecture vote or human acceptance" in compact_result
 
 
 def test_neutral_tokens_provide_accessibility_basics_without_layout_choice() -> None:
