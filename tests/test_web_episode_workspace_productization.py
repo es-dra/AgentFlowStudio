@@ -305,9 +305,13 @@ def test_pending_command_retention_distinguishes_persistence_from_command_reject
         """
         console.log(JSON.stringify({
           persistenceConflict: subject.retainPendingCommandAfterFailure("stale", false),
-          uncertainNetwork: subject.retainPendingCommandAfterFailure("server", true),
-          staleCommand: subject.retainPendingCommandAfterFailure("stale", true),
-          invalidCommand: subject.retainPendingCommandAfterFailure("invalid", true),
+          persistenceInvalid: subject.retainPendingCommandAfterFailure("invalid", false),
+          persistenceServer: subject.retainPendingCommandAfterFailure("server", false),
+          dispatchedServer: subject.retainPendingCommandAfterFailure("server", true),
+          dispatchedAuth: subject.retainPendingCommandAfterFailure("auth", true),
+          dispatchedStale: subject.retainPendingCommandAfterFailure("stale", true),
+          dispatchedInvalid: subject.retainPendingCommandAfterFailure("invalid", true),
+          dispatchedNotFound: subject.retainPendingCommandAfterFailure("not_found", true),
         }));
         """,
         {},
@@ -315,9 +319,51 @@ def test_pending_command_retention_distinguishes_persistence_from_command_reject
 
     assert result == {
         "persistenceConflict": True,
-        "uncertainNetwork": True,
-        "staleCommand": False,
-        "invalidCommand": False,
+        "persistenceInvalid": False,
+        "persistenceServer": False,
+        "dispatchedServer": True,
+        "dispatchedAuth": True,
+        "dispatchedStale": False,
+        "dispatchedInvalid": False,
+        "dispatchedNotFound": False,
+    }
+
+
+def test_pre_dispatch_invalid_envelope_clears_pending_and_unblocks_next_command() -> None:
+    result = _run(
+        "state.mjs",
+        """
+        const model = subject.buildWorkspaceModel(payload.projection);
+        const pending = {
+          episode_ref: model.episode.ref,
+          pending_command: {
+            idempotency_key: "invalid-before-dispatch",
+            payload: { action: "shot.review", expected_aggregate_version: 1 },
+          },
+        };
+        let ui = subject.createInitialUiState(model, pending);
+        const retained = subject.retainPendingCommandAfterFailure("invalid", false);
+        if (!retained) {
+          ui = subject.updateUiRecovery(ui, {
+            pendingIdempotencyKey: "",
+            pendingCommand: null,
+          });
+        }
+        console.log(JSON.stringify({
+          retained,
+          pendingKey: ui.pendingIdempotencyKey,
+          pendingCommand: ui.pendingCommand,
+          nextCommandUnblocked: !ui.pendingCommand,
+        }));
+        """,
+        {"projection": projection()},
+    )
+
+    assert result == {
+        "retained": False,
+        "pendingKey": "",
+        "pendingCommand": None,
+        "nextCommandUnblocked": True,
     }
 
 

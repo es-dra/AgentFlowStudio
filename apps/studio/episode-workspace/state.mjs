@@ -133,8 +133,10 @@ export function focusIfAvailable(target, options = { preventScroll: true }) {
 }
 
 export function retainPendingCommandAfterFailure(kind, commandDispatched = true) {
-  if (!commandDispatched) return true;
-  return !["stale", "invalid"].includes(String(kind || ""));
+  const failure = String(kind || "");
+  if (failure === "invalid") return false;
+  if (failure === "stale") return !commandDispatched;
+  return commandDispatched && ["server", "auth"].includes(failure);
 }
 
 export function episodeWorkspaceState(model, state) {
