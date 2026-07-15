@@ -192,10 +192,14 @@ def derive_prior_shot_blockers(
     _require_scope(aggregate, scope)
     target = _latest_shot(aggregate, target_shot_ref)
     target_scene = _scene(aggregate, target.scene_ref)
+    episode_shots = _latest_episode_shots(
+        aggregate,
+        episode_ref=target_scene.episode_ref,
+    )
+    _require_unique_episode_sequences(episode_shots)
     blockers: list[PriorShotBlocker] = []
-    for shot in _latest_shots(aggregate):
-        scene = _scene(aggregate, shot.scene_ref)
-        if scene.episode_ref != target_scene.episode_ref or shot.sequence >= target.sequence:
+    for shot in episode_shots:
+        if shot.sequence >= target.sequence:
             continue
         if (
             shot.lifecycle_state in ("approved", "locked")
@@ -368,6 +372,32 @@ def _latest_shots(
         if current is None or shot.revision > current.revision:
             latest[shot.entity_id] = shot
     return tuple(latest.values())
+
+
+def _latest_episode_shots(
+    aggregate: ProductionProjectAggregate,
+    *,
+    episode_ref: EntityVersionRef,
+) -> tuple[ShotVersion, ...]:
+    return tuple(
+        shot
+        for shot in _latest_shots(aggregate)
+        if _scene(aggregate, shot.scene_ref).episode_ref == episode_ref
+    )
+
+
+def _require_unique_episode_sequences(shots: tuple[ShotVersion, ...]) -> None:
+    seen: dict[int, EntityVersionRef] = {}
+    for shot in shots:
+        existing = seen.get(shot.sequence)
+        if existing is not None:
+            raise CreatorWorkflowStateError(
+                "latest shots in one episode must have unique sequence values; "
+                f"sequence {shot.sequence} is shared by "
+                f"{existing.entity_id}:{existing.version_id} and "
+                f"{shot.entity_id}:{shot.version_id}"
+            )
+        seen[shot.sequence] = shot.as_ref()
 
 
 def _require_unused_ref(

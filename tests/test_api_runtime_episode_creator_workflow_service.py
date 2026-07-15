@@ -506,6 +506,85 @@ def test_sixty_shot_blocker_order_is_deterministic() -> None:
     assert first == second
 
 
+def test_duplicate_later_sequence_blocks_derivation_for_entire_target_episode() -> None:
+    aggregate = build_episode()
+    template = latest_shot(aggregate, "shot-11")
+    duplicate_a = template.model_copy(
+        update={
+            "entity_id": "shot-12-a",
+            "version_id": "shot-12-a.v1",
+            "revision": 1,
+            "parent_version_id": None,
+            "sequence": 12,
+            "lifecycle_state": "approved",
+            "review_state": "approved",
+            "content_digest": digest("shot-12-a"),
+        }
+    )
+    duplicate_b = duplicate_a.model_copy(
+        update={
+            "entity_id": "shot-12-b",
+            "version_id": "shot-12-b.v1",
+            "content_digest": digest("shot-12-b"),
+        }
+    )
+    adversarial = ProductionProjectAggregate.model_validate(
+        {
+            **aggregate.model_dump(mode="python"),
+            "shots": (*aggregate.shots, duplicate_a, duplicate_b),
+        }
+    )
+    target = latest_shot(adversarial, "shot-11")
+
+    with pytest.raises(CreatorWorkflowStateError, match="unique sequence.*12"):
+        derive_prior_shot_blockers(
+            adversarial,
+            scope=adversarial.scope,
+            target_shot_ref=ref(target),
+        )
+
+
+def test_duplicate_lower_sequence_blocks_selection_without_appending_fact() -> None:
+    aggregate = build_episode()
+    approved = approve_shot(aggregate, "shot-6", SHOT6_APPROVAL_TIME)
+    approved = approve_shot(approved, "shot-7", SHOT7_APPROVAL_TIME)
+    shot_8 = latest_shot(approved, "shot-8")
+    duplicate_lower = shot_8.model_copy(
+        update={
+            "entity_id": "shot-7-shadow",
+            "version_id": "shot-7-shadow.v1",
+            "revision": 1,
+            "parent_version_id": None,
+            "sequence": 7,
+            "content_digest": digest("shot-7-shadow"),
+        }
+    )
+    adversarial = ProductionProjectAggregate.model_validate(
+        {
+            **approved.model_dump(mode="python"),
+            "shots": (*approved.shots, duplicate_lower),
+        }
+    )
+    before = adversarial.model_dump_json()
+    before_selections = adversarial.selections
+
+    with pytest.raises(CreatorWorkflowStateError, match="unique sequence.*7"):
+        select_shot_candidate_if_ready(
+            adversarial,
+            scope=adversarial.scope,
+            expected_aggregate_version=3,
+            target_shot_ref=ref(latest_shot(adversarial, "shot-11")),
+            candidate_ref=ref(adversarial.asset_candidates[0]),
+            purpose="image",
+            selection_entity_id="selection-should-not-exist",
+            selection_version_id="selection-should-not-exist.v1",
+            created_at=SELECTION_TIME,
+        )
+
+    assert adversarial.model_dump_json() == before
+    assert adversarial.selections == before_selections == ()
+
+
 def test_refresh_and_store_reload_preserve_workflow_facts(tmp_path) -> None:
     aggregate = build_episode()
     approved = approve_shot(aggregate, "shot-6", SHOT6_APPROVAL_TIME)
