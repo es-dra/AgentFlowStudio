@@ -9,7 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_episode_domain_contract import ProductionProjectAggregate
-from apps.api.runtime_episode_domain_routes import LOCAL_ACTOR_ID, LOCAL_ORG_ID
+from apps.api.runtime_episode_domain_routes import (
+    LOCAL_ACTOR_ID,
+    LOCAL_ORG_ID,
+    _reject_unsafe_projection,
+)
 from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore
 from apps.api.runtime_service import create_runtime_app
 
@@ -413,6 +417,26 @@ def test_integrity_failure_is_fail_closed_and_sanitized(tmp_path: Path, monkeypa
         ),
         ("azure-signed-url", "https://cdn.example/episode.png?sv=1&sig=secret"),
         ("token-url", "https://cdn.example/episode.png?access_token=secret"),
+        (
+            "embedded-windows-drive",
+            "Creator reopened C:/private/customer/secret.mov for review.",
+        ),
+        (
+            "embedded-windows-encoded",
+            "Creator reopened C%253A%255Cprivate%255Csecret.mov for review.",
+        ),
+        ("embedded-unc", r"Creator reopened \\server\share\secret.mov for review."),
+        ("embedded-posix", "Creator reopened /home/afs/private/secret.mov for review."),
+        ("embedded-file-uri", "Creator reopened file:///home/afs/secret.mov for review."),
+        (
+            "embedded-token-url",
+            "Creator reopened https://cdn.example/episode.png?access_token=secret for review.",
+        ),
+        (
+            "embedded-signed-url-encoded",
+            "Creator reopened https%253A%252F%252Fcdn.example%252Fepisode.png"
+            "%253FX-Amz-Signature%253Dsecret for review.",
+        ),
     ),
 )
 def test_unsafe_projection_matrix_is_rejected_and_never_returned(
@@ -451,6 +475,41 @@ def test_unsafe_projection_matrix_is_rejected_and_never_returned(
     assert failed_read.status_code == 500
     assert _error(failed_read) == "episode_aggregate_integrity_failed"
     assert unsafe_value not in failed_read.text
+
+
+@pytest.mark.parametrize(
+    "unsafe_value",
+    (
+        "Creator reopened C:/private/customer/secret.mov for review.",
+        r"Creator reopened C:\private\customer\secret.mov for review.",
+        r"Creator reopened \\server\share\secret.mov for review.",
+        "Creator reopened //server/share/secret.mov for review.",
+        "Creator reopened /opt/afs/private/secret.mov for review.",
+        "Creator reopened file:///home/afs/private/secret.mov for review.",
+        "Creator reopened https://cdn.example/item?X-Amz-Signature=secret for review.",
+        "Creator reopened https%253A%252F%252Fcdn.example%252Fitem"
+        "%253Faccess_token%253Dsecret for review.",
+    ),
+)
+def test_projection_sanitizer_scans_embedded_private_locations(unsafe_value: str) -> None:
+    with pytest.raises(ValueError, match="unsafe projection string"):
+        _reject_unsafe_projection({"note": unsafe_value})
+
+
+@pytest.mark.parametrize(
+    "safe_value",
+    (
+        "Creator reopened scene 7 for review.",
+        "Use assets/episode-001/preview.mp4?variant=small for review.",
+        "Use ./assets/episode-001/preview.mp4?variant=small for review.",
+        "Use https://cdn.example/episode.png?variant=small for review.",
+        "Use https://cdn.example/home/preview.mp4?variant=small for review.",
+        "Compare choices A/B before review.",
+        "Drive C: contains no shared path here.",
+    ),
+)
+def test_projection_sanitizer_preserves_safe_creator_text(safe_value: str) -> None:
+    _reject_unsafe_projection({"note": safe_value})
 
 
 def test_projection_safety_preserves_ordinary_text_and_relative_artifact_url(

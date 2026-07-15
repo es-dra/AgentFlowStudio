@@ -35,10 +35,26 @@ from apps.api.runtime_store import RuntimeStore
 LOCAL_ORG_ID = "local-runtime"
 LOCAL_ACTOR_ID = "local-creator"
 _SAFE_ID_RE = re.compile(SAFE_ID, re.ASCII)
-_WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
-_FILE_URI_RE = re.compile(r"^file:(?://|[\\/]|[A-Za-z]:[\\/])", re.IGNORECASE)
+_WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
+_UNC_PATH_RE = re.compile(
+    r"(?<![:\\/])(?:\\\\|//)[^\\/\s]+[\\/][^\s]+",
+)
+_POSIX_PRIVATE_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9._~:/-])"
+    r"/(?:home|Users|root|opt|var|tmp|private|mnt|srv|etc|run|test|data|workspace)"
+    r"(?:/|\\)",
+)
+_FILE_URI_RE = re.compile(
+    r"(?<![A-Za-z0-9+.-])file:(?://|[\\/]|[A-Za-z]:[\\/])",
+    re.IGNORECASE,
+)
 _URL_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
 _URL_HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$")
+_URL_CANDIDATE_RE = re.compile(
+    r"(?:[A-Za-z][A-Za-z0-9+.-]*://|//|(?:\.\.?/|/)?"
+    r"[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]{1,5})?/)"
+    r"[^\s<>\"']+"
+)
 _SIGNED_QUERY_KEYS = frozenset(
     {
         "access-token",
@@ -386,11 +402,11 @@ def _reject_unsafe_projection(value: Any) -> None:
         return
     decoded = _decoded_string(value).strip()
     if (
-        _WINDOWS_ABSOLUTE_PATH_RE.match(decoded)
-        or decoded.startswith("\\\\")
-        or decoded.startswith("//")
+        _WINDOWS_ABSOLUTE_PATH_RE.search(decoded)
+        or _UNC_PATH_RE.search(decoded)
         or decoded.startswith("/")
-        or _FILE_URI_RE.match(decoded)
+        or _POSIX_PRIVATE_ABSOLUTE_PATH_RE.search(decoded)
+        or _FILE_URI_RE.search(decoded)
         or _url_has_signed_credentials(decoded)
     ):
         raise ValueError("unsafe projection string")
@@ -407,17 +423,19 @@ def _decoded_string(value: str) -> str:
 
 
 def _url_has_signed_credentials(value: str) -> bool:
-    if "?" not in value:
-        return False
-    prefix, query = value.split("?", 1)
-    if not _looks_like_url(prefix):
-        return False
-    query = query.split("#", 1)[0]
-    for parameter in re.split(r"[&;]", query):
-        raw_key = parameter.split("=", 1)[0]
-        key = _decoded_string(raw_key).strip().casefold().replace("_", "-")
-        if key in _SIGNED_QUERY_KEYS:
-            return True
+    for match in _URL_CANDIDATE_RE.finditer(value):
+        candidate = match.group(0)
+        if "?" not in candidate:
+            continue
+        prefix, query = candidate.split("?", 1)
+        if not _looks_like_url(prefix):
+            continue
+        query = query.split("#", 1)[0]
+        for parameter in re.split(r"[&;]", query):
+            raw_key = parameter.split("=", 1)[0]
+            key = _decoded_string(raw_key).strip().casefold().replace("_", "-")
+            if key in _SIGNED_QUERY_KEYS:
+                return True
     return False
 
 
