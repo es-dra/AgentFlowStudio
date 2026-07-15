@@ -731,6 +731,7 @@ class ProductionControlHarness:
         if command.command_type == "plan.approve":
             decision = PlanApprovalDecision.model_validate(payload["decision"])
             tasks = [PlanTask.model_validate(value) for value in payload["tasks"]]
+            run_bundles = list(payload.get("runs") or [])
             if len(tasks) < 3:
                 raise StateConflictError("plan.approve requires at least three bounded tasks")
             task_refs = tuple(exact_ref("plan_task", task) for task in tasks)
@@ -762,7 +763,46 @@ class ProductionControlHarness:
                 raise AuthorizationError("approval exceeds exact budget admission")
             specs = [("PlanApproved", {"decision": decision.model_dump(mode="json")})]
             specs.extend(("TaskQueued", {"task": task.model_dump(mode="json")}) for task in tasks)
-            return specs, [exact_ref("plan_approval_decision", decision), *task_refs]
+            result_refs = [exact_ref("plan_approval_decision", decision), *task_refs]
+            if run_bundles:
+                if len(run_bundles) != len(tasks):
+                    raise StateConflictError("approval run batch must cover every approved task")
+                covered_task_refs: set[ExactObjectRef] = set()
+                for item in run_bundles:
+                    assignment = AgentAssignment.model_validate(item["assignment"])
+                    run = ProductionRun.model_validate(item["run"])
+                    attempt = RunAttempt.model_validate(item["attempt"])
+                    assignment_ref = exact_ref("agent_assignment", assignment)
+                    run_ref = exact_ref("production_run", run)
+                    attempt_ref = exact_ref("run_attempt", attempt)
+                    if (
+                        assignment.task_ref not in task_refs
+                        or run.task_ref != assignment.task_ref
+                        or run.assignment_ref != assignment_ref
+                        or attempt.run_ref != run_ref
+                        or attempt.attempt_number != 1
+                        or attempt.prior_attempt_ref is not None
+                        or run.latest_attempt_ref != attempt_ref
+                        or run.execution_state != "running"
+                    ):
+                        raise StateConflictError("approval run batch must start exact first attempts for approved tasks")
+                    if run.task_ref in covered_task_refs:
+                        raise StateConflictError("approval run batch cannot duplicate a task")
+                    covered_task_refs.add(run.task_ref)
+                    specs.append(
+                        (
+                            "RunStarted",
+                            {
+                                "assignment": assignment.model_dump(mode="json"),
+                                "run": run.model_dump(mode="json"),
+                                "attempt": attempt.model_dump(mode="json"),
+                            },
+                        )
+                    )
+                    result_refs.extend([run_ref, attempt_ref])
+                if covered_task_refs != set(task_refs):
+                    raise StateConflictError("approval run batch must match approved task refs")
+            return specs, result_refs
         if command.command_type == "run.start":
             assignment = AgentAssignment.model_validate(payload["assignment"])
             run = ProductionRun.model_validate(payload["run"])

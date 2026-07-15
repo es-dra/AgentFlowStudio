@@ -90,6 +90,29 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert "/workbench" not in index
 
 
+def test_studio_production_control_entry_is_linked_without_replacing_canvas() -> None:
+    production_control = STUDIO_ROOT / "production-control"
+    assert (production_control / "index.html").is_file()
+    assert (production_control / "app.mjs").is_file()
+    assert (production_control / "styles.css").is_file()
+
+    index = (production_control / "index.html").read_text(encoding="utf-8")
+    app = (production_control / "app.mjs").read_text(encoding="utf-8")
+    topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+
+    assert '<html lang="zh-CN">' in index
+    assert "/studio/production-control/" in topbar
+    assert 'href="/studio/"' in app
+    assert "画布" in app
+    assert "故事板 / 审核" in app
+    assert "提供方已关闭 · 没有 LLM 调用" in app
+    assert "strong-password-123" not in app
+    assert "getProductionControl()" in runtime_client
+    assert "recordProductionControlMission" in runtime_client
+    assert "approveProductionControlPlan" in runtime_client
+
+
 def test_package_exposes_frontend_js_syntax_check() -> None:
     package = json.loads(Path("package.json").read_text(encoding="utf-8"))
     script = Path("tools/check-web-js.mjs")
