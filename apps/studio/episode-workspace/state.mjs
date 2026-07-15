@@ -37,11 +37,10 @@ function assertProjection(payload) {
     if (!shotRefs.has(exactRefKey(shot.ref))) throw new Error("镜头展示数据与项目事实不一致。");
     if (!sceneRefs.has(exactRefKey(shot.scene_ref))) throw new Error("镜头场景引用不可用。");
   }
-  const nextRef = payload.workspace.next_action?.subject_ref;
-  if (!shotRefs.has(exactRefKey(nextRef))) throw new Error("建议下一步没有对应到有效镜头。");
-  const recovery = payload.workspace.recovery;
-  if (recovery?.active_shot_ref && !sameExactRef(recovery.active_shot_ref, nextRef)) {
-    throw new Error("恢复焦点与建议下一步不一致。");
+  const nextAction = payload.workspace.next_action;
+  const nextShotRef = nextAction?.shot_ref || nextAction?.subject_ref;
+  if (nextAction && !shotRefs.has(exactRefKey(nextShotRef))) {
+    throw new Error("建议下一步没有对应到有效镜头。");
   }
   return payload;
 }
@@ -73,17 +72,23 @@ export function buildWorkspaceModel(payload) {
   });
 }
 
-export function createInitialUiState(model) {
-  const nextShot = model.shots.find((shot) => sameExactRef(shot.ref, model.nextAction.subject_ref));
-  if (!nextShot) throw new Error("建议下一步的镜头不可用。");
-  const recoveredMode = MODES.includes(model.recovery?.mode) ? model.recovery.mode : "storyboard";
+export function createInitialUiState(model, savedState = null) {
+  const saved = savedState && sameExactRef(savedState.episode_ref, model.episode.ref) ? savedState : null;
+  const suggestedRef = model.nextAction?.shot_ref || model.nextAction?.subject_ref;
+  const suggestedShot = model.shots.find((shot) => sameExactRef(shot.ref, suggestedRef));
+  const savedShot = model.shots.find((shot) => sameExactRef(shot.ref, saved?.active_shot_ref));
+  const initialShot = savedShot || suggestedShot || model.shots[0] || null;
+  const recoveredMode = MODES.includes(saved?.mode) ? saved.mode : "storyboard";
   return Object.freeze({
     mode: recoveredMode,
-    activeShotKey: exactRefKey(nextShot.ref),
-    nextShotKey: exactRefKey(nextShot.ref),
+    activeShotKey: exactRefKey(initialShot?.ref),
+    nextShotKey: exactRefKey(suggestedShot?.ref),
     sceneFilterKey: "all",
     statusFilter: "all",
-    inspectorSection: "overview",
+    inspectorSection: String(saved?.inspector_section || "overview"),
+    focusedControl: String(saved?.focused_control || ""),
+    scrollTop: Math.max(0, Number(saved?.scroll_top || 0)),
+    pendingIdempotencyKey: String(saved?.pending_idempotency_key || ""),
   });
 }
 
@@ -111,6 +116,31 @@ export function activeShot(model, state) {
 
 export function nextShot(model, state) {
   return model.shots.find((shot) => exactRefKey(shot.ref) === state.nextShotKey) || null;
+}
+
+export function updateUiRecovery(state, patch = {}) {
+  return Object.freeze({ ...state, ...patch });
+}
+
+export function episodeWorkspaceState(model, state) {
+  const active = activeShot(model, state);
+  return {
+    schema_version: "afs_episode_workspace_ui.v0.1",
+    episode_ref: model.episode.ref,
+    active_shot_ref: active?.ref || null,
+    mode: state.mode,
+    focused_control: state.focusedControl || "",
+    inspector_section: state.inspectorSection || "overview",
+    scroll_top: Math.max(0, Number(state.scrollTop || 0)),
+    pending_idempotency_key: state.pendingIdempotencyKey || "",
+  };
+}
+
+export function mergeEpisodeWorkspaceState(studioState, model, state) {
+  return {
+    ...(studioState && typeof studioState === "object" ? studioState : {}),
+    episode_workspace: episodeWorkspaceState(model, state),
+  };
 }
 
 export function visibleShots(model, state) {

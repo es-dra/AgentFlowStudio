@@ -224,9 +224,12 @@ def test_projection_is_deterministic_and_uses_only_latest_exact_facts() -> None:
             "ref": candidate_v2.as_ref().model_dump(mode="json"),
             "label": "候选 1",
             "status_label": "候选",
-            "summary": None,
-            "artifact_present": True,
-            "job_state": "succeeded",
+                "summary": None,
+                "artifact_present": True,
+                "lifecycle_state": "draft",
+                "review_state": "not_requested",
+                "job_state": "succeeded",
+                "selectable": True,
         }
     ]
     assert first["workspace"]["truth"]["missing_asset_count"] == 0
@@ -331,9 +334,58 @@ def test_next_action_matches_a_real_enabled_adopt_action() -> None:
     assert adopt["enabled"] is True
     assert projection["workspace"]["next_action"] == {
         "action": "adopt_candidate",
-        "label": "为镜头 1 采用已审核候选",
+        "label": "为镜头 1 采用可用候选",
         "subject_ref": shot["ref"],
     }
+
+
+def test_selectable_needs_review_candidate_is_not_described_as_review_approved() -> None:
+    aggregate = _aggregate(shot_count=1)
+    candidate = AssetCandidateVersion(
+        **{
+            **_common(aggregate.scope, "candidate-available"),
+            "lifecycle_state": "candidate",
+            "review_state": "needs_review",
+        },
+        target_ref=aggregate.shots[0].as_ref(),
+        artifact_ref=SafeArtifactRef(
+            artifact_id="artifact-available",
+            artifact_type="image",
+            content_digest=_digest("artifact-available"),
+        ),
+        job_id="job-available",
+        job_state="succeeded",
+    )
+    projection = _projection(
+        ProductionProjectAggregate.model_validate(
+            {**aggregate.model_dump(mode="python"), "asset_candidates": (candidate,)}
+        )
+    )
+
+    assert projection["workspace"]["shots"][0]["candidates"][0]["selectable"] is True
+    assert projection["workspace"]["next_action"]["label"] == "为镜头 1 采用可用候选"
+    assert "已审核" not in projection["workspace"]["next_action"]["label"]
+
+
+def test_review_next_action_never_skips_an_exact_prior_shot_blocker() -> None:
+    aggregate = _aggregate(shot_count=2)
+    shots = tuple(
+        shot.model_copy(update={"lifecycle_state": "candidate", "review_state": "needs_review"})
+        for shot in aggregate.shots
+    )
+    projection = _projection(
+        ProductionProjectAggregate.model_validate(
+            {**aggregate.model_dump(mode="python"), "shots": shots}
+        )
+    )
+    first, second = projection["workspace"]["shots"]
+    second_review = next(
+        item for item in second["allowed_actions"] if item["action"] == "review_shot"
+    )
+
+    assert second_review["enabled"] is False
+    assert second_review["blocked_by"] == [first["ref"]]
+    assert projection["workspace"]["next_action"]["subject_ref"] == first["ref"]
 
 
 def test_stale_episode_ref_and_ambiguous_sequence_fail_closed() -> None:

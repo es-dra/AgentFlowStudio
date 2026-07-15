@@ -79,13 +79,16 @@ function isLocalHost(hostname) {
   return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function requestJson(route, { method = "GET", payload = null, meta = null } = {}) {
+async function requestJson(route, { method = "GET", payload = null, meta = null, headers: extraHeaders = null } = {}) {
   const requestMeta = buildRequestMeta(route, method, payload, meta);
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
   headers["X-Client-Request-ID"] = requestMeta.client_request_id;
   if (requestMeta.user_action) headers["X-User-Action"] = requestMeta.user_action;
   if (requestMeta.node_id) headers["X-Studio-Node-ID"] = requestMeta.node_id;
   if (requestMeta.node_type) headers["X-Studio-Node-Type"] = requestMeta.node_type;
+  for (const [name, value] of Object.entries(extraHeaders || {})) {
+    if (value != null && String(value).trim()) headers[name] = String(value);
+  }
   const token = authToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
@@ -639,6 +642,18 @@ export function createRuntimeClient(projectId = "studio-local-001") {
       const payload = { state };
       if (expectedVersion) payload.expected_version = expectedVersion;
       return requestJson(`/projects/${encoded}/studio-state`, { method: "PUT", payload });
+    },
+    loadEpisodeWorkspace(episodeId, episodeVersionId) {
+      const episode = encodeURIComponent(episodeId);
+      const version = encodeURIComponent(episodeVersionId);
+      return requestJson(`/projects/${encoded}/episodes/${episode}/versions/${version}/workspace`);
+    },
+    executeEpisodeCommand(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/episode-production-aggregate/commands`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
     },
     spriteChat(payload) {
       return requestJson(`/projects/${encoded}/sprite/chat`, { method: "POST", payload });

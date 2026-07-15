@@ -57,6 +57,7 @@ def sanitize_studio_state(value: dict[str, Any], *, project_id: str | None = Non
             text=_text,
             preview_url=safe_preview_url,
         ),
+        "episode_workspace": _episode_workspace(value.get("episode_workspace")),
         "production": _production(value.get("production")),
     }
     _reject_forbidden(sanitized)
@@ -155,6 +156,50 @@ def _production(value: Any) -> dict[str, Any]:
     # Production authority is reconstructed from the authenticated project ledger
     # by the route. A Studio snapshot never persists client-supplied authority.
     return {}
+
+
+def _episode_workspace(value: Any) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    if not data:
+        return {}
+    mode = _text(data.get("mode"), "storyboard", 24)
+    if mode not in {"storyboard", "review", "delivery"}:
+        mode = "storyboard"
+    return {
+        "schema_version": "afs_episode_workspace_ui.v0.1",
+        "episode_ref": _exact_ref(data.get("episode_ref"), "episode"),
+        "active_shot_ref": _exact_ref(data.get("active_shot_ref"), "shot"),
+        "mode": mode,
+        "focused_control": _text(data.get("focused_control"), "", 120),
+        "inspector_section": _text(data.get("inspector_section"), "overview", 80),
+        "scroll_top": max(0, _number(data.get("scroll_top"), 0)),
+        "pending_idempotency_key": _safe_identity(
+            data.get("pending_idempotency_key"), allow_empty=True
+        ),
+    }
+
+
+def _exact_ref(value: Any, expected_type: str) -> dict[str, str] | None:
+    data = value if isinstance(value, dict) else {}
+    if not data:
+        return None
+    entity_type = _text(data.get("entity_type"), "", 40)
+    if entity_type != expected_type:
+        raise ValueError("episode workspace exact reference has an invalid entity type")
+    return {
+        "entity_type": entity_type,
+        "entity_id": _safe_identity(data.get("entity_id")),
+        "version_id": _safe_identity(data.get("version_id")),
+    }
+
+
+def _safe_identity(value: Any, *, allow_empty: bool = False) -> str:
+    raw = str(value or "").strip()
+    if not raw and allow_empty:
+        return ""
+    if not raw or safe_id(raw) != raw:
+        raise ValueError("episode workspace identity is invalid")
+    return raw
 
 
 def _reject_forbidden(value: Any) -> None:

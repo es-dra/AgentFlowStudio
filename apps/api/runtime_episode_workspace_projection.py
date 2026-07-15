@@ -367,8 +367,8 @@ def _shot_projection(
     proposal_rows = [_proposal_projection(item) for item in relevant_proposals]
     selectable = any(
         item.artifact_ref is not None
-        and item.lifecycle_state in ("approved", "locked")
-        and item.review_state == "approved"
+        and item.lifecycle_state not in ("rejected", "retired")
+        and item.job_state not in ("queued", "running", "paused", "failed", "cancelled")
         for item in candidates
     )
     mutation_blocked = bool(blockers) or shot.lifecycle_state in ("locked", "retired")
@@ -423,7 +423,15 @@ def _shot_projection(
                 "status_label": _candidate_status(item),
                 "summary": None,
                 "artifact_present": item.artifact_ref is not None,
+                "lifecycle_state": item.lifecycle_state,
+                "review_state": item.review_state,
                 "job_state": item.job_state,
+                "selectable": (
+                    item.artifact_ref is not None
+                    and item.lifecycle_state not in ("rejected", "retired")
+                    and item.job_state
+                    not in ("queued", "running", "paused", "failed", "cancelled")
+                ),
             }
             for index, item in enumerate(candidates, start=1)
         ],
@@ -443,14 +451,74 @@ def _shot_projection(
         "allowed_actions": [
             {"action": "inspect", "enabled": True, "reason": "", "blocked_by": []},
             {
-                "action": "adopt_candidate",
-                "enabled": selectable and not mutation_blocked,
+                "action": "review_shot",
+                "enabled": (
+                    not blockers
+                    and shot.review_state == "needs_review"
+                    and shot.lifecycle_state not in ("locked", "retired")
+                ),
                 "reason": (
                     "请先完成前序镜头审核。"
                     if blockers
-                    else "当前没有已审核且带有素材的候选。"
+                    else "当前镜头不需要审核。"
+                ),
+                "blocked_by": [item["shot_ref"] for item in blockers],
+            },
+            {
+                "action": "reassign_scene",
+                "enabled": shot.lifecycle_state not in ("locked", "retired"),
+                "reason": (
+                    "已锁定或已归档镜头不能更换场景。"
+                    if shot.lifecycle_state in ("locked", "retired")
+                    else ""
+                ),
+                "blocked_by": [],
+            },
+            {
+                "action": "adopt_candidate",
+                "enabled": selectable and not mutation_blocked and not active_selections,
+                "reason": (
+                    "请先完成前序镜头审核。"
+                    if blockers
+                    else "当前镜头已有有效选版，请先审核、锁定或重新打开该选版。"
+                    if active_selections
+                    else "当前没有带安全素材且状态可选的候选。"
                     if not selectable
                     else "当前镜头状态不允许采用候选。"
+                    if mutation_blocked
+                    else ""
+                ),
+                "blocked_by": [item["shot_ref"] for item in blockers],
+            },
+            {
+                "action": "review_selection",
+                "enabled": any(
+                    item.lifecycle_state == "candidate"
+                    and item.review_state == "needs_review"
+                    for item in active_selections
+                ),
+                "reason": "当前没有待审核的选版。",
+                "blocked_by": [],
+            },
+            {
+                "action": "lock_selection",
+                "enabled": any(
+                    item.lifecycle_state == "approved"
+                    and item.review_state == "approved"
+                    for item in active_selections
+                ),
+                "reason": "请先批准当前选版。",
+                "blocked_by": [],
+            },
+            {
+                "action": "apply_continuity",
+                "enabled": bool(continuity) and not mutation_blocked,
+                "reason": (
+                    "请先完成前序镜头审核。"
+                    if blockers
+                    else "当前镜头没有可修正的连续性事实。"
+                    if not continuity
+                    else "当前镜头状态不允许连续性修正。"
                     if mutation_blocked
                     else ""
                 ),
@@ -509,20 +577,59 @@ def _next_action(
     rows: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     for shot, row in zip(shots, rows, strict=True):
-        adopt = next(
+        action = next(
             (
                 item
                 for item in row["allowed_actions"]
-                if item["action"] == "adopt_candidate"
+                if item["action"] == "review_shot"
             ),
             None,
         )
-        if adopt is not None and adopt["enabled"] is True:
+        if action is not None and action["enabled"] is True:
             return {
-                "action": "adopt_candidate",
-                "label": f"为镜头 {shot.sequence} 采用已审核候选",
+                "action": "review_shot",
+                "label": f"审核镜头 {shot.sequence}",
                 "subject_ref": _ref(shot.as_ref()),
             }
+    for shot, row in zip(shots, rows, strict=True):
+        action = next(
+            (item for item in row["allowed_actions"] if item["action"] == "adopt_candidate"),
+            None,
+        )
+        if action is not None and action["enabled"] is True:
+            return {
+                "action": "adopt_candidate",
+                "label": f"为镜头 {shot.sequence} 采用可用候选",
+                "subject_ref": _ref(shot.as_ref()),
+            }
+    for action_name, label in (
+        ("review_selection", "审核镜头 {sequence} 的选版"),
+        ("lock_selection", "锁定镜头 {sequence} 的选版"),
+    ):
+        for shot, row in zip(shots, rows, strict=True):
+            action = next(
+                (item for item in row["allowed_actions"] if item["action"] == action_name),
+                None,
+            )
+            if action is not None and action["enabled"] is True:
+                selection = next(
+                    item
+                    for item in reversed(row["selections"])
+                    if (
+                        action_name == "review_selection"
+                        and item["lifecycle_state"] == "candidate"
+                    )
+                    or (
+                        action_name == "lock_selection"
+                        and item["lifecycle_state"] == "approved"
+                    )
+                )
+                return {
+                    "action": action_name,
+                    "label": label.format(sequence=shot.sequence),
+                    "subject_ref": selection["ref"],
+                    "shot_ref": _ref(shot.as_ref()),
+                }
     return None
 
 
