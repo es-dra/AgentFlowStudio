@@ -416,6 +416,56 @@ textarea {
   gap: 12px;
 }
 
+.trial-surface {
+  display: grid;
+  gap: 18px;
+}
+
+.trial-grid,
+.shot-trial-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trial-grid article,
+.shot-trial-list article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.trial-grid span,
+.shot-trial-list span,
+.trial-grid small,
+.shot-trial-list small {
+  display: block;
+  color: var(--muted);
+}
+
+.trial-grid strong,
+.shot-trial-list strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 18px;
+}
+
+.trial-nonclaims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trial-nonclaims span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 12px;
+}
+
 .artifact-list article,
 .review-grid article,
 .agent-rail section {
@@ -566,7 +616,7 @@ dd {
   }
 
   .tabs {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .tabs button {
@@ -578,6 +628,8 @@ dd {
   .overview-band,
   .constraint-grid,
   .form-actions,
+  .trial-grid,
+  .shot-trial-list,
   .review-grid,
   .agent-rail {
     grid-template-columns: 1fr;

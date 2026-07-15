@@ -658,6 +658,30 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     getProductionControl() {
       return requestJson(`/projects/${encoded}/production-control`);
     },
+    getCreatorGoldenTrial() {
+      return requestJson(`/projects/${encoded}/creator-golden-trial`);
+    },
+    recordCreatorGoldenTrialMission(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/creator-golden-trial/mission`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    approveCreatorGoldenTrial(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/creator-golden-trial/approve`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    dispatchCreatorGoldenTrialNext(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/creator-golden-trial/dispatch-next`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
     recordProductionControlMission(payload, idempotencyKey) {
       return requestJson(`/projects/${encoded}/production-control/mission`, {
         method: "POST",
