@@ -13,11 +13,11 @@ let notice = "";
 let activeTab = params.get("view") || "mission";
 
 const tabs = [
-  ["mission", "使命"],
+  ["mission", "目标"],
   ["plan", "计划"],
-  ["cockpit", "驾驶舱"],
-  ["artifacts", "产物"],
-  ["review", "审核"],
+  ["cockpit", "制作"],
+  ["artifacts", "素材"],
+  ["review", "审片"],
 ];
 
 function escapeHtml(value = "") {
@@ -55,7 +55,7 @@ function statusLabel(value) {
     recorded: "已记录",
     proposed: "待批准",
     approved: "已批准",
-    running: "运行中",
+    running: "进行中",
     queued: "排队",
     "waiting-human": "等待人工",
     retrying: "重试中",
@@ -81,10 +81,10 @@ function toneForRun(run) {
 function renderShell(content) {
   app.innerHTML = `<div class="pc-shell">
     <header class="pc-topbar">
-      <a class="brand" href="/studio/">${icon("grid", 18)}<span>AFS Studio</span></a>
+      <a class="brand" href="/studio/">${icon("grid", 18)}<span>智能制片中枢</span></a>
       <nav class="surface-links" aria-label="Studio routes">
         <a href="/studio/">画布</a>
-        <a href="${escapeHtml(control?.workspace_entry?.href || "#")}" ${control?.version ? "" : "aria-disabled=\"true\""}>故事板 / 审核</a>
+        <a href="${escapeHtml(control?.workspace_entry?.href || "#")}" ${control?.version ? "" : "aria-disabled=\"true\""}>故事板 / 审片</a>
       </nav>
       <div class="session">${user ? `<span>${escapeHtml(user.display_name || user.email || "账号")}</span><button type="button" data-action="logout">${icon("user", 15)}退出</button>` : ""}</div>
     </header>
@@ -93,7 +93,7 @@ function renderShell(content) {
   bindGlobal();
 }
 
-function renderLoading(message = "正在读取生产控制事实…") {
+function renderLoading(message = "正在读取项目记录…") {
   renderShell(`<main class="state-screen"><div class="mark">${icon("bolt", 30)}</div><h1>${escapeHtml(message)}</h1></main>`);
 }
 
@@ -103,7 +103,7 @@ function renderAuth(status = {}) {
     : "";
   renderShell(`<main class="auth-grid">
     <section class="auth-panel">
-      <h1>登录生产控制</h1>
+      <h1>登录制片工作台</h1>
       <form data-form="login">
         <label>邮箱<input name="email" type="email" autocomplete="email" required /></label>
         <label>密码<input name="password" type="password" autocomplete="current-password" required /></label>
@@ -128,9 +128,9 @@ function renderAuth(status = {}) {
 function renderProjectSetup() {
   renderShell(`<main class="state-screen project-setup">
     <div class="mark">${icon("folder", 28)}</div>
-    <h1>新建生产控制项目</h1>
+    <h1>新建一集制作项目</h1>
     <form data-form="project">
-      <label>项目名称<input name="goal" value="AI-native production control vertical slice" maxlength="120" required /></label>
+      <label>项目名称<input name="goal" value="第一集制作计划" maxlength="120" required /></label>
       <button type="submit" class="primary">${icon("plus", 16)}创建项目</button>
     </form>
   </main>`);
@@ -147,14 +147,14 @@ function renderApp() {
     <aside class="pc-sidebar">
       <div class="pc-title">
         <span class="mark">${icon("bolt", 22)}</span>
-        <div><strong>生产控制</strong><small>${statusLabel(control.plan.status)}</small></div>
+        <div><strong>制片工作台</strong><small>${statusLabel(control.plan.status)}</small></div>
       </div>
       <nav class="tabs">${tabs.map(([key, label]) => `<button type="button" data-tab="${key}" aria-current="${activeTab === key ? "page" : "false"}">${label}</button>`).join("")}</nav>
       <div class="ledger-box">
-        <span>事件账本</span>
+        <span>项目记录</span>
         <strong>v${control.version}</strong>
-        <small>${control.event_count} 个事件 · ${control.outbox_count} 个待投递</small>
-        <button type="button" data-action="rebuild">${icon("retry", 14)}重建校验</button>
+        <small>${control.event_count} 次更新 · ${control.outbox_count} 个待同步项</small>
+        <button type="button" data-action="rebuild">${icon("retry", 14)}检查记录</button>
       </div>
     </aside>
     <main class="pc-main">
@@ -175,15 +175,15 @@ function renderHeader() {
     : 0;
   return `<section class="overview-band">
     <div>
-      <span class="eyeless">提供方已关闭 · 调度 ${control.provider_dispatch_count}</span>
-      <h1>${control.mission.objective ? escapeHtml(control.mission.objective) : "使命等待记录"}</h1>
-      <p>${notice ? escapeHtml(notice) : "所有控制命令写入同一条可重建事件账本。"}</p>
+      <span class="eyeless">外部生成未启用 · 已记录 ${control.provider_dispatch_count} 次外部任务</span>
+      <h1>${control.mission.objective ? escapeHtml(control.mission.objective) : "等待填写制作目标"}</h1>
+      <p>${notice ? escapeHtml(notice) : "所有制作操作都会保存到同一份项目记录，刷新后仍可恢复。"}</p>
     </div>
     <div class="metrics" aria-label="生产摘要">
       <div><strong>${control.plan.task_specs.length || control.tasks.length}</strong><span>任务</span></div>
-      <div><strong>${control.runs.length}</strong><span>运行</span></div>
+      <div><strong>${control.runs.length}</strong><span>制作项</span></div>
       <div><strong>${progress}%</strong><span>进度</span></div>
-      <div><strong>${control.artifacts.length}</strong><span>写回</span></div>
+      <div><strong>${control.artifacts.length}</strong><span>素材</span></div>
     </div>
   </section>`;
 }
@@ -199,14 +199,14 @@ function renderActiveTab() {
 function renderMission() {
   const disabled = control.mission.status === "recorded";
   return `<section class="work-surface">
-    <header><h2>使命</h2><p>${disabled ? "使命已进入账本。" : "定义本次生产目标与边界。"}</p></header>
+    <header><h2>制作目标</h2><p>${disabled ? "目标已保存到项目记录。" : "先写清楚这一集要完成什么，以及哪些内容不能被改动。"}</p></header>
     <form data-form="mission" class="mission-form">
-      <label>目标<textarea name="objective" rows="5" ${disabled ? "disabled" : ""}>${escapeHtml(control.mission.objective || "制作一个无提供方调用的 AI-native 生产控制纵切，覆盖使命、计划、审批、运行、写回、连续性与交付读回。")}</textarea></label>
+      <label>目标<textarea name="objective" rows="5" ${disabled ? "disabled" : ""}>${escapeHtml(control.mission.objective || "制作一集可审片、可返工、可锁版的故事板：先确认目标，再批准计划，最后把候选素材写回到对应镜头。")}</textarea></label>
       <div class="constraint-grid">
-        <label>边界 1<input name="constraint" ${disabled ? "disabled" : ""} value="提供方闸门保持关闭。" /></label>
-        <label>边界 2<input name="constraint" ${disabled ? "disabled" : ""} value="镜头局部返工必须保留未受影响镜头事实。" /></label>
+        <label>边界 1<input name="constraint" ${disabled ? "disabled" : ""} value="本轮不调用外部生成服务。" /></label>
+        <label>边界 2<input name="constraint" ${disabled ? "disabled" : ""} value="局部返工时保留未受影响镜头。" /></label>
       </div>
-      <button type="submit" class="primary" ${disabled || busy ? "disabled" : ""}>${icon("check", 16)}保存使命</button>
+      <button type="submit" class="primary" ${disabled || busy ? "disabled" : ""}>${icon("check", 16)}保存目标</button>
     </form>
   </section>`;
 }
@@ -215,7 +215,7 @@ function renderPlan() {
   const approved = control.plan.status === "approved";
   const specs = control.plan.task_specs.length ? control.plan.task_specs : defaultTasks();
   return `<section class="work-surface">
-    <header><h2>计划</h2><p>${approved ? "计划已批准并创建运行。" : "批准前可以编辑边界。"}</p></header>
+    <header><h2>计划</h2><p>${approved ? "计划已批准，制作项已创建。" : "批准前可以编辑每一步的范围。"}</p></header>
     <form data-form="plan" class="plan-form">
       ${specs.map((task, index) => `<fieldset>
         <legend>${escapeHtml(task.title || `任务 ${index + 1}`)}</legend>
@@ -231,7 +231,7 @@ function renderPlan() {
 }
 
 function renderCockpit() {
-  if (!control.runs.length) return emptyPanel("驾驶舱", "批准计划后会出现运行队列。");
+  if (!control.runs.length) return emptyPanel("制作", "批准计划后会出现制作项。");
   return `<section class="run-board">
     ${control.runs.map((run, index) => `<article class="run-row ${toneForRun(run)}">
       <div class="run-main">
@@ -241,7 +241,7 @@ function renderCockpit() {
       <div class="run-state">
         <strong>${statusLabel(run.execution_state)}</strong>
         <span>${statusLabel(run.control_state)} · 第 ${run.attempt_count} 次尝试</span>
-        <small>${escapeHtml(run.simulated_cost_label)}</small>
+        <small>${escapeHtml(costLabel(run.simulated_cost_label))}</small>
       </div>
       <div class="run-actions" data-run="${escapeHtml(run.run_id)}">
         ${run.control_state === "paused"
@@ -250,7 +250,7 @@ function renderCockpit() {
         ${button("retry", "重试", "retry")}
         ${run.waiting_human ? button("decide_human", "确认", "check") : button("waiting_human", "人工", "user")}
         ${run.blocked ? button("clear_blocker", "放行", "check") : button("block", "阻塞", "lock")}
-        ${button("provider_gate", "闸门", "lock")}
+        ${button("provider_gate", "预算", "lock")}
         ${button("writeback", "写回", "bookmark")}
         ${button("complete", "完成", "check")}
       </div>
@@ -259,17 +259,17 @@ function renderCockpit() {
 }
 
 function renderArtifacts() {
-  if (!control.artifacts.length) return emptyPanel("产物", "运行写回后会出现受影响与保护事实。");
+  if (!control.artifacts.length) return emptyPanel("素材", "写回后会显示受影响镜头与被保护镜头。");
   return `<section class="artifact-surface">
-    <header><h2>产物</h2><p>写回使用追加命令，绑定来源任务、运行与尝试。</p></header>
+    <header><h2>素材</h2><p>写回会保留来源制作项，并说明哪些镜头被改动、哪些镜头被保护。</p></header>
     <div class="artifact-list">
       ${control.artifacts.map((artifact, index) => `<article>
-        <strong>写回 ${index + 1}</strong>
+        <strong>素材 ${index + 1}</strong>
         <p>${escapeHtml(operationLabel(artifact.operation))} · 来源 ${escapeHtml(taskName(artifact.task_id))}</p>
         <dl>
           <div><dt>受影响</dt><dd>${escapeHtml(refLabel(artifact.affected_ref))}</dd></div>
           <div><dt>保护</dt><dd>${artifact.protected_refs.map(refLabel).map(escapeHtml).join("、")}</dd></div>
-          <div><dt>尝试</dt><dd>已记录尝试来源</dd></div>
+          <div><dt>来源</dt><dd>已记录制作来源</dd></div>
         </dl>
       </article>`).join("")}
     </div>
@@ -289,12 +289,12 @@ function renderReview() {
       </div>
     </article>
     <article>
-      <h2>审核 / 交付</h2>
-      <p>${control.review.delivery_readback === "internal_delivery_packet_ready" ? "交付读回可检查。" : "交付读回等待产物。"}</p>
-      <a class="primary link-button" href="${escapeHtml(control.workspace_entry.href)}">${icon("frames", 16)}打开故事板 / 审核</a>
+      <h2>审片 / 交付</h2>
+      <p>${control.review.delivery_readback === "internal_delivery_packet_ready" ? "可以进入故事板检查候选素材。" : "交付仍在等待素材与审片结果。"}</p>
+      <a class="primary link-button" href="${escapeHtml(control.workspace_entry.href)}">${icon("frames", 16)}打开故事板 / 审片</a>
     </article>
     <article>
-      <h2>非声明</h2>
+      <h2>尚未完成</h2>
       <ul>${control.review.non_claims.map((item) => `<li>${escapeHtml(nonClaimLabel(item))}</li>`).join("")}</ul>
     </article>
   </section>`;
@@ -302,27 +302,27 @@ function renderReview() {
 
 function renderAgentRail() {
   const suggestions = [];
-  if (control.mission.status !== "recorded") suggestions.push("先记录使命。");
+  if (control.mission.status !== "recorded") suggestions.push("先记录目标。");
   else if (!control.plan.task_specs.length) suggestions.push("生成三段式计划。");
-  else if (control.plan.status !== "approved") suggestions.push("审批后会原子创建任务与运行。");
-  else if (!control.artifacts.length) suggestions.push("选择一个运行执行追加写回。");
+  else if (control.plan.status !== "approved") suggestions.push("批准后会创建任务与制作项。");
+  else if (!control.artifacts.length) suggestions.push("选择一个制作项并写回候选素材。");
   else suggestions.push("检查审核 / 交付读回。");
   return `<section>
-    <h2>确定性建议</h2>
-    <p>提供方已关闭 · 没有 LLM 调用</p>
+    <h2>制作建议</h2>
+    <p>本轮只使用项目内的确定性记录</p>
     <ol>${suggestions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
   </section>
   <section>
     <h2>恢复</h2>
-    <p>重新加载 / 重启后从事件账本重建。</p>
-    <strong>${control.recovery.ledger_rebuildable ? "可重建" : "待检查"}</strong>
+    <p>重新加载后会从项目记录恢复。</p>
+    <strong>${control.recovery.ledger_rebuildable ? "可恢复" : "待检查"}</strong>
   </section>`;
 }
 
 function defaultTasks() {
   return [
-    { title: "镜头拆解", boundary: "拆解使命为局部镜头与连续性检查。" },
-    { title: "候选写回", boundary: "在提供方关闭状态下生成确定性候选与成本标签。" },
+    { title: "镜头拆解", boundary: "拆解制作目标为局部镜头与连续性检查。" },
+    { title: "候选写回", boundary: "生成本轮确定性候选，并标清预算与影响范围。" },
     { title: "审核交付", boundary: "汇总写回、连续性和交付读回证据。" },
   ];
 }
@@ -340,20 +340,28 @@ function taskName(taskId) {
   return spec?.title || "任务";
 }
 
+function costLabel(value) {
+  return String(value || "")
+    .replace(/provider closed/gi, "外部生成未启用")
+    .replace(/provider/gi, "外部生成")
+    .replace(/simulated/gi, "预估");
+}
+
 function operationLabel(value) {
   return {
     shot_local_rework: "镜头局部返工",
     artifact_writeback: "产物写回",
+    "asset_candidate.create_version": "候选素材写回",
   }[value] || "产物写回";
 }
 
 function nonClaimLabel(value) {
   return {
-    not_provider_smoke: "未运行提供方冒烟验证",
-    not_generated_media_qa: "未做生成媒体质检",
-    not_human_acceptance: "未声明人工验收",
-    not_business_validation: "未声明业务验证",
-  }[value] || "未声明额外验证";
+    not_provider_smoke: "未连接外部生成服务",
+    not_generated_media_qa: "未进行生成媒体质检",
+    not_human_acceptance: "未完成创作者验收",
+    not_business_validation: "未进行商业验证",
+  }[value] || "仍需后续确认";
 }
 
 function refLabel(ref) {
@@ -362,6 +370,7 @@ function refLabel(ref) {
     episode_shot: "镜头",
     shot: "镜头",
     artifact: "产物",
+    asset_candidate: "候选素材",
   }[ref.object_type] || "对象";
   return `${objectType} ${String(ref.object_id || "").replace("shot-", "")}`;
 }
@@ -417,11 +426,11 @@ async function onRegister(event) {
 
 async function onCreateProject(event) {
   event.preventDefault();
-  const goal = new FormData(event.currentTarget).get("goal")?.toString().trim() || "AI-native production control";
+  const goal = new FormData(event.currentTarget).get("goal")?.toString().trim() || "第一集制作计划";
   const id = projectId || safeProjectId(`production-control-${Date.now()}`);
   await guarded(async () => {
     setProject(id);
-    await runtime.createProject({ project_id: id, goal, project_type: "short_video_campaign", status: "in_progress" });
+    await runtime.createProject({ project_id: id, goal, project_type: "studio_episode_production", status: "in_progress" });
     await refresh();
   }, "创建项目失败");
 }
@@ -437,7 +446,7 @@ async function onMission(event) {
       constraints,
       created_at: new Date().toISOString(),
     }, commandKey("mission")),
-    "使命已保存",
+    "目标已保存",
     "mission",
   );
 }
@@ -466,7 +475,7 @@ async function onPlan(event) {
 async function onApprovePlan() {
   await mutate(
     runtime.approveProductionControlPlan({ expected_version: control.version, created_at: new Date().toISOString() }, commandKey("approve")),
-    "计划已批准，运行已启动",
+    "计划已批准，制作项已启动",
     "cockpit",
   );
 }
@@ -481,7 +490,7 @@ async function runAction(runId, action) {
       note: action === "block" ? "等待局部证据确认。" : "",
       created_at: new Date().toISOString(),
     }, commandKey(action)),
-    "操作已追加到账本",
+    "操作已保存到项目记录",
     action === "writeback" ? "artifacts" : "cockpit",
   );
 }
@@ -489,9 +498,9 @@ async function runAction(runId, action) {
 async function onRebuild() {
   await guarded(async () => {
     const result = await runtime.rebuildProductionControl();
-    notice = result.ok ? "重建校验通过" : "重建校验未通过";
+    notice = result.ok ? "项目记录检查通过" : "项目记录检查未通过";
     await refresh(false);
-  }, "重建校验失败");
+  }, "项目记录检查失败");
 }
 
 async function mutate(promise, message, nextTab) {

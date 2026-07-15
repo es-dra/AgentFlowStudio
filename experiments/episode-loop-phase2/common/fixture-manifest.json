@@ -8,7 +8,7 @@
   "domain_contract_wire_schema_literal": "afs_episode_production_aggregate.v0.1",
   "domain_contract_artifact": {
     "path": "docs/architecture/AFS_EPISODE_PRODUCTION_FACT_CONTRACT.md",
-    "sha256": "38b2b8671e7d732ccb3d1cb71a4e374a63dfa7aa1a89b13551ddea5dc58cf36c"
+    "sha256": "fa489a46fa0c11aa99ad6ef2fb9df3fbb190b4609cd7dc6764792f76222b5588"
   },
   "evidence_matrix": {
     "path": "docs/research/AFS_PHASE1_EVIDENCE_MATRIX.md",

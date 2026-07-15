@@ -1332,12 +1332,12 @@ def test_concurrent_same_version_approvals_commit_exactly_one_batch(
 
 def test_frozen_episode_contract_blobs_do_not_drift() -> None:
     expected = {
-        "apps/api/runtime_episode_domain_contract.py": "407020f1bdd34d8eb8df9de642d88dc9e88a8d9b",
+        "apps/api/runtime_episode_domain_contract.py": "b37e5ed2e7ac4d182c26b5c79955def956db68c9",
         "apps/api/runtime_episode_domain_store.py": "a861a04b4479c551528a74fcd1dae2dd589b230e",
         "apps/api/runtime_episode_continuity_service.py": "aa6fad1437c246ab581e93e26b7f2c206380e295",
         "apps/api/runtime_episode_review_delivery_service.py": "79c4dd0ae174c102c3ed36a911c0e805ccf76ba6",
         "apps/api/runtime_episode_command_routes.py": "8120d11b7c9431ea1517aecc6eb1721ea6f49b3a",
-        "docs/architecture/AFS_EPISODE_PRODUCTION_FACT_CONTRACT.md": "6496d9fb11cdd7b12d5386a22ff7454a609e1b0d",
+        "docs/architecture/AFS_EPISODE_PRODUCTION_FACT_CONTRACT.md": "fc0fa77a50c9b2cf71043ff5d9d190cfbb47cf0d",
     }
     actual = {
         path: subprocess.check_output(["git", "hash-object", path], text=True).strip()

@@ -1,7 +1,8 @@
 # AFS Episode Production Fact Contract v0.1.1
 
 Status: frozen v0.1 contract plus the additive v0.1.1 continuity-operation
-evidence repair. The wire aggregate schema literal remains
+evidence repair and Wave 1 production-control provenance fields. The wire
+aggregate schema literal remains
 `afs_episode_production_aggregate.v0.1`; old payloads omit the additive fields
 and receive empty or null defaults. This contract is schema-first and is not
 yet a claim that the Runtime, Studio, provider path, or delivery path has
@@ -144,6 +145,10 @@ proposal ownership or undo authorization.
 ## Candidate, review, and delivery rules
 
 - An asset candidate targets one exact shot or continuity-state version.
+- A production-control-originated asset candidate may carry exact task, run,
+  attempt, and writeback provenance plus explicit affected and protected refs.
+  This provenance is evidence only when the candidate revision is finalized
+  with approved lifecycle/review state and an exact approval review decision.
 - A selected version can only select a candidate for that same target version.
   Approved or locked selections require a non-rejected, non-retired candidate
   with approved review state.

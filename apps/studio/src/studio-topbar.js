@@ -111,9 +111,9 @@ function productionControlLink(projectId) {
     : "/studio/production-control/";
   const link = el("a", "icon-btn studio-home-btn production-control-btn");
   link.href = href;
-  link.innerHTML = `${icon("bolt", 14)}<span>生产控制</span>`;
-  link.title = "打开生产控制";
-  link.setAttribute("aria-label", "打开生产控制");
+  link.innerHTML = `${icon("bolt", 14)}<span>制片工作台</span>`;
+  link.title = "打开制片工作台";
+  link.setAttribute("aria-label", "打开制片工作台");
   return link;
 }
 
