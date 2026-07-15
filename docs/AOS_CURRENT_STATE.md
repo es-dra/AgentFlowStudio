@@ -26,8 +26,11 @@ business validation from repository/document changes.
 The active product program is the creator-controlled single-episode production
 loop in [AFS_EPISODE_LOOP_PROGRAM.md](AFS_EPISODE_LOOP_PROGRAM.md). The existing
 canvas and representative-episode paths are implementation inputs, not the
-authority for the new domain fact chain. Guided, storyboard-first, and hybrid
-structures remain unselected until same-task prototype evaluation.
+authority for the new domain fact chain. The selected frontend direction is a
+Project/Episode shell with a storyboard-centered default workspace and contextual
+inspector. Hybrid informs the information architecture; Guided is limited to
+next action, recovery, and natural error handling. This direction is decided and
+must not be reopened as a prototype vote.
 
 ## Local Repo Surface
 

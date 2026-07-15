@@ -23,9 +23,12 @@ create project or import script
 -> create playable preview and export
 ```
 
-The product structure remains a testable hypothesis. Guided, storyboard-first,
-and hybrid prototypes must run the same Rainlight task protocol before the
-production frontend structure is selected.
+The production frontend structure is selected: Project/Episode shell,
+storyboard-centered default workspace, and contextual inspector. Hybrid remains
+the information-architecture base; Guided is only the next-action, recovery, and
+natural-error mechanism. Mobile is a review, annotation, selection, and recovery
+companion. Infinite canvas, a complete NLE, and global Agent chat are not default
+entrypoints. This choice is no longer an open prototype vote.
 
 ## Stable boundaries
 
@@ -61,32 +64,30 @@ production frontend structure is selected.
 | Recoverable mutation | aggregate version + idempotency key | persistence/restart tests | contract only; Runtime open |
 | Continuity impact and rollback | continuity versions + exact shot refs | affected-shot E2E | contract only; implementation open |
 | Candidate-to-delivery trace | candidate, selection, review, delivery refs | locked-delivery negative tests + E2E | contract candidate written |
-| Creator-facing structure | three isolated prototypes | same-task protocol + independent evaluator | pending Phase 2 |
+| Creator-facing structure | Project/Episode shell + storyboard workspace + contextual inspector | authenticated local vertical-slice tests + independent browser evaluator | selected; productization evaluator pending |
 | Generic single-episode loop | Runtime/API/Studio/Review/Delivery | representative 8-15 shot E2E | pending Phase 3 |
 | Identity and recovery | auth, persistence, queue, restart | negative isolation + restart/relogin | partial legacy evidence; integrated proof open |
 | Content and commercial value | generated output and team use | human evaluation and owner decision | not claimed |
 
 ## Integration Queue
 
-1. Freeze and independently evaluate the shared domain contract.
-2. Commit the contract as the base for all next lanes.
-3. Build guided, storyboard-first, and hybrid prototypes in isolated worktrees
-   using one fixture, event logger, and evaluation protocol.
-4. Prepare Runtime/persistence tests that do not depend on the winning visual
-   structure.
-5. Select a frontend structure only from evaluator evidence or return an exact
-   decision needed.
-6. Integrate bounded vertical slices, invalidating evaluator results whenever
-   the final diff changes.
-7. Run final E2E, cross-project isolation, recovery, CI, merge, and serial
-   release verification.
+1. Keep the frozen domain contract, command API, and creator-safe projection as
+   the shared fact boundary.
+2. Productize the selected Project/Episode + storyboard + inspector direction
+   against authenticated GET, typed commands, and Studio-state recovery.
+3. Run fresh desktop/mobile browser QA and an independent evaluator; any final
+   diff invalidates the prior verdict.
+4. Integrate only exact evaluated commits through the Program Integration Queue.
+5. Establish PR/CI, cross-project isolation, recovery, and serial release
+   verification before any delivery claim.
 
 ## Research conclusion
 
 The traceable findings and current-capability gaps are maintained in the
-[Phase 1 evidence matrix](research/AFS_PHASE1_EVIDENCE_MATRIX.md). The three
-prototype structures use the same
-[Phase 2 evaluation protocol](AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md).
+[Phase 1 evidence matrix](research/AFS_PHASE1_EVIDENCE_MATRIX.md). The historical
+three-prototype comparison remains reproducible through the
+[Phase 2 evaluation protocol](AFS_EPISODE_LOOP_PHASE2_EVALUATION_PROTOCOL.md),
+but it no longer controls the selected frontend direction.
 AFS should not differentiate by canvas presence or agent count. The open
 product opportunity is one visible chain from object change to affected shots,
 creator scope decision, recoverable version update, review evidence, and

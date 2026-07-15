@@ -111,6 +111,13 @@ svg { width: 1.1em; height: 1.1em; fill: none; stroke: currentColor; stroke-widt
   .workspace-layout { grid-template-columns: 190px minmax(480px, 1fr) 300px; }.shot-grid { grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); }
 }
 
+@media (min-width: 761px) and (max-width: 980px) {
+  .topbar { grid-template-columns: minmax(190px, 1fr) auto minmax(280px, 1fr); }
+  .workspace-layout { grid-template-columns: minmax(420px, 1fr) 300px; }
+  .left-rail { display: none; }
+  .shot-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
 @media (max-width: 760px) {
   body { overflow-x: hidden; overflow-y: auto; }.workspace-shell { height: auto; min-height: 100dvh; overflow: visible; grid-template-rows: auto minmax(0, 1fr) 34px; }.topbar { position: sticky; top: 0; z-index: 7; min-height: 112px; grid-template-columns: 1fr auto; grid-template-rows: 58px 54px; gap: 0 12px; padding: 0 14px; }.identity { min-width: 0; }.project-copy strong { font-size: 13px; }.project-copy span { font-size: 10px; }.mode-tabs { grid-column: 2; grid-row: 1; }.mode-tabs button { min-width: 48px; font-size: 11px; }.top-status { display: none; }.mobile-context { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line-dark); color: #aab9c2; font-size: 11px; }.mobile-context button { min-height: 34px; padding: 0 10px; border: 1px solid #465e6d; border-radius: 3px; color: #d8e3e9; background: #102737; }
   .workspace-layout { display: block; overflow: visible; }.left-rail { display: none; }.center-stage { min-height: calc(100dvh - 174px); overflow: visible; }.inspector { border: 0; border-top: 1px solid var(--line-dark); overflow: visible; }

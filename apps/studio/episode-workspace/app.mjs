@@ -16,10 +16,12 @@ import {
   buildWorkspaceModel,
   createInitialUiState,
   exactRefKey,
+  focusIfAvailable,
   groupShotsByScene,
   inspectShot,
   mergeEpisodeWorkspaceState,
   nextShot,
+  retainPendingCommandAfterFailure,
   selectMode,
   selectSceneFilter,
   selectStatusFilter,
@@ -95,7 +97,7 @@ function renderTopbar(current) {
     <div class="identity"><div class="brand-mark compact" aria-hidden="true">雨</div><div class="project-copy"><strong>${escapeHtml(model.project.title)}</strong><span>${escapeHtml(model.episode.title)}</span></div></div>
     <nav class="mode-tabs" aria-label="单集工作模式">${[["storyboard", "故事板"], ["review", "审核"], ["delivery", "交付"]].map(([mode, label]) => `<button type="button" data-mode="${mode}" data-focus="mode-${mode}" aria-current="${ui.mode === mode ? "page" : "false"}">${label}</button>`).join("")}</nav>
     <div class="top-status">
-      <span class="save-state">${icons.shield}<span>事实 v${model.aggregateVersion} · 已同步</span></span>
+      <span class="save-state">${icons.shield}<span>${ui.pendingCommand ? "命令待核对" : `事实 v${model.aggregateVersion} · 已同步`}</span></span>
       <span class="privacy-state">${icons.lock}<span>${privateProject ? "私有" : "项目可见"} · ${noTraining ? "不用于训练" : "按项目策略使用"}</span></span>
       <button class="next-action" type="button" data-action="go-next" data-focus="next-action" ${next ? "" : "disabled"}><span>建议下一步</span><strong>${escapeHtml(next?.label || "当前没有服务建议")}</strong>${icons.chevron}</button>
     </div>
@@ -109,7 +111,7 @@ function renderLeftRail() {
     <button class="scene-row" type="button" data-scene="all" aria-pressed="${ui.sceneFilterKey === "all"}"><span>全部场景</span><strong>${model.shots.length}</strong></button>
     ${model.scenes.map((scene) => `<button class="scene-row" type="button" data-scene="${escapeHtml(exactRefKey(scene.ref))}" aria-pressed="${ui.sceneFilterKey === exactRefKey(scene.ref)}"><span><small>场景 ${scene.sequence}</small>${escapeHtml(scene.title)}</span></button>`).join("")}
     <div class="rail-heading issue-heading"><h2>定位</h2></div><div class="filter-list">${filters.map(([filter, label]) => `<button type="button" data-filter="${filter}" aria-pressed="${ui.statusFilter === filter}"><span>${filter === "blocking" ? icons.issue : ""}${label}</span></button>`).join("")}</div>
-    <button class="reset-link" type="button" data-action="reset-recovery">清除本次恢复位置</button></aside>`;
+    <button class="reset-link" type="button" data-action="reset-recovery" ${ui.pendingCommand ? "disabled" : ""}>清除本次恢复位置</button></aside>`;
 }
 
 function renderShotCard(shot) {
@@ -202,8 +204,18 @@ function captureUiPosition() {
 async function persistUi(required = false) {
   captureUiPosition();
   try {
-    const merged = mergeEpisodeWorkspaceState(studioState, model, ui);
-    const saved = await client.saveStudioState(merged, studioStateVersion);
+    let merged = mergeEpisodeWorkspaceState(studioState, model, ui);
+    let saved;
+    try {
+      saved = await client.saveStudioState(merged, studioStateVersion);
+    } catch (error) {
+      if (error?.kind !== "stale") throw error;
+      const current = await client.loadStudioState();
+      studioState = current.state || {};
+      studioStateVersion = current.state_version || "";
+      merged = mergeEpisodeWorkspaceState(studioState, model, ui);
+      saved = await client.saveStudioState(merged, studioStateVersion);
+    }
     studioState = saved.state || merged;
     studioStateVersion = saved.state_version || studioStateVersion;
     return true;
@@ -229,28 +241,79 @@ async function refreshAuthority(message = "已刷新最新项目事实") {
   render();
 }
 
+async function clearPendingAfterAuthority(message) {
+  ui = updateUiRecovery(ui, { pendingIdempotencyKey: "", pendingCommand: null });
+  statusMessage = message;
+  render();
+  await persistUi(false);
+}
+
 async function runCommand(command) {
   if (commandRunning) return;
+  if (ui.pendingCommand) {
+    await reconcilePendingCommand();
+    return;
+  }
   clearTimeout(persistTimer);
   commandRunning = true;
   const idempotencyKey = commandIdFor(command.action);
-  ui = updateUiRecovery(ui, { pendingIdempotencyKey: idempotencyKey });
-  statusMessage = "正在保存命令标识…";
+  const pendingCommand = { idempotency_key: idempotencyKey, payload: command };
+  ui = updateUiRecovery(ui, { pendingIdempotencyKey: idempotencyKey, pendingCommand });
+  statusMessage = "正在保存可恢复命令…";
   render();
+  let commandDispatched = false;
   try {
     await persistUi(true);
+    commandDispatched = true;
     await client.executeCommand(command, idempotencyKey);
     await refreshAuthority("操作已追加到项目事实");
-    ui = updateUiRecovery(ui, { pendingIdempotencyKey: "" });
-    await persistUi(false);
+    await clearPendingAfterAuthority("操作已追加到项目事实");
   } catch (error) {
     try {
-      await refreshAuthority(error?.kind === "stale" ? "项目已变化，已刷新最新事实" : "请求未确认，已重新核对项目事实");
-      ui = updateUiRecovery(ui, { pendingIdempotencyKey: "" });
-      await persistUi(false);
+      if (retainPendingCommandAfterFailure(error?.kind, commandDispatched)) {
+        await refreshAuthority(commandDispatched
+          ? "响应未确认；原命令已保留，等待同标识核对"
+          : "命令尚未发送；可恢复命令已保留，等待状态保存完成");
+      } else {
+        await refreshAuthority("命令被服务明确拒绝，已刷新最新事实");
+        await clearPendingAfterAuthority("命令未执行；可以基于最新事实继续");
+      }
     } catch {
       renderError(error);
     }
+  } finally {
+    commandRunning = false;
+  }
+}
+
+async function reconcilePendingCommand() {
+  const pending = ui.pendingCommand;
+  if (!pending || commandRunning) return !pending;
+  commandRunning = true;
+  statusMessage = "正在用原命令标识核对未确认操作…";
+  render();
+  let commandDispatched = false;
+  try {
+    await persistUi(true);
+    commandDispatched = true;
+    await client.executeCommand(pending.payload, pending.idempotency_key);
+    await refreshAuthority("未确认操作已由服务确认");
+    await clearPendingAfterAuthority("未确认操作已由服务确认");
+    return true;
+  } catch (error) {
+    try {
+      if (retainPendingCommandAfterFailure(error?.kind, commandDispatched)) {
+        await refreshAuthority(commandDispatched
+          ? "未确认操作仍待核对；不会启动新命令"
+          : "原命令尚未重放；等待可恢复状态保存完成");
+      } else {
+        await refreshAuthority("原命令被服务明确拒绝，已刷新最新事实");
+        await clearPendingAfterAuthority("原命令未执行；工作区已解除等待状态");
+      }
+    } catch {
+      renderError(error);
+    }
+    return false;
   } finally {
     commandRunning = false;
   }
@@ -264,7 +327,7 @@ function bindEvents() {
   app.querySelectorAll('[data-action="go-next"]').forEach((button) => button.addEventListener("click", () => { const shot = nextShot(model, ui); if (!shot) return; ui = inspectShot(ui, shot.ref); render(); queuePersist(); requestAnimationFrame(() => app.querySelector('[data-shot][data-next="true"]')?.focus()); }));
   app.querySelector('[data-action="open-mobile-nav"]')?.addEventListener("click", () => app.querySelector(".center-stage")?.scrollIntoView({ block: "start" }));
   app.querySelector('[data-action="back-to-shots"]')?.addEventListener("click", () => app.querySelector(".center-stage")?.scrollIntoView({ block: "start" }));
-  app.querySelector('[data-action="reset-recovery"]')?.addEventListener("click", () => { ui = createInitialUiState(model); render(); queuePersist(); });
+  app.querySelector('[data-action="reset-recovery"]')?.addEventListener("click", () => { if (!ui.pendingCommand) { ui = createInitialUiState(model); render(); queuePersist(); } });
   app.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("click", () => handleCommand(button.dataset.command, button)));
   app.querySelector(".continuity-form")?.addEventListener("submit", (event) => { event.preventDefault(); const shot = activeShot(model, ui); const continuity = shot.continuity.find((item) => exactRefKey(item.ref) === event.currentTarget.dataset.continuity); const value = new FormData(event.currentTarget).get("temporary_state")?.toString().trim(); if (value) void runCommand(buildContinuityApplyCommand(model, shot, continuity, { temporary_state: [...continuity.temporary_state, value] })); });
   app.onfocusin = (event) => {
@@ -303,7 +366,7 @@ function restorePosition() {
   let focus = ui.focusedControl && app.querySelector(`[data-focus="${CSS.escape(ui.focusedControl)}"]`);
   if (!focus && ui.focusedControl.startsWith("command:")) focus = app.querySelector(`[data-command="${CSS.escape(ui.focusedControl.slice(8))}"]`);
   if (!focus && ui.focusedControl.startsWith("field:")) focus = app.querySelector(`[name="${CSS.escape(ui.focusedControl.slice(6))}"]`);
-  focus?.focus({ preventScroll: true });
+  focusIfAvailable(focus);
   if (window.matchMedia("(max-width: 760px)").matches && ui.inspectorSection !== "overview") {
     app.querySelector(`[data-section="${CSS.escape(ui.inspectorSection)}"]`)?.scrollIntoView({ block: "start" });
   }
@@ -319,6 +382,7 @@ async function hydrate() {
     studioStateVersion = saved.state_version || "";
     ui = createInitialUiState(model, studioState.episode_workspace);
     render();
+    if (ui.pendingCommand) await reconcilePendingCommand();
     requestAnimationFrame(restorePosition);
   } catch (error) { renderError(error); }
 }

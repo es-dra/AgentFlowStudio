@@ -79,6 +79,9 @@ export function createInitialUiState(model, savedState = null) {
   const savedShot = model.shots.find((shot) => sameExactRef(shot.ref, saved?.active_shot_ref));
   const initialShot = savedShot || suggestedShot || model.shots[0] || null;
   const recoveredMode = MODES.includes(saved?.mode) ? saved.mode : "storyboard";
+  const pendingCommand = saved?.pending_command && typeof saved.pending_command === "object"
+    ? saved.pending_command
+    : null;
   return Object.freeze({
     mode: recoveredMode,
     activeShotKey: exactRefKey(initialShot?.ref),
@@ -88,7 +91,8 @@ export function createInitialUiState(model, savedState = null) {
     inspectorSection: String(saved?.inspector_section || "overview"),
     focusedControl: String(saved?.focused_control || ""),
     scrollTop: Math.max(0, Number(saved?.scroll_top || 0)),
-    pendingIdempotencyKey: String(saved?.pending_idempotency_key || ""),
+    pendingIdempotencyKey: String(pendingCommand?.idempotency_key || ""),
+    pendingCommand,
   });
 }
 
@@ -122,6 +126,17 @@ export function updateUiRecovery(state, patch = {}) {
   return Object.freeze({ ...state, ...patch });
 }
 
+export function focusIfAvailable(target, options = { preventScroll: true }) {
+  if (!target || typeof target.focus !== "function") return false;
+  target.focus(options);
+  return true;
+}
+
+export function retainPendingCommandAfterFailure(kind, commandDispatched = true) {
+  if (!commandDispatched) return true;
+  return !["stale", "invalid"].includes(String(kind || ""));
+}
+
 export function episodeWorkspaceState(model, state) {
   const active = activeShot(model, state);
   return {
@@ -133,6 +148,7 @@ export function episodeWorkspaceState(model, state) {
     inspector_section: state.inspectorSection || "overview",
     scroll_top: Math.max(0, Number(state.scrollTop || 0)),
     pending_idempotency_key: state.pendingIdempotencyKey || "",
+    pending_command: state.pendingCommand || null,
   };
 }
 

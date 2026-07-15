@@ -210,6 +210,20 @@ def test_ui_state_restores_exact_identity_mode_focus_scroll_and_pending_key() ->
         "inspector_section": "continuity",
         "scroll_top": 420,
         "pending_idempotency_key": "shot-review-pending-1",
+        "pending_command": {
+            "idempotency_key": "shot-review-pending-1",
+            "payload": {
+                "action": "shot.review",
+                "expected_aggregate_version": 3,
+                "shot_ref": _ref("shot", "shot-test"),
+                "decision": "approve",
+                "shot_version_id": "shot-test.v2",
+                "decision_entity_id": "review-shot-test",
+                "decision_version_id": "review-shot-test.v1",
+                "created_at": "2026-07-15T08:01:00+00:00",
+                "note": "Creator approved exact shot.",
+            },
+        },
     }
     result = _run(
         "state.mjs",
@@ -225,6 +239,7 @@ def test_ui_state_restores_exact_identity_mode_focus_scroll_and_pending_key() ->
           section: ui.inspectorSection,
           scroll: ui.scrollTop,
           pending: ui.pendingIdempotencyKey,
+          pendingAction: ui.pendingCommand.payload.action,
           legacy: merged.legacy.keep,
           namespace: merged.episode_workspace,
         }}));
@@ -239,6 +254,7 @@ def test_ui_state_restores_exact_identity_mode_focus_scroll_and_pending_key() ->
     assert result["section"] == "continuity"
     assert result["scroll"] == 420
     assert result["pending"] == "shot-review-pending-1"
+    assert result["pendingAction"] == "shot.review"
     assert result["legacy"] is True
     assert result["namespace"]["episode_ref"] == _ref("episode", "episode-test")
 
@@ -255,6 +271,54 @@ def test_no_next_action_does_not_invent_one_and_uses_first_real_shot_for_inspect
     )
 
     assert result == {"active": 1, "next": None, "action": None}
+
+
+def test_restore_focus_is_noop_for_empty_or_stale_selector_and_calls_real_focus() -> None:
+    result = _run(
+        "state.mjs",
+        """
+        const calls = [];
+        const element = { focus(options) { calls.push(options); } };
+        console.log(JSON.stringify({
+          empty: subject.focusIfAvailable(""),
+          missing: subject.focusIfAvailable(null),
+          stale: subject.focusIfAvailable({}),
+          real: subject.focusIfAvailable(element),
+          calls,
+        }));
+        """,
+        {},
+    )
+
+    assert result == {
+        "empty": False,
+        "missing": False,
+        "stale": False,
+        "real": True,
+        "calls": [{"preventScroll": True}],
+    }
+
+
+def test_pending_command_retention_distinguishes_persistence_from_command_rejection() -> None:
+    result = _run(
+        "state.mjs",
+        """
+        console.log(JSON.stringify({
+          persistenceConflict: subject.retainPendingCommandAfterFailure("stale", false),
+          uncertainNetwork: subject.retainPendingCommandAfterFailure("server", true),
+          staleCommand: subject.retainPendingCommandAfterFailure("stale", true),
+          invalidCommand: subject.retainPendingCommandAfterFailure("invalid", true),
+        }));
+        """,
+        {},
+    )
+
+    assert result == {
+        "persistenceConflict": True,
+        "uncertainNetwork": True,
+        "staleCommand": False,
+        "invalidCommand": False,
+    }
 
 
 def test_command_builders_use_exact_refs_current_cas_and_unique_safe_identity() -> None:
@@ -294,6 +358,14 @@ def test_mobile_layout_is_card_and_detail_based_without_wide_table() -> None:
     assert "<table" not in app.lower()
     assert 'data-action="back-to-shots"' in app
     assert 'data-action="open-mobile-nav"' in app
+
+
+def test_tablet_width_keeps_storyboard_and_inspector_inside_hidden_overflow_shell() -> None:
+    styles = _read("styles.css")
+
+    assert "@media (min-width: 761px) and (max-width: 980px)" in styles
+    assert ".workspace-layout { grid-template-columns: minmax(420px, 1fr) 300px; }" in styles
+    assert ".left-rail { display: none; }" in styles
 
 
 def test_workspace_sources_are_utf8_clean_and_do_not_expose_sensitive_errors() -> None:

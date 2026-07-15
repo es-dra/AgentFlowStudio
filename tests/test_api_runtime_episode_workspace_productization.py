@@ -121,6 +121,45 @@ def _register_owner(client: TestClient) -> tuple[dict[str, Any], dict[str, str]]
     return owner, {"Authorization": f"Bearer {owner['session_token']}"}
 
 
+def _bootstrap_owner_episode(
+    client: TestClient,
+) -> tuple[dict[str, Any], dict[str, str], ProductionProjectAggregate, dict[str, Any]]:
+    owner, headers = _register_owner(client)
+    owner_id = owner["user"]["user_id"]
+    created = client.post(
+        "/projects",
+        headers=headers,
+        json={"project_id": PROJECT_ID, "goal": "Authenticated episode workspace"},
+    )
+    assert created.status_code == 200, created.text
+    aggregate = _representative_episode()
+    seeded = client.put(
+        f"/projects/{PROJECT_ID}/episode-production-aggregate",
+        headers={**headers, "Idempotency-Key": "workspace-bootstrap"},
+        json={
+            "expected_aggregate_version": 0,
+            "aggregate": _owner_scoped(aggregate, owner_id),
+        },
+    )
+    assert seeded.status_code == 200, seeded.text
+    return owner, headers, aggregate, seeded.json()["aggregate"]
+
+
+def _shot_review_payload(shot: dict[str, Any], *, expected_version: int) -> dict[str, Any]:
+    return {
+        "action": "shot.review",
+        "expected_aggregate_version": expected_version,
+        "shot_ref": {
+            key: shot[key] for key in ("entity_type", "entity_id", "version_id")
+        },
+        "decision": "approve",
+        "shot_version_id": f"{shot['entity_id']}.v2",
+        "decision_entity_id": f"recovery-review-{shot['entity_id']}",
+        "decision_version_id": f"recovery-review-{shot['entity_id']}.v1",
+        "created_at": "2026-07-15T09:00:00+00:00",
+    }
+
+
 def _post_command(
     client: TestClient,
     headers: dict[str, str],
@@ -376,3 +415,271 @@ def test_authenticated_vertical_slice_and_three_eight_reload_recovery(
     assert final_workspace["delivery"]["status"] == "blocked"
     assert final_workspace["delivery"]["playable_preview_available"] is False
     assert final_workspace["truth"]["playable_preview_available"] is False
+
+
+def test_pending_command_replays_exact_identity_and_payload_after_restart(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "episode-owner-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _, headers, aggregate, seeded = _bootstrap_owner_episode(client)
+    shot6 = _latest(seeded["shots"], "shot-6")
+    command = _shot_review_payload(shot6, expected_version=1)
+    key = "restart-exact-review-shot-6"
+    pending = {
+        "schema_version": "afs_episode_workspace_ui.v0.1",
+        "episode_ref": _ref(aggregate.episodes[0]),
+        "active_shot_ref": command["shot_ref"],
+        "mode": "storyboard",
+        "focused_control": "command:shot.review.approve",
+        "inspector_section": "overview",
+        "scroll_top": 240,
+        "pending_idempotency_key": key,
+        "pending_command": {"idempotency_key": key, "payload": command},
+    }
+    saved = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": {
+                "meta": {"projectName": "Concurrent-safe legacy state", "seq": 4},
+                "episode_workspace": pending,
+            }
+        },
+    )
+    assert saved.status_code == 200, saved.text
+
+    first = client.post(
+        COMMAND_ROUTE,
+        headers={**headers, "Idempotency-Key": key},
+        json=command,
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["replayed"] is False
+    assert first.json()["aggregate"]["aggregate_version"] == 2
+
+    restarted = TestClient(create_runtime_app(runtime_root=tmp_path))
+    restored = restarted.get(
+        f"/projects/{PROJECT_ID}/studio-state", headers=headers
+    )
+    assert restored.status_code == 200, restored.text
+    envelope = restored.json()["state"]["episode_workspace"]["pending_command"]
+    assert envelope["idempotency_key"] == key
+    assert envelope["payload"] == {**command, "note": ""}
+    replay = restarted.post(
+        COMMAND_ROUTE,
+        headers={**headers, "Idempotency-Key": envelope["idempotency_key"]},
+        json=envelope["payload"],
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["replayed"] is True
+    assert replay.json()["aggregate"]["aggregate_version"] == 2
+
+    state = restored.json()["state"]
+    state["episode_workspace"] = {
+        **state["episode_workspace"],
+        "pending_idempotency_key": "",
+        "pending_command": None,
+    }
+    cleared = restarted.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": state,
+            "expected_version": restored.json()["state_version"],
+        },
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["state"]["meta"]["projectName"] == "Concurrent-safe legacy state"
+    assert cleared.json()["state"]["episode_workspace"]["pending_command"] is None
+
+
+def test_pending_command_cas_merge_preserves_concurrent_legacy_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "episode-owner-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _, headers, aggregate, seeded = _bootstrap_owner_episode(client)
+    shot6 = _latest(seeded["shots"], "shot-6")
+    command = _shot_review_payload(shot6, expected_version=1)
+    key = "cas-merge-review-shot-6"
+    initial = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={"state": {"meta": {"projectName": "Initial", "seq": 1}}},
+    )
+    assert initial.status_code == 200, initial.text
+    stale_version = initial.json()["state_version"]
+
+    concurrent_state = initial.json()["state"]
+    concurrent_state["meta"] = {
+        **concurrent_state["meta"],
+        "projectName": "Concurrent legacy edit",
+        "seq": 9,
+    }
+    concurrent = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={"state": concurrent_state, "expected_version": stale_version},
+    )
+    assert concurrent.status_code == 200, concurrent.text
+
+    pending_workspace = {
+        "schema_version": "afs_episode_workspace_ui.v0.1",
+        "episode_ref": _ref(aggregate.episodes[0]),
+        "active_shot_ref": command["shot_ref"],
+        "mode": "storyboard",
+        "focused_control": "command:shot.review.approve",
+        "inspector_section": "overview",
+        "scroll_top": 120,
+        "pending_idempotency_key": key,
+        "pending_command": {"idempotency_key": key, "payload": command},
+    }
+    stale = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": {
+                **initial.json()["state"],
+                "episode_workspace": pending_workspace,
+            },
+            "expected_version": stale_version,
+        },
+    )
+    assert stale.status_code == 409
+
+    refreshed = client.get(f"/projects/{PROJECT_ID}/studio-state", headers=headers)
+    merged = {
+        **refreshed.json()["state"],
+        "episode_workspace": pending_workspace,
+    }
+    retried = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": merged,
+            "expected_version": refreshed.json()["state_version"],
+        },
+    )
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["state"]["meta"]["projectName"] == "Concurrent legacy edit"
+    assert retried.json()["state"]["meta"]["seq"] == 9
+    stored_envelope = retried.json()["state"]["episode_workspace"]["pending_command"]
+    assert stored_envelope["idempotency_key"] == key
+    assert stored_envelope["payload"] == {**command, "note": ""}
+
+
+def test_pending_command_rejects_malformed_or_sensitive_envelopes_without_echo(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "episode-owner-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _, headers, aggregate, seeded = _bootstrap_owner_episode(client)
+    shot6 = _latest(seeded["shots"], "shot-6")
+    command = _shot_review_payload(shot6, expected_version=1)
+    route = f"/projects/{PROJECT_ID}/studio-state"
+    base = {
+        "episode_ref": _ref(aggregate.episodes[0]),
+        "mode": "storyboard",
+    }
+    bad_states = [
+        {**base, "pending_idempotency_key": "key-only"},
+        {
+            **base,
+            "pending_idempotency_key": "bad-envelope",
+            "pending_command": {
+                "idempotency_key": "bad-envelope",
+                "payload": command,
+                "unexpected": True,
+            },
+        },
+        {
+            **base,
+            "pending_idempotency_key": "sensitive-command",
+            "pending_command": {
+                "idempotency_key": "sensitive-command",
+                "payload": {
+                    **command,
+                    "decision_entity_id": "token-super-private-marker",
+                },
+            },
+        },
+    ]
+    for episode_workspace in bad_states:
+        response = client.put(
+            route,
+            headers=headers,
+            json={"state": {"episode_workspace": episode_workspace}},
+        )
+        assert response.status_code == 400, response.text
+        assert "super-private-marker" not in response.text
+
+
+def test_stale_pending_command_can_be_cleared_after_authoritative_refresh(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "episode-owner-invite")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _, headers, aggregate, seeded = _bootstrap_owner_episode(client)
+    shot6 = _latest(seeded["shots"], "shot-6")
+    stale_command = _shot_review_payload(shot6, expected_version=1)
+    stale_key = "stale-pending-review-shot-6"
+    saved = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": {
+                "meta": {"projectName": "Preserve after stale", "seq": 6},
+                "episode_workspace": {
+                    "episode_ref": _ref(aggregate.episodes[0]),
+                    "active_shot_ref": stale_command["shot_ref"],
+                    "mode": "storyboard",
+                    "pending_idempotency_key": stale_key,
+                    "pending_command": {
+                        "idempotency_key": stale_key,
+                        "payload": stale_command,
+                    },
+                },
+            }
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    _post_command(client, headers, "advance-before-recovery", stale_command)
+
+    rejected = client.post(
+        COMMAND_ROUTE,
+        headers={**headers, "Idempotency-Key": stale_key},
+        json=stale_command,
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"]["error"] == "episode_aggregate_version_conflict"
+    authority = client.get(WORKSPACE_ROUTE, headers=headers)
+    assert authority.status_code == 200, authority.text
+    assert authority.json()["aggregate"]["aggregate_version"] == 2
+
+    restored = client.get(f"/projects/{PROJECT_ID}/studio-state", headers=headers)
+    state = restored.json()["state"]
+    state["episode_workspace"] = {
+        **state["episode_workspace"],
+        "pending_idempotency_key": "",
+        "pending_command": None,
+    }
+    cleared = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        headers=headers,
+        json={
+            "state": state,
+            "expected_version": restored.json()["state_version"],
+        },
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["state"]["meta"]["projectName"] == "Preserve after stale"
+    assert cleared.json()["state"]["episode_workspace"]["pending_command"] is None
