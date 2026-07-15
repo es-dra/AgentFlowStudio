@@ -46,10 +46,15 @@ class WorkspaceProjectionStateError(EpisodeWorkspaceProjectionError):
 _WINDOWS_ABSOLUTE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\)[^\s<>\"']+"
 )
-_PRIVATE_POSIX_PATH_RE = re.compile(
-    r"(?<![A-Za-z0-9:])/(?:"
-    r"app|etc|home|media|mnt|opt|private|root|srv|test|tmp|users|usr|var|workspace"
-    r")(?=/|\b)",
+_SAFE_HTTP_URL_RE = re.compile(
+    r"https?://[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]+",
+    re.IGNORECASE,
+)
+_FORWARD_UNC_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9:.~])//[^\s<>\"']+",
+)
+_POSIX_ABSOLUTE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9:.~])/(?!/)(?=[^\s<>\"'])",
     re.IGNORECASE,
 )
 _FILE_URI_RE = re.compile(
@@ -625,11 +630,17 @@ def _reject_unsafe_visible_value(value: Any) -> None:
     if not isinstance(value, str):
         return
     decoded = _decoded_string(value).replace("&amp;", "&").strip()
+    # Credential-bearing URLs are rejected before safe URL spans are removed.
+    # The remaining scanner therefore treats every slash-prefixed token as a
+    # local absolute path without mistaking a proven credential-free http(s)
+    # URL path for local filesystem data.
+    without_safe_urls = _SAFE_HTTP_URL_RE.sub("", decoded)
     if (
-        _WINDOWS_ABSOLUTE_PATH_RE.search(decoded)
-        or _PRIVATE_POSIX_PATH_RE.search(decoded)
+        _CREDENTIAL_ASSIGNMENT_RE.search(decoded)
         or _FILE_URI_RE.search(decoded)
-        or _CREDENTIAL_ASSIGNMENT_RE.search(decoded)
+        or _WINDOWS_ABSOLUTE_PATH_RE.search(without_safe_urls)
+        or _FORWARD_UNC_PATH_RE.search(without_safe_urls)
+        or _POSIX_ABSOLUTE_PATH_RE.search(without_safe_urls)
     ):
         raise ValueError("unsafe workspace projection string")
 

@@ -404,6 +404,12 @@ def test_actor_scope_drift_fails_closed() -> None:
         "请查看 %2Fhome%2Fafs%2Fprivate%2Fepisode.json 的说明",
         "请查看 /etc/afs/runtime.conf 的说明",
         "请查看 /test/afs/private/episode.json 的说明",
+        "参考 /data/afs/private/episode.json",
+        "参考 /run/secrets/provider-token",
+        "参考 //server/share/episode.json",
+        r"参考 \\server\share\episode.json",
+        "参考 %2F%2Fserver%2Fshare%2Fepisode.json",
+        "参考 https://example.com/path，另见/data/private/episode.json",
     ),
 )
 def test_unsafe_visible_text_fails_closed(unsafe_text: str) -> None:
@@ -414,7 +420,11 @@ def test_unsafe_visible_text_fails_closed(unsafe_text: str) -> None:
 
 
 def test_ordinary_creator_text_and_unsigned_url_are_preserved() -> None:
-    title = "参考 https://example.com/home/storyboard?variant=small 的镜头说明"
+    title = (
+        "参考 https://example.com/home/data/storyboard?variant=small "
+        "和 data/afs/private/episode.json、run/secrets/provider-token、"
+        "./data/local.json、../run/local.json、~/home/local.json 的镜头说明"
+    )
     projection = _projection(_aggregate(project_title=title))
 
     assert projection["aggregate"]["projects"][0]["title"] == title
@@ -541,6 +551,18 @@ def test_route_fails_closed_on_corrupt_snapshot_without_leaking_storage_path(
         (
             "请查看 /home/afs/private/episode.json 的说明",
             ("episode.json", "/home/afs", "private"),
+        ),
+        (
+            "参考 /data/afs/private/episode.json",
+            ("episode.json", "/data/afs", "private"),
+        ),
+        (
+            "参考 /run/secrets/provider-token",
+            ("provider-token", "/run/secrets"),
+        ),
+        (
+            "参考 //server/share/episode.json",
+            ("episode.json", "//server/share"),
         ),
     ),
 )
