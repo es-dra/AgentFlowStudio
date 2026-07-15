@@ -360,6 +360,9 @@ function inferUserAction(route, method) {
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
+  if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
+  if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
+  if (/\/commercial-production\/revision-requests\/local-rewrite$/.test(route) && method === "POST") return "request_commercial_production_local_rewrite";
   if (/\/domain-crew\/tasks\/[^/]+\/claim$/.test(route) && method === "POST") return "claim_domain_crew_task";
   if (/\/domain-crew\/tasks$/.test(route) && method === "POST") return "create_domain_crew_task";
   if (/\/domain-crew\/messages$/.test(route) && method === "POST") return "send_domain_crew_message";
@@ -660,6 +663,30 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     getCreatorGoldenTrial() {
       return requestJson(`/projects/${encoded}/creator-golden-trial`);
+    },
+    getCommercialProduction() {
+      return requestJson(`/projects/${encoded}/commercial-production`);
+    },
+    createCommercialProductionSample(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/commercial-production/sample`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    lockCommercialProductionStageGate(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/commercial-production/stage-gate/lock`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
+    requestCommercialProductionLocalRewrite(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/commercial-production/revision-requests/local-rewrite`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
     },
     recordCreatorGoldenTrialMission(payload, idempotencyKey) {
       return requestJson(`/projects/${encoded}/creator-golden-trial/mission`, {

@@ -8,13 +8,16 @@ let projectId = safeProjectId(params.get("project")) || "";
 let runtime = projectId ? createRuntimeClient(projectId) : createRuntimeClient();
 let control = null;
 let trial = null;
+let commercial = null;
 let user = null;
 let busy = false;
 let notice = "";
 let activeTab = params.get("view") || "mission";
+let commercialView = params.get("commercialView") || "storyboard";
 
 const tabs = [
   ["mission", "目标"],
+  ["longform", "长篇生产"],
   ["plan", "计划"],
   ["cockpit", "制作"],
   ["trial", "图像试验"],
@@ -48,6 +51,7 @@ function syncRouteState() {
   const url = new URL(window.location.href);
   if (projectId) url.searchParams.set("project", projectId);
   if (activeTab) url.searchParams.set("view", activeTab);
+  if (commercialView) url.searchParams.set("commercialView", commercialView);
   window.history.replaceState({}, "", url);
 }
 
@@ -197,6 +201,7 @@ function renderHeader() {
 
 function renderActiveTab() {
   if (activeTab === "plan") return renderPlan();
+  if (activeTab === "longform") return renderCommercialProduction();
   if (activeTab === "cockpit") return renderCockpit();
   if (activeTab === "trial") return renderTrial();
   if (activeTab === "artifacts") return renderArtifacts();
@@ -317,6 +322,139 @@ function renderTrial() {
   </section>`;
 }
 
+function renderCommercialProduction() {
+  const state = commercial || { status: "empty", version: 0 };
+  if (state.status === "empty") {
+    return `<section class="work-surface longform-empty">
+      <header>
+        <h2>长篇生产纵切</h2>
+        <p>创建一个可运行样本：多集大纲、第一集 4 场 16 镜、人物/动物/场景/道具资产、创作方案继承和同源 Storyboard/Canvas。</p>
+      </header>
+      <div class="commercial-proof-grid">
+        <article><strong>事实层</strong><span>Project/IP → Bible → Arc → Episode → Scene → Shot</span></article>
+        <article><strong>资产链</strong><span>Entity → Identity → Variant → ReferenceSet → Candidate → Approved</span></article>
+        <article><strong>返工</strong><span>Scope lock → 局部改写 → 未选事实不漂移</span></article>
+      </div>
+      <button type="button" class="primary" data-action="commercial-sample" ${busy ? "disabled" : ""}>${icon("plus", 16)}创建可操作样本</button>
+    </section>`;
+  }
+  const locked = state.stage_gates?.storyboard_scope_lock?.status === "locked";
+  return `<section class="commercial-shell">
+    <header class="commercial-header">
+      <div>
+        <span class="eyeless">同一事实源 · v${state.version} · 外部生成 ${state.provider_dispatch_count || state.production_control?.provider_dispatch_count || 0} 次</span>
+        <h2>${escapeHtml(state.hierarchy?.project_title || "长篇项目")}</h2>
+        <p>${escapeHtml(state.hierarchy?.arc?.title || "")} · ${escapeHtml(state.hierarchy?.volume?.title || "")}</p>
+      </div>
+      <div class="segmented" role="tablist" aria-label="长篇生产模式">
+        <button type="button" data-commercial-view="storyboard" aria-current="${commercialView === "storyboard" ? "page" : "false"}">${icon("frames", 15)}故事板</button>
+        <button type="button" data-commercial-view="canvas" aria-current="${commercialView === "canvas" ? "page" : "false"}">${icon("grid", 15)}画布</button>
+      </div>
+    </header>
+    <div class="commercial-layout">
+      <div class="commercial-main">
+        ${renderCommercialFacts(state)}
+        ${commercialView === "canvas" ? renderCommercialCanvas(state) : renderCommercialStoryboard(state)}
+      </div>
+      <aside class="commercial-side">
+        ${renderCommercialGate(state, locked)}
+        ${renderCommercialRecipe(state)}
+        ${renderCommercialAssets(state)}
+      </aside>
+    </div>
+  </section>`;
+}
+
+function renderCommercialFacts(state) {
+  const bibleFacts = [
+    ...(state.hierarchy?.story_bible?.facts || []),
+    ...(state.hierarchy?.world_bible?.facts || []),
+  ];
+  return `<div class="fact-chain">
+    <article><span>IP</span><strong>${escapeHtml(state.hierarchy?.ip_title || "")}</strong></article>
+    <article><span>故事 / 世界</span><strong>${bibleFacts.length} 条事实</strong></article>
+    <article><span>多集大纲</span><strong>${state.episodes?.length || 0} 集</strong></article>
+    <article><span>当前集</span><strong>${state.storyboard?.scene_count || 0} 场 · ${state.storyboard?.shot_count || 0} 镜</strong></article>
+  </div>`;
+}
+
+function renderCommercialStoryboard(state) {
+  const scenes = state.scenes || [];
+  const shots = state.shots || [];
+  return `<div class="storyboard-surface">
+    <header><h3>结构化 Storyboard</h3><p>默认生产面。每个镜头引用同一批资产和创作方案，局部改写只更新被选镜头。</p></header>
+    <div class="episode-strip">${(state.episodes || []).map((episode) => `<article class="${episode.episode_id === state.selected_episode_id ? "selected" : ""}">
+      <span>第 ${episode.sequence} 集</span><strong>${escapeHtml(episode.title)}</strong><small>${escapeHtml(episode.logline)}</small>
+    </article>`).join("")}</div>
+    <div class="scene-stack">
+      ${scenes.map((scene) => {
+        const sceneShots = shots.filter((shot) => shot.scene_id === scene.scene_id);
+        return `<article class="scene-block">
+          <header><span>${String(scene.sequence).padStart(2, "0")}</span><div><h4>${escapeHtml(scene.title)}</h4><p>${escapeHtml(scene.purpose)}</p></div></header>
+          <div class="shot-grid">${sceneShots.map((shot) => `<button type="button" class="shot-tile ${shot.review_state === "needs_review" ? "needs-review" : ""}" data-shot-id="${escapeHtml(shot.shot_id)}">
+            <strong>${escapeHtml(shot.shot_id.replace("shot-", "镜头 "))}</strong>
+            <span>${escapeHtml(shot.beat)}</span>
+            <small>${escapeHtml(shot.version_id)} · ${shot.asset_refs.length} 个资产</small>
+          </button>`).join("")}</div>
+        </article>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+function renderCommercialCanvas(state) {
+  const scenes = state.scenes || [];
+  const assets = state.assets || [];
+  return `<div class="canvas-surface">
+    <header><h3>Canvas 探索视图</h3><p>用于关系和空间组织，不作为第二套事实源。</p></header>
+    <div class="canvas-map">
+      ${scenes.map((scene, index) => `<article style="--x:${(index % 2) * 42 + 8}%;--y:${Math.floor(index / 2) * 34 + 8}%">
+        <span>场景</span><strong>${escapeHtml(scene.title)}</strong><small>${escapeHtml(scene.scene_id)}</small>
+      </article>`).join("")}
+      ${assets.slice(0, 6).map((asset, index) => `<article class="asset-node" style="--x:${(index % 3) * 28 + 14}%;--y:${58 + Math.floor(index / 3) * 20}%">
+        <span>${escapeHtml(assetTypeLabel(asset.type))}</span><strong>${escapeHtml(asset.name)}</strong><small>${escapeHtml(asset.reference_set_id)}</small>
+      </article>`).join("")}
+    </div>
+  </div>`;
+}
+
+function renderCommercialGate(state, locked) {
+  const gate = state.stage_gates?.storyboard_scope_lock || {};
+  const last = state.revision_requests?.at?.(-1);
+  return `<section class="commercial-card">
+    <h3>Stage Gate</h3>
+    <p>${locked ? "故事板范围已锁定，可恢复返工。" : "锁定后才能提交局部改写。"}</p>
+    <div class="fact-pills">
+      <span>${statusLabel(gate.status || "missing")}</span>
+      <span>${gate.locked_refs?.length || 0} 个锁定引用</span>
+    </div>
+    <button type="button" data-action="commercial-lock" ${locked || busy ? "disabled" : ""}>${icon("lock", 15)}锁定范围</button>
+    <button type="button" class="primary" data-action="commercial-rewrite" ${!locked || busy ? "disabled" : ""}>${icon("pencil", 15)}改写第 6 镜</button>
+    ${last ? `<small>最近返工：${escapeHtml(last.target_ref?.entity_id || "")} · 未选事实 ${last.protected_digest_equal ? "未漂移" : "需复查"}</small>` : ""}
+  </section>`;
+}
+
+function renderCommercialRecipe(state) {
+  const cards = state.production_recipe?.cards || {};
+  return `<section class="commercial-card">
+    <h3>创作方案</h3>
+    <div class="recipe-list">
+      ${Object.entries(cards).map(([key, value]) => `<div><span>${escapeHtml(recipeLabel(key))}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}
+    </div>
+  </section>`;
+}
+
+function renderCommercialAssets(state) {
+  return `<section class="commercial-card">
+    <h3>资产身份链</h3>
+    <div class="asset-chain-list">${(state.assets || []).map((asset) => `<article>
+      <strong>${escapeHtml(asset.name)}</strong>
+      <span>${escapeHtml(assetTypeLabel(asset.type))} · 置信度 ${Math.round((asset.recognition?.confidence || 0) * 100)}%</span>
+      <small>${escapeHtml(asset.base_identity?.version_id)} → ${escapeHtml(asset.episode_variant?.version_id)} → ${escapeHtml(asset.reference_set_id)} → ${escapeHtml(asset.approved_version?.version_id)}</small>
+    </article>`).join("")}</div>
+  </section>`;
+}
+
 function renderArtifacts() {
   if (!control.artifacts.length) return emptyPanel("素材", "写回后会显示受影响镜头与被保护镜头。");
   return `<section class="artifact-surface">
@@ -414,6 +552,30 @@ function operationLabel(value) {
   }[value] || "产物写回";
 }
 
+function assetTypeLabel(value) {
+  return {
+    human: "人物",
+    animal: "动物",
+    scene_location: "场景 / 地点",
+    prop: "道具",
+    creature: "生物",
+    vehicle: "载具",
+    effect: "特效",
+  }[value] || "资产";
+}
+
+function recipeLabel(value) {
+  return {
+    genre: "类型",
+    narrative_grammar: "叙事语法",
+    shot_language: "镜头语言",
+    visual_style: "视觉风格",
+    motion_audio: "运动 / 声音",
+    negative_constraints: "负面约束",
+    provider_adapter: "生成适配",
+  }[value] || value;
+}
+
 function nonClaimLabel(value) {
   return {
     not_provider_smoke: "未连接外部生成服务",
@@ -461,6 +623,7 @@ function bindGlobal() {
     try { await runtime.logout(); } catch { saveAuthToken(""); }
     user = null;
     control = null;
+    commercial = null;
     await init();
   });
 }
@@ -470,9 +633,16 @@ function bindApp() {
     activeTab = button.dataset.tab;
     renderApp();
   }));
+  app.querySelectorAll("[data-commercial-view]").forEach((button) => button.addEventListener("click", () => {
+    commercialView = button.dataset.commercialView || "storyboard";
+    renderApp();
+  }));
   app.querySelector('[data-form="mission"]')?.addEventListener("submit", onMission);
   app.querySelector('[data-form="plan"]')?.addEventListener("submit", onPlan);
   app.querySelector('[data-action="approve-plan"]')?.addEventListener("click", onApprovePlan);
+  app.querySelector('[data-action="commercial-sample"]')?.addEventListener("click", onCommercialSample);
+  app.querySelector('[data-action="commercial-lock"]')?.addEventListener("click", onCommercialLock);
+  app.querySelector('[data-action="commercial-rewrite"]')?.addEventListener("click", onCommercialRewrite);
   app.querySelector('[data-action="trial-mission"]')?.addEventListener("click", onTrialMission);
   app.querySelector('[data-action="trial-approve"]')?.addEventListener("click", onTrialApprove);
   app.querySelector('[data-action="trial-dispatch"]')?.addEventListener("click", onTrialDispatch);
@@ -564,6 +734,41 @@ async function onApprovePlan() {
   );
 }
 
+async function onCommercialSample() {
+  await mutateCommercial(
+    runtime.createCommercialProductionSample({
+      expected_version: commercial?.version || 0,
+      title: "雾港异闻录",
+      created_at: new Date().toISOString(),
+    }, commandKey("commercial-sample")),
+    "长篇生产样本已创建",
+  );
+}
+
+async function onCommercialLock() {
+  await mutateCommercial(
+    runtime.lockCommercialProductionStageGate({
+      expected_version: commercial?.version || 0,
+      note: "锁定第一集 4 场 16 镜及资产身份链。",
+      created_at: new Date().toISOString(),
+    }, commandKey("commercial-lock")),
+    "故事板范围已锁定",
+  );
+}
+
+async function onCommercialRewrite() {
+  await mutateCommercial(
+    runtime.requestCommercialProductionLocalRewrite({
+      expected_version: commercial?.version || 0,
+      target_shot_id: "shot-006",
+      replacement_beat: "近景：分镜本空白页只显出半个白鹤轮廓，林澈先停手确认范围锁，再允许第 6 镜返工。",
+      reason: "只调整第 6 镜的悬念节奏，不改变人物、场景、道具或未选镜头。",
+      created_at: new Date().toISOString(),
+    }, commandKey("commercial-rewrite")),
+    "第 6 镜已局部改写，未选事实保持不变",
+  );
+}
+
 async function onTrialMission() {
   await mutateTrial(
     runtime.recordCreatorGoldenTrialMission({
@@ -643,6 +848,16 @@ async function mutateTrial(promise, message) {
   }, "图像试验命令失败");
 }
 
+async function mutateCommercial(promise, message) {
+  await guarded(async () => {
+    const result = await promise;
+    commercial = result.production;
+    notice = message;
+    activeTab = "longform";
+    renderApp();
+  }, "长篇生产命令失败");
+}
+
 async function guarded(fn, fallback) {
   if (busy) return;
   busy = true;
@@ -669,21 +884,26 @@ async function ensureProjectAndRefresh() {
 async function refresh(render = true) {
   if (!projectId) {
     control = null;
+    trial = null;
+    commercial = null;
     if (render) renderProjectSetup();
     return;
   }
   runtime = createRuntimeClient(projectId);
   try {
-    const [payload, trialPayload] = await Promise.all([
+    const [payload, trialPayload, commercialPayload] = await Promise.all([
       runtime.getProductionControl(),
       runtime.getCreatorGoldenTrial().catch(() => null),
+      runtime.getCommercialProduction().catch(() => null),
     ]);
     control = payload.control;
     trial = trialPayload?.trial || null;
+    commercial = commercialPayload?.production || null;
     if (render) renderApp();
   } catch (error) {
     control = null;
     trial = null;
+    commercial = null;
     notice = error?.message || "";
     renderProjectSetup();
   }

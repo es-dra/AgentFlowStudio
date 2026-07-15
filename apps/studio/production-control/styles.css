@@ -466,6 +466,230 @@ textarea {
   font-size: 12px;
 }
 
+.commercial-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.commercial-header,
+.commercial-proof-grid article,
+.commercial-card,
+.storyboard-surface,
+.canvas-surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.commercial-header {
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.commercial-header h2,
+.storyboard-surface h3,
+.canvas-surface h3,
+.commercial-card h3 {
+  margin: 0;
+}
+
+.segmented {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(108px, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.segmented button {
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+}
+
+.segmented button[aria-current="page"] {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+
+.commercial-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+}
+
+.commercial-main,
+.commercial-side {
+  display: grid;
+  gap: 14px;
+  align-self: start;
+}
+
+.fact-chain,
+.commercial-proof-grid,
+.episode-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fact-chain article,
+.episode-strip article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfa;
+}
+
+.fact-chain span,
+.episode-strip span,
+.episode-strip small,
+.asset-chain-list span,
+.asset-chain-list small,
+.recipe-list span,
+.commercial-card small {
+  display: block;
+  color: var(--muted);
+}
+
+.episode-strip article.selected {
+  border-color: #94b8aa;
+  background: #eef7f3;
+}
+
+.storyboard-surface,
+.canvas-surface,
+.commercial-card {
+  padding: 16px;
+}
+
+.storyboard-surface header,
+.canvas-surface header {
+  margin-bottom: 12px;
+}
+
+.scene-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.scene-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.scene-block > header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.scene-block > header > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #17201c;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.scene-block h4,
+.scene-block p {
+  margin: 0;
+}
+
+.shot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shot-tile {
+  min-height: 132px;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.shot-tile span,
+.shot-tile small {
+  color: var(--muted);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.shot-tile.needs-review {
+  border-color: #d5a04f;
+  background: #fff8ec;
+}
+
+.canvas-map {
+  position: relative;
+  min-height: 520px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(23, 107, 91, 0.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(23, 107, 91, 0.08) 1px, transparent 1px), #fbfcfa;
+  background-size: 44px 44px;
+  overflow: hidden;
+}
+
+.canvas-map article {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: min(210px, 34%);
+  min-height: 74px;
+  border: 1px solid #bed2c9;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(29, 46, 38, 0.1);
+}
+
+.canvas-map .asset-node {
+  border-color: #c6cfe8;
+}
+
+.canvas-map span,
+.canvas-map small {
+  display: block;
+  color: var(--muted);
+}
+
+.recipe-list,
+.asset-chain-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recipe-list div,
+.asset-chain-list article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfa;
+}
+
+.commercial-card button {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .artifact-list article,
 .review-grid article,
 .agent-rail section {
@@ -586,6 +810,14 @@ dd {
   .run-actions {
     justify-content: flex-start;
   }
+
+  .commercial-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .commercial-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -616,7 +848,7 @@ dd {
   }
 
   .tabs {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
   }
 
   .tabs button {
@@ -631,8 +863,31 @@ dd {
   .trial-grid,
   .shot-trial-list,
   .review-grid,
-  .agent-rail {
+  .agent-rail,
+  .commercial-header,
+  .commercial-side,
+  .fact-chain,
+  .commercial-proof-grid,
+  .episode-strip,
+  .shot-grid {
     grid-template-columns: 1fr;
+  }
+
+  .commercial-header {
+    display: grid;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+
+  .canvas-map {
+    min-height: 640px;
+  }
+
+  .canvas-map article {
+    width: 78%;
+    left: 8% !important;
   }
 
   .metrics {
