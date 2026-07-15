@@ -187,7 +187,7 @@ def review_selection(
         purpose=current.purpose,
         allowed_entity_id=current.entity_id,
     )
-    if decision == "approve" and _has_valid_approval(aggregate, current):
+    if decision == "approve" and _valid_exact_approvals(aggregate, current):
         raise ReviewDeliveryStateError(
             "selection already has an exact approval; duplicate approve is forbidden"
         )
@@ -251,8 +251,7 @@ def lock_selection(
     )
     if current.lifecycle_state != "approved" or current.review_state != "approved":
         raise ReviewDeliveryStateError("only an approved selection can be locked")
-    if not _has_valid_approval(aggregate, current):
-        raise ReviewDeliveryStateError("selection lock requires an exact approval decision")
+    _require_exactly_one_valid_approval(aggregate, current)
     _require_approved_candidate(_candidate(aggregate, current.candidate_ref))
     locked = current.model_copy(
         update={
@@ -599,8 +598,13 @@ def assess_delivery_readiness(
             blockers.append(f"selection_not_latest:{selection.entity_id}:{selection.version_id}")
         if selection.lifecycle_state != "locked" or selection.review_state != "approved":
             blockers.append(f"selection_not_locked:{selection.entity_id}:{selection.version_id}")
-        if not _has_valid_approval(aggregate, selection):
+        valid_approvals = _valid_exact_approvals(aggregate, selection)
+        if not valid_approvals:
             blockers.append(f"selection_approval_missing:{selection.entity_id}:{selection.version_id}")
+        elif len(valid_approvals) > 1:
+            blockers.append(
+                f"selection_approval_duplicate:{selection.entity_id}:{selection.version_id}"
+            )
         candidate = _candidate(aggregate, selection.candidate_ref)
         try:
             _require_approved_candidate(candidate)
@@ -665,7 +669,8 @@ def freeze_delivery(
         )
     selections = tuple(_selection(aggregate, ref) for ref in readiness.selection_refs)
     exact_approvals = tuple(
-        _latest_valid_approval(aggregate, selection).as_ref() for selection in selections
+        _require_exactly_one_valid_approval(aggregate, selection).as_ref()
+        for selection in selections
     )
     if any(item.entity_id == delivery_entity_id for item in aggregate.deliveries):
         raise ReviewDeliveryStateError("frozen delivery requires a new delivery entity id")
@@ -767,6 +772,16 @@ def assess_current_delivery(
         artifact_proofs=artifact_proofs,
     )
     blockers.extend(readiness.blockers)
+    expected_approval_refs: list[EntityVersionRef] = []
+    for selection_ref in delivery.selection_refs:
+        selection = _selection(aggregate, selection_ref)
+        approvals = _valid_exact_approvals(aggregate, selection)
+        if len(approvals) == 1:
+            expected_approval_refs.append(approvals[0].as_ref())
+    if tuple(expected_approval_refs) != delivery.review_decision_refs:
+        blockers.append(
+            f"delivery_approval_authority_stale:{delivery.entity_id}:{delivery.version_id}"
+        )
     invalidating = {
         "unlock",
         "request_revision",
@@ -951,7 +966,7 @@ def _delivery_selection_is_current(
         )
         and selection.lifecycle_state == "locked"
         and selection.review_state == "approved"
-        and _has_valid_approval(aggregate, selection)
+        and len(_valid_exact_approvals(aggregate, selection)) == 1
     )
 
 
@@ -1039,49 +1054,36 @@ def _require_approved_candidate(candidate: AssetCandidateVersion) -> None:
         raise ReviewDeliveryStateError("selection requires an approved exact candidate version")
 
 
-def _has_valid_approval(
+def _valid_exact_approvals(
     aggregate: ProductionProjectAggregate,
     selection: SelectedVersion,
-) -> bool:
-    return any(
-        decision.subject_ref == selection.as_ref()
-        and decision.decision == "approve"
-        and decision.lifecycle_state in ("approved", "locked")
-        and decision.review_state == "approved"
-        and datetime.fromisoformat(decision.created_at)
-        >= datetime.fromisoformat(selection.created_at)
-        and datetime.fromisoformat(decision.created_at)
-        <= datetime.fromisoformat(aggregate.evaluated_at)
-        for decision in aggregate.review_decisions
-    )
-
-
-def _latest_valid_approval(
-    aggregate: ProductionProjectAggregate,
-    selection: SelectedVersion,
-) -> ReviewDecision:
-    decisions = tuple(
+) -> tuple[ReviewDecision, ...]:
+    return tuple(
         decision
         for decision in aggregate.review_decisions
         if decision.subject_ref == selection.as_ref()
         and decision.decision == "approve"
         and decision.lifecycle_state in ("approved", "locked")
         and decision.review_state == "approved"
+        and decision.scope == aggregate.scope
+        and decision.scope == selection.scope
         and datetime.fromisoformat(decision.created_at)
         >= datetime.fromisoformat(selection.created_at)
         and datetime.fromisoformat(decision.created_at)
         <= datetime.fromisoformat(aggregate.evaluated_at)
     )
+
+
+def _require_exactly_one_valid_approval(
+    aggregate: ProductionProjectAggregate,
+    selection: SelectedVersion,
+) -> ReviewDecision:
+    decisions = _valid_exact_approvals(aggregate, selection)
     if not decisions:
         raise ReviewDeliveryStateError("selection has no exact approval decision")
-    return max(
-        decisions,
-        key=lambda item: (
-            datetime.fromisoformat(item.created_at),
-            item.revision,
-            item.version_id,
-        ),
-    )
+    if len(decisions) > 1:
+        raise ReviewDeliveryStateError("selection has multiple exact approval decisions")
+    return decisions[0]
 
 
 def _decision(

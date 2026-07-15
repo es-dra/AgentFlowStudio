@@ -42,6 +42,11 @@ from apps.api.runtime_episode_review_delivery_service import (
 
 
 SCOPE = TenantScope(org_id="small-studio", project_id="rainlight", actor_id="creator-1")
+FOREIGN_ACTOR_SCOPE = TenantScope(
+    org_id=SCOPE.org_id,
+    project_id=SCOPE.project_id,
+    actor_id="creator-2",
+)
 TIMES = tuple(f"2026-07-15T08:{minute:02d}:00+00:00" for minute in range(30))
 
 
@@ -228,6 +233,39 @@ def _frozen(aggregate: ProductionProjectAggregate) -> ProductionProjectAggregate
     )
 
 
+def _duplicate_exact_approval(
+    aggregate: ProductionProjectAggregate,
+    *,
+    selection_ref: EntityVersionRef,
+    entity_id: str,
+    created_at: str,
+) -> ProductionProjectAggregate:
+    duplicate = ReviewDecision(
+        **_fact(entity_id, created_at=created_at),
+        subject_ref=selection_ref,
+        decision="approve",
+    )
+    payload = aggregate.model_dump(mode="python")
+    payload["review_decisions"] = (*aggregate.review_decisions, duplicate)
+    return ProductionProjectAggregate.model_validate(payload)
+
+
+def _replace_approval_actor(
+    aggregate: ProductionProjectAggregate,
+    *,
+    approval_ref: EntityVersionRef,
+    scope: TenantScope,
+) -> ProductionProjectAggregate:
+    payload = aggregate.model_dump(mode="python")
+    payload["review_decisions"] = tuple(
+        decision.model_copy(update={"scope": scope})
+        if decision.as_ref() == approval_ref
+        else decision
+        for decision in aggregate.review_decisions
+    )
+    return ProductionProjectAggregate.model_validate(payload)
+
+
 def test_compare_v1_v2_and_reject_cross_target_versions() -> None:
     aggregate = _aggregate()
     comparison = compare_candidate_versions(
@@ -350,6 +388,136 @@ def test_duplicate_approve_fails_without_appending_another_revision() -> None:
         )
 
     assert approved.model_dump(mode="python") == before
+
+
+def test_foreign_actor_approval_cannot_authorize_lock_readiness_or_freeze() -> None:
+    approved = _approved(_selected_v2(_aggregate()))
+    foreign_approved = _replace_approval_actor(
+        approved,
+        approval_ref=_ref(approved.review_decisions[-1]),
+        scope=FOREIGN_ACTOR_SCOPE,
+    )
+    with pytest.raises(ReviewDeliveryStateError, match="no exact approval"):
+        lock_selection(
+            foreign_approved,
+            scope=SCOPE,
+            expected_aggregate_version=foreign_approved.aggregate_version,
+            selection_ref=_ref(foreign_approved.selections[-1]),
+            selection_version_id="selection-shot-1.v3",
+            decision_entity_id="lock-with-foreign-approval",
+            decision_version_id="lock-with-foreign-approval.v1",
+            created_at=TIMES[6],
+        )
+
+    locked = _locked(approved)
+    foreign_locked = _replace_approval_actor(
+        locked,
+        approval_ref=_ref(locked.review_decisions[-1]),
+        scope=FOREIGN_ACTOR_SCOPE,
+    )
+    preview = _artifact("preview-foreign-approval", "video")
+    proofs = _delivery_proofs(foreign_locked, preview)
+    readiness = assess_delivery_readiness(
+        foreign_locked,
+        scope=SCOPE,
+        episode_ref=_ref(foreign_locked.episodes[0]),
+        selection_refs=(_ref(foreign_locked.selections[-1]),),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        artifact_proofs=proofs,
+    )
+    assert (
+        "selection_approval_missing:selection-shot-1:selection-shot-1.v3"
+        in readiness.blockers
+    )
+    with pytest.raises(DeliveryNotReadyError) as exc_info:
+        freeze_delivery(
+            foreign_locked,
+            scope=SCOPE,
+            expected_aggregate_version=foreign_locked.aggregate_version,
+            episode_ref=_ref(foreign_locked.episodes[0]),
+            selection_refs=(_ref(foreign_locked.selections[-1]),),
+            missing_inventory_count=0,
+            preview_artifact_ref=preview,
+            export_artifact_refs=(),
+            artifact_proofs=proofs,
+            delivery_entity_id="delivery-foreign-approval",
+            delivery_version_id="delivery-foreign-approval.v1",
+            created_at=TIMES[7],
+        )
+    assert readiness.blockers == exc_info.value.readiness.blockers
+
+
+def test_duplicate_exact_approvals_fail_closed_for_lock_readiness_and_freeze() -> None:
+    approved = _approved(_selected_v2(_aggregate()))
+    duplicate_approved = _duplicate_exact_approval(
+        approved,
+        selection_ref=_ref(approved.selections[-1]),
+        entity_id="duplicate-selection-v2-approval",
+        created_at=TIMES[5],
+    )
+    with pytest.raises(ReviewDeliveryStateError, match="multiple exact approval"):
+        lock_selection(
+            duplicate_approved,
+            scope=SCOPE,
+            expected_aggregate_version=duplicate_approved.aggregate_version,
+            selection_ref=_ref(duplicate_approved.selections[-1]),
+            selection_version_id="selection-shot-1.v3",
+            decision_entity_id="lock-with-duplicate-approval",
+            decision_version_id="lock-with-duplicate-approval.v1",
+            created_at=TIMES[6],
+        )
+    with pytest.raises(ReviewDeliveryStateError, match="duplicate approve"):
+        review_selection(
+            duplicate_approved,
+            scope=SCOPE,
+            expected_aggregate_version=duplicate_approved.aggregate_version,
+            selection_ref=_ref(duplicate_approved.selections[-1]),
+            decision="approve",
+            selection_version_id="selection-shot-1.v3",
+            decision_entity_id="review-with-duplicate-approval",
+            decision_version_id="review-with-duplicate-approval.v1",
+            created_at=TIMES[6],
+        )
+
+    locked = _locked(approved)
+    duplicate_locked = _duplicate_exact_approval(
+        locked,
+        selection_ref=_ref(locked.selections[-1]),
+        entity_id="duplicate-selection-v3-approval",
+        created_at=TIMES[6],
+    )
+    preview = _artifact("preview-duplicate-approval", "video")
+    proofs = _delivery_proofs(duplicate_locked, preview)
+    readiness = assess_delivery_readiness(
+        duplicate_locked,
+        scope=SCOPE,
+        episode_ref=_ref(duplicate_locked.episodes[0]),
+        selection_refs=(_ref(duplicate_locked.selections[-1]),),
+        missing_inventory_count=0,
+        preview_artifact_ref=preview,
+        artifact_proofs=proofs,
+    )
+    assert (
+        "selection_approval_duplicate:selection-shot-1:selection-shot-1.v3"
+        in readiness.blockers
+    )
+    with pytest.raises(DeliveryNotReadyError) as exc_info:
+        freeze_delivery(
+            duplicate_locked,
+            scope=SCOPE,
+            expected_aggregate_version=duplicate_locked.aggregate_version,
+            episode_ref=_ref(duplicate_locked.episodes[0]),
+            selection_refs=(_ref(duplicate_locked.selections[-1]),),
+            missing_inventory_count=0,
+            preview_artifact_ref=preview,
+            export_artifact_refs=(),
+            artifact_proofs=proofs,
+            delivery_entity_id="delivery-duplicate-approval",
+            delivery_version_id="delivery-duplicate-approval.v1",
+            created_at=TIMES[7],
+        )
+    assert readiness.blockers == exc_info.value.readiness.blockers
 
 
 def test_parallel_selection_authorities_block_lock_and_freeze() -> None:
@@ -778,6 +946,55 @@ def test_delivery_unlock_is_append_only_and_serializes_roundtrip() -> None:
     assert validity.delivery == restored.deliveries[0]
     assert any(blocker.startswith("delivery_not_latest:") for blocker in validity.blockers)
     assert any("delivery_invalidated:unlock:" in blocker for blocker in validity.blockers)
+
+
+@pytest.mark.parametrize("approval_corruption", ["foreign_actor", "duplicate"])
+def test_current_delivery_fails_closed_when_exact_approval_authority_is_corrupt(
+    approval_corruption: str,
+) -> None:
+    frozen = _frozen(_locked(_approved(_selected_v2(_aggregate()))))
+    selection = frozen.selections[-1]
+    if approval_corruption == "foreign_actor":
+        corrupted = _replace_approval_actor(
+            frozen,
+            approval_ref=frozen.deliveries[-1].review_decision_refs[0],
+            scope=FOREIGN_ACTOR_SCOPE,
+        )
+        expected_approval_blocker = (
+            "selection_approval_missing:selection-shot-1:selection-shot-1.v3"
+        )
+    else:
+        corrupted = _duplicate_exact_approval(
+            frozen,
+            selection_ref=_ref(selection),
+            entity_id="duplicate-current-delivery-approval",
+            created_at=TIMES[7],
+        )
+        expected_approval_blocker = (
+            "selection_approval_duplicate:selection-shot-1:selection-shot-1.v3"
+        )
+
+    delivery = corrupted.deliveries[-1]
+    validity = assess_current_delivery(
+        corrupted,
+        scope=SCOPE,
+        delivery_ref=_ref(delivery),
+        artifact_proofs=_delivery_proofs(
+            corrupted,
+            delivery.preview_artifact_ref,
+            delivery.export_artifact_refs,
+        ),
+    )
+    assert validity.current_valid is False
+    assert expected_approval_blocker in validity.blockers
+    assert (
+        f"delivery_approval_authority_stale:{delivery.entity_id}:{delivery.version_id}"
+        in validity.blockers
+    )
+    assert (
+        f"delivery_not_current_authority:{delivery.entity_id}:{delivery.version_id}"
+        in validity.blockers
+    )
 
 
 def test_selection_unlock_revision_request_and_retire_invalidate_current_delivery() -> None:
