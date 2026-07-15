@@ -975,7 +975,7 @@ def _workspace_shots(model: dict[str, Any]) -> list[dict[str, Any]]:
                 "prior_shot_blockers": [],
                 "allowed_actions": [
                     {"action": "inspect", "enabled": True, "reason": "", "blocked_by": []},
-                    {"action": "review_shot", "enabled": affected, "reason": "", "blocked_by": []},
+                    {"action": "review_shot", "enabled": False, "reason": "生产控制投影只读，请回到生产控制页追加写回。", "blocked_by": []},
                     {"action": "reassign_scene", "enabled": False, "reason": "生产控制投影只读。", "blocked_by": []},
                     {"action": "apply_continuity", "enabled": False, "reason": "请回到生产控制页追加写回。", "blocked_by": []},
                     {"action": "adopt_candidate", "enabled": False, "reason": "没有候选素材。", "blocked_by": []},

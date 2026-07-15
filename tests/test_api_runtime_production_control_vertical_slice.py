@@ -199,6 +199,13 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
     assert workspace.json()["workspace"]["truth"]["shot_count"] == 3
     assert workspace.json()["workspace"]["shots"][0]["production_state"] == "rework"
     assert workspace.json()["workspace"]["shots"][1]["ref"]["version_id"] == "shot-002-v1"
+    review_action = next(
+        action
+        for action in workspace.json()["workspace"]["shots"][0]["allowed_actions"]
+        if action["action"] == "review_shot"
+    )
+    assert review_action["enabled"] is False
+    assert "只读" in review_action["reason"]
 
     restarted_client = TestClient(create_runtime_app(runtime_root=tmp_path))
     recovered = restarted_client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
