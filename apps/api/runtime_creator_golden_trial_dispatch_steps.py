@@ -166,6 +166,7 @@ def writeback_candidate(
             "status": "failed",
             "recoverable": True,
             "shot_id": next_shot_id,
+            "control_provenance_status": "not_written_by_adapter_cache",
         }
 
 
@@ -205,6 +206,7 @@ def complete_dispatch(
                 "job_id": dispatch_result.get("job_id"),
                 "provider_calls_started": bool(dispatch_result.get("provider_calls_started")),
                 "episode_writeback": episode_writeback,
+                "control_writeback_status": "not_written_by_adapter_cache",
                 "cost_receipt": cost_receipt(
                     provider_attempt_id,
                     status="recorded" if dispatch_result.get("provider_calls_started") else "estimated",

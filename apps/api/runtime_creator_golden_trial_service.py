@@ -6,9 +6,7 @@ from apps.api.runtime_artifacts import keyframe_generation_artifacts
 from apps.api.runtime_creator_golden_trial_common import DispatchNextRequest, digest, object_id
 from apps.api.runtime_episode_domain_contract import (
     AssetCandidateVersion,
-    ControlObjectRef,
     EntityVersionRef,
-    ProductionControlProvenance,
     ProductionProjectAggregate,
     SafeArtifactRef,
     TenantScope,
@@ -47,6 +45,7 @@ def dispatch_image_keyframe(
         aspect_ratio=body.aspect_ratio,
         candidate_count=body.candidate_count,
         provider_service_id=safe_id(body.provider_service_id),
+        node_parameters={"disable_provider_retry": True, "stop_loss": "single_provider_attempt_per_shot"},
         generated_at=body.generated_at,
     )
     result = build_keyframe_generation(
@@ -131,6 +130,7 @@ def write_episode_candidate(
                 "aggregate_version": aggregate.aggregate_version,
                 "candidate_ref": candidate.as_ref().model_dump(mode="json"),
                 "target_ref": target.model_dump(mode="json"),
+                "control_provenance_status": "not_written_by_adapter_cache",
             }
     candidate = AssetCandidateVersion(
         entity_id=candidate_entity_id,
@@ -153,12 +153,7 @@ def write_episode_candidate(
         artifact_ref=artifact_ref,
         job_id=job_id,
         job_state="succeeded",
-        control_provenance=_adapter_control_provenance(
-            shot_id=shot_id,
-            target=target,
-            job_id=job_id,
-            idempotency_key=idempotency_key,
-        ),
+        control_provenance=None,
     )
     payload = aggregate.model_dump(mode="python")
     payload.update(
@@ -189,6 +184,7 @@ def write_episode_candidate(
         "candidate_ref": written.as_ref().model_dump(mode="json"),
         "target_ref": target.model_dump(mode="json"),
         "human_review_state": "needs_review",
+        "control_provenance_status": "not_written_by_adapter_cache",
     }
 
 
@@ -197,36 +193,6 @@ def latest_shot_ref(aggregate: ProductionProjectAggregate, shot_id: str) -> Enti
     if not matches:
         raise EpisodeDomainStoreError(f"shot not found: {shot_id}")
     return max(matches, key=lambda item: item.revision).as_ref()
-
-
-def _adapter_control_provenance(
-    *,
-    shot_id: str,
-    target: EntityVersionRef,
-    job_id: str,
-    idempotency_key: str,
-) -> ProductionControlProvenance:
-    task_id = f"creator-golden-{safe_id(shot_id)}"
-    run_id = object_id("trial-adapter-run", job_id, shot_id)
-    attempt_id = object_id("trial-adapter-attempt", job_id, shot_id)
-    writeback_id = object_id("trial-adapter-writeback", idempotency_key, shot_id)
-    return ProductionControlProvenance(
-        plan_task_ref=_control_ref("plan_task", task_id),
-        run_ref=_control_ref("production_run", run_id),
-        attempt_ref=_control_ref("run_attempt", attempt_id),
-        writeback_ref=_control_ref("artifact_writeback", writeback_id),
-        affected_refs=(target,),
-        protected_refs=(),
-    )
-
-
-def _control_ref(object_type: str, object_id: str) -> ControlObjectRef:
-    safe = safe_id(object_id)
-    return ControlObjectRef(
-        object_type=object_type,
-        object_id=safe,
-        revision_id=f"{safe}-v1",
-    )
 
 
 def shot_prompt(shot_id: str, body: DispatchNextRequest) -> str:

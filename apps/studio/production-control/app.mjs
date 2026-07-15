@@ -276,7 +276,7 @@ function renderTrial() {
   return `<section class="work-surface trial-surface">
     <header>
       <h2>三镜头图像试验</h2>
-      <p>仅调度 3 个图像/关键帧 Provider 候选；不包含 LLM 脚本、视频、音频、导出、媒体 QA、人类接受或商业验证。金额只作合成准入上限，不代表真实账单。</p>
+      <p>仅调度 3 个图像/关键帧外部生成候选；不包含大模型脚本、视频、音频、导出、媒体质检、创作者验收或商业验证。金额只作合成准入上限，不代表真实账单。</p>
     </header>
     <div class="trial-grid">
       <article>
@@ -420,7 +420,7 @@ function nonClaimLabel(value) {
     not_generated_media_qa: "未进行生成媒体质检",
     not_human_acceptance: "未完成创作者验收",
     not_business_validation: "未进行商业验证",
-    "provider smoke is separate from media quality": "Provider smoke 与媒体质量分开",
+    "provider smoke is separate from media quality": "外部服务冒烟与媒体质量分开",
     "human acceptance is not claimed": "未声明人类接受",
     "business validation is not claimed": "未声明商业验证",
     "actual provider billing is not proven by this route": "真实账单需另行核对",
@@ -436,8 +436,8 @@ function moneyLabel(value) {
 
 function gateLabel(value) {
   if (!value || !value.status) return "未调度";
-  if (value.status === "ready") return "Provider gate 已开启";
-  if (value.status === "blocked") return "Provider gate 关闭";
+  if (value.status === "ready") return "外部服务门禁已开启";
+  if (value.status === "blocked") return "外部服务门禁关闭";
   return statusLabel(value.status);
 }
 
@@ -584,7 +584,7 @@ async function onTrialApprove() {
       expected_event_count: trial?.event_count || 0,
       created_at: new Date().toISOString(),
     }, commandKey("trial-approve")),
-    "试验计划已批准，下一步可以调度 Provider",
+    "试验计划已批准，下一步可以调度外部生成服务",
   );
 }
 

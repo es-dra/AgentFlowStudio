@@ -92,6 +92,7 @@ def rebuild_projection(ledger: dict[str, Any]) -> dict[str, Any]:
                     "candidate_ref": event.get("candidate_ref"),
                     "target_ref": event.get("target_ref"),
                     "human_review_state": event.get("human_review_state"),
+                    "control_provenance_status": event.get("control_provenance_status"),
                 },
             }
             if all(
@@ -150,6 +151,8 @@ def public_trial(ledger: dict[str, Any]) -> dict[str, Any]:
             "authoritative_media_source": "episode-production-aggregate",
             "owns_mission_plan_run_attempt_cost": False,
             "owns_media_acceptance_or_delivery": False,
+            "creates_production_control_objects": False,
+            "production_control_writeback_status": "not_written_by_adapter_cache",
         },
         "waiting_human": ledger.get("status") in {"planned", "awaiting_review"},
         "media_quality_status": "not_evaluated",
@@ -157,6 +160,7 @@ def public_trial(ledger: dict[str, Any]) -> dict[str, Any]:
         "business_validation_status": "not_claimed",
         "non_claims": [
             "this trial ledger is a discardable adapter cache, not the production control source of truth",
+            "this route does not create production-control run, attempt, cost, or writeback objects",
             "configured ceiling and unit estimates are synthetic admission limits, not verified provider pricing",
             "provider smoke is separate from media quality",
             "human acceptance is not claimed",

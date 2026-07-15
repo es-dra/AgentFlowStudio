@@ -6,8 +6,10 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from apps.api import runtime_creator_golden_trial
+from apps.api import runtime_creator_golden_trial, runtime_creator_golden_trial_service
+from apps.api.runtime_episode_domain_contract import TenantScope
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 STAMP = "2026-07-15T09:00:00+00:00"
@@ -92,9 +94,11 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     assert payload["receipt"]["cost_receipt"]["receipt_kind"] == "synthetic_admission"
     assert payload["receipt"]["cost_receipt"]["actual_cost"]["status"] == "unknown_unverified"
     assert payload["trial"]["adapter_authority"]["trial_ledger_role"] == "discardable_experiment_adapter_cache"
+    assert payload["trial"]["adapter_authority"]["creates_production_control_objects"] is False
     assert "cost" + "_receipts" not in payload["trial"]
     assert payload["trial"]["admission_receipts"]
     assert payload["trial"]["dispatches"]["shot-001"]["episode_writeback"]["human_review_state"] == "needs_review"
+    assert payload["trial"]["dispatches"]["shot-001"]["episode_writeback"]["control_provenance_status"] == "not_written_by_adapter_cache"
     assert calls == ["shot-001"]
 
     replay = _post(
@@ -127,7 +131,7 @@ def test_creator_golden_trial_dispatch_writes_episode_candidate_and_replays_with
     assert candidate["artifact_ref"]["artifact_type"] == "image_keyframe"
     assert candidate["job_state"] == "succeeded"
     assert candidate["review_state"] == "needs_review"
-    assert candidate["control_provenance"]["affected_refs"][0]["entity_id"] == "shot-001"
+    assert candidate["control_provenance"] is None
 
 
 def test_creator_golden_trial_uses_stored_unit_estimate_and_blocks_lowball_dispatch(
@@ -274,6 +278,51 @@ def test_creator_golden_trial_blocks_second_key_while_attempt_is_running(
     assert calls == ["shot-001"]
     assert nested["response"].status_code == 200
     assert nested["response"].json()["provider_calls_started"] is False
+
+
+def test_creator_golden_trial_keyframe_dispatch_disables_provider_retry(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_build_keyframe_generation(store, project_id, request, output_dir, **_kwargs):
+        captured["node_parameters"] = request.node_parameters
+        return {
+            "status": "succeeded",
+            "provider_gate": {"status": "ready", "required_gate": "AFS_ALLOW_REMOTE_IMAGE"},
+            "provider_calls_started": True,
+            "provider_outputs": [],
+            "safe_manifest": {"status": "succeeded", "provider_raw_response_stored": False},
+        }
+
+    monkeypatch.setattr(runtime_creator_golden_trial_service, "build_keyframe_generation", fake_build_keyframe_generation)
+    monkeypatch.setattr(runtime_creator_golden_trial_service, "keyframe_generation_artifacts", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(runtime_creator_golden_trial_service, "_candidate_records", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(runtime_creator_golden_trial_service, "_candidate_previews", lambda *_args, **_kwargs: [])
+
+    store = RuntimeStore(tmp_path)
+    store.create_project_manifest(
+        project_id="retry-disabled",
+        project_type="studio_episode_production",
+        goal="Retry disabled",
+        status="in_progress",
+    )
+    result = runtime_creator_golden_trial_service.dispatch_image_keyframe(
+        store,
+        "retry-disabled",
+        TenantScope(org_id="org", project_id="retry-disabled", actor_id="actor"),
+        shot_id="shot-001",
+        body=runtime_creator_golden_trial.DispatchNextRequest(
+            expected_event_count=0,
+            estimated_cost_amount=0.1,
+            generated_at=STAMP,
+        ),
+        provider_attempt_id="attempt-1",
+    )
+
+    assert result["provider_calls_started"] is True
+    assert captured["node_parameters"]["disable_provider_retry"] is True
 
 
 def test_creator_golden_trial_budget_ceiling_blocks_without_provider_call(
