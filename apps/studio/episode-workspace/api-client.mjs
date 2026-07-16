@@ -60,5 +60,9 @@ export function createEpisodeWorkspaceClient(projectId, episodeId, episodeVersio
       requireIdentity(idempotencyKey, "命令标识");
       return safe(() => runtime.executeEpisodeCommand(command, idempotencyKey));
     },
+    createProductionRequest(payload, idempotencyKey) {
+      requireIdentity(idempotencyKey, "制作任务标识");
+      return safe(() => runtime.createCreatorProductionRequest(payload, idempotencyKey));
+    },
   });
 }

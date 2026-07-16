@@ -344,6 +344,13 @@ def test_plan_approve_is_atomic_and_replay_safe(
         "TaskQueued",
         "TaskQueued",
     ]
+    start_run(harness, actor, data["tasks"][0])
+    advanced_version = harness.projection.version
+    replay_with_current_version = data["approval_command"].model_copy(
+        update={"expected_version": advanced_version}
+    )
+    assert harness.execute(replay_with_current_version) == receipt
+    assert harness.projection.version == advanced_version
     assert len([key for key in harness.projection.records if key[0] == "plan_task"]) == 3
     assert len(harness.events) == len(harness.outbox)
 

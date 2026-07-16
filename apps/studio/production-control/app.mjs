@@ -258,14 +258,15 @@ function renderCockpit() {
       </div>
       <div class="run-actions" data-run="${escapeHtml(run.run_id)}">
         ${run.control_state === "paused"
-          ? button("resume", "恢复", "play")
-          : button("pause", "暂停", "clock")}
-        ${button("retry", "重试", "retry")}
-        ${run.waiting_human ? button("decide_human", "确认", "check") : button("waiting_human", "人工", "user")}
-        ${run.blocked ? button("clear_blocker", "放行", "check") : button("block", "阻塞", "lock")}
-        ${button("provider_gate", "预算", "lock")}
-        ${button("writeback", "写回", "bookmark")}
-        ${button("complete", "完成", "check")}
+          ? button(run, "resume", "恢复", "play")
+          : button(run, "pause", "暂停", "clock")}
+        ${button(run, "retry", "重试", "retry")}
+        ${run.waiting_human ? button(run, "decide_human", "确认", "check") : button(run, "waiting_human", "人工", "user")}
+        ${run.blocked ? button(run, "clear_blocker", "放行", "check") : button(run, "block", "阻塞", "lock")}
+        ${button(run, "provider_gate", "预算", "lock")}
+        ${button(run, "writeback", "写回", "bookmark")}
+        ${button(run, "complete", "完成", "check")}
+        ${button(run, "cancel", "取消", "x")}
       </div>
     </article>`).join("")}
   </section>`;
@@ -524,8 +525,20 @@ function defaultTasks() {
   ];
 }
 
-function button(action, label, iconName) {
-  return `<button type="button" data-run-action="${action}" ${busy ? "disabled" : ""}>${icon(iconName, 14)}${label}</button>`;
+function button(run, action, label, iconName) {
+  const rule = runActionRule(run, action);
+  const disabled = busy || rule.enabled !== true;
+  const title = rule.reason ? ` title="${escapeHtml(rule.reason)}"` : "";
+  return `<button type="button" data-run-action="${action}" ${disabled ? "disabled" : ""}${title}>${icon(iconName, 14)}${label}</button>`;
+}
+
+function runActionRule(run, action) {
+  return (run?.allowed_actions || []).find((item) => item.action === action) || {
+    action,
+    enabled: false,
+    reason: "当前状态不允许这项操作。",
+    blocked_by: [],
+  };
 }
 
 function emptyPanel(title, text) {

@@ -62,6 +62,7 @@ export function createCreatorAuthoringClient(projectId) {
     loadStudioState: () => safe(() => runtime.loadStudioState()),
     saveStudioState: (state, expectedVersion = "") => safe(() => runtime.saveStudioState(state, expectedVersion)),
     executeCommand: (command, idempotencyKey) => safe(() => executeCreatorCommand(projectId, command, idempotencyKey)),
+    createProductionRequest: (payload, idempotencyKey) => safe(() => runtime.createCreatorProductionRequest(payload, idempotencyKey)),
     previewShotImpact: (payload) => safe(() => runtime.previewShotImpact(payload)),
     previewShotRestore: (payload) => safe(() => runtime.previewShotRestore(payload)),
     diffShotVersions: (payload) => safe(() => runtime.diffShotVersions(payload)),

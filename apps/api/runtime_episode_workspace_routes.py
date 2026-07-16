@@ -16,6 +16,12 @@ from apps.api.runtime_episode_authoring_service import (
     preview_shot_restore,
     preview_shot_revision,
 )
+from apps.api.runtime_creator_production_saga import (
+    SagaIntegrityError,
+    join_creator_production_authoring_projection,
+    overlay_creator_production_requests,
+)
+from apps.api.runtime_creator_production_integration import CreatorProductionControlError
 from apps.api.runtime_episode_domain_contract import SAFE_ID, EntityVersionRef, TenantScope
 from apps.api.runtime_episode_domain_routes import LOCAL_ACTOR_ID, LOCAL_ORG_ID
 from apps.api.runtime_episode_domain_store import (
@@ -61,6 +67,7 @@ class CreatorAuthoringWorkspaceResponse(BaseModel):
     reference_assets: list[dict[str, Any]]
     reference_sets: list[dict[str, Any]]
     counts: dict[str, int]
+    creator_production: dict[str, Any] = Field(default_factory=dict)
     provider_dispatch_count: int
 
 
@@ -142,7 +149,21 @@ def register_runtime_episode_workspace_routes(
             project_id,
         )
         try:
-            return build_creator_authoring_projection(aggregate)
+            projection = build_creator_authoring_projection(aggregate)
+            return join_creator_production_authoring_projection(
+                projection,
+                store,
+                scope=aggregate.scope,
+            )
+        except (SagaIntegrityError, CreatorProductionControlError) as exc:
+            _raise_workspace_error(
+                project_id,
+                status_code=500,
+                error="creator_workspace_production_join_failed",
+                message="Creator workspace production records could not be verified safely.",
+                stage="creator_workspace_production_join",
+                cause=exc,
+            )
         except EpisodeWorkspaceProjectionError as exc:
             _raise_workspace_error(
                 project_id,
@@ -190,7 +211,7 @@ def register_runtime_episode_workspace_routes(
                 stage="episode_workspace_read",
             )
         try:
-            return build_episode_workspace_projection(
+            projection = build_episode_workspace_projection(
                 aggregate,
                 episode_ref=EntityVersionRef(
                     entity_type="episode",
@@ -198,6 +219,7 @@ def register_runtime_episode_workspace_routes(
                     version_id=episode_version_id,
                 ),
             )
+            return overlay_creator_production_requests(projection, store, scope=scope)
         except WorkspaceProjectionReferenceError as exc:
             _raise_workspace_error(
                 project_id,

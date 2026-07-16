@@ -683,7 +683,13 @@ class ProductionControlHarness:
     @staticmethod
     def _semantic_command_digest(command: CommandEnvelope) -> str:
         value = command.model_dump(mode="json")
-        for field_name in ("command_id", "idempotency_key", "correlation_id", "causation_id"):
+        for field_name in (
+            "command_id",
+            "expected_version",
+            "idempotency_key",
+            "correlation_id",
+            "causation_id",
+        ):
             value.pop(field_name, None)
         return digest(value)
 

@@ -10,7 +10,6 @@ export function formatRuntimeError(error, fallback = "请求失败") {
     const detailText = [
       safeErrorText(payload.message, 240),
       safeErrorText(payload.detail, 240),
-      safeErrorText(payload.raw_detail, 240),
       safeObjectSummary(details, 320),
       safeErrorText(error?.message, 240),
     ].filter(Boolean).join("\n");
@@ -168,7 +167,6 @@ function safeObjectSummary(value, limit = 220) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
   const preferred = firstSafeText(
     value.reason,
-    value.raw_detail,
     value.message,
     value.detail,
     value.error_description,

@@ -489,6 +489,31 @@ def _execute_run_action(
     stamp = _stamp(body.created_at)
     version = body.expected_version
     receipts: list[Any] = []
+    execution_state = harness.projection.run_execution.get(run.identity.object_id, run.execution_state)
+    control_state = harness.projection.run_control.get(run.identity.object_id, run.control_state)
+    blocker = _run_blocker(harness, run.identity.object_id)
+    artifact_exists = any(
+        ArtifactWriteback.model_validate(value).run_ref.object_id == run.identity.object_id
+        for value in _records(harness, "artifact_writeback")
+    )
+    allowed = {
+        item["action"]: item
+        for item in _run_allowed_actions(
+            execution_state=execution_state,
+            control_state=control_state,
+            waiting_human=run.identity.object_id in harness.projection.open_human_requests,
+            blocker=blocker,
+            artifact_exists=artifact_exists,
+        )
+    }
+    rule = allowed.get(body.action)
+    idempotent_writeback_replay = (
+        body.action == "writeback"
+        and artifact_exists
+        and _receipt_for_key(harness, f"{idempotency_key}-artifact-writeback") is not None
+    )
+    if (rule is None or rule.get("enabled") is not True) and not idempotent_writeback_replay:
+        raise StateConflictError("run action is not allowed in the current lifecycle state")
 
     def execute(
         command_type: str,
@@ -860,8 +885,8 @@ def _apply_episode_asset_candidate_writeback(
         version_id=f"{candidate_ref.entity_id}-v2",
         revision=latest.revision + 1,
         parent_version_id=latest.version_id,
-        lifecycle_state="approved",
-        review_state="approved",
+        lifecycle_state="candidate",
+        review_state="needs_review",
         content_digest=digest(
             {
                 "artifact_id": writeback.artifact_id,
@@ -889,33 +914,12 @@ def _apply_episode_asset_candidate_writeback(
             protected_refs=protected_refs,
         ),
     )
-    approval = ReviewDecision(
-        entity_id=f"review-{candidate_ref.entity_id}",
-        version_id=f"review-{candidate_ref.entity_id}-v1",
-        revision=1,
-        parent_version_id=None,
-        lifecycle_state="approved",
-        review_state="approved",
-        content_digest=digest(
-            {
-                "operation": "production_control_episode_asset_candidate_approval",
-                "candidate_ref": candidate.as_ref().model_dump(mode="json"),
-                "writeback_ref": exact_ref("artifact_writeback", writeback).model_dump(mode="json"),
-            }
-        ),
-        scope=scope,
-        created_at=stamp,
-        subject_ref=candidate.as_ref(),
-        decision="approve",
-        note="Production control receipt closed for this deterministic candidate.",
-    )
     payload = aggregate.model_dump(mode="python")
     payload.update(
         {
             "aggregate_version": aggregate.aggregate_version + 1,
             "evaluated_at": stamp,
             "asset_candidates": (*aggregate.asset_candidates, candidate),
-            "review_decisions": (*aggregate.review_decisions, approval),
         }
     )
     updated = ProductionProjectAggregate.model_validate(payload)
@@ -928,7 +932,6 @@ def _apply_episode_asset_candidate_writeback(
                 {
                     "operation": "production_control_episode_asset_candidate_finalize",
                     "candidate": candidate.model_dump(mode="json"),
-                    "approval": approval.model_dump(mode="json"),
                     "expected_aggregate_version": aggregate.aggregate_version,
                 }
             ),
@@ -953,7 +956,7 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
     writebacks = _records(harness, "artifact_writeback")
     impacts = _records(harness, "impact_assessment")
     gates = _records(harness, "provider_gate_decision")
-    confirmed_writeback_refs = _confirmed_episode_writeback_refs(store, harness) if store is not None else None
+    episode_writeback_states = _episode_writeback_states(store, harness) if store is not None else {}
     task_by_ref = {
         _ref_key(_ref("plan_task", PlanTask.model_validate(item))): PlanTask.model_validate(item)
         for item in task_records
@@ -963,19 +966,33 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
         run = ProductionRun.model_validate(item)
         task = task_by_ref.get(_ref_key(run.task_ref))
         attempts = harness.projection.run_attempts.get(run.identity.object_id, [])
+        execution_state = harness.projection.run_execution.get(run.identity.object_id, run.execution_state)
+        control_state = harness.projection.run_control.get(run.identity.object_id, run.control_state)
+        blocker = _run_blocker(harness, run.identity.object_id)
         runs.append(
             {
                 "run_id": run.identity.object_id,
                 "task_id": run.task_ref.object_id,
                 "task_title": _task_title(run.task_ref.object_id),
                 "boundary": task.boundary if task else "",
-                "execution_state": harness.projection.run_execution.get(run.identity.object_id, run.execution_state),
-                "control_state": harness.projection.run_control.get(run.identity.object_id, run.control_state),
+                "execution_state": execution_state,
+                "control_state": control_state,
                 "attempt_count": len(attempts),
                 "latest_attempt_id": attempts[-1].object_id if attempts else "",
                 "simulated_cost_label": "¥0 · 外部生成未启用",
                 "waiting_human": run.identity.object_id in harness.projection.open_human_requests,
-                "blocked": run.identity.object_id in harness.projection.blockers,
+                "blocked": blocker is not None,
+                "blocker": blocker,
+                "allowed_actions": _run_allowed_actions(
+                    execution_state=execution_state,
+                    control_state=control_state,
+                    waiting_human=run.identity.object_id in harness.projection.open_human_requests,
+                    blocker=blocker,
+                    artifact_exists=any(
+                        ArtifactWriteback.model_validate(value).run_ref.object_id == run.identity.object_id
+                        for value in writebacks
+                    ),
+                ),
             }
         )
     artifacts = []
@@ -983,10 +1000,17 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
     protected_refs: list[dict[str, str]] = []
     for item in writebacks:
         writeback = ArtifactWriteback.model_validate(item)
-        if confirmed_writeback_refs is not None and _control_ref_key(
-            _control_ref(exact_ref("artifact_writeback", writeback))
-        ) not in confirmed_writeback_refs:
-            continue
+        writeback_ref = _control_ref(exact_ref("artifact_writeback", writeback))
+        writeback_key = _control_ref_key(writeback_ref)
+        episode_state = episode_writeback_states.get(
+            writeback_key,
+            {
+                "status": "ledger_pending_episode_receipt",
+                "candidate_ref": None,
+                "lifecycle_state": "",
+                "review_state": "",
+            },
+        )
         adapter = writeback.adapter_request
         affected_ref = _writeback_affected_ref(adapter)
         affected_refs.append(affected_ref.model_dump(mode="json"))
@@ -994,11 +1018,21 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
         artifacts.append(
             {
                 "artifact_id": writeback.artifact_id,
+                "status": episode_state["status"],
                 "task_id": writeback.plan_task_ref.object_id,
                 "run_id": writeback.run_ref.object_id,
                 "attempt_id": writeback.attempt_ref.object_id,
+                "provenance": {
+                    "task_ref": _control_ref(writeback.plan_task_ref).model_dump(mode="json"),
+                    "run_ref": _control_ref(writeback.run_ref).model_dump(mode="json"),
+                    "attempt_ref": _control_ref(writeback.attempt_ref).model_dump(mode="json"),
+                    "writeback_ref": writeback_ref.model_dump(mode="json"),
+                },
                 "affected_ref": affected_ref.model_dump(mode="json"),
                 "candidate_ref": adapter.successor_ref.model_dump(mode="json"),
+                "episode_candidate_ref": episode_state["candidate_ref"],
+                "episode_lifecycle_state": episode_state["lifecycle_state"],
+                "episode_review_state": episode_state["review_state"],
                 "predecessor_ref": adapter.predecessor_ref.model_dump(mode="json") if adapter.predecessor_ref else None,
                 "protected_refs": [ref.model_dump(mode="json") for ref in adapter.protected_exact_refs],
                 "operation": adapter.existing_typed_operation,
@@ -1050,8 +1084,25 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
         "blockers": {
             "open_count": len(harness.projection.blockers),
             "open_run_ids": sorted(harness.projection.blockers),
+            "open_items": [
+                item
+                for item in (_run_blocker(harness, run_id) for run_id in sorted(harness.projection.blockers))
+                if item is not None
+            ],
         },
         "artifacts": artifacts,
+        "artifact_status_digest": digest(
+            [
+                {
+                    "writeback_ref": item["provenance"]["writeback_ref"],
+                    "status": item["status"],
+                    "task_id": item["task_id"],
+                    "run_id": item["run_id"],
+                    "attempt_id": item["attempt_id"],
+                }
+                for item in artifacts
+            ]
+        ),
         "continuity": {
             "affected_refs": affected_refs,
             "protected_refs": protected_refs,
@@ -1059,8 +1110,8 @@ def _read_model(harness: ProductionControlHarness, store: RuntimeStore | None = 
             "shot_local_rework_protected": bool(affected_refs and protected_refs),
         },
         "review": {
-            "status": "ready" if artifacts else "waiting_for_artifacts",
-            "delivery_readback": "internal_delivery_packet_ready" if artifacts else "not_ready",
+            "status": _review_status(artifacts),
+            "delivery_readback": _delivery_readback_status(artifacts),
             "non_claims": [
                 "not_provider_smoke",
                 "not_generated_media_qa",
@@ -1163,11 +1214,11 @@ def _episode_workspace_projection(model: dict[str, Any]) -> dict[str, Any]:
             },
             "delivery": {
                 "current_ref": None,
-                "status": "ready" if model["artifacts"] else "blocked",
+                "status": "blocked",
                 "missing_asset_count": 0 if model["artifacts"] else len(shots),
                 "preview_artifact_present": False,
                 "playable_preview_available": False,
-                "blockers": [] if model["artifacts"] else ["delivery_not_frozen"],
+                "blockers": ["episode_selection_not_locked"] if model["artifacts"] else ["delivery_not_frozen"],
             },
             "evidence_environment": {
                 "provider_dispatch_count": model["provider_dispatch_count"],
@@ -1230,6 +1281,138 @@ def _workspace_shots(model: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _review_status(artifacts: list[dict[str, Any]]) -> str:
+    if not artifacts:
+        return "waiting_for_artifacts"
+    statuses = {str(item.get("status") or "") for item in artifacts}
+    if "ledger_pending_episode_receipt" in statuses:
+        return "waiting_for_episode_receipt"
+    if "pending_review" in statuses:
+        return "pending_episode_review"
+    if "locked" in statuses:
+        return "ready_for_delivery_readback"
+    return "pending_delivery_lock"
+
+
+def _delivery_readback_status(artifacts: list[dict[str, Any]]) -> str:
+    if not artifacts:
+        return "not_ready"
+    if all(item.get("status") == "locked" for item in artifacts):
+        return "internal_delivery_packet_ready"
+    return "blocked_until_episode_selection_lock"
+
+
+def _run_blocker(harness: ProductionControlHarness, run_id: str) -> dict[str, Any] | None:
+    ref = harness.projection.blockers.get(run_id)
+    if ref is None:
+        return None
+    blocker = Blocker.model_validate(harness.projection.get(ref))
+    return {
+        "ref": _control_ref(ref).model_dump(mode="json"),
+        "run_ref": _control_ref(blocker.run_ref).model_dump(mode="json"),
+        "owner_actor_id": blocker.owner_actor_id,
+        "reason": blocker.reason,
+        "clearance_evidence_refs": [
+            _control_ref(item).model_dump(mode="json")
+            for item in blocker.clearance_evidence_refs
+        ],
+    }
+
+
+def _run_allowed_actions(
+    *,
+    execution_state: str,
+    control_state: str,
+    waiting_human: bool,
+    blocker: dict[str, Any] | None,
+    artifact_exists: bool,
+) -> list[dict[str, Any]]:
+    terminal = execution_state in {"completed", "cancelled"}
+    blocked = blocker is not None or execution_state == "blocked"
+
+    def row(action: str, enabled: bool, reason: str = "", blocked_by: list[Any] | None = None) -> dict[str, Any]:
+        return {
+            "action": action,
+            "enabled": enabled,
+            "reason": reason,
+            "blocked_by": blocked_by or [],
+        }
+
+    blocker_refs = [blocker["ref"]] if blocker else []
+    return [
+        row(
+            "progress",
+            execution_state == "running" and not blocked,
+            "只有运行中且未阻塞的制作项可以刷新进度。",
+            blocker_refs,
+        ),
+        row(
+            "pause",
+            not terminal and not blocked and control_state == "active",
+            "终态或阻塞状态不能暂停。" if terminal or blocked else "",
+            blocker_refs,
+        ),
+        row(
+            "resume",
+            not terminal and not blocked and control_state == "paused",
+            "只有暂停中的制作项可以恢复。" if control_state != "paused" else "",
+            blocker_refs,
+        ),
+        row(
+            "retry",
+            execution_state == "running" and not blocked,
+            "阻塞或终态制作项不能重试；请先放行阻塞。",
+            blocker_refs,
+        ),
+        row(
+            "waiting_human",
+            execution_state == "running" and not waiting_human and not blocked,
+            "只有运行中的制作项可以进入人工确认。",
+            blocker_refs,
+        ),
+        row(
+            "decide_human",
+            execution_state == "waiting-human" and waiting_human,
+            "当前没有待处理的人工确认。",
+        ),
+        row(
+            "block",
+            not terminal and not blocked,
+            "当前制作项已经阻塞或结束。",
+            blocker_refs,
+        ),
+        row(
+            "clear_blocker",
+            blocked,
+            "当前没有可放行的阻塞。",
+            blocker_refs,
+        ),
+        row(
+            "provider_gate",
+            not terminal and not blocked,
+            "终态或阻塞状态不能重新评估门禁。",
+            blocker_refs,
+        ),
+        row(
+            "writeback",
+            execution_state == "running" and not blocked and not artifact_exists,
+            "写回需要运行中、未阻塞且尚未登记候选。",
+            blocker_refs,
+        ),
+        row(
+            "complete",
+            execution_state == "running" and not blocked,
+            "只有运行中的制作项可以完成。",
+            blocker_refs,
+        ),
+        row(
+            "cancel",
+            not terminal,
+            "制作项已经结束。",
+        ),
+    ]
 
 
 @contextmanager
@@ -1476,6 +1659,11 @@ def _records(harness: ProductionControlHarness, object_type: str) -> list[dict[s
     return sorted(rows, key=lambda item: (item["identity"]["object_id"], item["identity"]["revision"]))
 
 
+def _receipt_for_key(harness: ProductionControlHarness, key: str):
+    value = harness._receipts.get(key)  # deterministic file-safe harness receipt index
+    return value[1] if value is not None else None
+
+
 def _latest_model(harness: ProductionControlHarness, object_type: str, model: type[Any]):
     rows = _records(harness, object_type)
     if not rows:
@@ -1585,18 +1773,18 @@ def _load_episode_aggregate_for_writeback(
     return scope, aggregate
 
 
-def _confirmed_episode_writeback_refs(
+def _episode_writeback_states(
     store: RuntimeStore,
     harness: ProductionControlHarness,
-) -> set[str]:
+) -> dict[str, dict[str, Any]]:
     try:
         aggregate = EpisodeDomainAggregateStore(store.root).load(
             org_id=harness.scope.org_id,
             project_id=harness.scope.project_id,
         )
     except EpisodeDomainStoreError:
-        return set()
-    confirmed: set[str] = set()
+        return {}
+    states: dict[str, dict[str, Any]] = {}
     latest: dict[str, AssetCandidateVersion] = {}
     for candidate in aggregate.asset_candidates:
         current = latest.get(candidate.entity_id)
@@ -1604,13 +1792,20 @@ def _confirmed_episode_writeback_refs(
             latest[candidate.entity_id] = candidate
     for candidate in latest.values():
         provenance = candidate.control_provenance
-        if (
-            provenance is not None
-            and candidate.lifecycle_state in ("approved", "locked")
-            and candidate.review_state == "approved"
-        ):
-            confirmed.add(_control_ref_key(provenance.writeback_ref))
-    return confirmed
+        if provenance is None:
+            continue
+        status = "pending_review"
+        if candidate.lifecycle_state == "locked" and candidate.review_state == "approved":
+            status = "locked"
+        elif candidate.lifecycle_state == "approved" and candidate.review_state == "approved":
+            status = "approved"
+        states[_control_ref_key(provenance.writeback_ref)] = {
+            "status": status,
+            "candidate_ref": candidate.as_ref().model_dump(mode="json"),
+            "lifecycle_state": candidate.lifecycle_state,
+            "review_state": candidate.review_state,
+        }
+    return states
 
 
 def _latest_candidate_by_entity(

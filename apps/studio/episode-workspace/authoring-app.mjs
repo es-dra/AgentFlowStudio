@@ -67,6 +67,18 @@ function entityLabel(type) {
   })[type] || "内容";
 }
 
+function friendlyError(error, fallback = "请稍后重试。") {
+  const kind = String(error?.kind || "");
+  return ({
+    auth: "登录状态已失效，或你无权访问这个项目。",
+    not_found: "找不到这个创作项目。",
+    stale: "项目内容已更新，请读取最新版本后继续。",
+    invalid: "这次更改与当前内容不一致，请检查后重试。",
+    server: "创作工作台暂时无法完成请求，请稍后重试。",
+    missing_identity: "缺少项目身份。",
+  })[kind] || fallback;
+}
+
 function exactEntity(ref) {
   if (!ref) return null;
   if (sameStableRef(model.project?.ref, ref)) return model.project;
@@ -75,6 +87,26 @@ function exactEntity(ref) {
     if (found) return found;
   }
   return null;
+}
+
+function availableAction(record, action) {
+  return (record?.allowed_actions || []).find((item) => item.action === action) || {
+    action,
+    enabled: false,
+    reason: "当前内容暂不支持此操作。",
+    blocked_by: [],
+  };
+}
+
+function productionTone(status) {
+  return ({
+    queued: "neutral",
+    running: "warning",
+    blocked: "danger",
+    failed: "danger",
+    cancelled: "neutral",
+    done: "success",
+  })[status] || "neutral";
 }
 
 function selectedEntity() {
@@ -178,11 +210,17 @@ function renderScene(scene) {
 
 function renderShot(shot) {
   const active = sameStableRef(shot.ref, ui.selectedShot);
+  const production = shot.production_request;
+  const productionAction = availableAction(shot, "create_production_preview");
+  const productionLabel = production?.status_label || "未制作";
+  const productionDisabled = busy || !productionAction.enabled;
   return `<div class="creator-shot ${active ? "selected" : ""}" data-shot="${escapeHtml(stableKey(shot.ref))}" role="button" tabindex="0" aria-pressed="${active}">
     <span class="drag-handle" aria-hidden="true">⠿</span>
     <span class="shot-index">${shot.sequence}</span>
     <span class="shot-copy"><strong>${escapeHtml(shot.title)}</strong><small>${escapeHtml(shot.creative_intent || shot.summary || "补充镜头创作意图")}</small></span>
     <span class="shot-duration">${Number(shot.duration_seconds).toFixed(1).replace(".0", "")} 秒</span>
+    <span class="production-pill ${productionTone(production?.status)}">${escapeHtml(productionLabel)}</span>
+    <button class="shot-production-button" type="button" data-production="${escapeHtml(refKey(shot.ref))}" ${productionDisabled ? "disabled" : ""} aria-label="创建制作预览">制作</button>
     <span class="shot-reorder"><button type="button" data-move="shot:up" data-ref="${escapeHtml(stableKey(shot.ref))}" aria-label="镜头上移">↑</button><button type="button" data-move="shot:down" data-ref="${escapeHtml(stableKey(shot.ref))}" aria-label="镜头下移">↓</button></span>
   </div>`;
 }
@@ -193,7 +231,7 @@ function renderCanvas() {
   return `<section class="creator-stage creator-canvas" aria-label="画布投影">
     <header class="creator-stage-heading"><div><span>同源画布</span><h1>${escapeHtml(episode?.title || model.project.title)}</h1><p>这里展示故事板中的同一批场景和镜头，不创建第二套内容。</p></div></header>
     <div class="canvas-flow">
-      ${scenes.map((scene) => `<section class="canvas-lane"><h2>${escapeHtml(scene.title)}</h2><div>${shotsForScene(model, scene.ref).map((shot) => `<button type="button" class="canvas-node ${sameStableRef(shot.ref, ui.selectedShot) ? "selected" : ""}" data-shot="${escapeHtml(stableKey(shot.ref))}"><span>${shot.sequence}</span><strong>${escapeHtml(shot.title)}</strong><small>${escapeHtml(shot.creative_intent || "待补充创作意图")}</small></button>`).join("")}</div></section>`).join("") || '<div class="creator-empty-inline"><h2>画布会从故事板自动生成</h2><p>先创建单集、场景和镜头。</p></div>'}
+      ${scenes.map((scene) => `<section class="canvas-lane"><h2>${escapeHtml(scene.title)}</h2><div>${shotsForScene(model, scene.ref).map((shot) => `<button type="button" class="canvas-node ${sameStableRef(shot.ref, ui.selectedShot) ? "selected" : ""}" data-shot="${escapeHtml(stableKey(shot.ref))}"><span>${shot.sequence}</span><strong>${escapeHtml(shot.title)}</strong><small>${escapeHtml(shot.creative_intent || "待补充创作意图")}</small><em class="${productionTone(shot.production_request?.status)}">${escapeHtml(shot.production_request?.status_label || "未制作")}</em></button>`).join("")}</div></section>`).join("") || '<div class="creator-empty-inline"><h2>画布会从故事板自动生成</h2><p>先创建单集、场景和镜头。</p></div>'}
     </div>
   </section>`;
 }
@@ -213,10 +251,25 @@ function renderInspector() {
     <header><div><span>${escapeHtml(entityLabel(entity.ref.entity_type))}</span><h2>${isShot ? "镜头创作意图" : escapeHtml(entity.title || entity.label || model.project.title)}</h2></div>${reorder}<button type="button" data-close-inspector aria-label="关闭编辑面板">×</button></header>
     <form class="creator-edit-form" data-edit-type="${escapeHtml(entity.ref.entity_type)}">
       ${isAsset ? renderAssetFields(entity) : isSet ? renderReferenceSetFields(entity) : renderCreativeFields(entity)}
+      ${isShot ? renderProductionPanel(entity) : ""}
       ${isShot ? `<button class="impact-button" type="button" data-submit-edit>预览影响</button><button class="version-link" type="button" data-toggle-versions>版本与恢复</button>${renderVersionHistory(entity)}` : '<button class="impact-button" type="button" data-submit-edit>保存更改</button>'}
       <p class="impact-note">${isShot ? "更改会先预览影响，再由你确认保存。" : "保存后会产生一个可追溯的新版本。"}</p>
     </form>
   </aside>`;
+}
+
+function renderProductionPanel(shot) {
+  const current = shot.production_request;
+  const action = availableAction(shot, "create_production_preview");
+  const disabled = busy || !action.enabled;
+  const reason = action.reason || (current?.status === "done" ? "候选已写回，等待审核。" : "");
+  const failure = current?.failure ? `<p class="impact-note">${escapeHtml(current.failure)}</p>` : "";
+  return `<section class="production-panel">
+    <div><span class="production-pill ${productionTone(current?.status)}">${escapeHtml(current?.status_label || "未制作")}</span><strong>制作预览</strong></div>
+    <button class="impact-button" type="button" data-production="${escapeHtml(refKey(shot.ref))}" ${disabled ? "disabled" : ""}>创建制作预览</button>
+    ${reason ? `<p class="impact-note">${escapeHtml(reason)}</p>` : ""}
+    ${failure}
+  </section>`;
 }
 
 function renderCreativeFields(entity) {
@@ -313,10 +366,10 @@ function bindEvents() {
   root.querySelectorAll("[data-create]").forEach((button) => button.addEventListener("click", () => { createParentRef = button.dataset.parent || ""; createDialog = button.dataset.create; render(); }));
   root.querySelectorAll("[data-close-modal]").forEach((button) => button.addEventListener("click", () => { createDialog = ""; render(); }));
   root.querySelector(".creator-create-form select[name='entity_type']")?.addEventListener("change", (event) => { createDialog = event.target.value; render(); });
-  root.querySelector(".creator-create-form")?.addEventListener("submit", (event) => { event.preventDefault(); void submitCreate(event.currentTarget).catch((error) => { statusMessage = `无法创建：${error?.message || "表单内容无效。"}`; render(); }); });
+  root.querySelector(".creator-create-form")?.addEventListener("submit", (event) => { event.preventDefault(); void submitCreate(event.currentTarget).catch((error) => { statusMessage = `无法创建：${friendlyError(error, "表单内容无效。")}`; render(); }); });
   root.querySelector("[data-submit-create]")?.addEventListener("click", () => {
     const form = root.querySelector(".creator-create-form");
-    if (form) void submitCreate(form).catch((error) => { statusMessage = `无法创建：${error?.message || "表单内容无效。"}`; render(); });
+    if (form) void submitCreate(form).catch((error) => { statusMessage = `无法创建：${friendlyError(error, "表单内容无效。")}`; render(); });
   });
   root.querySelectorAll("[data-entity]").forEach((button) => button.addEventListener("click", () => {
     ui.selectedSection = button.dataset.entity;
@@ -337,13 +390,18 @@ function bindEvents() {
     render();
     void persistUi();
   }));
+  root.querySelectorAll("[data-production]").forEach((button) => button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const shot = model.shots.find((item) => refKey(item.ref) === button.dataset.production);
+    void runProductionRequest(shot);
+  }));
   root.querySelectorAll("[data-shot]").forEach((item) => item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); item.click(); } }));
   root.querySelector("[data-mobile-nav]")?.addEventListener("click", () => { mobileNavOpen = !mobileNavOpen; render(); });
   root.querySelector("[data-close-inspector]")?.addEventListener("click", () => { ui.mobileInspectorOpen = false; render(); void persistUi(); });
-  root.querySelector(".creator-edit-form")?.addEventListener("submit", (event) => { event.preventDefault(); void submitEdit(event.currentTarget).catch((error) => { statusMessage = `无法保存：${error?.message || "表单内容无效。"}`; render(); }); });
+  root.querySelector(".creator-edit-form")?.addEventListener("submit", (event) => { event.preventDefault(); void submitEdit(event.currentTarget).catch((error) => { statusMessage = `无法保存：${friendlyError(error, "表单内容无效。")}`; render(); }); });
   root.querySelector("[data-submit-edit]")?.addEventListener("click", () => {
     const form = root.querySelector(".creator-edit-form");
-    if (form) void submitEdit(form).catch((error) => { statusMessage = `无法保存：${error?.message || "表单内容无效。"}`; render(); });
+    if (form) void submitEdit(form).catch((error) => { statusMessage = `无法保存：${friendlyError(error, "表单内容无效。")}`; render(); });
   });
   root.querySelector("[data-toggle-versions]")?.addEventListener("click", () => { ui.technicalOpen = !ui.technicalOpen; render(); void persistUi(); });
   root.querySelector("[data-technical]")?.addEventListener("click", () => { ui.technicalOpen = !ui.technicalOpen; render(); void persistUi(); });
@@ -402,7 +460,7 @@ async function submitCreate(form) {
       createParentRef = "";
       render();
     }
-  } catch (error) { statusMessage = `无法创建：${error?.message || "请检查内容后再试。"}`; render(); }
+  } catch (error) { statusMessage = `无法创建：${friendlyError(error, "请检查内容后再试。")}`; render(); }
 }
 
 async function submitEdit(form) {
@@ -426,7 +484,7 @@ async function submitEdit(form) {
       const preview = await client.previewShotImpact({ expected_aggregate_version: model.aggregate_version, shot_ref: entity.ref, changes });
       impactDialog = { ...preview, kind: "revise", shot: entity, changes };
       render();
-    } catch (error) { statusMessage = `无法预览影响：${error?.message || "请重新读取后再试。"}`; render(); }
+    } catch (error) { statusMessage = `无法预览影响：${friendlyError(error, "请重新读取后再试。")}`; render(); }
     return;
   }
   await runCommand(reviseEntityCommand(model, entity.ref, changes));
@@ -440,7 +498,7 @@ async function previewRestore(serializedRef) {
     const preview = await client.previewShotRestore({ expected_aggregate_version: model.aggregate_version, historical_ref: historicalRef, current_ref: shot.ref });
     impactDialog = { ...preview, kind: "restore", shot, historicalRef };
     render();
-  } catch (error) { statusMessage = `无法预览恢复：${error?.message || "请重新读取后再试。"}`; render(); }
+  } catch (error) { statusMessage = `无法预览恢复：${friendlyError(error, "请重新读取后再试。")}`; render(); }
 }
 
 async function showVersionDiff(serializedRef) {
@@ -448,7 +506,7 @@ async function showVersionDiff(serializedRef) {
   const historicalRef = findShotVersionRef(serializedRef);
   if (!shot || !historicalRef) return;
   try { versionDiff = { left_ref: historicalRef, right_ref: shot.ref, changes: (await client.diffShotVersions({ left_ref: historicalRef, right_ref: shot.ref })).changes }; render(); }
-  catch (error) { statusMessage = `无法比较版本：${error?.message || "请稍后再试。"}`; render(); }
+  catch (error) { statusMessage = `无法比较版本：${friendlyError(error, "请稍后再试。")}`; render(); }
 }
 
 async function confirmImpact() {
@@ -504,7 +562,7 @@ async function runCommand(command, replayKey = "") {
     }
   } catch (error) {
     ui.pendingCommand = { ...envelope, status: "failed" };
-    ui.pendingFailure = error?.message || "命令未完成";
+    ui.pendingFailure = friendlyError(error, "命令未完成。");
     statusMessage = `保存未完成：${ui.pendingFailure}`;
     await persistUi({ immediate: true }).catch(() => {});
     busy = false;
@@ -523,6 +581,49 @@ async function runCommand(command, replayKey = "") {
     ui.pendingCommand = envelope;
     ui.pendingFailure = "";
     statusMessage = "更改已经保存；刷新后会核对保存记录。";
+  }
+  busy = false;
+  render();
+  return true;
+}
+
+async function runProductionRequest(shot) {
+  if (!shot || busy) return false;
+  const action = availableAction(shot, "create_production_preview");
+  if (!action.enabled) {
+    statusMessage = action.reason || "当前镜头不能创建制作预览。";
+    render();
+    return false;
+  }
+  const episode = currentEpisode(model, ui);
+  if (!episode) {
+    statusMessage = "请先选择单集。";
+    render();
+    return false;
+  }
+  busy = true;
+  statusMessage = "正在登记制作预览…";
+  render();
+  const keyBase = `${shot.ref.entity_id}-${shot.ref.version_id}-${model.aggregate_version}`;
+  const idempotencyKey = `production-${keyBase}`.replace(/[^A-Za-z0-9_.:-]+/g, "-").slice(0, 150);
+  const payload = {
+    expected_aggregate_version: model.aggregate_version,
+    episode_ref: episode.ref,
+    shot_ref: shot.ref,
+    scope: "production_preview",
+    expected_versions: {
+      episode: episode.ref.version_id,
+      shot: shot.ref.version_id,
+    },
+  };
+  try {
+    await client.createProductionRequest(payload, idempotencyKey);
+    model = await client.loadWorkspace();
+    ui = createAuthoringUi(model, uiPreference(ui));
+    statusMessage = "候选已写回，等待审核。";
+    await persistUi({ immediate: true }).catch(() => {});
+  } catch (error) {
+    statusMessage = friendlyError(error, "制作预览未能完成，请刷新后重试。");
   }
   busy = false;
   render();
@@ -571,6 +672,6 @@ export async function startCreatorAuthoring(target, projectId) {
     await reconcilePending();
   } catch (error) {
     const action = error?.kind === "auth" ? '<a class="impact-button" href="/studio/">返回登录</a>' : '<button class="impact-button" type="button" onclick="location.reload()">重试</button>';
-    renderState("无法打开创作工作台", error?.message || "请稍后重试。", action);
+    renderState("无法打开创作工作台", friendlyError(error, "请稍后重试。"), action);
   }
 }

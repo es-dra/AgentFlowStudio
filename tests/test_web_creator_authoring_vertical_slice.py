@@ -64,6 +64,20 @@ def test_storyboard_and_canvas_render_one_model_and_send_one_typed_command_path(
     assert "shot-006" not in source
 
 
+def test_runtime_client_does_not_promote_raw_error_detail_to_frontend_copy() -> None:
+    runtime_client = (ROOT / "apps" / "studio" / "src" / "runtime-client.js").read_text(
+        encoding="utf-8"
+    )
+    runtime_errors = (ROOT / "apps" / "studio" / "src" / "runtime-error-utils.js").read_text(
+        encoding="utf-8"
+    )
+    source = runtime_client + "\n" + runtime_errors
+
+    assert "raw_detail" not in source
+    assert "stale expected_version" not in source
+    assert "VersionConflictError" not in source
+
+
 def test_pending_command_envelope_is_server_persisted_and_malformed_state_fails_closed() -> None:
     app = _read("authoring-app.mjs")
     api = _read("authoring-api-client.mjs")
