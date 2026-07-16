@@ -25,6 +25,7 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     (tmp_path / ".gitattributes").write_text("* text=auto eol=lf\n", encoding="utf-8")
     (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
     (tmp_path / "package.json").write_text('{"type":"module"}\n', encoding="utf-8")
+    (tmp_path / "design-qa.md").write_text("# UI Design QA\n", encoding="utf-8")
     (tmp_path / "agentflow_studio").mkdir()
     (tmp_path / "agentflow_studio" / "memory_advantage_demo_012.py").write_text("", encoding="utf-8")
     (tmp_path / "experiments" / "episode-loop").mkdir(parents=True)
@@ -53,6 +54,10 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     assert files["uv.lock"]["status"] == "current"
     assert files["package.json"]["product_surface"] == "production_spine"
     assert files["package.json"]["status"] == "current"
+    assert files["design-qa.md"]["product_surface"] == "verification_surface"
+    assert files["design-qa.md"]["status"] == "current"
+    assert "Temporary UI design-QA evidence" in files["design-qa.md"]["rationale"]
+    assert "owning PR is merged or closed" in files["design-qa.md"]["retirement_condition"]
     assert files["agentflow_studio/memory_advantage_demo_012.py"]["product_surface"] == "delete_candidate"
     assert files["agentflow_studio/memory_advantage_demo_012.py"]["status"] == "legacy_demo_runtime"
     assert files["experiments/episode-loop/fixture.json"]["product_surface"] == "verification_surface"

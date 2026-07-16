@@ -127,6 +127,15 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
                 "提交删除后完成退休；如需恢复，必须证明 README.md 不能覆盖中文入口职责。",
             )
         return _file(path, git_state, "delete_candidate", "delete_candidate", "README.md 已作为中文主入口，旧中文副本会制造双入口漂移。", "删除或转为短跳转后再次运行审查。")
+    if path == "design-qa.md":
+        return _file(
+            path,
+            git_state,
+            "verification_surface",
+            "current",
+            "Temporary UI design-QA evidence retained while its draft PR and exact-head evaluation remain active.",
+            "Retire after the owning PR is merged or closed and its evaluator evidence has been consumed; Git history remains the archive.",
+        )
     if path in {"README.md", "AGENTS.md", "BACKLOG.md", "pyproject.toml", "package.json", "uv.lock", ".gitattributes", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
         return _file(path, git_state, "production_spine", "current", "项目入口、规则、跟踪、配置或许可证。")
     if path == ".github/workflows/maintenance.yml":

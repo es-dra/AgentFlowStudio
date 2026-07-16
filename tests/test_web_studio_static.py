@@ -90,36 +90,22 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert "/workbench" not in index
 
 
-def test_studio_production_control_entry_is_linked_without_replacing_canvas() -> None:
+def test_studio_retires_the_separate_production_control_frontend_but_keeps_internal_contracts() -> None:
     production_control = STUDIO_ROOT / "production-control"
-    assert (production_control / "index.html").is_file()
-    assert (production_control / "app.mjs").is_file()
-    assert (production_control / "styles.css").is_file()
-
-    index = (production_control / "index.html").read_text(encoding="utf-8")
-    app = (production_control / "app.mjs").read_text(encoding="utf-8")
     topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    product_shell = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
-    assert '<html lang="zh-CN">' in index
-    assert "/studio/production-control/" in topbar
-    assert 'href="/studio/"' in app
-    assert "画布" in app
-    assert "故事板 / 审片" in app
-    assert "长篇生产" in app
-    assert "结构化 Storyboard" in app
-    assert "Canvas 探索视图" in app
-    assert "资产身份链" in app
-    assert "改写第 6 镜" in app
-    assert "未选事实保持不变" in app
-    assert "三镜头图像试验" in app
-    assert "冻结图像试验" in app
-    assert "不包含大模型脚本、视频、音频、导出、媒体质检、创作者验收或商业验证" in app
-    assert "Provider gate" not in app
-    assert "Provider smoke" not in app
-    assert "调度下一镜头" in app
-    assert "外部生成未启用" in app
-    assert "strong-password-123" not in app
+    assert not any(production_control.rglob("*"))
+    assert "/studio/production-control/" not in topbar
+    assert "productionControlLink" not in topbar
+    assert "项目状态与下一步" in product_shell
+    assert "project.next_action" in product_shell
+    assert 'next.addEventListener("click", activateNextAction)' in product_shell
+    assert "findNextProductionTarget(sceneModel(), selection)" in product_shell
+    assert "selectContext(target.sceneIndex, target.shotIndex" in product_shell
+    assert "context.actionLabel = actionLabel" in product_shell
+    assert "导演 · 当前镜头" in product_shell
     assert "getProductionControl()" in runtime_client
     assert "getCommercialProduction()" in runtime_client
     assert "createCommercialProductionSample" in runtime_client

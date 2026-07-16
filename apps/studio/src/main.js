@@ -26,7 +26,8 @@ import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { clearProjectSession, initialProjectId } from "./studio-project-session.js";
 import { clearIdentityScopedStudioState, prepareIdentityStorage } from "./store-persistence.js";
 import { createProjectController } from "./studio-project-controller.js";
-import { createProductShell, showSecureEntry } from "./product-shell.js";
+import { showSecureEntry } from "./product-shell.js";
+import { createStudioProductShell, mountStudioDom } from "./studio-product-bootstrap.js";
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
@@ -45,6 +46,8 @@ let domainCrewController = null;
 let projectController = null;
 let productShell = null;
 let editorMounted = false;
+let editorShell = null;
+let editorParking = null;
 let identityBoundaryInFlight = false;
 
 bootstrap().catch((error) => {
@@ -65,7 +68,7 @@ async function bootstrap() {
   if (authState?.auth_status_unknown || authState?.blocked) return;
   if (authState?.auth_required && !authState?.authenticated) return;
   prepareIdentityStorage(authState?.user?.user_id || "local-runtime-user");
-  mountStudioDom();
+  ({ editorMounted, editorParking, editorShell } = mountStudioDom());
   initializeStudio(authState?.user || null);
   projectController.rememberStartupProject(runtime.projectId);
   if (editorMounted) {
@@ -105,8 +108,11 @@ function initializeStudio(authUser) {
     getRuntime: () => runtime,
     onNavigateNode: (nodeId) => window.dispatchEvent(new CustomEvent("afs:studio-select-node", { detail: { node_id: nodeId } })),
   });
-  productShell = createProductShell({
+  productShell = createStudioProductShell({
     onOpenCanvas: openCanvasWorkspace,
+    getStore: () => store,
+    getCanvasShell: () => editorShell,
+    getCanvasParking: () => editorParking,
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
@@ -142,24 +148,6 @@ function initializeStudio(authUser) {
     render: () => renderAll(store.get()),
   });
   projectController.setAuthUser(authUser);
-}
-function mountStudioDom() {
-  const app = document.getElementById("app");
-  app.className = "product-mode";
-  app.replaceChildren();
-  const productRoot = document.createElement("div");
-  productRoot.id = "product-shell-root";
-  app.appendChild(productRoot);
-  editorMounted = !window.matchMedia("(max-width: 760px)").matches;
-  if (editorMounted) {
-    const editor = document.createElement("div");
-    editor.id = "studio-editor-shell";
-    editor.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从制作总览进入画布，组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
-    app.appendChild(editor);
-  }
-  const overlay = document.createElement("div");
-  overlay.id = "overlay-root";
-  app.appendChild(overlay);
 }
 function bindDomainCrewEvents() {
   window.addEventListener("afs:studio-open-domain-crew", () => { syncDomainCrewContext(); openDomainCrewPanel(domainCrewController); });
@@ -321,6 +309,7 @@ function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
 }
 function renderAll(state) {
   syncDomainCrewContext();
+  productShell?.updateStudioState(state);
   if (!editorMounted) return;
   renderTopbar({
     state,
@@ -375,7 +364,13 @@ function openProductOverview() {
   void refreshProductOverview();
 }
 function openCanvasWorkspace() {
-  if (editorMounted && productShell?.showCanvas()) renderAll(store.get());
+  if (!editorMounted) return false;
+  store.set((state) => {
+    state.ui.inspectorOpen = false;
+  }, { history: false, persist: false });
+  const opened = productShell?.showCanvas() === true;
+  if (opened) renderAll(store.get());
+  return opened;
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
