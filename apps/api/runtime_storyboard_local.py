@@ -13,6 +13,7 @@ from apps.api.runtime_storyboard_grounding import (
     storyboard_source_span,
     unsupported_additions_for_description,
 )
+from apps.api.runtime_storyboard_asset_coverage import reconcile_storyboard_asset_coverage
 from apps.api.runtime_storyboard_planning import storyboard_plan_fields
 
 
@@ -30,7 +31,7 @@ def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None)
     chunks = _script_chunks(script_text, shot_count_hint=shot_count_hint)
     global_refs = _asset_refs(source)
     total_count = len(chunks[:80])
-    return [
+    shots = [
         structured_shot(
             chunk,
             index + 1,
@@ -41,6 +42,7 @@ def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None)
         )
         for index, chunk in enumerate(chunks[:80])
     ]
+    return reconcile_storyboard_asset_coverage(shots)
 
 
 def structured_shot(
@@ -354,15 +356,27 @@ def _infer_scene_label(text: str) -> str:
         return "办公室"
     if re.search(r"房间|室内", source):
         return "室内空间"
+    if re.search(r"老城区巷口|巷口|窄巷|巷子|青石台阶|青砖", source):
+        return "老城区巷口" if re.search(r"老城区|巷口", source) else "巷道空间"
     if re.search(r"街道|街区|路面", source):
         return "街道空间"
     if re.search(r"海边|海面|沙滩|灯塔", source):
         return "海边"
     if "餐厅" in source:
         return "餐厅"
-    if re.search(r"山巅|山脊|石台|云海|战场", source):
+    if "古战场" in source:
+        return "古战场"
+    if "战场" in source:
+        return "战场"
+    if _looks_like_mountain_battle_scene(source):
         return "山巅石台战场"
     return ""
+
+
+def _looks_like_mountain_battle_scene(source: str) -> bool:
+    if re.search(r"山巅|山脊|云海", source):
+        return True
+    return bool("石台" in source and re.search(r"山|峰|云|战|大战|对决|破碎", source))
 
 
 def _repeated_actor_names(source: str) -> list[str]:

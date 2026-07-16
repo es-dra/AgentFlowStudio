@@ -84,9 +84,8 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
     low, high = case["expected_shot_range"]
 
     assert low <= len(storyboard_payload["shots"]) <= high
-    assert {("周岚", "character"), ("陈默", "character"), ("餐厅", "scene")} <= labels_by_type
-    assert ("信件", "prop") not in labels_by_type
-    assert {"周岚", "陈默"} <= candidate_labels
+    assert {("周岚", "character"), ("陈默", "character"), ("餐厅", "scene"), ("信件", "prop")} <= labels_by_type
+    assert {"周岚", "陈默", "信件"} <= candidate_labels
     assert preflight_payload["included_asset_source_evidence_count"] == 2
     assert payload["job"]["status"] == "blocked"
     assert payload["provider_calls_started"] is False

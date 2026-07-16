@@ -109,7 +109,11 @@ def test_principal_character_extraction_prioritizes_relationship_subjects_and_ho
     assert not any(ref.get("display_name") == "猪八戒" for ref in refs)
     assert not any(ref.get("asset_type") == "prop" for ref in refs)
     assert any(item["display_name"] == "孙悟空" and item["reason"] == "secondary_character_requires_manual_asset_entry" for item in diagnostics)
-    assert any(item["display_name"] == "金箍棒" and item["reason"] == "prop_requires_manual_asset_entry" for item in diagnostics)
+    assert any(
+        item["display_name"] == "金箍棒"
+        and item["reason"] == "prop_requires_critical_evidence_or_manual_asset_entry"
+        for item in diagnostics
+    )
     assert graph["held_asset_ref_count"] >= 2
 
 
