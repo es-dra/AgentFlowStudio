@@ -8,10 +8,11 @@ from apps.api.generation_path_contract import GenerationPathId, validate_generat
 
 
 ProjectStatus = Literal["in_progress", "blocked", "ready_for_next_round"]
+PROJECT_ID_MAX_LENGTH = 128
 
 
 class ProjectCreateRequest(BaseModel):
-    project_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1, max_length=PROJECT_ID_MAX_LENGTH)
     project_type: str = "short_video_campaign"
     goal: str = Field(min_length=1)
     status: ProjectStatus = "in_progress"

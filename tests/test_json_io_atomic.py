@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import threading
+from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -37,6 +39,21 @@ def _maximum_length_json_filename() -> str:
     return filename
 
 
+def _write_json_process_worker(args: tuple[str, int, int, int]) -> None:
+    path_text, round_index, process_index, writes_per_process = args
+    path = Path(path_text)
+    for write_index in range(writes_per_process):
+        write_json(
+            path,
+            {
+                "round": round_index,
+                "process": process_index,
+                "write": write_index,
+                "values": list(range(25)),
+            },
+        )
+
+
 def test_write_json_atomic_concurrent_writes_keep_valid_json(tmp_path) -> None:
     path = tmp_path / "state.json"
 
@@ -50,6 +67,26 @@ def test_write_json_atomic_concurrent_writes_keep_valid_json(tmp_path) -> None:
     assert isinstance(payload["index"], int)
     assert payload["values"] == list(range(25))
     assert _lock_path(tmp_path / "state.json").exists()
+
+
+def test_write_json_multiprocess_plain_unicode_path_keeps_valid_json(tmp_path) -> None:
+    directory = tmp_path / "unicode-json-状态"
+    directory.mkdir()
+    path = directory / "state.json"
+    ctx = multiprocessing.get_context("spawn")
+
+    with ProcessPoolExecutor(max_workers=4, mp_context=ctx) as executor:
+        futures = [
+            executor.submit(_write_json_process_worker, (str(path), 0, process_index, 8))
+            for process_index in range(4)
+        ]
+        for future in futures:
+            future.result(timeout=15)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(payload["process"], int)
+    assert payload["values"] == list(range(25))
+    assert not list(directory.glob("*.tmp"))
 
 
 def test_lock_path_name_is_bounded_for_maximum_length_filename(tmp_path) -> None:
@@ -98,6 +135,30 @@ def test_write_json_concurrent_writes_support_windows_long_paths(tmp_path) -> No
     with open(system_path(path), encoding="utf-8") as handle:
         payload = json.load(handle)
     assert isinstance(payload["index"], int)
+    assert payload["values"] == list(range(25))
+    with os.scandir(system_path(directory)) as entries:
+        assert not [entry.name for entry in entries if entry.name.endswith(".tmp")]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows msvcrt cross-process lock contention")
+def test_write_json_windows_multiprocess_contention_has_bounded_lock_retry(tmp_path) -> None:
+    directory = _long_directory(tmp_path)
+    path = directory / _long_json_filename()
+    ctx = multiprocessing.get_context("spawn")
+
+    for round_index in range(3):
+        with ProcessPoolExecutor(max_workers=12, mp_context=ctx) as executor:
+            futures = [
+                executor.submit(_write_json_process_worker, (str(path), round_index, process_index, 10))
+                for process_index in range(12)
+            ]
+            for future in futures:
+                future.result(timeout=60)
+
+    with open(system_path(path), encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert isinstance(payload["process"], int)
+    assert payload["round"] in {0, 1, 2}
     assert payload["values"] == list(range(25))
     with os.scandir(system_path(directory)) as entries:
         assert not [entry.name for entry in entries if entry.name.endswith(".tmp")]

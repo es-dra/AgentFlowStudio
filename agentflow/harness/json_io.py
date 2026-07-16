@@ -2,13 +2,28 @@ from __future__ import annotations
 
 import json
 import os
+import errno
+import random
 import tempfile
+import threading
+import time
 from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Iterator
 
 from pydantic import BaseModel
+
+
+_WINDOWS_LOCK_TIMEOUT_SECONDS = 30.0
+_WINDOWS_LOCK_INITIAL_DELAY_SECONDS = 0.005
+_WINDOWS_LOCK_MAX_DELAY_SECONDS = 0.1
+_RETRIABLE_WINDOWS_LOCK_ERRNOS = {
+    errno.EACCES,
+    errno.EAGAIN,
+    getattr(errno, "EDEADLK", 36),
+    getattr(errno, "EWOULDBLOCK", errno.EAGAIN),
+}
 
 
 def write_json(path: str | Path, data: Any) -> Path:
@@ -43,7 +58,7 @@ def exclusive_file_lock(path: str | Path) -> Iterator[None]:
     lock_path = Path(path)
     os.makedirs(system_path(lock_path.parent), exist_ok=True)
     with open(system_path(lock_path), "a+b") as handle:
-        _lock_handle(handle)
+        _lock_handle(handle, lock_path)
         try:
             yield
         finally:
@@ -68,16 +83,45 @@ def _lock_path(path: Path) -> Path:
     return path.with_name(f".json-lock-{digest}.lock")
 
 
-def _lock_handle(handle: Any) -> None:
+def _lock_handle(handle: Any, path: Path) -> None:
     if os.name == "nt":
-        import msvcrt
-
-        handle.seek(0)
-        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        _lock_windows_handle(handle, path)
         return
     import fcntl
 
     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _lock_windows_handle(handle: Any, path: Path) -> None:
+    import msvcrt
+
+    deadline = time.monotonic() + _WINDOWS_LOCK_TIMEOUT_SECONDS
+    delay = _WINDOWS_LOCK_INITIAL_DELAY_SECONDS
+    attempts = 0
+    rng = random.Random((os.getpid() << 16) ^ threading.get_ident() ^ time.monotonic_ns())
+    while True:
+        handle.seek(0)
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError as exc:
+            if not _is_retriable_windows_lock_error(exc):
+                raise
+            attempts += 1
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    "timed out acquiring JSON lock "
+                    f"{path.name!r} after {attempts} attempts; "
+                    f"last errno={getattr(exc, 'errno', None)}"
+                ) from exc
+            sleep_for = min(delay + rng.uniform(0, delay), remaining)
+            time.sleep(sleep_for)
+            delay = min(delay * 1.5, _WINDOWS_LOCK_MAX_DELAY_SECONDS)
+
+
+def _is_retriable_windows_lock_error(exc: OSError) -> bool:
+    return getattr(exc, "errno", None) in _RETRIABLE_WINDOWS_LOCK_ERRNOS
 
 
 def _unlock_handle(handle: Any) -> None:
