@@ -179,6 +179,7 @@ function bindStudioWorkflowEvents() {
     store.set((s) => {
       s.selection = { nodeIds: [node.id], edgeId: null };
     }, { history: false, persist: false });
+    productShell?.syncSelectionFromCanvasNode?.(node.id);
   });
 }
 function bindSaveAuthRecovery() {

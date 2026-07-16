@@ -106,11 +106,18 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
 def test_scene_and_shot_selection_use_one_context_sync_path() -> None:
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
+    main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
 
     assert 'let selection = { sceneIndex: 0, shotIndex: 0 }' in shell
     assert "selectContext(index, 0)" in shell
     assert "selectContext(selection.sceneIndex, index)" in shell
     assert 'options.onSelectCanvasNode?.(currentShot().nodeId || "")' in shell
+    assert "function syncSelectionFromCanvasNode(nodeId, { renderAfter = true } = {})" in shell
+    assert "function syncSelectionFromStudioState(studioState)" in shell
+    assert "syncSelectionFromCanvasNode(nodeIds[0], { renderAfter: false })" in shell
+    assert "function findShotSelectionByNodeId(nodeId)" in shell
+    assert "syncSelectionFromCanvasNode," in shell
+    assert "productShell?.syncSelectionFromCanvasNode?.(node.id)" in main
     assert "stage.dataset.canvasTarget" in shell
     assert "aside.dataset.contextKey" in shell
     assert 'window.dispatchEvent(new CustomEvent("afs:studio-select-node"' in bootstrap

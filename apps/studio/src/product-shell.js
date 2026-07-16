@@ -634,6 +634,28 @@ export function createProductShell(options = {}) {
     options.onSelectCanvasNode?.(currentShot().nodeId || "");
   }
 
+  function syncSelectionFromCanvasNode(nodeId, { renderAfter = true } = {}) {
+    const target = findShotSelectionByNodeId(nodeId);
+    if (!target) return false;
+    if (selection.sceneIndex === target.sceneIndex && selection.shotIndex === target.shotIndex) return true;
+    selection = { sceneIndex: target.sceneIndex, shotIndex: target.shotIndex };
+    directorTab = "suggestion";
+    notice = "";
+    if (renderAfter) render();
+    return true;
+  }
+
+  function findShotSelectionByNodeId(nodeId) {
+    const targetId = String(nodeId || "");
+    if (!targetId) return null;
+    const scenes = sceneModel();
+    for (let sceneIndex = 0; sceneIndex < scenes.length; sceneIndex += 1) {
+      const shotIndex = scenes[sceneIndex].shots.findIndex((shot) => shot.nodeId === targetId);
+      if (shotIndex >= 0) return { sceneIndex, shotIndex };
+    }
+    return null;
+  }
+
   function focusDirectorBrief() {
     directorTab = "suggestion";
     directorCollapsed = false;
@@ -720,7 +742,14 @@ export function createProductShell(options = {}) {
 
   function updateStudioState(studioState) {
     snapshot = { ...snapshot, studioState };
+    syncSelectionFromStudioState(studioState);
     if (document.getElementById("app")?.classList.contains("product-mode")) render();
+  }
+
+  function syncSelectionFromStudioState(studioState) {
+    const nodeIds = studioState?.selection?.nodeIds;
+    if (!Array.isArray(nodeIds) || nodeIds.length !== 1) return false;
+    return syncSelectionFromCanvasNode(nodeIds[0], { renderAfter: false });
   }
 
   function showOverview() {
@@ -811,6 +840,7 @@ export function createProductShell(options = {}) {
     updateStudioState,
     showOverview,
     showCanvas,
+    syncSelectionFromCanvasNode,
     setSection(next) { section = next; render(); },
     get section() { return section; },
   };
