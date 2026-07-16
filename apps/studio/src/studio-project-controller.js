@@ -116,22 +116,18 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
 
   async function createNewProject() {
     try {
-      const name = await requestProjectName(projectSummaries);
-      if (name === null) return false;
+      const creation = await requestProjectCreation(projectSummaries);
+      if (creation === null) return false;
       const suffix = Math.random().toString(36).slice(2, 8);
       const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
-      const projectName = name.trim() || "AFS Studio project";
+      const projectName = creation.name.trim();
       const nextRuntime = createRuntimeClient(projectId);
-      const created = await createProjectWithRetry(nextRuntime, {
+      await createProjectWithRetry(nextRuntime, {
         project_id: projectId,
         project_type: "studio_creator_authoring",
         goal: projectName,
       });
       await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
-      const creatorEntry = created?.episode_bootstrap?.workspace_entry?.href;
-      if (creatorEntry) {
-        window.location.assign(creatorEntry);
-      }
       return true;
     } catch (error) {
       reportProjectCreateClientError(getRuntime(), error, safeError);
@@ -273,7 +269,7 @@ function emptyProjectRuntimeClient() {
   };
 }
 
-function requestProjectName(existingProjects = []) {
+function requestProjectCreation(existingProjects = []) {
   return new Promise((resolve) => {
     const modal = el("div", "modal compact project-create-modal");
     const head = el("div", "modal-head");
@@ -288,16 +284,38 @@ function requestProjectName(existingProjects = []) {
     field.appendChild(el("span", "", "项目名称"));
     const input = document.createElement("input");
     input.type = "text";
-    input.value = uniqueProjectName("AFS 内测项目", existingProjects);
+    input.value = uniqueProjectName("未命名项目", existingProjects);
     input.maxLength = 80;
     field.appendChild(input);
+    const modeGroup = el("fieldset", "project-create-modes");
+    const legend = el("legend", "", "开始方式");
+    modeGroup.appendChild(legend);
+    const modes = [
+      ["empty", "从空白开始", "不创建场景、镜头、进度、参考或示例素材。"],
+      ["import", "粘贴/导入剧本或故事材料", "进入统一 Studio 后由 AI 导演先整理简报，确认前不写入故事事实。"],
+      ["example", "使用示例", "创建一个明确标记的示例项目；示例内容不会混入普通项目。"],
+    ];
+    for (const [value, title, description] of modes) {
+      const option = el("label", "project-create-mode");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "project-create-mode";
+      radio.value = value;
+      radio.checked = value === "empty";
+      option.append(
+        radio,
+        el("span", "", `<strong>${title}</strong><small>${description}</small>`),
+      );
+      option.lastElementChild.innerHTML = `<strong>${title}</strong><small>${description}</small>`;
+      modeGroup.appendChild(option);
+    }
     const error = el("div", "modal-error");
     error.hidden = true;
-    body.append(field, error);
+    body.append(field, modeGroup, error);
 
     const actions = el("div", "modal-actions");
     const cancel = el("button", "ghost-btn", "取消");
-    const confirm = el("button", "primary-btn", "创建并切换");
+    const confirm = el("button", "primary-btn", "进入 Studio");
     actions.append(cancel, confirm);
 
     modal.append(head, body, actions);
@@ -312,8 +330,10 @@ function requestProjectName(existingProjects = []) {
         input.focus();
         return;
       }
-      if (isDuplicateProjectName(name, existingProjects)) {
-        error.textContent = `项目名称“${name}”已存在，请换一个名称。`;
+      const startMode = selectedCreationMode(modal);
+      const projectName = startMode === "example" ? exampleProjectName(name, existingProjects) : name;
+      if (isDuplicateProjectName(projectName, existingProjects)) {
+        error.textContent = `项目名称“${projectName}”已存在，请换一个名称。`;
         error.hidden = false;
         input.focus();
         input.select();
@@ -321,7 +341,7 @@ function requestProjectName(existingProjects = []) {
       }
       settled = true;
       close();
-      resolve(name);
+      resolve({ name: projectName, startMode });
     };
 
     confirm.addEventListener("click", finish);
@@ -355,6 +375,16 @@ function requestProjectName(existingProjects = []) {
   });
 }
 
+function selectedCreationMode(root) {
+  return root.querySelector("input[name='project-create-mode']:checked")?.value || "empty";
+}
+
+function exampleProjectName(name, projects) {
+  const trimmed = String(name || "").trim();
+  const base = /^示例[：:]/.test(trimmed) ? trimmed : `示例：${trimmed}`;
+  return uniqueProjectName(base, projects);
+}
+
 function isDuplicateProjectName(name, projects) {
   const normalized = normalizeProjectName(name);
   if (!normalized) return false;
@@ -362,7 +392,7 @@ function isDuplicateProjectName(name, projects) {
 }
 
 function uniqueProjectName(baseName, projects) {
-  const base = String(baseName || "AFS 内测项目").trim() || "AFS 内测项目";
+  const base = String(baseName || "未命名项目").trim() || "未命名项目";
   if (!isDuplicateProjectName(base, projects)) return base;
   for (let index = 2; index < 1000; index += 1) {
     const candidate = `${base} ${index}`;

@@ -55,6 +55,34 @@ def test_product_shell_exposes_loading_empty_error_recovery_and_focus_states() -
     assert "@media (prefers-reduced-motion: reduce)" in styles
 
 
+def test_new_project_enters_unified_studio_and_empty_storyboard_has_no_demo_facts() -> None:
+    controller = (STUDIO / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    context = (STUDIO / "src" / "product-shell-context.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
+
+    assert 'project_type: "studio_creator_authoring"' in controller
+    assert "window.location.assign" not in controller
+    assert "created?.episode_bootstrap?.workspace_entry?.href" not in controller
+    assert 'uniqueProjectName("未命名项目", existingProjects)' in controller
+    assert "AFS 内测项目" not in controller
+    for label in ("从空白开始", "粘贴/导入剧本或故事材料", "使用示例", "示例："):
+        assert label in controller
+
+    assert "FALLBACK_SCENES" not in shell
+    for forbidden in ("巷口", "雨巷", "老宅"):
+        assert forbidden not in shell
+    assert "storyboard-empty-state" in shell
+    assert "0 场景 · 0 镜头" in shell
+    assert "空项目不会自动带入示例、进度、参考或分镜。" in shell
+    assert "导演 · 项目简报" in shell
+    assert 'stage.dataset.canvasTarget = currentShot().nodeId || "empty-project"' in shell
+    assert "return [];" in shell
+    assert "scene-list-empty" in styles
+    assert "先核对主体目标、连续性影响和确认边界" in context
+    assert "雨夜层次" not in context
+
+
 def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
     bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")

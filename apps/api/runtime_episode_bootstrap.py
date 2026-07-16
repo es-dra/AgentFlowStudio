@@ -60,7 +60,7 @@ class CreatorAuthoringBootstrapResult:
     def workspace_entry(self) -> dict[str, str]:
         return {
             "href": (
-                f"/studio/episode-workspace/?project={self.aggregate.scope.project_id}"
+                f"/studio/?project={self.aggregate.scope.project_id}"
             ),
         }
 

@@ -318,7 +318,7 @@ def _crew_summary(crew: dict[str, Any]) -> dict[str, Any]:
 
 def _canonical_coverage(store: RuntimeStore, project_id: str, run: dict[str, Any]) -> dict[str, Any]:
     empty = {
-        "status_label": "0/15",
+        "status_label": "0/0",
         "episode_title": "",
         "episode_version_id": "",
         "package_sha256": "",
@@ -334,7 +334,7 @@ def _canonical_coverage(store: RuntimeStore, project_id: str, run: dict[str, Any
         "timeline": [],
         "audio": {
             "covered_shot_count": 0,
-            "total_shot_count": 15,
+            "total_shot_count": 0,
             "pending_asset_count": 0,
             "all_audio_ready": False,
             "status": "尚未绑定",
@@ -611,7 +611,7 @@ def _next_action(stages: list[dict[str, str]], decisions: dict[str, Any], crew: 
 
 def _episode_label(run: dict[str, Any]) -> str:
     binding = run.get("representative_episode_binding") if isinstance(run.get("representative_episode_binding"), dict) else {}
-    return _safe_text(binding.get("episode_title"), 100) or "第 01 集"
+    return _safe_text(binding.get("episode_title"), 100) or "未创建分集"
 
 
 def _localized_project_status(status: str, delivery: dict[str, Any]) -> str:

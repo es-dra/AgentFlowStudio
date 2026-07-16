@@ -69,6 +69,9 @@ def test_creator_routes_build_long_form_from_empty_and_reload_after_process_rest
     )
     assert created.status_code == 200, created.text
     assert created.json()["episode_bootstrap"]["aggregate_version"] == 1
+    assert created.json()["episode_bootstrap"]["workspace_entry"] == {
+        "href": f"/studio/?project={PROJECT_ID}",
+    }
     empty = client.get(f"/projects/{PROJECT_ID}/creator-workspace")
     assert empty.status_code == 200, empty.text
     assert empty.json()["counts"] == {
