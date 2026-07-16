@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 
@@ -25,11 +27,11 @@ def test_product_shell_is_chinese_first_and_hides_diagnostics_from_primary_flow(
 
 
 def test_mobile_shell_has_no_canvas_mount_and_no_horizontal_page_overflow_contract() -> None:
-    main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
     styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
 
-    assert 'editorMounted = !window.matchMedia("(max-width: 760px)").matches;' in main
-    assert "if (editorMounted) {" in main
+    assert 'const editorMounted = !window.matchMedia("(max-width: 760px)").matches;' in bootstrap
+    assert "if (editorMounted) {" in bootstrap
     assert "@media (max-width: 760px)" in styles
     assert "html, body { max-width: 100%; overflow-x: clip; }" in styles
     assert "#studio-editor-shell { display: none !important; }" in styles
@@ -55,18 +57,93 @@ def test_product_shell_exposes_loading_empty_error_recovery_and_focus_states() -
 
 def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
 
-    assert 'editorParking.id = "studio-canvas-parking"' in main
+    assert 'editorParking.id = "studio-canvas-parking"' in bootstrap
     assert "getCanvasShell: () => editorShell" in main
     assert 'section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace()' in shell
     assert 'stage.appendChild(editor)' in shell
     assert 'root.dataset.view = section' in shell
     assert 'const active = section === key' in shell
-    assert 'options.onSelectCanvasNode?.(currentShot().nodeId)' in shell
+    assert 'options.onSelectCanvasNode?.(currentShot().nodeId || "")' in shell
     assert 'state.ui.inspectorOpen = false' in main
     assert '.canvas-workspace-stage #studio-editor-shell' in styles
     assert '.canvas-workspace-stage #sprite-root { display: none; }' in styles
     assert '.canvas-mode #product-shell-root' not in styles
     assert 'app?.classList.remove("product-mode")' not in shell
+
+
+def test_scene_and_shot_selection_use_one_context_sync_path() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
+
+    assert 'let selection = { sceneIndex: 0, shotIndex: 0 }' in shell
+    assert "selectContext(index, 0)" in shell
+    assert "selectContext(selection.sceneIndex, index)" in shell
+    assert 'options.onSelectCanvasNode?.(currentShot().nodeId || "")' in shell
+    assert "stage.dataset.canvasTarget" in shell
+    assert "aside.dataset.contextKey" in shell
+    assert 'window.dispatchEvent(new CustomEvent("afs:studio-select-node"' in bootstrap
+    assert "state.selection = { nodeIds: [], edgeId: null }" in bootstrap
+
+
+def test_director_context_and_next_action_helpers_partition_and_target_real_work() -> None:
+    script = r'''
+import {
+  createDirectorContextStore,
+  findNextProductionTarget,
+  productContextKey,
+} from "./apps/studio/src/product-shell-context.js";
+
+const store = createDirectorContextStore();
+const firstKey = productContextKey({ projectId: "p1", sceneIndex: 0, shotIndex: 0, shot: { nodeId: "n1", title: "开场" } });
+const secondKey = productContextKey({ projectId: "p1", sceneIndex: 1, shotIndex: 0, shot: { nodeId: "n2", title: "雨巷" } });
+store.get(firstKey).conversations.push({ role: "user", text: "只属于开场" });
+store.get(firstKey).proposalApplied = true;
+const second = store.get(secondKey);
+const target = findNextProductionTarget([
+  { name: "开场", shots: [{ state: "ready", nodeId: "n1" }] },
+  { name: "雨巷", shots: [{ state: "blocked", nodeId: "n2" }, { state: "draft", nodeId: "n3" }] },
+], { sceneIndex: 0, shotIndex: 0 });
+process.stdout.write(JSON.stringify({
+  keysDiffer: firstKey !== secondKey,
+  secondConversations: second.conversations.length,
+  secondApplied: second.proposalApplied,
+  target: { sceneIndex: target.sceneIndex, shotIndex: target.shotIndex, nodeId: target.shot.nodeId },
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload == {
+        "keysDiffer": True,
+        "secondConversations": 0,
+        "secondApplied": False,
+        "target": {"sceneIndex": 1, "shotIndex": 0, "nodeId": "n2"},
+    }
+
+
+def test_cockpit_next_action_save_semantics_and_sparse_density_are_not_decorative() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
+
+    assert 'next.addEventListener("click", activateNextAction)' in shell
+    assert "findNextProductionTarget(sceneModel(), selection)" in shell
+    assert "context.actionLabel = actionLabel" in shell
+    assert "syncCanvasSelection()" in shell
+    assert "requestAnimationFrame(focusCurrentContext)" in shell
+    assert 'const retry = node("button", "studio-save-retry", "重试")' in shell
+    assert 'status.setAttribute("role", "status")' in shell
+    assert 'retry.type = "button"' in shell
+    assert 'retry.setAttribute("role", "status")' not in shell
+    assert 'grid.classList.toggle("is-sparse", sparse)' in shell
+    assert ".storyboard-content.is-sparse" in styles
+    assert ".storyboard-shot-grid.is-sparse" in styles

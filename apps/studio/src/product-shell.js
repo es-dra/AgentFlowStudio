@@ -1,5 +1,6 @@
 import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
+import { createDirectorContextStore, findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 
 const FALLBACK_SCENES = ["巷口", "雨巷", "老宅", "天台", "尾声"];
 const DIRECTOR_TABS = [
@@ -11,16 +12,14 @@ const DIRECTOR_TABS = [
 export function createProductShell(options = {}) {
   let locale = currentLocale();
   let section = "storyboard";
-  let selectedScene = 0;
-  let selectedShot = 0;
+  let selection = { sceneIndex: 0, shotIndex: 0 };
   let directorTab = "suggestion";
   let directorCollapsed = false;
   let cockpitOpen = false;
   let contextOpen = false;
   let mobileDirectorOpen = false;
   let notice = "";
-  let proposalApplied = false;
-  let conversations = [];
+  const directorContexts = createDirectorContextStore();
   let snapshot = {
     loading: true,
     workspace: null,
@@ -137,16 +136,20 @@ export function createProductShell(options = {}) {
   function buildSaveStatus() {
     const saveState = String(snapshot.studioState?.ui?.saveState || "本地暂存");
     const retryable = ["需要登录", "保存冲突", "保存失败"].includes(saveState);
-    const control = node(retryable ? "button" : "span", `studio-save-status ${saveTone(saveState)}`, saveState);
-    control.setAttribute("role", "status");
-    control.setAttribute("aria-live", "polite");
-    control.title = snapshot.studioState?.ui?.saveMessage || saveState;
+    const cluster = node("span", "studio-save-cluster");
+    const status = node("span", `studio-save-status ${saveTone(saveState)}`, saveState);
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    status.title = snapshot.studioState?.ui?.saveMessage || saveState;
+    cluster.appendChild(status);
     if (retryable) {
-      control.type = "button";
-      control.setAttribute("aria-label", `重试保存：${control.title}`);
-      control.addEventListener("click", () => options.onRetrySave?.());
+      const retry = node("button", "studio-save-retry", "重试");
+      retry.type = "button";
+      retry.setAttribute("aria-label", `重试保存：${status.title}`);
+      retry.addEventListener("click", () => options.onRetrySave?.());
+      cluster.appendChild(retry);
     }
-    return control;
+    return cluster;
   }
 
   function buildCockpit() {
@@ -167,17 +170,14 @@ export function createProductShell(options = {}) {
     }
     const next = node("button", "cockpit-next", project.next_action || "继续制作");
     next.type = "button";
-    next.addEventListener("click", () => {
-      cockpitOpen = false;
-      notice = "已定位到当前阶段的下一步。";
-      render();
-    });
+    next.addEventListener("click", activateNextAction);
     panel.append(copy, stages, next);
     return panel;
   }
 
   function buildWorkspace() {
     const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
+    shell.dataset.contextKey = currentContextKey();
     shell.appendChild(buildSceneRail());
     const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
     shell.appendChild(main);
@@ -200,6 +200,7 @@ export function createProductShell(options = {}) {
     main.appendChild(buildContextBar());
     const stage = node("section", "canvas-workspace-stage");
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
+    stage.dataset.canvasTarget = currentShot().nodeId || "empty-shot";
     const editor = options.getCanvasShell?.();
     if (editor) stage.appendChild(editor);
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
@@ -221,17 +222,12 @@ export function createProductShell(options = {}) {
     const list = node("nav", "scene-list");
     list.setAttribute("aria-label", "场景列表");
     scenes.forEach((scene, index) => {
-      const button = node("button", index === selectedScene ? "active" : "");
+      const button = node("button", index === selection.sceneIndex ? "active" : "");
       button.type = "button";
-      button.setAttribute("aria-current", index === selectedScene ? "true" : "false");
+      button.setAttribute("aria-current", index === selection.sceneIndex ? "true" : "false");
       button.innerHTML = `<span class="scene-number">${String(index + 1).padStart(2, "0")}</span><span><strong>${escapeHtml(scene.name)}</strong><small>${scene.shots.length} 镜头 · ${scene.duration}</small></span><span class="scene-state ${scene.blocked ? "blocked" : ""}">${scene.blocked ? "需处理" : "已就绪"}</span>`;
       button.addEventListener("click", () => {
-        selectedScene = index;
-        selectedShot = 0;
-        proposalApplied = false;
-        directorTab = "suggestion";
-        render();
-        requestAnimationFrame(() => document.getElementById("product-main")?.focus());
+        selectContext(index, 0);
       });
       list.appendChild(button);
     });
@@ -246,8 +242,8 @@ export function createProductShell(options = {}) {
     const scene = currentScene();
     const shot = currentShot();
     const bar = node("header", "storyboard-context-bar");
-    const selection = node("div", "selection-context");
-    selection.innerHTML = `<span>当前选择</span><strong>场景 ${String(selectedScene + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selectedShot + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
+    const selectionContext = node("div", "selection-context");
+    selectionContext.innerHTML = `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
     const review = node("button", "studio-secondary-button", "进入审核");
     review.type = "button";
@@ -265,21 +261,24 @@ export function createProductShell(options = {}) {
       : `查看画布${icon("expand", 13)}`;
     canvas.addEventListener("click", () => section === "canvas" ? showOverview() : openCanvas());
     actions.append(review, canvas);
-    bar.append(selection, actions);
+    bar.append(selectionContext, actions);
     return bar;
   }
 
   function buildStoryboardContent() {
     const scene = currentScene();
     const sectionEl = node("section", "storyboard-content");
+    const sparse = scene.shots.length <= 2;
+    sectionEl.classList.toggle("is-sparse", sparse);
     const heading = node("div", "storyboard-heading");
     heading.append(
-      node("div", "", `<span class="eyebrow">场景 ${String(selectedScene + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`),
+      node("div", "", `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`),
       node("span", "storyboard-duration", `${scene.shots.length} 镜头 · ${scene.duration}`),
     );
-    heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selectedScene + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`;
+    heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`;
     sectionEl.appendChild(heading);
     const grid = node("div", "storyboard-shot-grid");
+    grid.classList.toggle("is-sparse", sparse);
     scene.shots.forEach((shot, index) => grid.appendChild(buildShotCard(shot, index)));
     sectionEl.appendChild(grid);
     if (notice) {
@@ -291,9 +290,10 @@ export function createProductShell(options = {}) {
   }
 
   function buildShotCard(shot, index) {
-    const card = node("button", `storyboard-shot ${index === selectedShot ? "active" : ""}`);
+    const card = node("button", `storyboard-shot ${index === selection.shotIndex ? "active" : ""}`);
     card.type = "button";
-    card.setAttribute("aria-pressed", String(index === selectedShot));
+    card.id = `storyboard-shot-${selection.sceneIndex}-${index}`;
+    card.setAttribute("aria-pressed", String(index === selection.shotIndex));
     card.setAttribute("aria-label", `镜头 ${index + 1}：${shot.title}`);
     const media = node("span", `shot-media ${shot.preview ? "has-preview" : "empty"}`);
     if (shot.preview) {
@@ -303,7 +303,7 @@ export function createProductShell(options = {}) {
       image.loading = "lazy";
       media.appendChild(image);
     } else {
-      media.innerHTML = `${icon("image", 20)}<span>等待镜头画面</span>`;
+      media.innerHTML = `${icon("image", 20)}<span class="shot-empty-copy"><strong>等待镜头画面</strong><small>${escapeHtml(shot.description)}</small></span>`;
     }
     media.append(
       node("span", "shot-index", String(index + 1).padStart(2, "0")),
@@ -316,14 +316,7 @@ export function createProductShell(options = {}) {
       node("small", `shot-status ${shot.state}`, shotStateLabel(shot.state)),
     );
     card.append(media, copy);
-    card.addEventListener("click", () => {
-      selectedShot = index;
-      options.onSelectCanvasNode?.(shot.nodeId);
-      directorTab = "suggestion";
-      proposalApplied = false;
-      notice = "";
-      render();
-    });
+    card.addEventListener("click", () => selectContext(selection.sceneIndex, index));
     return card;
   }
 
@@ -350,6 +343,7 @@ export function createProductShell(options = {}) {
 
   function buildDirector() {
     const aside = node("aside", `studio-director ${mobileDirectorOpen ? "mobile-open" : ""}`);
+    aside.dataset.contextKey = currentContextKey();
     const head = node("header", "director-head");
     const title = node("div");
     title.innerHTML = `<span class="director-mark">AI</span><span><strong>导演 · 当前镜头</strong><small>${escapeHtml(currentShot().title)}</small></span>`;
@@ -391,8 +385,9 @@ export function createProductShell(options = {}) {
     const body = node("div", "director-body");
     const chat = node("div", "director-chat");
     const shot = currentShot();
+    const context = directorContext();
     chat.appendChild(chatBubble("assistant", `建议先检查“${shot.title}”的主体方向与环境关系，再决定是否进入审核。`));
-    for (const item of conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
+    for (const item of context.conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
     body.appendChild(chat);
 
     const references = node("button", "director-reference-summary");
@@ -404,19 +399,19 @@ export function createProductShell(options = {}) {
     });
     body.appendChild(references);
 
-    const proposal = node("section", `director-proposal ${proposalApplied ? "applied" : ""}`);
-    proposal.innerHTML = `<span class="eyebrow">建议调整 · 不自动执行</span><strong>${proposalApplied ? "调整已加入当前镜头草稿" : "强化主体轮廓，保留雨夜层次"}</strong><p>只影响当前镜头；相邻镜头、已确认事实和版本仍保持不变。</p>`;
-    const apply = node("button", "studio-primary-button", proposalApplied ? "已加入草稿" : "应用到草稿");
+    const proposal = node("section", `director-proposal ${context.proposalApplied ? "applied" : ""}`);
+    proposal.innerHTML = `<span class="eyebrow">${context.actionLabel ? "当前下一步 · 已定位" : "建议调整 · 不自动执行"}</span><strong>${context.proposalApplied ? "调整已加入当前镜头草稿" : escapeHtml(context.proposalText)}</strong><p>只影响当前镜头；相邻镜头、已确认事实和版本仍保持不变。</p>`;
+    const apply = node("button", "studio-primary-button", context.proposalApplied ? "已加入草稿" : "应用到草稿");
     apply.type = "button";
-    apply.disabled = proposalApplied;
+    apply.disabled = context.proposalApplied;
     apply.addEventListener("click", () => {
-      const applied = options.onApplyDirectorDraft?.(shot.nodeId, "强化主体轮廓，保留雨夜层次");
+      const applied = options.onApplyDirectorDraft?.(shot.nodeId, context.proposalText);
       if (applied === false) {
         notice = "当前镜头还没有可写入的画布节点，建议已保留在本次讨论中。";
         render();
         return;
       }
-      proposalApplied = true;
+      context.proposalApplied = true;
       notice = "导演建议已加入当前镜头草稿，正在保存；尚未提交审核。";
       render();
     });
@@ -437,7 +432,10 @@ export function createProductShell(options = {}) {
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      conversations = [...conversations, { role: "user", text }, { role: "assistant", text: "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" }];
+      context.conversations.push(
+        { role: "user", text },
+        { role: "assistant", text: "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" },
+      );
       render();
     });
     body.appendChild(form);
@@ -448,7 +446,7 @@ export function createProductShell(options = {}) {
     const body = node("div", "director-body director-reference-list");
     const refs = [
       ["脚本场景", currentScene().name, "当前"],
-      ["相邻镜头", selectedShot > 0 ? currentScene().shots[selectedShot - 1].title : "场景开场", "上下文"],
+      ["相邻镜头", selection.shotIndex > 0 ? currentScene().shots[selection.shotIndex - 1].title : "场景开场", "上下文"],
       ["当前候选", currentShot().title, "v3"],
     ];
     for (const [type, title, meta] of refs) {
@@ -509,6 +507,62 @@ export function createProductShell(options = {}) {
     button.setAttribute("aria-selected", String(active));
     button.addEventListener("click", () => key === "canvas" ? openCanvas() : showOverview());
     return button;
+  }
+
+  function activateNextAction() {
+    const target = findNextProductionTarget(sceneModel(), selection);
+    if (!target) return;
+    const actionLabel = snapshot.project?.next_action || "继续当前镜头制作";
+    cockpitOpen = false;
+    directorTab = "suggestion";
+    directorCollapsed = false;
+    mobileDirectorOpen = true;
+    selectContext(target.sceneIndex, target.shotIndex, {
+      actionLabel,
+      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，导演建议已按当前下一步准备。`,
+    });
+  }
+
+  function selectContext(sceneIndex, shotIndex, { actionLabel = "", noticeText = "" } = {}) {
+    const scenes = sceneModel();
+    const nextSceneIndex = Math.max(0, Math.min(Number(sceneIndex || 0), scenes.length - 1));
+    const nextShotIndex = Math.max(0, Math.min(Number(shotIndex || 0), scenes[nextSceneIndex].shots.length - 1));
+    selection = { sceneIndex: nextSceneIndex, shotIndex: nextShotIndex };
+    directorTab = "suggestion";
+    notice = noticeText;
+    const context = directorContext();
+    if (actionLabel) {
+      context.actionLabel = actionLabel;
+      context.proposalText = `${actionLabel}：先复核“${currentShot().title}”的画面目标与阻塞项`;
+      context.proposalApplied = false;
+    }
+    syncCanvasSelection();
+    render();
+    requestAnimationFrame(focusCurrentContext);
+  }
+
+  function syncCanvasSelection() {
+    options.onSelectCanvasNode?.(currentShot().nodeId || "");
+  }
+
+  function focusCurrentContext() {
+    const target = section === "storyboard"
+      ? document.getElementById(`storyboard-shot-${selection.sceneIndex}-${selection.shotIndex}`)
+      : document.getElementById("product-main");
+    target?.focus();
+  }
+
+  function currentContextKey() {
+    return productContextKey({
+      projectId: snapshot.project?.project_id,
+      sceneIndex: selection.sceneIndex,
+      shotIndex: selection.shotIndex,
+      shot: currentShot(),
+    });
+  }
+
+  function directorContext() {
+    return directorContexts.get(currentContextKey());
   }
 
   function openCanvas() {
@@ -580,7 +634,7 @@ export function createProductShell(options = {}) {
   function showCanvas() {
     if (!options.getCanvasShell?.()) return false;
     section = "canvas";
-    options.onSelectCanvasNode?.(currentShot().nodeId);
+    syncCanvasSelection();
     render();
     return true;
   }
@@ -600,8 +654,11 @@ export function createProductShell(options = {}) {
       scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0));
       scene.blocked = scene.shots.some((shot) => shot.state === "blocked");
     }
-    selectedScene = Math.min(selectedScene, scenes.length - 1);
-    selectedShot = Math.min(selectedShot, scenes[selectedScene].shots.length - 1);
+    const sceneIndex = Math.min(selection.sceneIndex, scenes.length - 1);
+    selection = {
+      sceneIndex,
+      shotIndex: Math.min(selection.shotIndex, scenes[sceneIndex].shots.length - 1),
+    };
     return scenes;
   }
 
@@ -638,8 +695,8 @@ export function createProductShell(options = {}) {
     }));
   }
 
-  function currentScene() { return sceneModel()[selectedScene]; }
-  function currentShot() { return currentScene().shots[selectedShot]; }
+  function currentScene() { return sceneModel()[selection.sceneIndex]; }
+  function currentShot() { return currentScene().shots[selection.shotIndex]; }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function totalReadyShots() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => shot.state === "ready").length; }
   function completionPercent() { return Math.round((totalReadyShots() / Math.max(1, totalShots())) * 100); }

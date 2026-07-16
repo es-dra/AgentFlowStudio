@@ -1,103 +1,93 @@
-# AFS Unified Project Studio — Owner-feedback Design QA
+# AFS Unified Project Studio — Owner-feedback Design QA V3
 
-## Supersession and acceptance gate
+## Supersession and gate
 
-The earlier `design-qa.md` PASS at PR head `7405a5ef6c3349e8c95914bee570ca76f1d57827` is superseded by Owner live-test feedback. It incorrectly treated the legacy full-screen Canvas replacement and the separate `production-control` product entry as acceptable. This QA starts from those P0/P1 findings and passes only after the same-shell Canvas continuity, frontend production-control retirement, hierarchy, density, responsive, and interaction-feedback requirements are reverified.
+The PASS recorded for PR head `10e25c8b346b39467320c65767d47b58feb44039` is superseded by the independent evaluator FAIL. That evaluation found stale Canvas selection after a scene change, a decorative Cockpit next action, sparse Storyboard density, Director conversation leakage, incorrect retry-button semantics, and two CI failures. This V3 result is PASS only after those findings are fixed, focused and full tests pass, real browser journeys pass, and the final PR head includes `master@d40daeb5fc04a3d4e0d2c4ef6803223533a5e99c`.
 
-## Target and evidence
+## Evidence roots
 
-- Accepted hierarchy direction (north star, not a pixel mandate): `C:\Users\chenzy\.codex\generated_images\019f6bfb-d905-7543-a92f-a09ba8a569d5\exec-b883435d-bd8e-40e1-9004-af1ee92773d5.png`
-- Concept / final Storyboard comparison: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\15-concept-final-storyboard-comparison.png`
-- Owner-failing Canvas / fixed Canvas comparison: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\16-owner-before-after-canvas-comparison.png`
-- Final Storyboard, 1440 × 1024: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\09-final-storyboard-desktop-1440x1024.png`
-- Final Canvas in the persistent shell, 1440 × 1024: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\11-final-canvas-same-shell-settled-1440x1024.png`
-- Contextual project status / Cockpit: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\13-project-cockpit-contextual-settled-1440x1024.png`
-- Canvas recovery feedback: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\14-canvas-recovery-feedback-1440x1024.png`
-- Mobile Storyboard, 390 × 844: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\04-storyboard-mobile-390x844.png`
-- Mobile review/version drawer: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\05-mobile-review-version-drawer-390x844.png`
-- Mobile Canvas policy: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-evidence\08-mobile-canvas-policy-visible-top-390x844.png`
+- Accepted hierarchy reference, used as direction rather than a pixel mandate: `C:\Users\chenzy\.codex\generated_images\019f6bfb-d905-7543-a92f-a09ba8a569d5\exec-b883435d-bd8e-40e1-9004-af1ee92773d5.png`
+- New evidence root: `C:\Users\chenzy\AppData\Local\Temp\afs-pr166-owner-fix-v3-evidence`
+- Canvas evaluator-before / V3-after comparison: `comparison-canvas-before-after.png`
+- Sparse Storyboard evaluator-before / V3-after comparison: `comparison-sparse-before-after.png`
+- Desktop Storyboard, 1440x1024: `01-desktop-storyboard-1440x1024.png`
+- Canvas after an in-place scene change, 1440x1024: `02-desktop-canvas-scene-sync-1440x1024.png`
+- Director context partition after changing selection: `03-desktop-director-context-partition-1440x1024.png`
+- Cockpit before next action: `04-desktop-cockpit-before-next-action-1440x1024.png`
+- Cockpit next-action result: `05-desktop-cockpit-next-action-result-1440x1024.png`
+- Mobile Storyboard, 390x844: `06-mobile-storyboard-390x844.png`
+- Mobile review/version context, 390x844: `07-mobile-review-390x844.png`
+- Mobile Canvas policy, 390x844: `08-mobile-canvas-policy-390x844.png`
 
-The local QA project was `雨夜追光 · 第一集`. The verified Canvas state retained scene 02 / shot 02 (`雨巷` / `人物回望`) and its AI Director context.
+## Evaluator findings — before / after
 
-## Owner findings — before / after
+| Finding | Evaluator evidence | V3 fix and result |
+|---|---|---|
+| P1 Canvas selection continuity | Scene 02 / 雨巷 was selected in the shell and Director while the embedded Canvas retained the Lin Wan fixed-asset selection. | `selectContext()` is now the canonical scene/shot transition. It synchronizes the Canvas engine before render, updates the shell and Director context key, and clears Canvas selection when the selected shot has no corresponding node. Browser result for 雨巷: shell key and Director key both `pr166-evaluator-ui:1:0:雨巷开场`, Canvas target `empty-shot`, no stale asset selection. |
+| P1 production-control merge parity | Cockpit next action only closed the panel and displayed decorative copy. | `findNextProductionTarget()` selects the next blocked/draft production object. The action changes scene/shot selection, synchronizes Canvas, focuses the target workspace, opens the scoped Director suggestion, and supplies an actionable proposal. Browser result moved from scene 03 / 老宅 to scene 02 / 雨巷 and exposed `当前下一步 · 已定位`. |
+| P1 sparse black space | One- and two-shot scenes left most of the center stage unused. | Sparse Storyboard scenes use adaptive full-height, asset-forward cards. The before/after comparison shows the same two shots using the available production stage without new permanent panels or dashboard noise. |
+| P2 Director leakage | One global conversation/proposal array remained visible after selection changes. | `createDirectorContextStore()` partitions conversations, proposal state, and next-action labels by project/scene/shot context key. A note entered for 雨巷 was absent in 老宅 and restored only in its originating context. |
+| P2 retry semantics | A retryable save `<button>` was overwritten with `role=status`. | Save status is now a separate polite live region. Retry remains a native `type=button` with an explicit retry label and click action. |
+| CI maintainability | `main.js` was 541 lines. | Product-shell DOM/bootstrap wiring moved to `studio-product-bootstrap.js`; `main.js` is 495 lines and keeps the existing Canvas mount/reuse contract. |
+| CI retention | Root `design-qa.md` produced one manual-review item. | The exact root path is classified as a current temporary `verification_surface` with an explicit retirement lifecycle. The rule is exact-path only; the broader retention policy is unchanged. |
+| P3 mobile rail | The horizontal rail scrollbar was visually heavy. | The rail remains keyboard/touch-scrollable but its decorative native scrollbar is hidden. Page-level horizontal overflow remains zero. |
 
-| Severity | Before at the superseded head | Implemented fix | Evidence |
-|---|---|---|---|
-| P0 | `openCanvasWorkspace -> productShell.showCanvas()` enabled `.canvas-mode`, hid `product-shell-root`, and exposed the legacy `studio-editor-shell` as a separate full-screen app. | `main.js` parks the existing Canvas engine and `product-shell.js` mounts it into `.canvas-workspace-stage` inside the persistent Studio shell. The project/episode/stage header, Storyboard/Canvas switch, scene/shot selection, version/recovery context, and collapsible AI Director stay present. The Canvas engine was adapted, not rewritten. | `16-owner-before-after-canvas-comparison.png`, final Canvas screenshot, and Storyboard → Canvas → Storyboard browser journey. |
-| P0/P1 | `创作中枢` / `制作总览` / `/studio/production-control/` remained a third top-level product surface. | The frontend route files and topbar entry were retired. Useful status, save state, attention, and next-action capability now live in the project Cockpit and contextual AI Director. Internal runtime-client/backend contracts remain intact. | Contextual Cockpit screenshot, caller scan, static tests, and matrix below. |
-| P1 | Large empty black regions, tiny low-contrast text, repetitive border/card framing, and weak interaction feedback. | Body copy is 12–14 px, canvas/stage allocation is denser, asset grouping and selection hierarchy are stronger, borders/noise are reduced, and hover/pressed/focus/selected/save/recovery states are explicit and restrained. | Desktop/mobile screenshots, visible keyboard focus, recovery live message, CSS state scan, zero-overflow checks. |
+## Canvas same-shell continuity comparison
 
-No actionable P0, P1, or P2 finding remains in this bounded frontend lane.
-
-## Focused Canvas shell-continuity comparison
-
-The original Owner-failing screenshot showed Canvas replacing the full product surface: there was no shared project header, no Storyboard/Canvas switch, no scene/shot rail from the unified shell, and no contextual Director aligned to the selected shot.
-
-The fixed screenshot proves one continuous shell:
-
-- the same project, episode, stage, scene 02, and shot 02 remain selected;
-- Storyboard and Canvas are adjacent tabs in the same header and switch without page navigation or root-shell replacement;
-- the existing Canvas node/edge/prompt engine is mounted in the shared center stage;
-- the persistent scene rail and the AI Director remain visible and collapsible;
-- version recovery feedback renders inside Canvas without leaving the workspace;
-- `.canvas-mode` no longer hides `product-shell-root`; the legacy editor root is a parked/mounted engine surface only.
+The evaluator-before side shows the shell and Director on 雨巷 while a fixed Lin Wan asset remains selected in Canvas. The V3-after side keeps the same persistent project header, Storyboard/Canvas switch, scene rail, version/recovery footer, and collapsible Director, but removes the stale Canvas selection. The existing Canvas engine remains mounted inside `.canvas-workspace-stage`; it was not rewritten. Switching Canvas → Storyboard kept the same scene/shot and Director context and parked the engine under `#studio-canvas-parking` without hiding `#product-shell-root`.
 
 ## Production-control caller / route / test audit
 
-The audit used `rg -n --hidden --glob '!design-qa.md' --glob '!node_modules' "production-control|制作总览|创作中枢" apps/studio tests` after deletion.
-
-- Removed frontend callers/routes: `apps/studio/src/studio-topbar.js` no longer exposes `/studio/production-control/`; the standalone `apps/studio/production-control/{index.html,app.mjs,styles.css}` surface is deleted.
-- Remaining frontend contract only: `apps/studio/src/runtime-client.js` retains `production-control` request methods because backend/internal orchestration contracts and their tests still use them. They are not exposed as a top-level product.
-- Remaining tests are backend/contract coverage such as `tests/test_api_runtime_production_control_vertical_slice.py`, `tests/test_api_runtime_creator_production_saga.py`, and `tests/test_production_control_contract.py`.
-- Frontend deletion parity is asserted by `tests/test_web_studio_static.py`: the directory has no files, the topbar route/function is absent, project status/Cockpit/Director capability exists, and runtime-client contract methods remain.
+- The standalone frontend directory and `/studio/production-control/` route remain retired; the topbar has no production-control entry.
+- `apps/studio/src/runtime-client.js` retains internal production-control methods because backend/contract callers still own those contracts. No backend/API/runtime contract was changed.
+- Frontend parity is supplied by the project Cockpit, canonical selection/navigation path, and contextual Director proposal. It does not recreate a third product or page.
+- `tests/test_web_studio_static.py` asserts route/entry retirement, retained runtime-client contracts, and the real next-action path.
+- `tests/test_web_studio_product_shell_browser.py` covers canonical Canvas synchronization, context-keyed Director state, actionable next-target selection, retry semantics, and sparse density.
 
 ## KEEP | REFINE | MERGE | RETIRE matrix
 
-| Class | Actual files / components | Decision | Caller/test and deletion-parity route |
-|---|---|---|---|
-| KEEP | `apps/studio/src/runtime-client.js`; backend/internal production-control API and tests (unchanged) | Keep the internal contract needed by orchestration and existing backend consumers without exposing another product shell. | Runtime-client methods remain; backend/contract tests continue to own API semantics. No backend file changed. |
-| KEEP | Existing Canvas engine modules and `#studio-editor-shell` | Reuse the established node/edge/prompt/persistence engine. | Mounted into `.canvas-workspace-stage`; focused browser journey proves selection and engine continuity. |
-| REFINE | `apps/studio/src/product-shell.js`, `apps/studio/styles/product-shell.css`, `apps/studio/src/i18n.js`, `apps/studio/src/review-delivery-workspace.js` | Strengthen hierarchy, density, responsive behavior, project-status naming, save/recovery feedback, and contextual return labels. | Desktop/mobile screenshots, focus/overflow/console checks, focused frontend tests. |
-| MERGE | Project Cockpit/status/next action and AI Director inside `product-shell.js` | Merge useful orchestration/status capability into project context instead of a competing page. | `13-project-cockpit-contextual-settled-1440x1024.png`; static Cockpit/Director assertions. |
-| RETIRE | `apps/studio/production-control/index.html`, `app.mjs`, `styles.css`; production-control topbar link/function in `studio-topbar.js` | Delete the redundant user-facing third product and route entry. | Exact post-delete caller scan plus frontend deletion-parity test; backend/internal contract retained. |
+| Class | Files / components | Decision and parity evidence |
+|---|---|---|
+| KEEP | `apps/studio/src/runtime-client.js`; unchanged backend/internal production-control contracts | Keep internal callers and contract tests. No user-facing route or top-level entry is restored. |
+| KEEP | Existing Canvas engine and `#studio-editor-shell` | Reuse it as the mounted editing engine inside the unified product shell. Browser evidence proves in-place scene change and switch-back behavior. |
+| REFINE | `apps/studio/src/main.js`, `studio-product-bootstrap.js`, `product-shell-context.js`, `product-shell.js`, `product-shell.css` | Establish one selection/context source, split bootstrap responsibilities, increase sparse-state density, preserve native action semantics, and reduce the mobile scrollbar. |
+| MERGE | Cockpit next action + contextual AI Director | Move from status copy to an actual production-object selection/focus action and a context-scoped proposal. |
+| RETIRE | `apps/studio/production-control/*`; topbar route/entry | Keep the third product retired. Deletion parity is asserted in focused frontend tests; `/studio/production-control/` remains absent. |
 
-## Visual maturity, interaction, accessibility, and responsive findings
+## Visual, interaction, responsive, and accessibility QA
 
-- Typography uses the existing Inter / PingFang SC / Microsoft YaHei stack with 12–14 px body copy, stronger headings, and readable Chinese line height.
-- Desktop uses a stable scene rail, flexible Storyboard/Canvas stage, and contextual Director; both required desktop views report zero horizontal overflow.
-- Selected scene/shot/tab states are explicit. Hover and pressed states are encoded in the shared control/card rules; keyboard focus was exercised and produced a visible 2 px solid outline.
-- Save state maps to saving/saved/error/retry UI from the existing Studio state. Saved success was visible in the final header; recovery was exercised live in Canvas. Loading/saving/error were not artificially induced against the local-only runtime, so those remain implementation/static-test evidence rather than claimed live failure-path evidence.
-- Mobile 390 × 844 keeps project context, Storyboard, review/version access, and Director policy with zero horizontal overflow. Canvas editing remains desktop-only and returns a clear fixed policy message instead of loading a cramped editor.
-- Semantic buttons/tabs, `aria-current`, `aria-selected`, `aria-pressed`, focus-visible styling, live messaging, and reduced-motion handling remain present.
-- Final page console audit: 44 informational request entries, 0 errors/warnings.
+- Desktop Storyboard and Canvas both measured `scrollWidth=1440` at `innerWidth=1440`; no horizontal overflow.
+- Mobile Storyboard, review, and Canvas-policy journeys measured `scrollWidth=390` at `innerWidth=390`; no page overflow.
+- Selected scene/shot/tab states, native pressed state, focus transfer, focus-visible CSS, loading/saving/success/status regions, retry action, recovery action, and reduced-motion rules are present. Saved success and target focus were exercised live; failure/retry remains focused static-test evidence rather than an artificially induced runtime failure.
+- Mobile-first load does not mount `#studio-editor-shell`. Selecting Canvas retains Storyboard/project/review context and announces: `移动端保留项目上下文与审核；画布编辑请在桌面打开。`
+- Final in-app Browser console audit returned 0 warnings and 0 errors.
 
 ## Intentional concept deviations as product-quality improvements
 
-- No generated imagery was copied or fabricated for empty shot assets; empty states stay truthful.
-- The legacy Canvas inspector is collapsed and the decorative sprite layer is hidden when embedded so the selected asset remains the focus.
-- Status and next action use progressive disclosure in the project Cockpit; they are not a persistent dashboard or separate product.
-- Director references and versions remain contextual tabs/drawers instead of simultaneous panels.
-- Canvas editing is deliberately desktop-only at 390 px, while project/review context remains available.
+- Empty media remains truthful; no generated or fabricated placeholder asset was added.
+- Sparse scenes enlarge the production objects themselves instead of adding new cards, panels, or a generic dashboard.
+- Context/status details stay progressively disclosed through the Cockpit and Director tabs.
+- Canvas remains desktop editing at 390 px while project and review context stay available.
 
-## Provider and runtime safety evidence
+## Provider and runtime safety
 
-- Preview: local-only `127.0.0.1:4187` (non-protected port), with `AFS_AUTH_ENABLED=false` and every remote LLM/ASR/image/video/vision/external-download gate false.
-- `/health` reported local-only readiness and closed provider gates.
-- Provider/model/media calls made: 0.
-- Protected ports 8790/8791/8793 and deployed/runtime checkouts were not touched.
+- Browser QA used local-only `127.0.0.1:4188`, never protected ports 8790/8791/8793.
+- The tested preview reported LLM, ASR, image, video, vision, and external-download gates all false.
+- Provider/model/media calls: 0. No provider or media endpoint was invoked.
+- No deployed runtime, service, `/opt`, `/test`, or production checkout was mutated.
 
-## Verification
+## Verification result
 
-- `npm run check:studio-js` — passed, 174 files.
-- `python -m pytest tests\test_web_studio_product_shell_browser.py tests\test_web_studio_static.py -q` — passed, 19 tests.
-- `python -m pytest tests\test_web_studio_product_shell_browser.py tests\test_web_studio_modal_auth_semantics_static.py tests\test_web_studio_static.py tests\test_web_studio_session_boundary_browser.py tests\test_web_episode_workspace_productization.py tests\test_web_creator_authoring_vertical_slice.py tests\test_architecture_creator_authoring_fitness.py -q` — passed, 51 tests.
-- `git diff --check` — passed.
-- Browser journeys — Storyboard, same-shell Canvas and return, project Cockpit, Canvas recovery, mobile project/review policy, focus, overflow, and console checks passed at required viewports.
+- `npm run check:studio-js` — PASS, 176 JavaScript files.
+- Focused Studio and retention tests — PASS, 38 tests before the final base refresh.
+- Retention summary — PASS, `manual_review_required_count=0`.
+- `git diff --check` — PASS before final base refresh.
+- Full suite and post-refresh checks are recorded in the PR fix packet for the exact pushed head.
 
-## Residual P3 / nonclaims
+## Residual risks and nonclaims
 
-- P3: real generated-media crop/contrast QA remains untested because provider/media calls were intentionally zero and the local project had empty media.
-- Live loading/saving/error/retry failure paths were not forced; implementation and focused static tests cover them, while saved success and recovery were exercised live.
-- This is not provider smoke, generated-media QA, human acceptance, business/public/legal/SaaS/Alpha readiness, deployment, release, or durable AOS promotion.
+- Generated-media crop/contrast QA remains untested because provider/media calls intentionally remained zero.
+- Live error/retry failure was not forced; semantic structure and action wiring are covered by focused tests.
+- This is not provider smoke, generated-media QA, human acceptance, business/public/legal/SaaS/Alpha readiness, deployment, release, merge, or durable AOS promotion.
 
-final result: passed
+Final result: PASS for the bounded frontend/design-QA lane, conditional on the exact pushed head retaining the verification results above and including `master@d40daeb5fc04a3d4e0d2c4ef6803223533a5e99c`.

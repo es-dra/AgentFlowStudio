@@ -101,6 +101,10 @@ def test_studio_retires_the_separate_production_control_frontend_but_keeps_inter
     assert "productionControlLink" not in topbar
     assert "项目状态与下一步" in product_shell
     assert "project.next_action" in product_shell
+    assert 'next.addEventListener("click", activateNextAction)' in product_shell
+    assert "findNextProductionTarget(sceneModel(), selection)" in product_shell
+    assert "selectContext(target.sceneIndex, target.shotIndex" in product_shell
+    assert "context.actionLabel = actionLabel" in product_shell
     assert "导演 · 当前镜头" in product_shell
     assert "getProductionControl()" in runtime_client
     assert "getCommercialProduction()" in runtime_client
