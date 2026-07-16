@@ -679,6 +679,13 @@ export function createRuntimeClient(projectId = "studio-local-001") {
         headers: { "Idempotency-Key": idempotencyKey },
       });
     },
+    createCreatorProductionRequest(payload, idempotencyKey) {
+      return requestJson(`/projects/${encoded}/creator-production-requests`, {
+        method: "POST",
+        payload,
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    },
     getProductionControl() {
       return requestJson(`/projects/${encoded}/production-control`);
     },

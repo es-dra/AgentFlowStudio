@@ -15,6 +15,10 @@ AUTHORING_MODULES = (
     API / "runtime_episode_workspace_routes.py",
     API / "runtime_studio_state_creator_authoring.py",
 )
+CREATOR_PRODUCTION_SAGA_MODULES = (
+    API / "runtime_creator_production_saga.py",
+    API / "runtime_episode_workspace_routes.py",
+)
 
 
 def _imports(path: Path) -> set[str]:
@@ -86,3 +90,24 @@ def test_creator_projection_and_frontend_do_not_expose_private_media_or_signed_u
     )
     for forbidden in ("signed_url", "media_bytes", "provider_response", "absolute_path"):
         assert forbidden not in source + frontend
+
+
+def test_creator_production_saga_keeps_owner_and_provider_boundaries() -> None:
+    forbidden = (
+        "runtime_commercial_production",
+        "runtime_production_runs",
+        "runtime_product_read_models",
+        "runtime_domain_crew",
+        "runtime_creator_golden_trial",
+        "runtime_provider_dispatch",
+        "runtime_video_dispatch",
+    )
+    for path in CREATOR_PRODUCTION_SAGA_MODULES:
+        imported = _imports(path)
+        assert not any(any(part in module for part in forbidden) for module in imported), path
+    source = (API / "runtime_creator_production_saga.py").read_text(encoding="utf-8")
+    assert "provider_dispatch_count" in source
+    assert "provider_dispatch_count\": 0" in source
+    assert "EpisodeDomainAggregateStore" in source
+    assert ".save(" in source
+    assert "production_runs" not in source

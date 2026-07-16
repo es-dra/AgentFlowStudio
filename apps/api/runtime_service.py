@@ -29,6 +29,7 @@ from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory
 from apps.api.runtime_production_runs import register_runtime_production_run_routes
 from apps.api.runtime_product_read_models import register_runtime_product_read_model_routes
 from apps.api.runtime_production_control import register_runtime_production_control_routes
+from apps.api.runtime_creator_production_saga import register_runtime_creator_production_saga_routes
 from apps.api.runtime_domain_crew import register_runtime_domain_crew_routes
 from apps.api.runtime_episode_bootstrap import (
     ensure_empty_creator_bootstrap,
@@ -379,6 +380,7 @@ def create_runtime_app(
     register_runtime_episode_domain_routes(app, store, auth)
     register_runtime_episode_command_routes(app, store, auth)
     register_runtime_episode_workspace_routes(app, store, auth)
+    register_runtime_creator_production_saga_routes(app, store, auth)
     register_runtime_product_read_model_routes(app, store, auth)
     register_runtime_provider_script_routes(app, store)
     register_runtime_storyboard_routes(app, store)
