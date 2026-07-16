@@ -577,6 +577,7 @@ process.stdout.write(JSON.stringify({ textRendered, imageRendered }));
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     script_file_import = (STUDIO_ROOT / "src" / "script-file-import.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
@@ -600,6 +601,287 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     assert 'createNode(store, "script"' in script_breakdown
     assert "connect(store, fresh.id, shotNode.id)" in script_breakdown
     assert "剧本拆分分镜" in nodes
+    assert "splitTextNodeToStoryboardNodes(store, node, runtime)" in node_actions
+
+
+def test_storyboard_breakdown_runtime_failure_is_visible_not_local_fallback() -> None:
+    script = r'''
+import { splitTextNodeToStoryboardNodes } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "小明有一只猫，小猫捡到了一只狗。",
+      content: "小明有一只猫，小猫捡到了一只狗。",
+      params: {},
+      status: "complete",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 280,
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+  nextId: (prefix) => `${prefix}_${Object.keys(state.nodes).length + 1}`,
+};
+const runtime = {
+  breakdownStoryboard: async () => {
+    throw new Error("Runtime request failed (422): provider output rejected");
+  },
+};
+const created = await splitTextNodeToStoryboardNodes(store, state.nodes.text_1, runtime);
+process.stdout.write(JSON.stringify({ created, node: state.nodes.text_1, node_count: Object.keys(state.nodes).length }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["created"] == []
+    assert payload["node_count"] == 1
+    assert payload["node"]["status"] == "error"
+    assert payload["node"]["params"]["storyboardBreakdownState"]["status"] == "failed"
+    assert payload["node"]["params"]["generationPolicyStatus"] == "needs_attention"
+    assert "小明有一只猫" in payload["node"]["prompt"]
+
+
+def test_storyboard_breakdown_runtime_local_fallback_is_visible_to_tester() -> None:
+    script = r'''
+import { splitTextNodeToStoryboardNodes } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "小明蹲在老城区巷口，橘猫“煤球”叼回一只湿漉漉的奶狗。",
+      content: "小明蹲在老城区巷口，橘猫“煤球”叼回一只湿漉漉的奶狗。",
+      params: {},
+      status: "complete",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 280,
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+  nextId: (prefix) => `${prefix}_${Object.keys(state.nodes).length + 1}`,
+};
+const runtime = {
+  breakdownStoryboard: async () => ({
+    provider_calls_started: false,
+    fallback_visible_to_user: true,
+    fallback_reason: "llm_gate_blocked",
+    fallback_message: "LLM gate 未开启，已使用本地保守分镜；结果需要人工复核后再继续资产识别。",
+    safe_manifest: {
+      status: "local_fallback",
+      fallback_visible_to_user: true,
+      fallback_reason: "llm_gate_blocked",
+      fallback_message: "LLM gate 未开启，已使用本地保守分镜；结果需要人工复核后再继续资产识别。",
+    },
+    shots: [{
+      shot_id: "shot_01",
+      index: 1,
+      duration: "6s",
+      description: "@小明 @煤球 @奶狗 @老城区巷口。小明蹲在老城区巷口，橘猫“煤球”叼回一只湿漉漉的奶狗。",
+      shot_size: "中景",
+      light_atmosphere: "自然光影",
+      camera_motion: "固定机位",
+      dialogue: "无明确对白",
+      sound: "环境底噪",
+      asset_refs: [
+        { label: "小明", asset_type: "character", status: "candidate", source: "candidate" },
+        { label: "煤球", asset_type: "character", character_subtype: "animal", status: "candidate", source: "candidate" },
+        { label: "奶狗", asset_type: "character", character_subtype: "animal", status: "candidate", source: "candidate" },
+        { label: "老城区巷口", asset_type: "scene", status: "candidate", source: "candidate" },
+      ],
+    }],
+  }),
+};
+const created = await splitTextNodeToStoryboardNodes(store, state.nodes.text_1, runtime);
+process.stdout.write(JSON.stringify({ created, node: state.nodes.text_1, shot: state.nodes[created[0]] }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert len(payload["created"]) == 1
+    assert payload["node"]["status"] == "complete"
+    assert payload["node"]["params"]["storyboardBreakdownState"]["status"] == "fallback"
+    assert payload["node"]["params"]["storyboardBreakdown"]["fallback_reason"] == "llm_gate_blocked"
+    assert payload["node"]["params"]["generationPolicyStatus"] == "needs_attention"
+    assert "LLM gate" in payload["node"]["params"]["generationBlockedReason"]
+    assert "煤球" in payload["shot"]["prompt"]
+
+
+def test_storyboard_breakdown_preserves_empty_runtime_asset_refs_without_global_pollution() -> None:
+    script = r'''
+import { splitTextNodeToStoryboardNodes } from "./apps/studio/src/script-breakdown.js";
+
+const rainScript = "《雨痕》高中生小红站在空荡校门口屋檐外。远处教学楼顶，闪电劈亮整片灰云。";
+const cleanShotDescription = "特写试卷背面：小红缓缓翻转试卷，露出密密麻麻补写的演算字迹；最后一行手写：“第12题，其实可以换种思路。”墨迹未干，在湿纸上微微晕散。";
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: rainScript,
+      content: rainScript,
+      params: {},
+      status: "complete",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 280,
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+  nextId: (prefix) => `${prefix}_${Object.keys(state.nodes).length + 1}`,
+};
+const runtime = {
+  breakdownStoryboard: async () => ({
+    provider_calls_started: true,
+    fallback_visible_to_user: false,
+    safe_manifest: { status: "provider_structured", fallback_visible_to_user: false },
+    asset_auto_binding_graph: {
+      artifact_type: "agentflow_asset_auto_binding_graph",
+      algorithm_id: "test",
+      binding_suggestions: [
+        {
+          binding_id: "bind_xiaohong",
+          binding_state: "bound",
+          graph_asset_id: "graph:character:小红",
+          fixed_visual_asset_id: "asset_xiaohong",
+          asset_type: "character",
+          label: "小红",
+          confidence: 1,
+        },
+        {
+          binding_id: "bind_rooftop",
+          binding_state: "bound",
+          graph_asset_id: "graph:scene:屋顶平台",
+          fixed_visual_asset_id: "asset_rooftop",
+          asset_type: "scene",
+          label: "屋顶平台",
+          confidence: 1,
+        },
+      ],
+    },
+    shots: [{
+      shot_id: "S05",
+      index: 5,
+      duration: "2.2",
+      description: cleanShotDescription,
+      shot_size: "特写",
+      light_atmosphere: "阴天漫射光",
+      camera_motion: "缓慢下移聚焦最后一行字",
+      dialogue: "第12题，其实可以换种思路。",
+      sound: "纸页翻转窸窣声",
+      asset_refs: [],
+      dropped_asset_ref_diagnostics: [
+        { label: "数学试卷", asset_type: "prop", reason: "prop_requires_manual_asset_entry" },
+      ],
+    }],
+  }),
+};
+const created = await splitTextNodeToStoryboardNodes(store, state.nodes.text_1, runtime);
+const shot = state.nodes[created[0]];
+process.stdout.write(JSON.stringify({ created, shot }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    shot = payload["shot"]
+    structured = shot["params"]["structuredShot"]
+
+    assert len(payload["created"]) == 1
+    assert structured["asset_refs"] == []
+    assert shot["params"]["shotAssetRefs"] == []
+    assert "无明确可固定资产" in shot["prompt"]
+    assert "@可见人物" not in shot["prompt"]
+    assert "@屋顶平台" not in shot["prompt"]
+    assert "@小红" not in structured["description"]
+    assert "@屋顶平台" not in structured["description"]
+    assert "nodeReferenceStack" not in shot["params"]
+
+
+def test_asset_auto_binding_does_not_match_empty_shot_refs_to_every_asset() -> None:
+    script = r'''
+import { nodeReferenceStackForGraphBoundAssets } from "./apps/studio/src/asset-auto-binding-refs.js";
+
+const graph = {
+  artifact_type: "agentflow_asset_auto_binding_graph",
+  algorithm_id: "test",
+  binding_suggestions: [{
+    binding_id: "bind_xiaohong",
+    binding_state: "bound",
+    graph_asset_id: "graph:character:小红",
+    fixed_visual_asset_id: "asset_xiaohong",
+    asset_type: "character",
+    label: "小红",
+    confidence: 1,
+  }],
+};
+const empty = nodeReferenceStackForGraphBoundAssets(graph, { asset_refs: [] }, "shot_empty");
+const matched = nodeReferenceStackForGraphBoundAssets(graph, {
+  asset_refs: [{ graph_asset_id: "graph:character:小红", asset_type: "character", label: "小红" }],
+}, "shot_match");
+process.stdout.write(JSON.stringify({ empty, matched }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["empty"] is None
+    assert payload["matched"]["summary"]["asset_auto_binding_reference_count"] == 1
 
 
 def test_idea_expansion_fallback_outputs_formal_script_not_storyboard_template() -> None:
@@ -1013,7 +1295,186 @@ process.stdout.write(JSON.stringify({
     assert "Forbidden: software dashboard, app interface, data chart" in payload["legacyCharacterPrompt"]
 
 
-def test_storyboard_asset_recognition_prioritizes_principal_characters_and_manual_props() -> None:
+def test_asset_card_draft_uses_runtime_profile_plan_for_animal_facts() -> None:
+    script = r'''
+import { assetCardDraftFromRef, assetCardText } from "./apps/studio/src/asset-card-drafts.js";
+
+const shot = {
+  shot_id: "S01",
+  description: "镜号：01 时长：3.2 画面描述：@老槐树 @橘猫 @小狗。老槐树粗壮盘曲的树根特写，泥土湿润微裂；纸盒内橘猫蜷卧，尾巴尖轻晃，嘴里叼着湿漉漉的小狗，小狗左耳缺一小块，正打喷嚏 景别：特写 光影氛围：午后柔光，树影斑驳",
+};
+const cat = assetCardDraftFromRef({
+  label: "橘猫",
+  asset_type: "character",
+  profile_plan: {
+    character_subtype: "animal",
+    facts: {
+      identity: "橘猫",
+      species: "猫",
+      color_pattern: "橘色",
+      current_action: ["蜷卧", "尾巴尖轻晃", "叼着小狗"],
+      relationship: ["保护小狗"],
+    },
+    continuity_locks: ["保持橘猫身份", "保持橘色毛色", "保持尾巴动作和体型比例"],
+    negative_locks: ["不要新增项圈或衣物"],
+    fact_evidence: ["纸盒内橘猫蜷卧，尾巴尖轻晃，嘴里叼着湿漉漉的小狗"],
+  },
+}, shot);
+const dog = assetCardDraftFromRef({
+  label: "小狗",
+  asset_type: "character",
+  profile_plan: {
+    character_subtype: "animal",
+    facts: {
+      identity: "小狗",
+      species: "狗",
+      color_pattern: "灰白相间",
+      surface_state: "湿漉漉",
+      size_or_age: "幼小",
+      distinctive_marks: ["左耳缺一小块"],
+      current_action: ["打喷嚏"],
+    },
+    continuity_locks: ["保持灰白相间毛色", "保持左耳缺一小块", "保持幼小体型"],
+    negative_locks: ["不要新增项圈或衣物"],
+  },
+}, shot);
+process.stdout.write(JSON.stringify({
+  cat,
+  dog,
+  catText: assetCardText(cat),
+  dogText: assetCardText(dog),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    surface = json.dumps(payload, ensure_ascii=False)
+
+    for expected in ("橘色", "尾巴尖轻晃", "叼着小狗", "灰白相间", "湿漉漉", "左耳缺一小块"):
+        assert expected in surface
+    for placeholder in ("身份与外观待确认", "服装或外观按分镜语境确定", "根据分镜描述确定可复用外观辨识点"):
+        assert placeholder not in surface
+    assert payload["cat"]["character_subtype"] == "animal"
+    assert payload["dog"]["facts"]["color_pattern"] == "灰白相间"
+    assert "资产类型：动物角色资产" in payload["catText"]
+    assert "资产类型：动物角色资产" in payload["dogText"]
+    assert "资产类型：角色资产" not in payload["catText"] + payload["dogText"]
+    assert "无服装" in payload["catText"] + payload["dogText"]
+
+
+def test_structured_shot_refinement_preserves_runtime_asset_profiles() -> None:
+    script = r'''
+import { refineStructuredShotAssets } from "./apps/studio/src/structured-shot.js";
+import { assetCardDraftFromRef, assetCardText } from "./apps/studio/src/asset-card-drafts.js";
+
+const shot = {
+  shot_id: "S01",
+  index: 1,
+  description: "@小明 @橘猫 @老城区巷口。小明给橘猫顺毛。",
+  asset_refs: [
+    {
+      label: "橘猫",
+      asset_type: "character",
+      status: "mentioned",
+      source: "runtime_asset_plan",
+      profile_plan: {
+        character_subtype: "animal",
+        facts: {
+          identity: "橘猫",
+          species: "猫",
+          color_pattern: "橘色",
+          current_action: ["顺毛"],
+        },
+        continuity_locks: ["保持橘色毛色"],
+        negative_locks: ["不要新增衣物"],
+      },
+    },
+  ],
+};
+const refined = refineStructuredShotAssets(shot, shot.description);
+const draft = assetCardDraftFromRef(refined.asset_refs[0], refined);
+process.stdout.write(JSON.stringify({
+  ref: refined.asset_refs[0],
+  draft,
+  text: assetCardText(draft),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["ref"]["profile_plan"]["character_subtype"] == "animal"
+    assert payload["draft"]["character_subtype"] == "animal"
+    assert payload["draft"]["facts"]["species"] == "猫"
+    assert "资产类型：动物角色资产" in payload["text"]
+    assert "根据分镜描述确定可复用外观辨识点" not in payload["text"]
+
+
+def test_frontend_structured_shot_does_not_treat_bluestone_steps_as_battlefield() -> None:
+    script = r'''
+import { structuredShotFromSegment, structuredShotText } from "./apps/studio/src/structured-shot.js";
+
+const shot = structuredShotFromSegment(
+  "片名：《猫捡到狗那天》小明蹲在老城区巷口的青石台阶上，指尖沾着猫粮碎屑，正给蜷在纸箱里的橘猫顺毛。夕阳斜切过窄巷高墙，在青砖地面投下细长影子。",
+  1,
+);
+process.stdout.write(JSON.stringify({ shot, text: structuredShotText(shot) }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    refs = {(item["label"], item["asset_type"]) for item in payload["shot"]["asset_refs"]}
+
+    assert "山巅石台战场" not in payload["text"]
+    assert ("老城区巷口", "scene") in refs
+
+
+def test_frontend_structured_shot_does_not_fabricate_generic_assets_for_ancient_battlefield() -> None:
+    script = r'''
+import { structuredShotFromSegment, structuredShotText } from "./apps/studio/src/structured-shot.js";
+
+const shot = structuredShotFromSegment(
+  "《断戟惊雷》暴雨如注，古战场泥泞翻涌。沈砚单膝陷在泥中，右臂青筋暴起，死攥半截断戟，指节泛白如骨。",
+  1,
+);
+process.stdout.write(JSON.stringify({ shot, text: structuredShotText(shot) }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    refs = {(item["label"], item["asset_type"]) for item in payload["shot"]["asset_refs"]}
+    surface = json.dumps(payload, ensure_ascii=False)
+
+    assert "可见人物" not in surface
+    assert "山巅石台战场" not in surface
+    assert "@可见人物" not in surface
+    assert "@山巅石台战场" not in surface
+    assert ("沈砚", "character") in refs
+    assert ("古战场", "scene") in refs
+    assert not payload["shot"]["description"].startswith("@")
+
+
+def test_storyboard_asset_recognition_prioritizes_principal_characters_and_key_props() -> None:
     script = r'''
 import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
 
@@ -1035,10 +1496,12 @@ process.stdout.write(JSON.stringify({
     )
     payload = json.loads(completed.stdout)
 
-    assert payload["refs"] == [["唐僧", "character"], ["白骨精", "character"]]
+    assert ["唐僧", "character"] in payload["refs"]
+    assert ["白骨精", "character"] in payload["refs"]
+    assert ["金箍棒", "prop"] in payload["refs"]
     assert ["孙悟空", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
     assert ["猪八戒", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
-    assert ["金箍棒", "prop", "prop_requires_manual_asset_entry"] in payload["dropped"]
+    assert ["金箍棒", "prop", "prop_requires_manual_asset_entry"] not in payload["dropped"]
 
 
 def test_asset_and_storyboard_cards_use_compact_editor_layout() -> None:
@@ -1220,6 +1683,75 @@ process.stdout.write(JSON.stringify({
     assert "夜晚城市屋顶" not in visible_text
 
 
+def test_script_asset_recognition_does_not_create_template_cards_when_runtime_plan_fails() -> None:
+    script = r'''
+import { identifyScriptAssets } from "./apps/studio/src/storyboard-node-actions.js";
+
+const state = {
+  nodes: {
+    script_1: {
+      id: "script_1",
+      type: "script",
+      title: "分镜 01",
+      x: 0,
+      y: 0,
+      w: 320,
+      h: 240,
+      prompt: "镜号：01 画面描述：@小明 @橘猫。小明轻抚怀中橘猫脊背，猫呼噜声轻柔持续。",
+      content: "镜号：01 画面描述：@小明 @橘猫。小明轻抚怀中橘猫脊背，猫呼噜声轻柔持续。",
+      status: "complete",
+      params: { scriptSegmentIndex: 1 },
+    },
+  },
+  edges: {},
+  order: ["script_1"],
+  groups: {},
+  selection: { nodeIds: ["script_1"], edgeId: null },
+  ui: {},
+};
+
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+  nextId: (prefix) => `${prefix}_should_not_be_used`,
+};
+const runtime = {
+  planShotAssets: async () => {
+    const error = new Error("authentication_required");
+    error.status = 401;
+    throw error;
+  },
+};
+
+const created = await identifyScriptAssets(store, runtime, state.nodes.script_1);
+
+process.stdout.write(JSON.stringify({
+  created,
+  nodes: state.nodes,
+  order: state.order,
+  scriptStatus: state.nodes.script_1.status,
+  result: state.nodes.script_1.result,
+  blockedReason: state.nodes.script_1.params.generationBlockedReason,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    visible_text = json.dumps(payload, ensure_ascii=False)
+
+    assert payload["created"] == []
+    assert list(payload["nodes"].keys()) == ["script_1"]
+    assert payload["order"] == ["script_1"]
+    assert payload["scriptStatus"] == "error"
+    assert "资产规划暂时不可用" in visible_text
+    assert "可复用角色，身份与外观待确认" not in visible_text
+
+
 def test_keyframe_generation_carries_connected_asset_card_images_as_local_refs() -> None:
     script = r'''
 import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
@@ -1300,6 +1832,8 @@ process.stdout.write(JSON.stringify({
 def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_asset_nodes() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
+    canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     add_asset_modal = (STUDIO_ROOT / "src" / "panels" / "add-asset-modal.js").read_text(encoding="utf-8")
@@ -1308,6 +1842,9 @@ def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_ass
     assert "shot-asset-plans" in runtime_client
     assert "identifyScriptAssets(store, runtime, node)" in storyboard_actions
     assert "runtime?.planShotAssets" in storyboard_actions
+    assert "handleNodeIntent(store, runtime, node, actionEl.dataset.intent)" in canvas_action_handler
+    assert "identifyScriptAssets(store, runtime, node)" in node_actions
+    assert "identifyScriptAssets(store, null, node)" not in node_actions
     assert "createManualShotAssetNode" in asset_nodes
     assert "openAddAssetModal" in node_menu
     assert "新增资产" in node_menu

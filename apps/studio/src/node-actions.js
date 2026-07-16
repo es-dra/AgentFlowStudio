@@ -23,7 +23,7 @@ export function canRunNodeGeneration(node) {
 }
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
-export function handleNodeIntent(store, node, intent) {
+export function handleNodeIntent(store, runtime, node, intent) {
   if (node.type === "text" && intent === "上传完整剧本") {
     importScriptFileIntoTextNode(store, node);
     return;
@@ -33,8 +33,11 @@ export function handleNodeIntent(store, node, intent) {
     return;
   }
   if (node.type === "text" && intent === "剧本拆分分镜") {
-    splitTextNodeToStoryboardNodes(store, node).then((created) => {
-      if (!created.length) setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
+    splitTextNodeToStoryboardNodes(store, node, runtime).then((created) => {
+      const current = store.get().nodes[node.id];
+      if (!created.length && current?.params?.storyboardBreakdownState?.status !== "failed") {
+        setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
+      }
     });
     return;
   }
@@ -43,7 +46,7 @@ export function handleNodeIntent(store, node, intent) {
     return;
   }
   if (node.type === "script" && intent === "识别资产") {
-    identifyScriptAssets(store, null, node);
+    identifyScriptAssets(store, runtime, node);
     return;
   }
   if (node.type === "script" && intent === "生成关键帧层") {
