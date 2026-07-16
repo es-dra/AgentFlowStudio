@@ -253,7 +253,7 @@ function cleanRuntimeErrorText(value, limit = 220) {
   if (typeof value === "object") {
     const field = validationFieldMessage(value.fields);
     if (field) return field.slice(0, limit);
-    for (const key of ["reason", "raw_detail", "message", "detail", "error_description"]) {
+    for (const key of ["reason", "message", "detail", "error_description"]) {
       const text = cleanRuntimeErrorText(value[key], limit);
       if (text) return text;
     }

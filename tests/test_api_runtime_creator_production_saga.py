@@ -202,6 +202,90 @@ def test_creator_production_crash_matrix_reconciles_exactly_once(tmp_path: Path,
         ) == 1
 
 
+def test_creator_production_episode_applied_interleaves_with_unrelated_control_advance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    workspace = _workspace(client, headers)
+    first_body = _request_body(workspace, shot_index=0)
+
+    crashed = _post_request(client, headers, first_body, "preview-a", crash_after="episode_applied")
+    assert crashed.status_code == 500
+    assert crashed.json()["detail"]["error"] == "creator_production_injected_crash"
+
+    aggregate = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    shot_two = sorted(
+        (item for item in aggregate.shots if item.scene_ref.entity_id == "scene-001"),
+        key=lambda item: item.sequence,
+    )[1]
+    second_body = {
+        "expected_aggregate_version": aggregate.aggregate_version,
+        "episode_ref": first_body["episode_ref"],
+        "shot_ref": shot_two.as_ref().model_dump(mode="json"),
+        "scope": "production_preview",
+        "expected_versions": {
+            "episode": first_body["episode_ref"]["version_id"],
+            "shot": shot_two.version_id,
+        },
+    }
+    second = _post_request(client, headers, second_body, "preview-b")
+    assert second.status_code == 200, second.text
+    assert second.json()["request"]["status"] == "done"
+
+    restarted = TestClient(create_runtime_app(runtime_root=tmp_path))
+    recovered = restarted.get(f"/projects/{PROJECT_ID}/creator-production-requests", headers=headers)
+    assert recovered.status_code == 200, recovered.text
+    requests = sorted(recovered.json()["requests"], key=lambda item: item["request_id"])
+    assert [item["status"] for item in requests] == ["done", "done"]
+    assert all(item["candidate_ref"] for item in requests)
+    assert all(item["receipt"]["episode_confirmed"] is True for item in requests)
+
+    ledger = _control_ledger(tmp_path)
+    event_types = [event["event_type"] for event in ledger["events"]]
+    assert event_types.count("ArtifactCandidateRegistered") == 2
+    assert event_types.count("ArtifactWrittenBack") == 2
+    assert event_types.count("RunCompleted") == 2
+    assert len({item["candidate_ref"]["entity_id"] for item in requests}) == 2
+    assert sorted(_candidate_entities(tmp_path, owner)) == sorted(
+        item["candidate_ref"]["entity_id"] for item in requests
+    )
+
+    readback = restarted.get(
+        f"/projects/{PROJECT_ID}/episodes/{BOOTSTRAP_EPISODE_ID}/versions/{BOOTSTRAP_EPISODE_VERSION_ID}/workspace",
+        headers=headers,
+    )
+    assert readback.status_code == 200, readback.text
+    shots = readback.json()["workspace"]["shots"]
+    assert shots[0]["production_request"]["status"] == "done"
+    assert shots[1]["production_request"]["status"] == "done"
+    assert shots[0]["candidates"][0]["selectable"] is True
+    assert shots[1]["candidates"][0]["selectable"] is True
+
+    control = restarted.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    creator = restarted.get(f"/projects/{PROJECT_ID}/creator-workspace", headers=headers)
+    assert control.status_code == 200, control.text
+    assert creator.status_code == 200, creator.text
+    control_model = control.json()["control"]
+    joined_control = creator.json()["creator_production"]["control"]
+    assert control_model["version"] == joined_control["version"]
+    assert control_model["event_count"] == joined_control["event_count"]
+    assert control_model["artifact_status_digest"] == joined_control["artifact_status_digest"]
+    assert [item["status"] for item in control_model["artifacts"]] == ["pending_review", "pending_review"]
+    assert control_model["review"]["delivery_readback"] == "blocked_until_episode_selection_lock"
+    for artifact in control_model["artifacts"]:
+        assert artifact["provenance"]["task_ref"]["object_id"] == artifact["task_id"]
+        assert artifact["provenance"]["run_ref"]["object_id"] == artifact["run_id"]
+        assert artifact["provenance"]["attempt_ref"]["object_id"] == artifact["attempt_id"]
+        assert artifact["provenance"]["writeback_ref"]["object_id"].startswith("writeback-preview-")
+
+
 def test_creator_production_same_key_replay_after_episode_apply_response_failure_is_once(
     tmp_path: Path,
     monkeypatch,
@@ -273,7 +357,51 @@ def test_creator_production_protected_shot_stale_before_episode_apply_fails_clos
     request = reconcile.json()["requests"][0]
     assert request["status"] == "failed"
     assert request["candidate_ref"] is None
+    assert request["failure_code"] == "creator_production_state_changed"
+    assert request["failure"] == "制作事实已变化，请刷新工作区后重新创建制作任务。"
+    serialized = json.dumps(request, ensure_ascii=False)
+    assert "expected_version" not in serialized
+    assert "current " not in serialized
+    assert "stale expected" not in serialized
+    assert "EpisodeDomainStoreError" not in serialized
     assert _candidate_entities(tmp_path, owner) == []
+
+
+def test_unconfirmed_saga_candidate_is_hidden_from_workspace_projection(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    workspace = _workspace(client, headers)
+    body = _request_body(workspace)
+
+    crashed = _post_request(client, headers, body, "preview-1", crash_after="episode_applied")
+    assert crashed.status_code == 500
+    assert len(_candidate_entities(tmp_path, owner)) == 1
+
+    import apps.api.runtime_creator_production_saga as saga_module
+    from apps.api.runtime_creator_production_integration import CreatorProductionControlError
+
+    def fail_confirm(*args, **kwargs):
+        raise CreatorProductionControlError("stale expected_version 8; current 14")
+
+    monkeypatch.setattr(saga_module, "confirm_creator_preview_control_run", fail_confirm)
+    projected = client.get(
+        f"/projects/{PROJECT_ID}/episodes/{BOOTSTRAP_EPISODE_ID}/versions/{BOOTSTRAP_EPISODE_VERSION_ID}/workspace",
+        headers=headers,
+    )
+    assert projected.status_code == 200, projected.text
+    shot = projected.json()["workspace"]["shots"][0]
+    assert shot["candidates"] == []
+    assert shot["production_request"]["status"] == "failed"
+    assert shot["production_request"]["candidate_ref"] is None
+    assert shot["production_request"]["failure"] == "制作事实已变化，请刷新工作区后重新创建制作任务。"
+    serialized = json.dumps(projected.json(), ensure_ascii=False)
+    assert "stale expected" not in serialized
+    assert "current 14" not in serialized
 
 
 def test_creator_production_rejects_conflict_stale_foreign_and_corrupt_saga(

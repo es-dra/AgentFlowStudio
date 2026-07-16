@@ -312,6 +312,33 @@ existing episode-store adapter transaction, and runtime/API authorization. It
 must not inherit a provider, deployment, or public-release authorization from
 this contract task.
 
+## Runtime application hardening addendum
+
+PR #162 applies the contract to the local Runtime Service with these additional
+application rules:
+
+- Control commands use receipt-before-CAS replay for the same deterministic
+  idempotency key and canonical command intent. `expected_version` remains the
+  CAS guard for new commands, but it is not part of the replay identity. A
+  process restart or an unrelated ledger advance can therefore replay a prior
+  success without appending duplicate facts, while stale new commands still fail
+  closed.
+- Creator-production writeback reconciliation reloads the current Control
+  projection before every command and only appends missing Mission, Plan, Task,
+  Run, Attempt, ArtifactCandidateRegistered, ArtifactWrittenBack,
+  SelectiveRevisionRequested, ImpactAssessed, or RunCompleted facts. Candidate
+  visibility requires both a matching Control writeback/completion receipt and
+  a matching Episode candidate receipt.
+- `/production-control` and Creator joined projections expose ledger
+  ArtifactCandidateRegistered/ArtifactWrittenBack rows as pending review with
+  exact task/run/attempt/writeback provenance. Pending artifacts do not imply
+  Episode approval, delivery readiness, playable preview availability, provider
+  smoke, generated-media QA, human acceptance, or business validation.
+- `blocked` and `cancelled` are reachable typed lifecycle states. Blocked runs
+  carry exact blocker refs and clearance evidence; invalid retry/writeback
+  actions stay disabled and fail closed server-side. Cancelled runs are
+  terminal and do not produce later Control or candidate facts.
+
 ## Non-claims
 
 This artifact supports contract/structure and deterministic runtime-harness

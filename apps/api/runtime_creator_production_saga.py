@@ -203,10 +203,12 @@ def reconcile_creator_production_request_envelopes(
                 _advance_envelope(store, scope, envelope, crash_after="none")
                 changed = True
             except (CreatorProductionControlError, EpisodeDomainStoreError, SagaConflictError) as exc:
+                failure_code = _failure_code(exc)
                 envelope["phase"] = "failed"
                 envelope["status"] = "failed"
                 envelope["creator_status_label"] = "制作失败"
-                envelope["failure"] = _safe_failure(str(exc) or type(exc).__name__)
+                envelope["failure_code"] = failure_code
+                envelope["failure"] = _safe_failure(failure_code)
                 _seal_current_phase(envelope)
                 changed = True
         if changed:
@@ -221,10 +223,15 @@ def overlay_creator_production_requests(
     scope: TenantScope,
 ) -> dict[str, Any]:
     requests = reconcile_creator_production_request_envelopes(store, scope=scope)
+    visibility = _creator_production_candidate_visibility(store, scope=scope)
     by_shot: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for item in requests:
         ref = item["shot_ref"]
         by_shot.setdefault((ref["entity_type"], ref["entity_id"], ref["version_id"]), []).append(item)
+    _filter_unconfirmed_saga_candidates(
+        projection,
+        hidden_candidate_keys=visibility["hidden_candidate_keys"],
+    )
     for shot in projection.get("workspace", {}).get("shots", []):
         ref = shot.get("ref") or {}
         rows = by_shot.get((ref.get("entity_type"), ref.get("entity_id"), ref.get("version_id")), [])
@@ -234,6 +241,10 @@ def overlay_creator_production_requests(
         actions.append(_production_action_for_request(rows[-1] if rows else None))
     projection.setdefault("workspace", {})["creator_production"] = {
         "requests": requests,
+        "candidate_visibility": {
+            "confirmed_count": len(visibility["confirmed_candidate_keys"]),
+            "hidden_unconfirmed_count": len(visibility["hidden_candidate_keys"]),
+        },
         "provider_dispatch_count": 0,
     }
     return projection
@@ -246,6 +257,7 @@ def join_creator_production_authoring_projection(
     scope: TenantScope,
 ) -> dict[str, Any]:
     requests = reconcile_creator_production_request_envelopes(store, scope=scope)
+    visibility = _creator_production_candidate_visibility(store, scope=scope)
     by_shot: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for item in requests:
         ref = item["shot_ref"]
@@ -267,6 +279,10 @@ def join_creator_production_authoring_projection(
     projection["creator_production"] = {
         "requests": requests,
         "control": control_projection,
+        "candidate_visibility": {
+            "confirmed_count": len(visibility["confirmed_candidate_keys"]),
+            "hidden_unconfirmed_count": len(visibility["hidden_candidate_keys"]),
+        },
         "provider_dispatch_count": control_projection["provider_dispatch_count"],
     }
     return projection
@@ -309,6 +325,71 @@ def _production_action_for_request(current: dict[str, Any] | None) -> dict[str, 
         "reason": "制作任务正在处理。",
         "blocked_by": [],
     }
+
+
+def _creator_production_candidate_visibility(
+    store: RuntimeStore,
+    *,
+    scope: TenantScope,
+) -> dict[str, set[str]]:
+    path = _saga_path(store, scope.project_id)
+    with exclusive_file_lock(_lock_path(path)):
+        payload = _load_saga_file(path, scope=scope)
+    confirmed: set[str] = set()
+    hidden: set[str] = set()
+    for envelope in payload["envelopes"]:
+        candidate_ref = envelope.get("candidate_ref")
+        if not isinstance(candidate_ref, dict):
+            continue
+        key = _entity_ref_key(candidate_ref)
+        control = envelope.get("control") or {}
+        episode = envelope.get("episode") or {}
+        episode_candidate = episode.get("candidate_ref") if isinstance(episode, dict) else None
+        matched_episode = (
+            isinstance(episode_candidate, dict)
+            and _entity_ref_key(episode_candidate) == key
+            and episode.get("status") in {"applied", "replayed", "already_applied"}
+        )
+        matched_control = bool(control.get("completion_receipt") and control.get("writeback_ref"))
+        if envelope.get("phase") == "confirmed" and matched_control and matched_episode:
+            confirmed.add(key)
+        else:
+            hidden.add(key)
+    return {
+        "confirmed_candidate_keys": confirmed,
+        "hidden_candidate_keys": hidden - confirmed,
+    }
+
+
+def _filter_unconfirmed_saga_candidates(
+    projection: dict[str, Any],
+    *,
+    hidden_candidate_keys: set[str],
+) -> None:
+    if not hidden_candidate_keys:
+        return
+    for shot in projection.get("workspace", {}).get("shots", []):
+        candidates = list(shot.get("candidates") or [])
+        filtered = [
+            item
+            for item in candidates
+            if _entity_ref_key(item.get("ref") or {}) not in hidden_candidate_keys
+        ]
+        if len(filtered) == len(candidates):
+            continue
+        shot["candidates"] = filtered
+        selectable = any(item.get("selectable") is True for item in filtered)
+        for action in shot.get("allowed_actions") or []:
+            if action.get("action") != "adopt_candidate":
+                continue
+            if not selectable:
+                action["enabled"] = False
+                action["reason"] = "制作候选尚未完成服务端确认。"
+                action["blocked_by"] = []
+
+
+def _entity_ref_key(ref: dict[str, Any]) -> str:
+    return f"{ref.get('entity_type')}:{ref.get('entity_id')}:{ref.get('version_id')}"
 
 
 def _execute_or_reconcile(
@@ -414,6 +495,7 @@ def _prepare_envelope(
         "artifact": None,
         "candidate_ref": candidate_ref.model_dump(mode="json"),
         "episode": None,
+        "failure_code": None,
         "failure": None,
         "phase_checksums": {},
         "provider_dispatch_count": 0,
@@ -600,8 +682,10 @@ def _public_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
             "recorded": bool(control.get("writeback_ref")),
         },
         "receipt": receipt,
+        "failure_code": envelope.get("failure_code"),
         "failure": envelope["failure"],
         "retry_action": "重新创建制作任务" if envelope["status"] == "failed" else None,
+        "allowed_actions": _request_allowed_actions(envelope),
         "provider_dispatch_count": 0,
     }
 
@@ -715,9 +799,58 @@ def _safe_stamp(value: str) -> str:
     return value if value and "+" in value else _STAMP
 
 
-def _safe_failure(value: str) -> str:
-    text = value.replace("/", "_").replace("\\", "_")
-    return text[:240] or "creator production request failed"
+def _failure_code(exc: Exception) -> str:
+    text = str(exc).lower()
+    if "stale" in text or "version" in text or "changed" in text:
+        return "creator_production_state_changed"
+    if "idempotency" in text:
+        return "creator_production_idempotency_conflict"
+    if "integrity" in text or "checksum" in text or "ledger" in text:
+        return "creator_production_integrity_failed"
+    if "scope" in text or "foreign" in text or "forbidden" in text:
+        return "creator_production_scope_rejected"
+    return "creator_production_reconcile_failed"
+
+
+def _safe_failure(code: str) -> str:
+    return {
+        "creator_production_state_changed": "制作事实已变化，请刷新工作区后重新创建制作任务。",
+        "creator_production_idempotency_conflict": "这个制作请求编号已用于不同内容，请重新创建制作任务。",
+        "creator_production_integrity_failed": "制作恢复记录校验失败，服务已停止公开候选。",
+        "creator_production_scope_rejected": "当前账号不能访问这条制作记录。",
+        "creator_production_reconcile_failed": "制作任务未能安全恢复，请刷新后重新创建。",
+    }.get(code, "制作任务未能安全恢复，请刷新后重新创建。")
+
+
+def _request_allowed_actions(envelope: dict[str, Any]) -> list[dict[str, Any]]:
+    if envelope["status"] == "failed":
+        return [
+            {
+                "action": "create_production_preview",
+                "enabled": True,
+                "reason": envelope.get("failure") or "制作任务未能安全恢复。",
+                "blocked_by": [],
+            }
+        ]
+    if envelope["status"] == "done":
+        return [
+            {
+                "action": "review_candidate",
+                "enabled": True,
+                "reason": "",
+                "blocked_by": [envelope["candidate_ref"]],
+            }
+        ]
+    if envelope["status"] in {"queued", "running", "blocked"}:
+        return [
+            {
+                "action": "wait_for_reconcile",
+                "enabled": False,
+                "reason": "制作任务正在由服务恢复。",
+                "blocked_by": [],
+            }
+        ]
+    return []
 
 
 def _saga_path(store: RuntimeStore, project_id: str) -> Path:

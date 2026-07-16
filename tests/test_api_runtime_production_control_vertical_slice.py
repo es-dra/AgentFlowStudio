@@ -210,9 +210,15 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
     assert writeback.status_code == 200, writeback.text
     control = writeback.json()["control"]
     assert len(control["artifacts"]) == 1
+    assert control["artifacts"][0]["status"] == "pending_review"
+    assert control["review"]["status"] == "pending_episode_review"
+    assert control["review"]["delivery_readback"] == "blocked_until_episode_selection_lock"
     assert control["continuity"]["shot_local_rework_protected"] is True
     assert control["artifacts"][0]["affected_ref"]["object_id"] == "shot-002"
     assert control["artifacts"][0]["candidate_ref"]["object_id"].startswith("candidate-run-002-")
+    assert control["artifacts"][0]["provenance"]["task_ref"]["object_id"] == "task-002"
+    assert control["artifacts"][0]["provenance"]["run_ref"]["object_id"] == "run-002"
+    assert control["artifacts"][0]["provenance"]["attempt_ref"]["object_id"] == "attempt-run-002-002"
     protected = control["artifacts"][0]["protected_refs"]
     assert {item["object_id"] for item in protected} == {"shot-001", "shot-003"}
     replay_writeback = _action(client, headers, "run-002", "writeback-1", version, "writeback")
@@ -247,6 +253,7 @@ def test_production_control_vertical_slice_is_authenticated_recoverable_and_prov
     assert recovered.status_code == 200, recovered.text
     assert recovered.json()["control"]["projection_digest"] == control["projection_digest"]
     assert len(recovered.json()["control"]["artifacts"]) == 1
+    assert recovered.json()["control"]["artifacts"][0]["status"] == "pending_review"
 
     foreign = client.get(f"/projects/{PROJECT_ID}/production-control", headers=_headers(other))
     assert foreign.status_code == 403
@@ -295,6 +302,99 @@ def test_production_control_writeback_requires_episode_facts_before_ledger_commi
     assert control.json()["control"]["artifacts"] == []
 
 
+def test_production_control_blocked_and_cancelled_lifecycle_persists_with_typed_actions(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    control = _approve_default_plan(client, headers)
+
+    blocked = _action(
+        client,
+        headers,
+        "run-001",
+        "block-1",
+        control["version"],
+        "block",
+        note="等待镜头一参考审批。",
+    )
+    assert blocked.status_code == 200, blocked.text
+    run = blocked.json()["control"]["runs"][0]
+    assert run["execution_state"] == "blocked"
+    assert run["blocker"]["reason"] == "等待镜头一参考审批。"
+    assert run["blocker"]["clearance_evidence_refs"] == [
+        {"object_type": "plan_task", "object_id": "task-001", "revision_id": "task-001-v1"}
+    ]
+    actions = {item["action"]: item for item in run["allowed_actions"]}
+    assert actions["retry"]["enabled"] is False
+    assert actions["clear_blocker"]["enabled"] is True
+    assert actions["cancel"]["enabled"] is True
+    retry = _action(
+        client,
+        headers,
+        "run-001",
+        "retry-while-blocked",
+        blocked.json()["control"]["version"],
+        "retry",
+    )
+    assert retry.status_code == 409
+    assert retry.json()["detail"]["error"] == "production_control_state_conflict"
+
+    restarted = TestClient(create_runtime_app(runtime_root=tmp_path))
+    recovered = restarted.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    assert recovered.status_code == 200, recovered.text
+    recovered_run = recovered.json()["control"]["runs"][0]
+    assert recovered_run["execution_state"] == "blocked"
+    recovered_actions = {item["action"]: item for item in recovered_run["allowed_actions"]}
+    assert recovered_actions["retry"]["enabled"] is False
+
+    cleared = _action(
+        restarted,
+        headers,
+        "run-001",
+        "clear-block-1",
+        recovered.json()["control"]["version"],
+        "clear_blocker",
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["control"]["runs"][0]["execution_state"] == "running"
+    assert cleared.json()["control"]["runs"][0]["blocker"] is None
+
+    cancelled = _action(
+        restarted,
+        headers,
+        "run-003",
+        "cancel-3",
+        cleared.json()["control"]["version"],
+        "cancel",
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    cancelled_run = cancelled.json()["control"]["runs"][2]
+    assert cancelled_run["execution_state"] == "cancelled"
+    cancel_actions = {item["action"]: item for item in cancelled_run["allowed_actions"]}
+    assert cancel_actions["writeback"]["enabled"] is False
+    assert cancel_actions["cancel"]["enabled"] is False
+
+    after_cancel_version = cancelled.json()["control"]["version"]
+    writeback = _action(
+        restarted,
+        headers,
+        "run-003",
+        "writeback-cancelled",
+        after_cancel_version,
+        "writeback",
+    )
+    assert writeback.status_code == 409
+    assert writeback.json()["detail"]["error"] == "production_control_state_conflict"
+    readback = restarted.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
+    assert readback.status_code == 200, readback.text
+    assert readback.json()["control"]["version"] == after_cancel_version
+    assert readback.json()["control"]["artifacts"] == []
+
+
 def test_writeback_finalize_failure_hides_artifact_and_same_key_replay_completes(
     tmp_path: Path,
     monkeypatch,
@@ -335,7 +435,8 @@ def test_writeback_finalize_failure_hides_artifact_and_same_key_replay_completes
 
     readback = client.get(f"/projects/{PROJECT_ID}/production-control", headers=headers)
     assert readback.status_code == 200, readback.text
-    assert readback.json()["control"]["artifacts"] == []
+    assert len(readback.json()["control"]["artifacts"]) == 1
+    assert readback.json()["control"]["artifacts"][0]["status"] == "ledger_pending_episode_receipt"
     aggregate = EpisodeDomainAggregateStore(tmp_path).load(
         org_id=owner["user"]["user_id"],
         project_id=PROJECT_ID,
@@ -362,8 +463,8 @@ def test_writeback_finalize_failure_hides_artifact_and_same_key_replay_completes
     ]
     assert len({item.entity_id for item in candidates}) == 1
     latest = max(candidates, key=lambda item: item.revision)
-    assert latest.lifecycle_state == "approved"
-    assert latest.review_state == "approved"
+    assert latest.lifecycle_state == "candidate"
+    assert latest.review_state == "needs_review"
     assert latest.control_provenance is not None
 
 
@@ -424,7 +525,8 @@ def test_writeback_ledger_failure_after_episode_draft_replays_without_duplicate_
     ]
     assert len({item.entity_id for item in candidates}) == 1
     latest = max(candidates, key=lambda item: item.revision)
-    assert latest.lifecycle_state == "approved"
+    assert latest.lifecycle_state == "candidate"
+    assert latest.review_state == "needs_review"
     assert latest.job_state == "succeeded"
     assert latest.control_provenance is not None
 

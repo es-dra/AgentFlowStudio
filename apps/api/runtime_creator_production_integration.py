@@ -114,72 +114,79 @@ def record_creator_preview_control_writeback(
     stamp = _stamp(created_at)
     with _locked_harness(store, project_scope, actor) as harness:
         _validate_control_plan(control_plan)
-        expected = int(control_plan["start_version"])
         receipts: list[dict[str, Any]] = []
 
-        if control_plan.get("needs_mission") is True:
+        def execute_current(
+            command_type: str,
+            payload: dict[str, Any],
+            key: str,
+            *,
+            refs: tuple[ExactObjectRef, ...] = (),
+            budget_authorization: BudgetAuthorization | None = None,
+        ):
             receipt = harness.execute(
                 _command(
                     harness,
                     actor,
-                    "mission.record",
-                    _mission_payload(project_scope, stamp),
-                    f"{idempotency_key}-control-mission",
-                    expected_version=expected,
+                    command_type,
+                    payload,
+                    key,
+                    expected_version=harness.projection.version,
+                    refs=refs,
+                    budget_authorization=budget_authorization,
                 )
             )
             receipts.append(receipt.model_dump(mode="json"))
-            expected += 1
-        elif _latest_model(harness, "mission_revision", MissionRevision) is None:
+            return receipt
+
+        mission_revision = _latest_model(harness, "mission_revision", MissionRevision)
+        if mission_revision is None:
+            execute_current(
+                "mission.record",
+                _mission_payload(project_scope, stamp),
+                f"{idempotency_key}-control-mission",
+            )
+            mission_revision = _latest_model(harness, "mission_revision", MissionRevision)
+        else:
+            _append_existing_receipt(harness, f"{idempotency_key}-control-mission", receipts)
+        if mission_revision is None:
             raise StateConflictError("production control mission is missing")
 
-        if control_plan.get("needs_plan") is True:
-            mission_revision = _latest_model(harness, "mission_revision", MissionRevision)
-            if mission_revision is None:
-                raise StateConflictError("production control mission is missing")
+        plan_revision = _latest_model(harness, "plan_revision", PlanRevision)
+        if plan_revision is None:
             payload = _plan_payload(project_scope, mission_revision, stamp)
-            receipt = harness.execute(
-                _command(
-                    harness,
-                    actor,
-                    "plan.propose",
-                    payload,
-                    f"{idempotency_key}-control-plan",
-                    expected_version=expected,
-                    refs=(exact_ref("mission_revision", mission_revision),),
-                )
+            execute_current(
+                "plan.propose",
+                payload,
+                f"{idempotency_key}-control-plan",
+                refs=(exact_ref("mission_revision", mission_revision),),
             )
-            receipts.append(receipt.model_dump(mode="json"))
-            expected += 1
-        elif _latest_model(harness, "plan_revision", PlanRevision) is None:
+            plan_revision = _latest_model(harness, "plan_revision", PlanRevision)
+        else:
+            _append_existing_receipt(harness, f"{idempotency_key}-control-plan", receipts)
+        if plan_revision is None:
             raise StateConflictError("production control plan is missing")
 
-        if control_plan.get("needs_approval") is True:
-            plan_revision = _latest_model(harness, "plan_revision", PlanRevision)
+        if not _records(harness, "plan_task"):
             budget = _latest_model(harness, "budget_envelope", BudgetEnvelope)
-            if plan_revision is None or budget is None:
+            if budget is None:
                 raise StateConflictError("production control plan cannot be approved")
             payload = _approval_payload(project_scope, plan_revision, budget, stamp)
-            receipt = harness.execute(
-                _command(
-                    harness,
-                    actor,
-                    "plan.approve",
-                    payload,
-                    f"{idempotency_key}-control-approve",
-                    expected_version=expected,
-                    refs=(exact_ref("plan_revision", plan_revision),),
-                    budget_authorization=BudgetAuthorization(
-                        budget_envelope_ref=exact_ref("budget_envelope", budget),
-                        admitted_amount=budget.max_budget,
-                        currency=budget.estimated.currency,
-                        authorization_ref="budget-provider-closed",
-                    ),
-                )
+            execute_current(
+                "plan.approve",
+                payload,
+                f"{idempotency_key}-control-approve",
+                refs=(exact_ref("plan_revision", plan_revision),),
+                budget_authorization=BudgetAuthorization(
+                    budget_envelope_ref=exact_ref("budget_envelope", budget),
+                    admitted_amount=budget.max_budget,
+                    currency=budget.estimated.currency,
+                    authorization_ref="budget-provider-closed",
+                ),
             )
-            receipts.append(receipt.model_dump(mode="json"))
-            expected += 1
-        elif not _records(harness, "plan_task"):
+        else:
+            _append_existing_receipt(harness, f"{idempotency_key}-control-approve", receipts)
+        if not _records(harness, "plan_task"):
             raise StateConflictError("production control tasks are missing")
 
         task = _task_by_id(harness, "task-002")
@@ -188,23 +195,18 @@ def record_creator_preview_control_writeback(
         run_ref = exact_ref("production_run", run)
         attempt_ref = exact_ref("run_attempt", attempt)
         if not harness.projection.has(run_ref):
-            receipt = harness.execute(
-                _command(
-                    harness,
-                    actor,
-                    "run.start",
-                    {
-                        "assignment": assignment.model_dump(mode="json"),
-                        "run": run.model_dump(mode="json"),
-                        "attempt": attempt.model_dump(mode="json"),
-                    },
-                    f"{idempotency_key}-control-run-start",
-                    expected_version=expected,
-                    refs=(task_ref,),
-                )
+            execute_current(
+                "run.start",
+                {
+                    "assignment": assignment.model_dump(mode="json"),
+                    "run": run.model_dump(mode="json"),
+                    "attempt": attempt.model_dump(mode="json"),
+                },
+                f"{idempotency_key}-control-run-start",
+                refs=(task_ref,),
             )
-            receipts.append(receipt.model_dump(mode="json"))
-            expected += 1
+        else:
+            _append_existing_receipt(harness, f"{idempotency_key}-control-run-start", receipts)
 
         adapter = EpisodeArtifactAdapterRequest(
             mode="asset_candidate",
@@ -272,12 +274,14 @@ def record_creator_preview_control_writeback(
                 "artifact.register",
                 {"registration": registration.model_dump(mode="json")},
                 "artifact-register",
+                exact_ref("artifact_candidate_registration", registration),
                 (task_ref, run_ref, attempt_ref, adapter.predecessor_ref, *adapter.protected_exact_refs),
             ),
             (
                 "artifact.writeback",
                 {"writeback": writeback.model_dump(mode="json")},
                 "artifact-writeback",
+                exact_ref("artifact_writeback", writeback),
                 (
                     exact_ref("artifact_candidate_registration", registration),
                     adapter.predecessor_ref,
@@ -288,6 +292,7 @@ def record_creator_preview_control_writeback(
                 "selective_revision.request",
                 {"revision_request": revision_request.model_dump(mode="json")},
                 "revision-request",
+                exact_ref("selective_revision_request", revision_request),
                 (
                     exact_ref("artifact_writeback", writeback),
                     adapter.predecessor_ref,
@@ -298,26 +303,19 @@ def record_creator_preview_control_writeback(
                 "impact.assess",
                 {"impact_assessment": impact.model_dump(mode="json")},
                 "impact",
+                exact_ref("impact_assessment", impact),
                 (
                     exact_ref("selective_revision_request", revision_request),
                     *adapter.protected_exact_refs,
                 ),
             ),
         )
-        for command_type, payload, suffix, refs in commands:
-            receipt = harness.execute(
-                _command(
-                    harness,
-                    actor,
-                    command_type,
-                    payload,
-                    f"{idempotency_key}-control-{suffix}",
-                    expected_version=expected,
-                    refs=refs,
-                )
-            )
-            receipts.append(receipt.model_dump(mode="json"))
-            expected += 1
+        for command_type, payload, suffix, result_ref, refs in commands:
+            key = f"{idempotency_key}-control-{suffix}"
+            if harness.projection.has(result_ref):
+                _append_existing_receipt(harness, key, receipts)
+                continue
+            execute_current(command_type, payload, key, refs=refs)
 
         return {
             "schema_version": "afs.creator-production-control-writeback.v0.1",
@@ -338,7 +336,7 @@ def record_creator_preview_control_writeback(
             "writeback_ref": _control_ref(exact_ref("artifact_writeback", writeback)),
             "receipts": receipts,
             "control_receipt": receipts[-1] if receipts else None,
-            "next_expected_version": expected,
+            "next_expected_version": harness.projection.version,
             "projection_digest": harness.projection.state_digest,
             "event_count": len(harness.events),
             "provider_dispatch_count": harness.provider_dispatch_count,
@@ -459,6 +457,17 @@ def confirm_creator_preview_control_run(
     project_scope, actor = _control_identity(scope)
     with _locked_harness(store, project_scope, actor) as harness:
         run_ref = _exact_ref_from_control(project_scope, control["run"]["ref"])
+        state = harness.projection.run_execution.get(run_ref.object_id)
+        if state == "completed":
+            receipt = _receipt_for_key(harness, f"{idempotency_key}-control-run-complete")
+            return {
+                "receipt": receipt.model_dump(mode="json") if receipt is not None else None,
+                "projection_digest": harness.projection.state_digest,
+                "event_count": len(harness.events),
+                "provider_dispatch_count": harness.provider_dispatch_count,
+            }
+        if state == "cancelled":
+            raise StateConflictError("creator preview control run is cancelled")
         receipt = harness.execute(
             _command(
                 harness,
@@ -469,7 +478,7 @@ def confirm_creator_preview_control_run(
                     "target_state": "completed",
                 },
                 f"{idempotency_key}-control-run-complete",
-                expected_version=int(control["next_expected_version"]),
+                expected_version=harness.projection.version,
                 refs=(run_ref,),
             )
         )
@@ -488,12 +497,26 @@ def read_creator_preview_control_projection(
 ) -> dict[str, Any]:
     project_scope, actor = _control_identity(scope)
     with _locked_harness(store, project_scope, actor) as harness:
+        artifacts = _control_artifact_rows(store, harness)
         return {
             "schema_version": "afs.creator-production-control-projection.v0.1",
             "version": harness.projection.version,
             "projection_digest": harness.projection.state_digest,
             "event_count": len(harness.events),
             "provider_dispatch_count": harness.provider_dispatch_count,
+            "artifacts": artifacts,
+            "artifact_status_digest": digest(
+                [
+                    {
+                        "writeback_ref": item["provenance"]["writeback_ref"],
+                        "status": item["status"],
+                        "task_id": item["task_id"],
+                        "run_id": item["run_id"],
+                        "attempt_id": item["attempt_id"],
+                    }
+                    for item in artifacts
+                ]
+            ),
             "writeback_refs": sorted(
                 f"{kind}:{object_id}:{revision_id}"
                 for (kind, object_id, revision_id) in harness.projection.records
@@ -791,6 +814,104 @@ def _records(harness: ProductionControlHarness, object_type: str) -> list[dict[s
         ],
         key=lambda item: (item["identity"]["object_id"], item["identity"]["revision"]),
     )
+
+
+def _control_artifact_rows(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+) -> list[dict[str, Any]]:
+    episode_states = _episode_writeback_states(store, harness)
+    rows: list[dict[str, Any]] = []
+    for item in _records(harness, "artifact_writeback"):
+        writeback = ArtifactWriteback.model_validate(item)
+        writeback_ref = _control_ref(exact_ref("artifact_writeback", writeback))
+        writeback_key = f"{writeback_ref['object_type']}:{writeback_ref['object_id']}:{writeback_ref['revision_id']}"
+        episode_state = episode_states.get(
+            writeback_key,
+            {
+                "status": "ledger_pending_episode_receipt",
+                "candidate_ref": None,
+                "lifecycle_state": "",
+                "review_state": "",
+            },
+        )
+        rows.append(
+            {
+                "artifact_id": writeback.artifact_id,
+                "status": episode_state["status"],
+                "task_id": writeback.plan_task_ref.object_id,
+                "run_id": writeback.run_ref.object_id,
+                "attempt_id": writeback.attempt_ref.object_id,
+                "provenance": {
+                    "task_ref": _control_ref(writeback.plan_task_ref),
+                    "run_ref": _control_ref(writeback.run_ref),
+                    "attempt_ref": _control_ref(writeback.attempt_ref),
+                    "writeback_ref": writeback_ref,
+                },
+                "candidate_ref": writeback.adapter_request.successor_ref.model_dump(mode="json"),
+                "episode_candidate_ref": episode_state["candidate_ref"],
+                "episode_lifecycle_state": episode_state["lifecycle_state"],
+                "episode_review_state": episode_state["review_state"],
+            }
+        )
+    return rows
+
+
+def _episode_writeback_states(
+    store: RuntimeStore,
+    harness: ProductionControlHarness,
+) -> dict[str, dict[str, Any]]:
+    try:
+        aggregate = EpisodeDomainAggregateStore(store.root).load(
+            org_id=harness.scope.org_id,
+            project_id=harness.scope.project_id,
+        )
+    except EpisodeDomainStoreError:
+        return {}
+    states: dict[str, dict[str, Any]] = {}
+    latest: dict[str, AssetCandidateVersion] = {}
+    for candidate in aggregate.asset_candidates:
+        current = latest.get(candidate.entity_id)
+        if current is None or candidate.revision > current.revision:
+            latest[candidate.entity_id] = candidate
+    for candidate in latest.values():
+        provenance = candidate.control_provenance
+        if provenance is None:
+            continue
+        status = "pending_review"
+        if candidate.lifecycle_state == "locked" and candidate.review_state == "approved":
+            status = "locked"
+        elif candidate.lifecycle_state == "approved" and candidate.review_state == "approved":
+            status = "approved"
+        key = (
+            f"{provenance.writeback_ref.object_type}:"
+            f"{provenance.writeback_ref.object_id}:"
+            f"{provenance.writeback_ref.revision_id}"
+        )
+        states[key] = {
+            "status": status,
+            "candidate_ref": candidate.as_ref().model_dump(mode="json"),
+            "lifecycle_state": candidate.lifecycle_state,
+            "review_state": candidate.review_state,
+        }
+    return states
+
+
+def _receipt_for_key(harness: ProductionControlHarness, key: str):
+    value = harness._receipts.get(key)  # deterministic file-safe harness receipt index
+    return value[1] if value is not None else None
+
+
+def _append_existing_receipt(
+    harness: ProductionControlHarness,
+    key: str,
+    receipts: list[dict[str, Any]],
+) -> None:
+    receipt = _receipt_for_key(harness, key)
+    if receipt is not None:
+        dumped = receipt.model_dump(mode="json")
+        if dumped not in receipts:
+            receipts.append(dumped)
 
 
 def _latest_model(harness: ProductionControlHarness, object_type: str, model: type[Any]):
