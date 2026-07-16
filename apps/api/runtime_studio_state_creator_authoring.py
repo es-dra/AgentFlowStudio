@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from apps.api.runtime_episode_domain_contract import EntityVersionRef
 from apps.api.runtime_store import safe_id
 
 
@@ -133,10 +134,9 @@ def _creator_command(value: Any) -> dict[str, Any]:
 def _exact_ref(value: Any) -> None:
     if not isinstance(value, dict) or set(value) != {"entity_type", "entity_id", "version_id"}:
         raise ValueError("creator authoring exact reference is invalid")
-    if value["entity_type"] not in {
-        "project", "series", "story_bible", "arc", "episode", "scene", "shot",
-        "reference_asset", "reference_set", "candidate", "selection", "review", "delivery",
-    }:
+    try:
+        EntityVersionRef.model_validate(value)
+    except ValueError:
         raise ValueError("creator authoring exact reference type is invalid")
     for key in ("entity_id", "version_id"):
         raw = str(value.get(key) or "")

@@ -302,6 +302,145 @@ def test_material_reference_edits_reset_human_approval_and_scope_is_enforced() -
         )
 
 
+def test_reference_approval_reset_uses_canonical_value_change_matrix() -> None:
+    aggregate = _long_form_aggregate()
+    asset = _latest(aggregate, "reference_assets", "asset-hero")
+    unchanged_asset = revise_authoring_entity(
+        aggregate,
+        scope=SCOPE,
+        expected_aggregate_version=aggregate.aggregate_version,
+        target_ref=asset.as_ref(),
+        new_version_id="asset-hero-v2",
+        created_at=_time(40),
+        changes={
+            "label": asset.label,
+            "identity": asset.identity,
+            "confidence": asset.confidence,
+            "approval_state": "approved",
+            "human_confirmed": True,
+        },
+    )
+    asset_v2 = _latest(unchanged_asset, "reference_assets", "asset-hero")
+    assert asset_v2.approval_state == "approved"
+    assert asset_v2.human_confirmed is True
+
+    changed_asset = revise_authoring_entity(
+        unchanged_asset,
+        scope=SCOPE,
+        expected_aggregate_version=unchanged_asset.aggregate_version,
+        target_ref=asset_v2.as_ref(),
+        new_version_id="asset-hero-v3",
+        created_at=_time(41),
+        changes={
+            "identity": "短发，右眉浅疤。",
+            "approval_state": "approved",
+            "human_confirmed": True,
+        },
+    )
+    asset_v3 = _latest(changed_asset, "reference_assets", "asset-hero")
+    assert asset_v3.approval_state == "pending_human"
+    assert asset_v3.human_confirmed is False
+
+    reference_set = _latest(aggregate, "reference_sets", "refset-main")
+    unchanged_set = revise_authoring_entity(
+        aggregate,
+        scope=SCOPE,
+        expected_aggregate_version=aggregate.aggregate_version,
+        target_ref=reference_set.as_ref(),
+        new_version_id="refset-main-v2",
+        created_at=_time(40),
+        changes={
+            "title": reference_set.title,
+            "summary": reference_set.summary,
+            "scope_kind": reference_set.scope_kind,
+            "scope_refs": reference_set.scope_refs,
+            "asset_refs": reference_set.asset_refs,
+            "approval_state": "approved",
+            "human_confirmed": True,
+        },
+    )
+    refset_v2 = _latest(unchanged_set, "reference_sets", "refset-main")
+    assert refset_v2.approval_state == "approved"
+    assert refset_v2.human_confirmed is True
+
+    changed_set = revise_authoring_entity(
+        unchanged_set,
+        scope=SCOPE,
+        expected_aggregate_version=unchanged_set.aggregate_version,
+        target_ref=refset_v2.as_ref(),
+        new_version_id="refset-main-v3",
+        created_at=_time(41),
+        changes={
+            "scope_kind": "series",
+            "scope_refs": (_latest(unchanged_set, "series", "series-main").as_ref(),),
+            "approval_state": "approved",
+            "human_confirmed": True,
+        },
+    )
+    refset_v3 = _latest(changed_set, "reference_sets", "refset-main")
+    assert refset_v3.approval_state == "pending_human"
+    assert refset_v3.human_confirmed is False
+
+
+def test_reference_set_binding_requires_approved_exact_version() -> None:
+    aggregate = _long_form_aggregate()
+    project_ref = aggregate.projects[0].as_ref()
+    aggregate = _create(
+        aggregate,
+        step=40,
+        entity_type="reference_set",
+        entity_id="refset-pending",
+        attributes={
+            "project_ref": project_ref,
+            "title": "待确认基准",
+            "summary": "需要确认后才能绑定。",
+            "scope_kind": "project",
+            "scope_refs": (project_ref,),
+            "asset_refs": (_latest(aggregate, "reference_assets", "asset-hero").as_ref(),),
+            "approval_state": "pending_human",
+            "human_confirmed": False,
+        },
+    )
+    episode = _latest(aggregate, "episodes", "episode-1")
+    pending_set = _latest(aggregate, "reference_sets", "refset-pending")
+    with pytest.raises(AuthoringStateError, match="human-approved exact version"):
+        revise_authoring_entity(
+            aggregate,
+            scope=SCOPE,
+            expected_aggregate_version=aggregate.aggregate_version,
+            target_ref=episode.as_ref(),
+            new_version_id="episode-1-v2",
+            created_at=_time(41),
+            changes={"reference_set_ref": pending_set.as_ref()},
+        )
+
+    approved = revise_authoring_entity(
+        aggregate,
+        scope=SCOPE,
+        expected_aggregate_version=aggregate.aggregate_version,
+        target_ref=pending_set.as_ref(),
+        new_version_id="refset-pending-v2",
+        created_at=_time(41),
+        changes={
+            "asset_refs": pending_set.asset_refs,
+            "scope_refs": pending_set.scope_refs,
+            "approval_state": "approved",
+            "human_confirmed": True,
+        },
+    )
+    approved_set = _latest(approved, "reference_sets", "refset-pending")
+    rebound = revise_authoring_entity(
+        approved,
+        scope=SCOPE,
+        expected_aggregate_version=approved.aggregate_version,
+        target_ref=episode.as_ref(),
+        new_version_id="episode-1-v2",
+        created_at=_time(42),
+        changes={"reference_set_ref": approved_set.as_ref()},
+    )
+    assert _latest(rebound, "episodes", "episode-1").reference_set_ref == approved_set.as_ref()
+
+
 def test_shot_revision_requires_exact_preview_and_preserves_every_protected_digest() -> None:
     aggregate = _long_form_aggregate()
     shot = _latest(aggregate, "shots", "episode-1-scene-1-shot-1")
@@ -422,6 +561,13 @@ def test_restore_appends_v3_and_reorder_requires_complete_current_sibling_set() 
         confirmed_protected_refs=preview_v2.protected_refs,
     )
     shot_v2 = _latest(revised, "shots", shot_v1.entity_id)
+    diff_v1_v2 = diff_shot_versions(
+        revised,
+        scope=SCOPE,
+        left_ref=shot_v1.as_ref(),
+        right_ref=shot_v2.as_ref(),
+    )
+    assert diff_v1_v2 == {"title": {"before": "镜头1", "after": "雨中的回望"}}
     restore_changes = {
         "title": shot_v1.title,
         "summary": shot_v1.summary,
@@ -475,6 +621,13 @@ def test_restore_appends_v3_and_reorder_requires_complete_current_sibling_set() 
     )
     assert _latest(reordered, "shots", siblings[1].entity_id).sequence == 1
     assert _latest(reordered, "shots", siblings[0].entity_id).sequence == 2
+    assert _latest(reordered, "shots", shot_v1.entity_id).version_id == f"{shot_v1.entity_id}-v4"
+    assert diff_shot_versions(
+        reordered,
+        scope=SCOPE,
+        left_ref=shot_v1.as_ref(),
+        right_ref=shot_v2.as_ref(),
+    ) == diff_v1_v2
 
     with pytest.raises(AuthoringStateError, match="complete current sibling"):
         reorder_authoring_entities(

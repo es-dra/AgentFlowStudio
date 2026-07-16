@@ -271,12 +271,13 @@ def revise_authoring_entity(
                 _exact_latest(canonical, ref, scope_kind).as_ref()
                 for ref in normalized["scope_refs"]
             )
-        if set(normalized) & {"asset_refs", "scope_kind", "scope_refs"}:
+        if _reference_set_material_changed(current, normalized):
             normalized["approval_state"] = "pending_human"
             normalized["human_confirmed"] = False
-    if target_ref.entity_type == "reference_asset" and set(normalized) & {
-        "label", "identity", "confidence"
-    }:
+    if target_ref.entity_type == "reference_asset" and _reference_asset_material_changed(
+        current,
+        normalized,
+    ):
         normalized["approval_state"] = "pending_human"
         normalized["human_confirmed"] = False
     payload = current.model_dump(mode="python")
@@ -594,6 +595,28 @@ def _normalize_shot_changes(
     # Validate field limits without constructing a successor revision yet.
     ShotVersion.model_validate(candidate.model_dump(mode="python"))
     return normalized
+
+
+def _reference_asset_material_changed(
+    current: VersionedFact,
+    normalized: dict[str, Any],
+) -> bool:
+    for field in ("identity", "confidence", "source_refs"):
+        if field in normalized and normalized[field] != getattr(current, field):
+            return True
+    return False
+
+
+def _reference_set_material_changed(
+    current: VersionedFact,
+    normalized: dict[str, Any],
+) -> bool:
+    if "scope_kind" in normalized and normalized["scope_kind"] != getattr(current, "scope_kind"):
+        return True
+    for field in ("asset_refs", "scope_refs", "source_refs"):
+        if field in normalized and set(normalized[field]) != set(getattr(current, field)):
+            return True
+    return False
 
 
 def _approved_reference_set(

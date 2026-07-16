@@ -51,6 +51,8 @@ def test_storyboard_and_canvas_render_one_model_and_send_one_typed_command_path(
     source = "\n".join((app, api, commands, _read("authoring-model.mjs")))
 
     assert 'ui.mode === "canvas" ? renderCanvas() : renderStoryboard()' in app
+    assert 'root.querySelectorAll(".creator-modes button[data-mode]")' in app
+    assert 'root.querySelectorAll("[data-mode]")' not in app
     assert "shotsForScene(model, scene.ref)" in app
     assert "data-shot=" in app
     assert "reviseShotCommand" in app
@@ -81,6 +83,29 @@ def test_pending_command_envelope_is_server_persisted_and_malformed_state_fails_
         )
         is True
     )
+
+
+def test_create_default_picks_next_creatable_entity_and_blocks_missing_parents() -> None:
+    app = _read("authoring-app.mjs")
+
+    assert 'if (!model.series.length) return "series";' in app
+    assert 'if (!model.episodes.length) return "episode";' in app
+    assert 'if (!scenesForEpisode(model, currentEpisode(model, ui)?.ref).length) return "scene";' in app
+    assert 'return "shot";' in app
+    assert "请先创建长篇故事，再创建单集。" in app
+    assert "请先创建单集，再创建场景。" in app
+    assert "请先为当前单集创建场景，再创建镜头。" in app
+    assert 'data-submit-create ${blocker ? "disabled" : ""}' in app
+
+
+def test_version_diff_uses_exact_labels_and_clears_after_current_version_advances() -> None:
+    app = _read("authoring-app.mjs")
+
+    assert "renderVersionDiff(shot)" in app
+    assert "versionLabel(shot, versionDiff.left_ref)" in app
+    assert "versionLabel(shot, versionDiff.right_ref)" in app
+    assert "left_ref: historicalRef, right_ref: shot.ref" in app
+    assert "versionDiff = null;" in app
 
 
 def test_default_creator_surface_hides_internal_runtime_and_provider_noise() -> None:

@@ -242,19 +242,31 @@ function renderReferenceSetFields(entity) {
 
 function renderVersionHistory(shot) {
   if (!ui.technicalOpen) return "";
-  const diff = versionDiff ? `<div class="creator-diff"><h4>版本差异</h4>${Object.entries(versionDiff).map(([field, values]) => `<p><strong>${escapeHtml(diffFieldLabel(field))}</strong><del>${escapeHtml(diffValue(values.before))}</del><ins>${escapeHtml(diffValue(values.after))}</ins></p>`).join("") || "<p>两个版本的创作字段一致。</p>"}</div>` : "";
+  const diff = renderVersionDiff(shot);
   return `<section class="version-history"><h3>历史版本</h3>${(shot.versions || []).slice().reverse().map((version) => `<div><span>版本 ${version.revision}</span><strong>${escapeHtml(version.title)}</strong>${version.ref.version_id !== shot.ref.version_id ? `<span><button type="button" data-diff="${escapeHtml(refKey(version.ref))}">比较</button><button type="button" data-restore="${escapeHtml(refKey(version.ref))}">恢复为新版本</button></span>` : "<small>当前</small>"}</div>`).join("")}${diff}</section>`;
+}
+
+function renderVersionDiff(shot) {
+  if (!versionDiff || !sameStableRef(versionDiff.right_ref, shot.ref)) return "";
+  const changes = versionDiff.changes || {};
+  return `<div class="creator-diff"><h4>版本差异</h4><div class="diff-exact-refs"><span>${escapeHtml(versionLabel(shot, versionDiff.left_ref))}</span><span>${escapeHtml(versionLabel(shot, versionDiff.right_ref))}</span></div>${Object.entries(changes).map(([field, values]) => `<p><strong>${escapeHtml(diffFieldLabel(field))}</strong><del>${escapeHtml(diffValue(values.before))}</del><ins>${escapeHtml(diffValue(values.after))}</ins></p>`).join("") || "<p>两个版本的创作字段一致。</p>"}</div>`;
+}
+
+function versionLabel(shot, ref) {
+  const version = (shot.versions || []).find((item) => refKey(item.ref) === refKey(ref));
+  return version ? `版本 ${version.revision} · ${version.ref.version_id}` : refKey(ref);
 }
 
 function diffFieldLabel(field) { return ({ title: "标题", summary: "摘要", creative_intent: "创作意图", duration_seconds: "时长", reference_set_ref: "参考基准" })[field] || field; }
 function diffValue(value) { if (value == null || value === "") return "未填写"; if (typeof value === "object") return value.entity_type === "reference_set" ? "指定参考基准版本" : "已设置"; return String(value); }
 
 function renderCreateDialog(type) {
+  const blocker = createBlocker(type);
   const options = [
     ["story_bible", "世界设定"], ["series", "长篇故事"], ["arc", "篇章"], ["episode", "单集"],
     ["scene", "场景"], ["shot", "镜头"], ["reference_asset", "参考资产"], ["reference_set", "参考基准"],
   ];
-  return `<div class="creator-modal-backdrop" role="presentation"><section class="creator-modal" role="dialog" aria-modal="true" aria-labelledby="create-title"><header><div><span>新建内容</span><h2 id="create-title">${escapeHtml(entityLabel(type))}</h2></div><button type="button" data-close-modal aria-label="关闭">×</button></header><form class="creator-create-form"><label>内容类型<select name="entity_type">${options.map(([value, label]) => `<option value="${value}" ${type === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>${renderCreateFields(type)}<div class="modal-actions"><button type="button" data-close-modal>取消</button><button class="impact-button" type="button" data-submit-create>创建</button></div></form></section></div>`;
+  return `<div class="creator-modal-backdrop" role="presentation"><section class="creator-modal" role="dialog" aria-modal="true" aria-labelledby="create-title"><header><div><span>新建内容</span><h2 id="create-title">${escapeHtml(entityLabel(type))}</h2></div><button type="button" data-close-modal aria-label="关闭">×</button></header><form class="creator-create-form"><label>内容类型<select name="entity_type">${options.map(([value, label]) => `<option value="${value}" ${type === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>${blocker ? `<p class="form-help">${escapeHtml(blocker)}</p>` : ""}${renderCreateFields(type)}<div class="modal-actions"><button type="button" data-close-modal>取消</button><button class="impact-button" type="button" data-submit-create ${blocker ? "disabled" : ""}>创建</button></div></form></section></div>`;
 }
 
 function renderCreateFields(type) {
@@ -292,7 +304,7 @@ function findRef(serialized) {
 }
 
 function bindEvents() {
-  root.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
+  root.querySelectorAll(".creator-modes button[data-mode]").forEach((button) => button.addEventListener("click", () => {
     ui.mode = button.dataset.mode;
     render();
     void persistUi();
@@ -318,6 +330,7 @@ function bindEvents() {
   root.querySelectorAll("[data-shot]").forEach((button) => button.addEventListener("click", () => {
     const shot = model.shots.find((item) => stableKey(item.ref) === button.dataset.shot);
     if (!shot) return;
+    if (!sameStableRef(shot.ref, ui.selectedShot)) versionDiff = null;
     ui.selectedShot = shot.ref;
     ui.selectedSection = `shot:${shot.ref.entity_id}`;
     ui.mobileInspectorOpen = true;
@@ -352,15 +365,24 @@ function findRefByStable(key) {
 
 function suggestedCreateType() {
   if (!model.series.length) return "series";
-  if (!model.story_bibles.length) return "story_bible";
-  if (!model.arcs.length) return "arc";
   if (!model.episodes.length) return "episode";
+  if (!scenesForEpisode(model, currentEpisode(model, ui)?.ref).length) return "scene";
   return "shot";
+}
+
+function createBlocker(type) {
+  if (type === "arc" && !model.series.length) return "请先创建长篇故事，再创建篇章。";
+  if (type === "episode" && !model.series.length) return "请先创建长篇故事，再创建单集。";
+  if (type === "scene" && !model.episodes.length) return "请先创建单集，再创建场景。";
+  if (type === "shot" && !scenesForEpisode(model, currentEpisode(model, ui)?.ref).length) return "请先为当前单集创建场景，再创建镜头。";
+  return "";
 }
 
 async function submitCreate(form) {
   const data = new FormData(form);
   const type = String(data.get("entity_type") || createDialog);
+  const blocker = createBlocker(type);
+  if (blocker) { statusMessage = blocker; render(); return; }
   const title = String(data.get("title") || "").trim();
   const entityId = stableIdentity(type);
   const projectRef = model.project.ref;
@@ -425,7 +447,7 @@ async function showVersionDiff(serializedRef) {
   const shot = currentShot(model, ui);
   const historicalRef = findShotVersionRef(serializedRef);
   if (!shot || !historicalRef) return;
-  try { versionDiff = (await client.diffShotVersions({ left_ref: historicalRef, right_ref: shot.ref })).changes; render(); }
+  try { versionDiff = { left_ref: historicalRef, right_ref: shot.ref, changes: (await client.diffShotVersions({ left_ref: historicalRef, right_ref: shot.ref })).changes }; render(); }
   catch (error) { statusMessage = `无法比较版本：${error?.message || "请稍后再试。"}`; render(); }
 }
 
@@ -494,6 +516,7 @@ async function runCommand(command, replayKey = "") {
     ui.pendingCommand = null;
     ui.pendingFailure = "";
     ui = createAuthoringUi(model, uiPreference(ui));
+    versionDiff = null;
     statusMessage = "更改已保存，并可在版本记录中恢复。";
     await persistUi({ immediate: true });
   } catch (error) {
