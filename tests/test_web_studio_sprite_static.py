@@ -6,6 +6,7 @@ from studio_static_helpers import STUDIO_ROOT
 def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    bootstrap = (STUDIO_ROOT / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     sprite = (STUDIO_ROOT / "src" / "sprite-widget.js").read_text(encoding="utf-8")
     pending = (STUDIO_ROOT / "src" / "sprite-pending-state.js").read_text(encoding="utf-8")
@@ -29,7 +30,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     )
 
     assert '<div id="sprite-root"></div>' not in index
-    assert '<div id="sprite-root"></div>' in main
+    assert '<div id="sprite-root"></div>' in bootstrap
     assert './styles/studio-sprite.css' in index
     assert 'from "./sprite-widget.js"' in main
     assert "renderSpriteWidget" in main
