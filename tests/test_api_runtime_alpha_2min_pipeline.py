@@ -60,12 +60,16 @@ def _create_project(client: TestClient, headers: dict[str, str], project_id: str
     assert "episode_bootstrap" not in response.json()
 
 
-def _brief(title: str = "Signal Kitchen") -> dict[str, Any]:
+def _brief(
+    title: str = "Signal Kitchen",
+    *,
+    brief_id: str = "alpha-brief-001",
+) -> dict[str, Any]:
     return {
         "expected_aggregate_version": 0,
         "created_at": STAMP,
         "brief": {
-            "brief_id": "alpha-brief-001",
+            "brief_id": brief_id,
             "project_title": title,
             "logline": "A night-shift cook must choose whether to expose a false emergency signal.",
             "target_audience": "internal alpha reviewer",
@@ -193,6 +197,35 @@ def test_alpha_2min_pipeline_executes_brief_to_export_provider_free(
     conflict = _post_alpha(client, headers, _brief(title="Changed Title"))
     assert conflict.status_code == 409
     assert conflict.json()["detail"]["error"] == "idempotency_conflict"
+
+    new_key_changed = _post_alpha(
+        client,
+        _headers(owner, key="alpha-2min-new-key-changed-brief"),
+        _brief(brief_id="alpha-brief-CHANGED"),
+    )
+    assert new_key_changed.status_code == 409
+    assert new_key_changed.json()["detail"]["error"] == "alpha_2min_brief_conflict"
+    assert "production_recipe" not in new_key_changed.json()
+
+    after_changed = EpisodeDomainAggregateStore(tmp_path).load(
+        org_id=owner["user"]["user_id"],
+        project_id=PROJECT_ID,
+    )
+    assert after_changed.aggregate_version == aggregate.aggregate_version
+    assert [item.entity_id for item in after_changed.deliveries] == [
+        item.entity_id for item in aggregate.deliveries
+    ]
+    ledger_after_changed = json.loads(
+        (
+            tmp_path
+            / "projects"
+            / PROJECT_ID
+            / "production_control"
+            / "ledger.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert len(ledger_after_changed["events"]) == len(ledger["events"])
+    assert ledger_after_changed["provider_dispatch_count"] == 0
 
 
 def test_alpha_2min_pipeline_recovers_provider_free_stale_lease_without_duplicate_writeback(

@@ -93,6 +93,10 @@ ALPHA_REFERENCE_ASSET_IDS = (
 )
 
 
+class Alpha2MinBriefConflictError(RuntimeError):
+    pass
+
+
 class Alpha2MinRouteModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -138,6 +142,19 @@ def register_runtime_episode_alpha_2min_routes(
                 message="Alpha 2-minute production control state changed; retry with the same request.",
                 stage="alpha_2min_production_control",
                 retryable=True,
+                cause=exc,
+            )
+        except Alpha2MinBriefConflictError as exc:
+            _raise_api_error(
+                request,
+                project_id,
+                status_code=409,
+                error="alpha_2min_brief_conflict",
+                message=(
+                    "Alpha 2-minute project already has canonical brief truth. "
+                    "Retry with the original brief or create a new project."
+                ),
+                stage="alpha_2min_brief_match",
                 cause=exc,
             )
         except ValueError as exc:
@@ -289,7 +306,9 @@ def _ensure_base_alpha_aggregate(
     if existing.scope != scope:
         raise ValueError("existing aggregate scope does not match alpha_2min request")
     if not _existing_alpha_matches_brief(existing, brief):
-        raise ValueError("project already has a non-matching episode aggregate")
+        raise Alpha2MinBriefConflictError(
+            "incoming alpha_2min brief does not match canonical aggregate truth"
+        )
     return existing
 
 
@@ -859,16 +878,31 @@ def _existing_alpha_matches_brief(
 ) -> bool:
     try:
         project = max(aggregate.projects, key=lambda item: item.revision)
-        episode = _alpha_episode(aggregate)
+        expected = _build_base_aggregate(
+            scope=aggregate.scope,
+            brief=brief,
+            created_at=project.created_at,
+        )
     except ValueError:
         return False
-    return (
-        project.title == brief.project_title
-        and project.summary == brief.logline
-        and sum(item.duration_seconds for item in _alpha_shots(aggregate))
-        == brief.target_duration_seconds
-        and episode.reference_set_ref is not None
-    )
+    return _alpha_base_signature(aggregate) == _alpha_base_signature(expected)
+
+
+def _alpha_base_signature(aggregate: ProductionProjectAggregate) -> dict[str, Any]:
+    return {
+        "project": max(aggregate.projects, key=lambda item: item.revision).model_dump(mode="json"),
+        "story_bible": _alpha_story_bible(aggregate).model_dump(mode="json"),
+        "series": _alpha_series(aggregate).model_dump(mode="json"),
+        "arc": _alpha_arc(aggregate).model_dump(mode="json"),
+        "episode": _alpha_episode(aggregate).model_dump(mode="json"),
+        "scenes": [item.model_dump(mode="json") for item in _alpha_scenes(aggregate)],
+        "shots": [item.model_dump(mode="json") for item in _alpha_shots(aggregate)],
+        "reference_assets": [
+            _latest_exact(aggregate.reference_assets, asset_id).model_dump(mode="json")
+            for asset_id in ALPHA_REFERENCE_ASSET_IDS
+        ],
+        "reference_set": _alpha_reference_set(aggregate).model_dump(mode="json"),
+    }
 
 
 def _export_manifest_for_existing(
@@ -955,6 +989,10 @@ def _entity_ref(ref: EntityVersionRef) -> dict[str, str]:
 
 def _alpha_story_bible(aggregate: ProductionProjectAggregate) -> StoryBibleVersion:
     return _latest_exact(aggregate.story_bibles, ALPHA_STORY_BIBLE_ID)
+
+
+def _alpha_series(aggregate: ProductionProjectAggregate) -> SeriesVersion:
+    return _latest_exact(aggregate.series, ALPHA_SERIES_ID)
 
 
 def _alpha_arc(aggregate: ProductionProjectAggregate) -> ArcVersion:
