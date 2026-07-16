@@ -11,7 +11,7 @@ def test_product_shell_is_chinese_first_and_hides_diagnostics_from_primary_flow(
     i18n = (STUDIO / "src" / "i18n.js").read_text(encoding="utf-8")
     index = (STUDIO / "index.html").read_text(encoding="utf-8")
 
-    for label in ("工作空间", "项目", "单集", "制作团队", "审核", "交付", "制作总览", "待主创决策", "剧组动态", "交付准备度"):
+    for label in ("工作空间", "项目", "单集", "制作团队", "审核", "交付", "项目状态", "待主创决策", "剧组动态", "交付准备度"):
         assert label in i18n
     assert 'return localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh-CN"' in i18n
     assert "runtime-status" not in shell
@@ -51,3 +51,22 @@ def test_product_shell_exposes_loading_empty_error_recovery_and_focus_states() -
     assert "function hasActiveProject()" in main
     assert ":focus-visible" in styles
     assert "@media (prefers-reduced-motion: reduce)" in styles
+
+
+def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
+    main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
+
+    assert 'editorParking.id = "studio-canvas-parking"' in main
+    assert "getCanvasShell: () => editorShell" in main
+    assert 'section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace()' in shell
+    assert 'stage.appendChild(editor)' in shell
+    assert 'root.dataset.view = section' in shell
+    assert 'const active = section === key' in shell
+    assert 'options.onSelectCanvasNode?.(currentShot().nodeId)' in shell
+    assert 'state.ui.inspectorOpen = false' in main
+    assert '.canvas-workspace-stage #studio-editor-shell' in styles
+    assert '.canvas-workspace-stage #sprite-root { display: none; }' in styles
+    assert '.canvas-mode #product-shell-root' not in styles
+    assert 'app?.classList.remove("product-mode")' not in shell

@@ -45,6 +45,8 @@ let domainCrewController = null;
 let projectController = null;
 let productShell = null;
 let editorMounted = false;
+let editorShell = null;
+let editorParking = null;
 let identityBoundaryInFlight = false;
 
 bootstrap().catch((error) => {
@@ -107,7 +109,34 @@ function initializeStudio(authUser) {
   });
   productShell = createProductShell({
     onOpenCanvas: openCanvasWorkspace,
+    getCanvasShell: () => editorShell,
+    parkCanvas: () => {
+      if (editorShell && editorParking && editorShell.parentElement !== editorParking) {
+        editorParking.appendChild(editorShell);
+      }
+    },
     getStudioState: () => store?.get?.() || null,
+    onSelectCanvasNode: (nodeId) => {
+      if (!nodeId || !store?.get?.().nodes?.[nodeId]) return false;
+      store.set((state) => {
+        state.selection = { nodeIds: [nodeId], edgeId: null };
+      }, { history: false, persist: false });
+      return true;
+    },
+    onApplyDirectorDraft: (nodeId, draft) => {
+      if (!nodeId || !store?.get?.().nodes?.[nodeId]) return false;
+      store.set((state) => {
+        const target = state.nodes[nodeId];
+        target.params = target.params || {};
+        target.params.directorDraft = {
+          text: String(draft || ""),
+          scope: "current_shot",
+          updated_at: new Date().toISOString(),
+        };
+      });
+      return true;
+    },
+    onRetrySave: () => store?.flushRuntimeSave?.(),
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
@@ -153,10 +182,14 @@ function mountStudioDom() {
   app.appendChild(productRoot);
   editorMounted = !window.matchMedia("(max-width: 760px)").matches;
   if (editorMounted) {
-    const editor = document.createElement("div");
-    editor.id = "studio-editor-shell";
-    editor.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从故事板进入画布，继续组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
-    app.appendChild(editor);
+    editorParking = document.createElement("div");
+    editorParking.id = "studio-canvas-parking";
+    editorParking.hidden = true;
+    editorShell = document.createElement("div");
+    editorShell.id = "studio-editor-shell";
+    editorShell.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从故事板进入画布，继续组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
+    editorParking.appendChild(editorShell);
+    app.appendChild(editorParking);
   }
   const overlay = document.createElement("div");
   overlay.id = "overlay-root";
@@ -378,11 +411,12 @@ function openProductOverview() {
 }
 function openCanvasWorkspace() {
   if (!editorMounted) return false;
-  if (productShell?.showCanvas()) {
-    renderAll(store.get());
-    return true;
-  }
-  return false;
+  store.set((state) => {
+    state.ui.inspectorOpen = false;
+  }, { history: false, persist: false });
+  const opened = productShell?.showCanvas() === true;
+  if (opened) renderAll(store.get());
+  return opened;
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");

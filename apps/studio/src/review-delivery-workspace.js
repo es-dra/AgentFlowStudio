@@ -28,9 +28,9 @@ export function renderReviewDeliveryWorkspace(root, state, handlers = {}) {
 function buildHeader(state, handlers) {
   const header = el("header", "review-header");
   const brand = el("div", "review-brand");
-  const home = el("a", "review-back", "制作总览");
+  const home = el("a", "review-back", "项目工作区");
   home.href = "/studio/";
-  home.setAttribute("aria-label", "返回 AgentFlow Studio 制作总览");
+  home.setAttribute("aria-label", "返回 AgentFlow Studio 项目工作区");
   brand.append(home, el("span", "review-divider", "/"), el("strong", "", "审核与交付"));
 
   const context = el("div", "review-context");
@@ -70,7 +70,7 @@ function stateView(state, handlers) {
   }
   if (state.phase === "empty") {
     main.append(el("span", "state-mark", "○"), el("h1", "", "暂时没有可审核的制作版本"), el("p", "", "候选进入制作运行后，会在这里形成可比较、可追溯的主创审核。"));
-    const home = el("a", "primary-button", "返回制作总览");
+    const home = el("a", "primary-button", "返回项目工作区");
     home.href = "/studio/";
     main.appendChild(home);
     return main;

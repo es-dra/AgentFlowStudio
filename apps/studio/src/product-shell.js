@@ -35,7 +35,9 @@ export function createProductShell(options = {}) {
     snapshot.studioState = snapshot.studioState || options.getStudioState?.() || null;
     const root = document.getElementById("product-shell-root");
     if (!root) return;
+    options.parkCanvas?.();
     root.className = `unified-studio-shell ${cockpitOpen ? "cockpit-open" : ""}`;
+    root.dataset.view = section;
     root.replaceChildren();
     root.appendChild(buildHeader());
     if (cockpitOpen && snapshot.project) root.appendChild(buildCockpit());
@@ -76,8 +78,8 @@ export function createProductShell(options = {}) {
     viewSwitch.setAttribute("role", "tablist");
     viewSwitch.setAttribute("aria-label", "工作区视图");
     viewSwitch.append(
-      viewButton("storyboard", "故事板", true),
-      viewButton("canvas", "画布", false),
+      viewButton("storyboard", "故事板"),
+      viewButton("canvas", "画布"),
     );
 
     const summary = node("div", "studio-header-summary");
@@ -88,6 +90,7 @@ export function createProductShell(options = {}) {
     );
 
     const actions = node("div", "studio-header-actions");
+    actions.appendChild(buildSaveStatus());
     const language = node("button", "studio-icon-button", locale === "zh-CN" ? "中" : "EN");
     language.type = "button";
     language.setAttribute("aria-label", `${message("language", locale)}：${language.textContent}`);
@@ -131,6 +134,21 @@ export function createProductShell(options = {}) {
     return menu;
   }
 
+  function buildSaveStatus() {
+    const saveState = String(snapshot.studioState?.ui?.saveState || "本地暂存");
+    const retryable = ["需要登录", "保存冲突", "保存失败"].includes(saveState);
+    const control = node(retryable ? "button" : "span", `studio-save-status ${saveTone(saveState)}`, saveState);
+    control.setAttribute("role", "status");
+    control.setAttribute("aria-live", "polite");
+    control.title = snapshot.studioState?.ui?.saveMessage || saveState;
+    if (retryable) {
+      control.type = "button";
+      control.setAttribute("aria-label", `重试保存：${control.title}`);
+      control.addEventListener("click", () => options.onRetrySave?.());
+    }
+    return control;
+  }
+
   function buildCockpit() {
     const project = snapshot.project;
     const panel = node("section", "studio-cockpit");
@@ -161,13 +179,37 @@ export function createProductShell(options = {}) {
   function buildWorkspace() {
     const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
     shell.appendChild(buildSceneRail());
-    const main = node("main", "studio-storyboard");
-    main.id = "product-main";
-    main.tabIndex = -1;
-    main.append(buildContextBar(), buildStoryboardContent(), buildVersionBar());
+    const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
     shell.appendChild(main);
     shell.appendChild(buildDirector());
     return shell;
+  }
+
+  function buildStoryboardWorkspace() {
+    const main = node("main", "studio-workspace-main studio-storyboard");
+    main.id = "product-main";
+    main.tabIndex = -1;
+    main.append(buildContextBar(), buildStoryboardContent(), buildVersionBar());
+    return main;
+  }
+
+  function buildCanvasWorkspace() {
+    const main = node("main", "studio-workspace-main studio-canvas-workspace");
+    main.id = "product-main";
+    main.tabIndex = -1;
+    main.appendChild(buildContextBar());
+    const stage = node("section", "canvas-workspace-stage");
+    stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
+    const editor = options.getCanvasShell?.();
+    if (editor) stage.appendChild(editor);
+    else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
+    if (notice) {
+      const live = node("p", "studio-live-notice", notice);
+      live.setAttribute("aria-live", "polite");
+      stage.appendChild(live);
+    }
+    main.append(stage, buildVersionBar());
+    return main;
   }
 
   function buildSceneRail() {
@@ -218,8 +260,10 @@ export function createProductShell(options = {}) {
     });
     const canvas = node("button", "studio-text-button");
     canvas.type = "button";
-    canvas.innerHTML = `查看画布${icon("expand", 13)}`;
-    canvas.addEventListener("click", openCanvas);
+    canvas.innerHTML = section === "canvas"
+      ? `${icon("grid", 13)}在故事板查看`
+      : `查看画布${icon("expand", 13)}`;
+    canvas.addEventListener("click", () => section === "canvas" ? showOverview() : openCanvas());
     actions.append(review, canvas);
     bar.append(selection, actions);
     return bar;
@@ -274,6 +318,7 @@ export function createProductShell(options = {}) {
     card.append(media, copy);
     card.addEventListener("click", () => {
       selectedShot = index;
+      options.onSelectCanvasNode?.(shot.nodeId);
       directorTab = "suggestion";
       proposalApplied = false;
       notice = "";
@@ -365,8 +410,14 @@ export function createProductShell(options = {}) {
     apply.type = "button";
     apply.disabled = proposalApplied;
     apply.addEventListener("click", () => {
+      const applied = options.onApplyDirectorDraft?.(shot.nodeId, "强化主体轮廓，保留雨夜层次");
+      if (applied === false) {
+        notice = "当前镜头还没有可写入的画布节点，建议已保留在本次讨论中。";
+        render();
+        return;
+      }
       proposalApplied = true;
-      notice = "导演建议已加入当前镜头草稿，尚未提交审核。";
+      notice = "导演建议已加入当前镜头草稿，正在保存；尚未提交审核。";
       render();
     });
     proposal.appendChild(apply);
@@ -450,7 +501,8 @@ export function createProductShell(options = {}) {
     return nav;
   }
 
-  function viewButton(key, label, active) {
+  function viewButton(key, label) {
+    const active = section === key;
     const button = node("button", active ? "active" : "", label);
     button.type = "button";
     button.setAttribute("role", "tab");
@@ -462,6 +514,8 @@ export function createProductShell(options = {}) {
   function openCanvas() {
     const opened = options.onOpenCanvas?.();
     if (opened === false) {
+      section = "storyboard";
+      mobileDirectorOpen = false;
       notice = "移动端保留项目上下文与审核；画布编辑请在桌面打开。";
       render();
     }
@@ -518,19 +572,16 @@ export function createProductShell(options = {}) {
   }
 
   function showOverview() {
-    const app = document.getElementById("app");
-    app?.classList.remove("canvas-mode");
-    app?.classList.add("product-mode");
     section = "storyboard";
     mobileDirectorOpen = false;
     render();
   }
 
   function showCanvas() {
-    if (!document.getElementById("studio-editor-shell")) return false;
-    const app = document.getElementById("app");
-    app?.classList.remove("product-mode");
-    app?.classList.add("canvas-mode");
+    if (!options.getCanvasShell?.()) return false;
+    section = "canvas";
+    options.onSelectCanvasNode?.(currentShot().nodeId);
+    render();
     return true;
   }
 
@@ -568,6 +619,7 @@ export function createProductShell(options = {}) {
       const title = cleanTitle(structured.title || item.title || item.label || shotTitle(index));
       const description = cleanDescription(structured.description || structured.action || item.prompt || item.content || item.result || "等待补充镜头说明");
       return {
+        nodeId: item.id,
         title,
         description,
         duration: `${Number(structured.duration_seconds || item.params?.duration || 3 + (index % 3) * 0.5).toFixed(1)}s`,
@@ -577,6 +629,7 @@ export function createProductShell(options = {}) {
     });
     if (mapped.length) return mapped;
     return Array.from({ length: 15 }, (_, index) => ({
+      nodeId: "",
       title: shotTitle(index),
       description: ["建立空间与天气", "人物进入画面", "视线转向雨巷", "细节切入", "继续前行"][index % 5],
       duration: `${(3 + (index % 3) * 0.5).toFixed(1)}s`,
@@ -592,6 +645,13 @@ export function createProductShell(options = {}) {
   function completionPercent() { return Math.round((totalReadyShots() / Math.max(1, totalShots())) * 100); }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
+
+  function saveTone(state) {
+    if (state === "已保存") return "success";
+    if (state === "保存中" || state === "同步中") return "saving";
+    if (["需要登录", "保存冲突", "保存失败"].includes(state)) return "error";
+    return "local";
+  }
 
   return {
     render,
