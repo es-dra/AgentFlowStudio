@@ -197,9 +197,7 @@
         {
           "label": "办公室",
           "asset_type": "scene"
-        }
-      ],
-      "expected_held_assets": [
+        },
         {
           "label": "地图",
           "asset_type": "prop"
@@ -207,7 +205,9 @@
         {
           "label": "信件",
           "asset_type": "prop"
-        },
+        }
+      ],
+      "expected_held_assets": [
         {
           "label": "手机",
           "asset_type": "prop"

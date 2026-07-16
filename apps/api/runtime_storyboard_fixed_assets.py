@@ -25,37 +25,51 @@ def attach_fixed_visual_asset_refs(
             continue
         source = _shot_source_text(shot)
         refs = [ref for ref in shot.get("asset_refs", []) if isinstance(ref, dict)]
-        existing = {
-            (str(ref.get("asset_type") or ""), str(ref.get("label") or ""))
-            for ref in refs
-        }
-        added: list[dict[str, Any]] = []
+        replaced = False
         for asset in fixed_assets:
             label = str(asset.get("label") or "").strip()
             asset_type = str(asset.get("asset_type") or "").strip()
-            if (asset_type, label) in existing or not _fixed_asset_label_in_text(label, source):
+            if not _fixed_asset_label_in_text(label, source):
                 continue
-            added.append(
-                {
-                    "label": label,
-                    "display_name": label,
-                    "asset_id": str(asset.get("asset_id") or "").strip(),
-                    "asset_type": asset_type,
-                    "status": "fixed",
-                    "source": "fixed_visual_asset_reuse",
-                    "scope": "project",
-                    "confidence": 0.9,
-                    "evidence_text": source[:240],
-                    "descriptive_signature": str(asset.get("signature") or label)[:240],
-                    "evidence_modality": "visual",
-                    "visual_evidence_span": source[:240],
-                    "name_source": "fixed_visual_asset",
-                    "provisional_name": False,
-                }
+            fixed_ref = _fixed_asset_ref(asset, source)
+            found_index = next(
+                (
+                    index
+                    for index, ref in enumerate(refs)
+                    if str(ref.get("asset_type") or "") == asset_type
+                    and str(ref.get("label") or ref.get("display_name") or "") == label
+                ),
+                None,
             )
-            existing.add((asset_type, label))
-        result.append({**shot, "asset_refs": [*refs, *added]} if added else shot)
+            if found_index is None:
+                refs.append(fixed_ref)
+                replaced = True
+            else:
+                refs[found_index] = {**refs[found_index], **fixed_ref}
+                replaced = True
+        result.append({**shot, "asset_refs": refs} if replaced else shot)
     return result
+
+
+def _fixed_asset_ref(asset: dict[str, Any], source: str) -> dict[str, Any]:
+    label = str(asset.get("label") or "").strip()
+    asset_type = str(asset.get("asset_type") or "").strip()
+    return {
+        "label": label,
+        "display_name": label,
+        "asset_id": str(asset.get("asset_id") or "").strip(),
+        "asset_type": asset_type,
+        "status": "fixed",
+        "source": "fixed_visual_asset_reuse",
+        "scope": "project",
+        "confidence": 0.9,
+        "evidence_text": source[:240],
+        "descriptive_signature": str(asset.get("signature") or label)[:240],
+        "evidence_modality": "visual",
+        "visual_evidence_span": source[:240],
+        "name_source": "fixed_visual_asset",
+        "provisional_name": False,
+    }
 
 
 def _shot_source_text(shot: dict[str, Any]) -> str:

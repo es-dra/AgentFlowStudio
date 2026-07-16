@@ -10,6 +10,7 @@ from apps.api.runtime_storyboard_grounding import (
     storyboard_source_span,
     unsupported_additions_for_description,
 )
+from apps.api.runtime_storyboard_asset_coverage import reconcile_storyboard_asset_coverage
 from apps.api.runtime_storyboard_local import structured_shot
 from apps.api.runtime_storyboard_provider_latin_guard import (
     validate_localized_display_fields as _validate_localized_display_fields,
@@ -38,6 +39,7 @@ def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list
     shots = [item for item in shots if item]
     if not shots:
         raise ValueError("provider storyboard response has no usable shots")
+    shots = reconcile_storyboard_asset_coverage(shots)
     _validate_provider_shots(shots, source_script_text)
     _validate_localized_display_fields(shots, source_script_text)
     return shots
