@@ -22,6 +22,7 @@ from apps.api.runtime_creator_production_saga import (
     overlay_creator_production_requests,
 )
 from apps.api.runtime_creator_production_integration import CreatorProductionControlError
+from apps.api.runtime_episode_alpha_2min import register_runtime_episode_alpha_2min_routes
 from apps.api.runtime_episode_domain_contract import SAFE_ID, EntityVersionRef, TenantScope
 from apps.api.runtime_episode_domain_routes import LOCAL_ACTOR_ID, LOCAL_ORG_ID
 from apps.api.runtime_episode_domain_store import (
@@ -350,6 +351,8 @@ def register_runtime_episode_workspace_routes(
         except (AuthoringScopeError, AuthoringReferenceError) as exc:
             _raise_authoring_read_error(exc, project_id=project_id)
         return {"changes": changes}
+
+    register_runtime_episode_alpha_2min_routes(app, store, auth)
 
 
 def _require_project_scope(
