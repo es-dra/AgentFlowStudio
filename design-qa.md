@@ -79,10 +79,10 @@ The evaluator-before side shows the shell and Director on 雨巷 while a fixed L
 ## Verification result
 
 - `npm run check:studio-js` — PASS, 176 JavaScript files.
-- Focused Studio and retention tests — PASS, 38 tests before the final base refresh.
+- Focused Studio, session-boundary, sprite, retry-layout, mature-shell, and retention tests — PASS, 43 tests after the final base refresh.
 - Retention summary — PASS, `manual_review_required_count=0`.
-- `git diff --check` — PASS before final base refresh.
-- Full suite and post-refresh checks are recorded in the PR fix packet for the exact pushed head.
+- `git diff --check` and staged whitespace check — PASS after the final base refresh.
+- Local Python 3.13 full suite — `1663 passed, 1 skipped, 521 deselected, 6 failed`. Three stale helper-location tests were fixed and then passed; the retry-layout failure passed when rerun. The two remaining reproducible failures are OpenAPI schema/snapshot differences on Python 3.13 in unchanged API files from the refreshed master. GitHub maintenance uses Python 3.12, so the exact pushed-head check suite is the authoritative CI gate; no API/OpenAPI file was changed in this UI lane.
 
 ## Residual risks and nonclaims
 
