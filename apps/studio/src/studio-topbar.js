@@ -98,9 +98,9 @@ function siteHomeLink(onBeforeSiteHome) {
 
 function studioHomeButton(onOpenHome) {
   const home = el("button", "icon-btn studio-home-btn");
-  home.innerHTML = `${icon("grid", 14)}<span>制作总览</span>`;
-  home.title = "返回制作总览";
-  home.setAttribute("aria-label", "返回制作总览");
+  home.innerHTML = `${icon("frames", 14)}<span>故事板</span>`;
+  home.title = "返回故事板";
+  home.setAttribute("aria-label", "返回故事板");
   home.addEventListener("click", onOpenHome);
   return home;
 }

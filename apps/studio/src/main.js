@@ -107,6 +107,7 @@ function initializeStudio(authUser) {
   });
   productShell = createProductShell({
     onOpenCanvas: openCanvasWorkspace,
+    getStudioState: () => store?.get?.() || null,
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
@@ -154,7 +155,7 @@ function mountStudioDom() {
   if (editorMounted) {
     const editor = document.createElement("div");
     editor.id = "studio-editor-shell";
-    editor.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从制作总览进入画布，组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
+    editor.innerHTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从故事板进入画布，继续组织剧本、设定、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
     app.appendChild(editor);
   }
   const overlay = document.createElement("div");
@@ -321,6 +322,7 @@ function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
 }
 function renderAll(state) {
   syncDomainCrewContext();
+  productShell?.updateStudioState(state);
   if (!editorMounted) return;
   renderTopbar({
     state,
@@ -375,7 +377,12 @@ function openProductOverview() {
   void refreshProductOverview();
 }
 function openCanvasWorkspace() {
-  if (editorMounted && productShell?.showCanvas()) renderAll(store.get());
+  if (!editorMounted) return false;
+  if (productShell?.showCanvas()) {
+    renderAll(store.get());
+    return true;
+  }
+  return false;
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
