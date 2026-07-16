@@ -109,5 +109,6 @@ def test_creator_production_saga_keeps_owner_and_provider_boundaries() -> None:
     assert "provider_dispatch_count" in source
     assert "provider_dispatch_count\": 0" in source
     assert "EpisodeDomainAggregateStore" in source
-    assert ".save(" in source
+    assert ".save(" not in source
+    assert "runtime_creator_production_integration" in source
     assert "production_runs" not in source

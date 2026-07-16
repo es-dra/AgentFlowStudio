@@ -162,7 +162,8 @@ function renderProductionRequest(shot) {
   const status = current?.status_label || "尚未创建";
   const failure = current?.failure ? `<p class="action-reason">${escapeHtml(current.failure)}</p>` : "";
   const disabled = commandRunning || current?.status === "running";
-  return `<section data-section="production"><div class="section-title"><h3>制作预览任务</h3><span>${escapeHtml(status)}</span></div><p class="muted">${current ? "Production Control 已记录任务、运行和尝试；候选写回由恢复流程确认。" : "为这个精确镜头版本创建一个确定性制作预览任务。"}</p><button class="inspector-action" data-command="create-production-preview" ${disabled ? "disabled" : ""}>创建制作任务</button>${failure}</section>`;
+  const recorded = current?.control?.recorded === true;
+  return `<section data-section="production"><div class="section-title"><h3>制作预览任务</h3><span>${escapeHtml(status)}</span></div><p class="muted">${recorded ? "制作控制记录已由服务确认，候选等待审核。" : "为这个精确镜头版本创建一个确定性制作预览任务。"}</p><button class="inspector-action" data-command="create-production-preview" ${disabled ? "disabled" : ""}>创建制作任务</button>${failure}</section>`;
 }
 
 function renderSelections(shot) {
@@ -187,7 +188,7 @@ function renderInspector() {
   const [label, tone] = lifecycleLabel(shot);
   const review = availableAction(shot, "review_shot");
   return `<aside class="inspector" aria-label="当前镜头上下文"><header class="inspector-heading"><div><button class="mobile-back" type="button" data-action="back-to-shots">返回镜头列表</button><span>当前查看</span><h2>镜头 ${shot.sequence}</h2></div><span class="shot-status">${statusDot(tone)}${escapeHtml(label)}</span></header>
-    <section data-section="overview"><h3>镜头版本</h3><p class="script-copy">${escapeHtml(shot.ref.entity_id)} · ${escapeHtml(shot.ref.version_id)}</p><div class="selection-actions"><button data-command="approve-shot" ${review.enabled ? "" : "disabled"}>批准</button><button data-command="reject-shot" ${review.enabled ? "" : "disabled"}>返工</button></div></section>
+    <section data-section="overview"><h3>镜头版本</h3><p class="script-copy">此镜头版本由服务精确保存。</p><div class="selection-actions"><button data-command="approve-shot" ${review.enabled ? "" : "disabled"}>批准</button><button data-command="reject-shot" ${review.enabled ? "" : "disabled"}>返工</button></div></section>
     <section data-section="scene"><div class="section-title"><h3>场景归属</h3><span>追加新版本</span></div><select class="scene-select" aria-label="目标场景">${model.scenes.map((scene) => `<option value="${escapeHtml(exactRefKey(scene.ref))}" ${exactRefKey(scene.ref) === exactRefKey(shot.scene_ref) ? "selected" : ""}>场景 ${scene.sequence} · ${escapeHtml(scene.title)}</option>`).join("")}</select><button class="inspector-action" data-command="reassign-shot" ${availableAction(shot, "reassign_scene").enabled ? "" : "disabled"}>保存局部场景修正</button></section>
     <section data-section="continuity"><div class="section-title"><h3>角色与场景事实</h3><span>精确版本</span></div>${renderContinuity(shot)}</section>
     ${renderProductionRequest(shot)}
@@ -351,7 +352,7 @@ async function runProductionRequest(shot) {
     if (error?.kind === "server" || error?.kind === "stale") {
       await refreshAuthority("制作任务正在等待恢复，已读取最新状态");
     } else {
-      statusMessage = error?.message || "制作任务未创建。";
+      statusMessage = "制作任务未创建，请刷新后重试。";
       render();
     }
   } finally {

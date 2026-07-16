@@ -106,6 +106,12 @@ def _candidate_entities(tmp_path: Path, owner: dict[str, Any], project_id: str =
     return sorted(item.entity_id for item in aggregate.asset_candidates)
 
 
+def _control_ledger(tmp_path: Path, project_id: str = PROJECT_ID) -> dict[str, Any]:
+    path = tmp_path / "projects" / project_id / "production_control" / "ledger.json"
+    assert path.is_file()
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def test_creator_production_request_replays_once_and_restores_workspace(tmp_path: Path, monkeypatch) -> None:
     client = _client(tmp_path, monkeypatch)
     owner = _register(client, "owner@example.com")
@@ -118,24 +124,44 @@ def test_creator_production_request_replays_once_and_restores_workspace(tmp_path
     assert created.status_code == 200, created.text
     request = created.json()["request"]
     assert request["status"] == "done"
-    assert request["status_label"] == "制作完成"
+    assert request["status_label"] == "候选待审核"
     assert request["task"]["state"] == "completed"
     assert request["run"]["state"] == "completed"
     assert request["attempt"]["state"] == "completed"
     assert request["receipt"]["episode_confirmed"] is True
+    assert request["control"]["recorded"] is True
+    assert request["control"]["event_count"] > 0
     assert request["provider_dispatch_count"] == 0
+    ledger = _control_ledger(tmp_path)
+    event_types = [event["event_type"] for event in ledger["events"]]
+    assert "ArtifactWrittenBack" in event_types
+    assert "RunCompleted" in event_types
+    assert ledger["provider_dispatch_count"] == 0
 
     replay = _post_request(client, headers, body, "preview-1")
     assert replay.status_code == 200, replay.text
     assert replay.json()["request"]["receipt"]["receipt_id"] == request["receipt"]["receipt_id"]
     assert _candidate_entities(tmp_path, owner).count(request["candidate_ref"]["entity_id"]) == 1
+    assert len(_control_ledger(tmp_path)["events"]) == len(ledger["events"])
 
     readback = _workspace(client, headers)
     shot = readback["workspace"]["shots"][0]
-    assert shot["production_request"]["status_label"] == "制作完成"
+    assert shot["production_request"]["status_label"] == "候选待审核"
     assert shot["candidates"][0]["ref"] == request["candidate_ref"]
     assert shot["candidates"][0]["artifact_present"] is True
     assert readback["workspace"]["creator_production"]["provider_dispatch_count"] == 0
+
+    creator = client.get(f"/projects/{PROJECT_ID}/creator-workspace", headers=headers)
+    assert creator.status_code == 200, creator.text
+    creator_shot = creator.json()["shots"][0]
+    assert creator_shot["production_request"]["status_label"] == "候选待审核"
+    production_action = next(
+        item
+        for item in creator_shot["allowed_actions"]
+        if item["action"] == "create_production_preview"
+    )
+    assert production_action["enabled"] is False
+    assert production_action["reason"] == "已有候选等待审核。"
 
 
 def test_creator_production_crash_matrix_reconciles_exactly_once(tmp_path: Path, monkeypatch) -> None:
@@ -189,6 +215,7 @@ def test_creator_production_same_key_replay_after_episode_apply_response_failure
 
     crashed = _post_request(client, headers, body, "preview-1", crash_after="before_confirmed")
     assert crashed.status_code == 500
+    before_events = len(_control_ledger(tmp_path)["events"])
 
     replay = _post_request(client, headers, body, "preview-1")
     assert replay.status_code == 200, replay.text
@@ -196,6 +223,33 @@ def test_creator_production_same_key_replay_after_episode_apply_response_failure
     assert request["status"] == "done"
     assert request["receipt"]["episode_confirmed"] is True
     assert _candidate_entities(tmp_path, owner).count(request["candidate_ref"]["entity_id"]) == 1
+    event_types = [event["event_type"] for event in _control_ledger(tmp_path)["events"]]
+    assert event_types.count("ArtifactWrittenBack") == 1
+    assert len(event_types) == before_events + 1
+
+
+def test_creator_production_same_key_replay_after_confirmed_response_failure_is_once(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+    owner = _register(client, "owner@example.com")
+    headers = _headers(owner)
+    _create_project(client, headers)
+    workspace = _workspace(client, headers)
+    body = _request_body(workspace)
+
+    crashed = _post_request(client, headers, body, "preview-1", crash_after="confirmed")
+    assert crashed.status_code == 500
+    before = _control_ledger(tmp_path)
+    assert [event["event_type"] for event in before["events"]].count("RunCompleted") == 1
+
+    replay = _post_request(client, headers, body, "preview-1")
+    assert replay.status_code == 200, replay.text
+    request = replay.json()["request"]
+    assert request["status"] == "done"
+    assert _candidate_entities(tmp_path, owner).count(request["candidate_ref"]["entity_id"]) == 1
+    assert len(_control_ledger(tmp_path)["events"]) == len(before["events"])
 
 
 def test_creator_production_protected_shot_stale_before_episode_apply_fails_closed(
@@ -211,6 +265,7 @@ def test_creator_production_protected_shot_stale_before_episode_apply_fails_clos
 
     crashed = _post_request(client, headers, body, "preview-1", crash_after="control_applied")
     assert crashed.status_code == 500
+    assert _candidate_entities(tmp_path, owner) == []
     _revise_shot_directly(tmp_path, owner, shot_index=1)
 
     reconcile = client.get(f"/projects/{PROJECT_ID}/creator-production-requests", headers=headers)
@@ -253,6 +308,10 @@ def test_creator_production_rejects_conflict_stale_foreign_and_corrupt_saga(
 
     foreign = client.get(f"/projects/{PROJECT_ID}/creator-production-requests", headers=_headers(other))
     assert foreign.status_code == 403
+    anon_get = client.get(f"/projects/{PROJECT_ID}/creator-production-requests")
+    assert anon_get.status_code == 401
+    foreign_post = _post_request(client, _headers(other), body, "preview-foreign")
+    assert foreign_post.status_code == 403
 
     saga_path = tmp_path / "projects" / PROJECT_ID / "creator_production_saga" / "saga.json"
     payload = json.loads(saga_path.read_text(encoding="utf-8"))

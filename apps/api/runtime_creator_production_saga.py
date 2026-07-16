@@ -15,12 +15,8 @@ from agentflow.harness.json_io import exclusive_file_lock
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_episode_domain_contract import (
     SAFE_ID,
-    AssetCandidateVersion,
-    ControlObjectRef,
     EntityVersionRef,
-    ProductionControlProvenance,
     ProductionProjectAggregate,
-    SafeArtifactRef,
     TenantScope,
 )
 from apps.api.runtime_episode_domain_routes import _require_project_scope
@@ -29,6 +25,14 @@ from apps.api.runtime_episode_domain_store import (
     EpisodeDomainStoreError,
 )
 from apps.api.runtime_errors import safe_error_detail
+from apps.api.runtime_creator_production_integration import (
+    CreatorProductionControlError,
+    apply_creator_preview_episode_candidate,
+    confirm_creator_preview_control_run,
+    prepare_creator_preview_control_plan,
+    read_creator_preview_control_projection,
+    record_creator_preview_control_writeback,
+)
 from apps.api.runtime_store import RuntimeStore, safe_id
 
 
@@ -129,6 +133,16 @@ def register_runtime_creator_production_saga_routes(
                 stage="creator_production_recover",
                 cause=exc,
             )
+        except CreatorProductionControlError as exc:
+            _raise_saga_error(
+                project_id,
+                status_code=409,
+                error="creator_production_control_conflict",
+                message="制作控制记录未能确认，候选不会写入工作区。",
+                stage="creator_production_control",
+                retryable=True,
+                cause=exc,
+            )
         except EpisodeDomainStoreError as exc:
             _raise_saga_error(
                 project_id,
@@ -145,7 +159,7 @@ def register_runtime_creator_production_saga_routes(
     def reconcile_creator_production_requests(project_id: str, request: Request) -> dict[str, Any]:
         scope = _require_project_scope(store, auth, request, project_id)
         try:
-            return {"requests": reconcile_creator_production_requests(store, scope=scope)}
+            return {"requests": reconcile_creator_production_request_envelopes(store, scope=scope)}
         except SagaIntegrityError as exc:
             _raise_saga_error(
                 project_id,
@@ -160,7 +174,7 @@ def register_runtime_creator_production_saga_routes(
     def list_creator_production_requests(project_id: str, request: Request) -> dict[str, Any]:
         scope = _require_project_scope(store, auth, request, project_id)
         try:
-            return {"requests": reconcile_creator_production_requests(store, scope=scope)}
+            return {"requests": reconcile_creator_production_request_envelopes(store, scope=scope)}
         except SagaIntegrityError as exc:
             _raise_saga_error(
                 project_id,
@@ -172,7 +186,7 @@ def register_runtime_creator_production_saga_routes(
             )
 
 
-def reconcile_creator_production_requests(
+def reconcile_creator_production_request_envelopes(
     store: RuntimeStore,
     *,
     scope: TenantScope,
@@ -188,11 +202,12 @@ def reconcile_creator_production_requests(
             try:
                 _advance_envelope(store, scope, envelope, crash_after="none")
                 changed = True
-            except (EpisodeDomainStoreError, SagaConflictError) as exc:
+            except (CreatorProductionControlError, EpisodeDomainStoreError, SagaConflictError) as exc:
                 envelope["phase"] = "failed"
                 envelope["status"] = "failed"
-                envelope["creator_status_label"] = "失败原因"
+                envelope["creator_status_label"] = "制作失败"
                 envelope["failure"] = _safe_failure(str(exc) or type(exc).__name__)
+                _seal_current_phase(envelope)
                 changed = True
         if changed:
             _write_saga_file(path, payload, scope=scope)
@@ -205,7 +220,7 @@ def overlay_creator_production_requests(
     *,
     scope: TenantScope,
 ) -> dict[str, Any]:
-    requests = reconcile_creator_production_requests(store, scope=scope)
+    requests = reconcile_creator_production_request_envelopes(store, scope=scope)
     by_shot: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for item in requests:
         ref = item["shot_ref"]
@@ -216,19 +231,84 @@ def overlay_creator_production_requests(
         shot["production_requests"] = rows
         shot["production_request"] = rows[-1] if rows else None
         actions = shot.setdefault("allowed_actions", [])
-        actions.append(
-            {
-                "action": "create_production_preview",
-                "enabled": True,
-                "reason": "",
-                "blocked_by": [],
-            }
-        )
+        actions.append(_production_action_for_request(rows[-1] if rows else None))
     projection.setdefault("workspace", {})["creator_production"] = {
         "requests": requests,
         "provider_dispatch_count": 0,
     }
     return projection
+
+
+def join_creator_production_authoring_projection(
+    projection: dict[str, Any],
+    store: RuntimeStore,
+    *,
+    scope: TenantScope,
+) -> dict[str, Any]:
+    requests = reconcile_creator_production_request_envelopes(store, scope=scope)
+    by_shot: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for item in requests:
+        ref = item["shot_ref"]
+        by_shot.setdefault((ref["entity_type"], ref["entity_id"], ref["version_id"]), []).append(item)
+    for shot in projection.get("shots", []):
+        ref = shot.get("ref") or {}
+        rows = by_shot.get((ref.get("entity_type"), ref.get("entity_id"), ref.get("version_id")), [])
+        current = rows[-1] if rows else None
+        shot["production_requests"] = rows
+        shot["production_request"] = current
+        shot["production_status"] = current["status"] if current else "queued"
+        shot["production_status_label"] = current["status_label"] if current else "尚未创建"
+        action = _production_action_for_request(current)
+        shot["allowed_actions"] = [
+            *(shot.get("allowed_actions") or []),
+            action,
+        ]
+    control_projection = read_creator_preview_control_projection(store, scope=scope)
+    projection["creator_production"] = {
+        "requests": requests,
+        "control": control_projection,
+        "provider_dispatch_count": control_projection["provider_dispatch_count"],
+    }
+    return projection
+
+
+def _production_action_for_request(current: dict[str, Any] | None) -> dict[str, Any]:
+    if current is None:
+        return {
+            "action": "create_production_preview",
+            "enabled": True,
+            "reason": "",
+            "blocked_by": [],
+        }
+    status = current.get("status")
+    if status == "failed":
+        return {
+            "action": "create_production_preview",
+            "enabled": True,
+            "reason": "上次制作失败，可重新创建。",
+            "blocked_by": [],
+        }
+    if status == "done":
+        candidate = current.get("candidate_ref")
+        return {
+            "action": "create_production_preview",
+            "enabled": False,
+            "reason": "已有候选等待审核。",
+            "blocked_by": [candidate] if candidate else [],
+        }
+    if status == "blocked":
+        return {
+            "action": "create_production_preview",
+            "enabled": False,
+            "reason": "制作记录需要先由服务恢复。",
+            "blocked_by": [],
+        }
+    return {
+        "action": "create_production_preview",
+        "enabled": False,
+        "reason": "制作任务正在处理。",
+        "blocked_by": [],
+    }
 
 
 def _execute_or_reconcile(
@@ -296,20 +376,16 @@ def _prepare_envelope(
         if key == "episode" and version_id != body.episode_ref.version_id:
             raise SagaConflictError("creator_production_stale_episode_version")
     token = _digest({"key": idempotency_key, "payload": payload_digest})[:24]
-    task_ref = _control_ref("plan_task", f"task-{token}", f"task-{token}-v1")
-    run_ref = _control_ref("production_run", f"run-{token}", f"run-{token}-v1")
-    attempt_ref = _control_ref("run_attempt", f"attempt-{token}", f"attempt-{token}-v1")
-    writeback_ref = _control_ref("artifact_writeback", f"writeback-{token}", f"writeback-{token}-v1")
     candidate_ref = EntityVersionRef(
         entity_type="asset_candidate",
         entity_id=f"candidate-{token}",
         version_id=f"candidate-{token}-v1",
     )
-    return {
+    envelope = {
         "saga_id": f"saga-{token}",
         "phase": "prepared",
         "status": "queued",
-        "creator_status_label": "正在准备",
+        "creator_status_label": "已排队",
         "payload_digest": payload_digest,
         "idempotency_key": idempotency_key,
         "created_at": _safe_stamp(body.created_at),
@@ -322,18 +398,28 @@ def _prepare_envelope(
             if ref != shot.as_ref()
         ],
         "control": {
-            "task": {"ref": task_ref, "state": "queued", "title": "制作预览任务"},
-            "run": {"ref": run_ref, "state": "queued"},
-            "attempt": {"ref": attempt_ref, "state": "queued", "attempt_number": 1},
-            "writeback_ref": writeback_ref,
-            "receipt": None,
+            "plan": prepare_creator_preview_control_plan(store, scope=scope),
+            "task": None,
+            "run": None,
+            "attempt": None,
+            "registration_ref": None,
+            "writeback_ref": None,
+            "receipts": [],
+            "control_receipt": None,
+            "completion_receipt": None,
+            "projection_digest": "",
+            "event_count": 0,
+            "next_expected_version": None,
         },
         "artifact": None,
         "candidate_ref": candidate_ref.model_dump(mode="json"),
         "episode": None,
         "failure": None,
+        "phase_checksums": {},
         "provider_dispatch_count": 0,
     }
+    _seal_current_phase(envelope)
+    return envelope
 
 
 def _advance_envelope(
@@ -354,137 +440,73 @@ def _advance_envelope(
         }
         envelope["phase"] = "artifact_prepared"
         envelope["status"] = "running"
-        envelope["creator_status_label"] = "正在准备"
+        envelope["creator_status_label"] = "正在生成候选"
+        _seal_current_phase(envelope)
         if persist is not None:
             persist()
         _crash_if(crash_after, "artifact_prepared")
     if envelope["phase"] == "artifact_prepared":
+        control = record_creator_preview_control_writeback(
+            store,
+            scope=scope,
+            control_plan=envelope["control"]["plan"],
+            idempotency_key=envelope["idempotency_key"],
+            target_ref=EntityVersionRef.model_validate(envelope["shot_ref"]),
+            protected_refs=tuple(
+                EntityVersionRef.model_validate(item)
+                for item in envelope.get("protected_refs", ())
+            ),
+            artifact_id=envelope["artifact"]["artifact_id"],
+            artifact_digest=envelope["artifact"]["content_digest"],
+            candidate_ref=EntityVersionRef.model_validate(envelope["candidate_ref"]),
+            created_at=envelope["created_at"],
+        )
+        envelope["control"].update(control)
         envelope["phase"] = "control_applied"
         envelope["status"] = "running"
-        envelope["creator_status_label"] = "正在准备"
-        envelope["control"]["task"]["state"] = "running"
-        envelope["control"]["run"]["state"] = "running"
-        envelope["control"]["attempt"]["state"] = "running"
+        envelope["creator_status_label"] = "已记录，正在写回"
+        _seal_current_phase(envelope)
         if persist is not None:
             persist()
         _crash_if(crash_after, "control_applied")
     if envelope["phase"] == "control_applied":
-        applied = _apply_episode_candidate(store, scope, envelope)
+        applied = apply_creator_preview_episode_candidate(
+            store,
+            scope=scope,
+            control=envelope["control"],
+            idempotency_key=envelope["idempotency_key"],
+            created_at=envelope["created_at"],
+        )
         envelope["episode"] = applied
         envelope["phase"] = "episode_applied"
         envelope["status"] = "running"
-        envelope["creator_status_label"] = "等待恢复"
+        envelope["creator_status_label"] = "候选已写回"
+        _seal_current_phase(envelope)
         if persist is not None:
             persist()
         _crash_if(crash_after, "episode_applied")
         _crash_if(crash_after, "before_confirmed")
     if envelope["phase"] == "episode_applied":
-        envelope["control"]["receipt"] = {
-            "receipt_id": _digest(
-                {
-                    "saga_id": envelope["saga_id"],
-                    "candidate_ref": envelope["candidate_ref"],
-                    "episode": envelope["episode"],
-                }
-            ),
-            "writeback_ref": envelope["control"]["writeback_ref"],
-            "candidate_ref": envelope["candidate_ref"],
-            "episode_confirmed": True,
-        }
+        completed = confirm_creator_preview_control_run(
+            store,
+            scope=scope,
+            control=envelope["control"],
+            idempotency_key=envelope["idempotency_key"],
+        )
+        envelope["control"]["completion_receipt"] = completed["receipt"]
+        envelope["control"]["projection_digest"] = completed["projection_digest"]
+        envelope["control"]["event_count"] = completed["event_count"]
+        envelope["control"]["provider_dispatch_count"] = completed["provider_dispatch_count"]
         envelope["phase"] = "confirmed"
         envelope["status"] = "done"
-        envelope["creator_status_label"] = "制作完成"
+        envelope["creator_status_label"] = "候选待审核"
         envelope["control"]["task"]["state"] = "completed"
         envelope["control"]["run"]["state"] = "completed"
         envelope["control"]["attempt"]["state"] = "completed"
+        _seal_current_phase(envelope)
         if persist is not None:
             persist()
         _crash_if(crash_after, "confirmed")
-
-
-def _apply_episode_candidate(
-    store: RuntimeStore,
-    scope: TenantScope,
-    envelope: dict[str, Any],
-) -> dict[str, Any]:
-    aggregate_store = EpisodeDomainAggregateStore(store.root)
-    aggregate = aggregate_store.load(org_id=scope.org_id, project_id=scope.project_id)
-    candidate_ref = EntityVersionRef.model_validate(envelope["candidate_ref"])
-    existing = next((item for item in aggregate.asset_candidates if item.as_ref() == candidate_ref), None)
-    if existing is not None:
-        return {
-            "status": "already_applied",
-            "aggregate_version": aggregate.aggregate_version,
-            "candidate_ref": candidate_ref.model_dump(mode="json"),
-        }
-    target_ref = EntityVersionRef.model_validate(envelope["shot_ref"])
-    _exact_latest_shot(aggregate, target_ref)
-    protected_refs = tuple(EntityVersionRef.model_validate(item) for item in envelope.get("protected_refs", ()))
-    for protected in protected_refs:
-        _exact_latest_shot(aggregate, protected)
-    artifact = SafeArtifactRef.model_validate(
-        {
-            "artifact_id": envelope["artifact"]["artifact_id"],
-            "artifact_type": envelope["artifact"]["artifact_type"],
-            "content_digest": envelope["artifact"]["content_digest"],
-        }
-    )
-    candidate = AssetCandidateVersion(
-        entity_id=candidate_ref.entity_id,
-        version_id=candidate_ref.version_id,
-        revision=1,
-        parent_version_id=None,
-        lifecycle_state="candidate",
-        review_state="needs_review",
-        content_digest=_digest(
-            {
-                "operation": "creator_production_preview_candidate",
-                "target_ref": target_ref.model_dump(mode="json"),
-                "artifact_ref": artifact.model_dump(mode="json"),
-                "saga_id": envelope["saga_id"],
-            }
-        ),
-        scope=scope,
-        created_at=_next_stamp(aggregate.evaluated_at, envelope["created_at"]),
-        target_ref=target_ref,
-        artifact_ref=artifact,
-        job_id=f"job-{envelope['control']['run']['ref']['object_id']}",
-        job_state="succeeded",
-        control_provenance=ProductionControlProvenance(
-            plan_task_ref=ControlObjectRef.model_validate(envelope["control"]["task"]["ref"]),
-            run_ref=ControlObjectRef.model_validate(envelope["control"]["run"]["ref"]),
-            attempt_ref=ControlObjectRef.model_validate(envelope["control"]["attempt"]["ref"]),
-            writeback_ref=ControlObjectRef.model_validate(envelope["control"]["writeback_ref"]),
-            affected_refs=(target_ref,),
-            protected_refs=protected_refs,
-        ),
-    )
-    payload = aggregate.model_dump(mode="python")
-    payload.update(
-        {
-            "aggregate_version": aggregate.aggregate_version + 1,
-            "evaluated_at": candidate.created_at,
-            "asset_candidates": (*aggregate.asset_candidates, candidate),
-        }
-    )
-    updated = ProductionProjectAggregate.model_validate(payload)
-    result = aggregate_store.save(
-        updated,
-        expected_aggregate_version=aggregate.aggregate_version,
-        idempotency_key=f"{envelope['idempotency_key']}-episode-candidate",
-        payload_digest=_digest(
-            {
-                "operation": "creator_production_preview_candidate",
-                "candidate": candidate.model_dump(mode="json"),
-                "expected_aggregate_version": aggregate.aggregate_version,
-            }
-        ),
-    )
-    return {
-        "status": "applied" if not result.replayed else "replayed",
-        "aggregate_version": result.aggregate.aggregate_version,
-        "candidate_ref": candidate.as_ref().model_dump(mode="json"),
-    }
 
 
 def _load_saga_file(path: Path, *, scope: TenantScope) -> dict[str, Any]:
@@ -513,6 +535,8 @@ def _load_saga_file(path: Path, *, scope: TenantScope) -> dict[str, Any]:
         if _SAFE_ID_RE.fullmatch(str(key)) is None or _SAFE_ID_RE.fullmatch(str(saga_id)) is None:
             raise SagaIntegrityError("creator production saga idempotency index is invalid")
         _find_envelope(envelope, str(saga_id))
+    for item in envelope["envelopes"]:
+        _validate_current_phase_checksum(item)
     return body
 
 
@@ -540,20 +564,44 @@ def _write_saga_file(path: Path, payload: dict[str, Any], *, scope: TenantScope)
 
 
 def _public_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
+    control = envelope.get("control") or {}
+    receipt = None
+    if envelope["phase"] == "confirmed":
+        receipt = {
+            "receipt_id": _digest(
+                {
+                    "control": control.get("control_receipt"),
+                    "completion": control.get("completion_receipt"),
+                    "episode": envelope.get("episode"),
+                }
+            ),
+            "control_receipt": control.get("control_receipt"),
+            "completion_receipt": control.get("completion_receipt"),
+            "episode_receipt": envelope.get("episode"),
+            "writeback_ref": control.get("writeback_ref"),
+            "candidate_ref": envelope.get("candidate_ref"),
+            "episode_confirmed": True,
+        }
     return {
         "request_id": envelope["saga_id"],
         "status": envelope["status"],
         "status_label": envelope["creator_status_label"],
         "phase": envelope["phase"],
-        "task": envelope["control"]["task"],
-        "run": envelope["control"]["run"],
-        "attempt": envelope["control"]["attempt"],
+        "task": control.get("task"),
+        "run": control.get("run"),
+        "attempt": control.get("attempt"),
         "shot_ref": envelope["shot_ref"],
         "episode_ref": envelope["episode_ref"],
         "candidate_ref": envelope["candidate_ref"] if envelope["phase"] == "confirmed" else None,
-        "receipt": envelope["control"]["receipt"],
+        "control": {
+            "event_count": control.get("event_count", 0),
+            "projection_digest": control.get("projection_digest", ""),
+            "writeback_ref": control.get("writeback_ref"),
+            "recorded": bool(control.get("writeback_ref")),
+        },
+        "receipt": receipt,
         "failure": envelope["failure"],
-        "retry_action": "恢复制作任务" if envelope["status"] in {"running", "failed"} else None,
+        "retry_action": "重新创建制作任务" if envelope["status"] == "failed" else None,
         "provider_dispatch_count": 0,
     }
 
@@ -563,6 +611,29 @@ def _find_envelope(payload: dict[str, Any], saga_id: str) -> dict[str, Any]:
     if len(matches) != 1:
         raise SagaIntegrityError("creator production saga index does not resolve exactly")
     return matches[0]
+
+
+def _seal_current_phase(envelope: dict[str, Any]) -> None:
+    checksums = envelope.setdefault("phase_checksums", {})
+    checksums[envelope["phase"]] = _digest(_phase_checksum_body(envelope))
+
+
+def _validate_current_phase_checksum(envelope: dict[str, Any]) -> None:
+    checksums = envelope.get("phase_checksums")
+    if not isinstance(checksums, dict):
+        raise SagaIntegrityError("creator production saga phase checksum is missing")
+    phase = str(envelope.get("phase") or "")
+    expected = checksums.get(phase)
+    if not isinstance(expected, str) or _digest(_phase_checksum_body(envelope)) != expected:
+        raise SagaIntegrityError("creator production saga phase checksum does not match")
+
+
+def _phase_checksum_body(envelope: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in envelope.items()
+        if key != "phase_checksums"
+    }
 
 
 def _exact_latest_shot(aggregate: ProductionProjectAggregate, ref: EntityVersionRef):
@@ -620,19 +691,12 @@ def _artifact_manifest(envelope: dict[str, Any]) -> dict[str, Any]:
         "artifact_id": f"artifact-{envelope['saga_id'][5:]}",
         "kind": "production_preview",
         "shot_ref": envelope["shot_ref"],
-        "task_ref": envelope["control"]["task"]["ref"],
-        "run_ref": envelope["control"]["run"]["ref"],
-        "attempt_ref": envelope["control"]["attempt"]["ref"],
         "safe_summary": "deterministic provider-free production preview candidate",
         "contains_media_bytes": False,
         "contains_private_path": False,
         "contains_signed_url": False,
         "provider_dispatch_count": 0,
     }
-
-
-def _control_ref(object_type: str, object_id: str, revision_id: str) -> dict[str, str]:
-    return {"object_type": object_type, "object_id": object_id, "revision_id": revision_id}
 
 
 def _request_intent(body: CreatorProductionRequest) -> dict[str, Any]:
@@ -649,17 +713,6 @@ def _digest(value: Any) -> str:
 
 def _safe_stamp(value: str) -> str:
     return value if value and "+" in value else _STAMP
-
-
-def _next_stamp(current: str, requested: str) -> str:
-    if requested > current:
-        return requested
-    date, _, tz = current.partition("+")
-    if "." in date:
-        base, fraction = date.rsplit(".", 1)
-        fraction = f"{int(fraction or '0') + 1:06d}"
-        return f"{base}.{fraction}+{tz or '00:00'}"
-    return f"{date}.000001+{tz or '00:00'}"
 
 
 def _safe_failure(value: str) -> str:
@@ -732,7 +785,8 @@ def _raise_saga_error(
 
 __all__ = (
     "CreatorProductionRequest",
+    "join_creator_production_authoring_projection",
     "overlay_creator_production_requests",
-    "reconcile_creator_production_requests",
+    "reconcile_creator_production_request_envelopes",
     "register_runtime_creator_production_saga_routes",
 )
