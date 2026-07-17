@@ -93,6 +93,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "visual_asset_register",
         "video_asset_register",
         "keyframe_generation",
+        "audio_generation",
         "video_generation",
         "generation_comparison",
         "studio_state",

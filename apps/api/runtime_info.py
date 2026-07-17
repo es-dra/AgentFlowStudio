@@ -181,6 +181,7 @@ def runtime_capabilities_payload() -> dict[str, Any]:
             "visual_asset_register",
             "video_asset_register",
             "keyframe_generation",
+            "audio_generation",
             "video_generation",
             "generation_comparison",
             "studio_state",

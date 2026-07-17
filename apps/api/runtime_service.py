@@ -48,6 +48,7 @@ from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_ro
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
+from apps.api.runtime_audio_routes import register_runtime_audio_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_creator_golden_trial import register_runtime_creator_golden_trial_routes
 from apps.api.runtime_commercial_production import register_runtime_commercial_production_routes
@@ -392,6 +393,7 @@ def create_runtime_app(
     register_runtime_human_gate_routes(app, store)
     register_runtime_keyframe_routes(app, store)
     register_runtime_keyframe_local_edit_routes(app, store)
+    register_runtime_audio_routes(app, store)
     register_runtime_video_routes(app, store)
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
