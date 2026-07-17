@@ -510,12 +510,15 @@ def _run_keyframe(
     artifacts = keyframe_generation_artifacts(store, output_dir)
     store.write_job(runtime_job(job_id, project_id, "keyframe_generation", result["status"], artifacts=artifacts))
     provider_output = (result.get("provider_outputs") or [])[0]
+    candidate_id = str(provider_output.get("candidate_id") or "candidate_001")
+    candidate_path = _keyframe_candidate_path(output_dir, candidate_id)
     registered = register_generated_image_asset(
         store,
         project_id,
         source_node_id=keyframe_request.node_id,
         source_job_id=job_id,
-        source_candidate_id=str(provider_output.get("candidate_id") or "candidate_001"),
+        source_candidate_id=candidate_id,
+        image_path=candidate_path,
         source_candidate_digest=str(provider_output.get("sha256") or ""),
         source_candidate_status="succeeded",
     )
@@ -523,7 +526,7 @@ def _run_keyframe(
         store,
         project_id,
         source_job_id=job_id,
-        source_candidate_id="candidate_001",
+        source_candidate_id=candidate_id,
         require_existing_asset=True,
     )
     suffix = authority["suffix"]
@@ -643,6 +646,17 @@ def _run_video(
         },
         "job": {"capability": "video", "job_id": job_id, "status": result["status"], "shot_id": shot["shot_id"]},
     }
+
+
+def _keyframe_candidate_path(output_dir: Path, candidate_id: str) -> Path:
+    candidates = [
+        path
+        for suffix in (".png", ".jpg", ".jpeg")
+        if (path := output_dir / "image_candidates" / f"{safe_id(candidate_id)}{suffix}").is_file()
+    ]
+    if len(candidates) != 1:
+        raise RealStoryProductionError("keyframe candidate authority requires one image file")
+    return candidates[0]
 
 
 def _run_audio(

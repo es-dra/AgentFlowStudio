@@ -10,11 +10,14 @@ from agentflow_studio.production.episode_delivery import sha256_file
 from apps.api.runtime_real_story_production import (
     REAL_STORY_SCHEMA_VERSION,
     RealStoryProductionError,
+    RealStoryProductionRequest,
     _read_persisted_script_authority,
+    _run_keyframe,
     compile_story_canon,
     run_creative_media_qa,
 )
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 def test_real_story_canon_uses_script_source_variable_pacing_and_per_shot_video_recipe() -> None:
@@ -143,6 +146,78 @@ def test_creative_media_qa_flags_repeated_dialogue_source(tmp_path: Path) -> Non
     )
 
     assert "AUDIO-REPEAT" in {finding["id"] for finding in qa["findings"]}
+
+
+def test_run_keyframe_registers_canonical_candidate_image_path(tmp_path: Path, monkeypatch) -> None:
+    store = RuntimeStore(tmp_path / "runtime")
+    project_id = "real-story-keyframe-test"
+    store.ensure_project_manifest(project_id)
+    canon = compile_story_canon(
+        brief="制作一部中文海边机器人送信短片",
+        script_text="《回声信标》小澄修复灯塔并让迟到的消息抵达海面远处。",
+    )
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    captured: dict[str, Path] = {}
+
+    def fake_build_keyframe_generation(store_arg, project_id_arg, request, output_dir, **_kwargs):
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True)
+        candidate_path = image_dir / "candidate_001.png"
+        candidate_path.write_bytes(b"not-a-real-png-but-register-is-mocked")
+        for name in (
+            "model_call_context.json",
+            "model_request_plan.json",
+            "keyframe_request_plan.json",
+            "keyframe_candidates_summary.json",
+            "keyframe_generation_safe_manifest.json",
+        ):
+            (output_dir / name).write_text(json.dumps({"artifact_type": name}), encoding="utf-8")
+        return {
+            "status": "succeeded",
+            "provider_calls_started": True,
+            "provider_outputs": [{"candidate_id": "candidate_001", "sha256": "a" * 64}],
+            "safe_manifest": {"retry_count": 0},
+        }
+
+    def fake_register_generated_image_asset(*_args, **kwargs):
+        captured["image_path"] = Path(kwargs["image_path"])
+        return {"asset": {"asset_id": "asset-keyframe-001"}, "artifact": {"artifact_id": "artifact-keyframe-001"}}
+
+    def fake_resolve_generated_candidate_authority(*_args, **_kwargs):
+        return {"suffix": ".png", "candidate_path": captured["image_path"]}
+
+    monkeypatch.setattr(
+        "apps.api.runtime_real_story_production.build_keyframe_generation",
+        fake_build_keyframe_generation,
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_real_story_production.register_generated_image_asset",
+        fake_register_generated_image_asset,
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_real_story_production.resolve_generated_candidate_authority",
+        fake_resolve_generated_candidate_authority,
+    )
+
+    result = _run_keyframe(
+        store,
+        project_id,
+        canon["shots"][0],
+        canon,
+        request=RealStoryProductionRequest(
+            idempotency_key="real-story-keyframe-test",
+            expected_checkpoint_version=1,
+            brief="一部 120 秒中文动画短片：小型邮差机器人小澄修复灯塔并送达迟到多年的消息。",
+        ),
+        assets_dir=assets_dir,
+        request_id="req-test",
+        client_request_id="client-test",
+    )
+
+    assert captured["image_path"].name == "candidate_001.png"
+    assert result["asset_id"] == "asset-keyframe-001"
+    assert (assets_dir / "shot-001-keyframe.png").is_file()
 
 
 def test_real_story_production_route_persists_safe_manifest_and_preview(tmp_path: Path, monkeypatch) -> None:
