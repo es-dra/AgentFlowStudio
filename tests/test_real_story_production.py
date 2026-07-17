@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from agentflow_studio.production.episode_delivery import sha256_file
 from apps.api.runtime_real_story_production import (
     REAL_STORY_SCHEMA_VERSION,
+    RealStoryProductionError,
+    _read_persisted_script_authority,
     compile_story_canon,
     run_creative_media_qa,
 )
@@ -30,6 +32,25 @@ def test_real_story_canon_uses_script_source_variable_pacing_and_per_shot_video_
     assert canon["production_recipe"]["requires_per_shot_keyframe"] is True
     assert canon["production_recipe"]["requires_per_shot_video"] is True
     assert canon["production_recipe"]["allows_unintentional_hash_reuse"] is False
+
+
+def test_persisted_script_authority_is_read_back_and_hash_guarded(tmp_path: Path) -> None:
+    script_path = tmp_path / "llm_script_body.txt"
+    script_path.write_text("《回声信标》这是落盘后的权威剧本文本。", encoding="utf-8")
+    public = {"script_ref": "llm_script_body.txt", "script_sha256": sha256_file(script_path)}
+
+    authority = _read_persisted_script_authority(tmp_path, public)
+
+    assert authority["script_text"] == "《回声信标》这是落盘后的权威剧本文本。"
+    assert authority["script_sha256"] == public["script_sha256"]
+
+    bad_public = {"script_ref": "llm_script_body.txt", "script_sha256": "0" * 64}
+    try:
+        _read_persisted_script_authority(tmp_path, bad_public)
+    except RealStoryProductionError as exc:
+        assert "hash mismatch" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("expected persisted script hash guard to reject drift")
 
 
 def test_creative_media_qa_flags_repeated_hashes_and_static_final_media(tmp_path: Path) -> None:
@@ -75,6 +96,53 @@ def test_creative_media_qa_flags_repeated_hashes_and_static_final_media(tmp_path
     assert qa["status"] == "fail"
     assert "DUPLICATE-HASH" in finding_ids
     assert "VIDEO-COVERAGE" in finding_ids
+
+
+def test_creative_media_qa_flags_exact_subtitle_mismatch(tmp_path: Path) -> None:
+    canon = compile_story_canon(
+        brief="制作一部中文海边机器人送信短片",
+        script_text="《回声信标》小澄修复灯塔并让迟到的消息抵达海面远处。",
+    )
+    wrong_shots = [dict(shot) for shot in canon["shots"]]
+    wrong_shots[1]["subtitle_text"] = wrong_shots[0]["subtitle_text"]
+    _write_test_subtitles(tmp_path / "subtitles.srt", wrong_shots)
+    visual_assets = _video_assets_for(canon)
+
+    qa = run_creative_media_qa(
+        tmp_path,
+        canon,
+        visual_assets,
+        {"provenance": {"tts_source_duration_sec": 119}},
+        {"status": "pass"},
+    )
+
+    assert "SUBTITLES" in {finding["id"] for finding in qa["findings"]}
+
+
+def test_creative_media_qa_flags_repeated_dialogue_source(tmp_path: Path) -> None:
+    canon = compile_story_canon(
+        brief="制作一部中文海边机器人送信短片",
+        script_text="《回声信标》小澄修复灯塔并让迟到的消息抵达海面远处。",
+    )
+    canon["shots"][1]["subtitle_text"] = canon["shots"][0]["subtitle_text"]
+    _write_test_subtitles(tmp_path / "subtitles.srt", canon["shots"])
+    visual_assets = _video_assets_for(canon)
+
+    qa = run_creative_media_qa(
+        tmp_path,
+        canon,
+        visual_assets,
+        {
+            "provenance": {
+                "tts_source_duration_sec": 119,
+                "dialogue_source_line_count": len(canon["shots"]),
+                "dialogue_source_unique_line_count": len({shot["subtitle_text"] for shot in canon["shots"]}),
+            }
+        },
+        {"status": "pass"},
+    )
+
+    assert "AUDIO-REPEAT" in {finding["id"] for finding in qa["findings"]}
 
 
 def test_real_story_production_route_persists_safe_manifest_and_preview(tmp_path: Path, monkeypatch) -> None:
@@ -164,3 +232,31 @@ def test_real_story_production_route_persists_safe_manifest_and_preview(tmp_path
     preview = client.get(production["delivery"]["preview_url"], headers=headers)
     assert preview.status_code == 200, preview.text
     assert preview.content == b"fake-mp4-bytes"
+
+
+def _video_assets_for(canon: dict) -> list[dict]:
+    return [
+        {
+            "shot_id": shot["shot_id"],
+            "scene_id": shot["scene_id"],
+            "path": f"assets/{shot['shot_id']}",
+            "sha256": hashlib.sha256(shot["shot_id"].encode("utf-8")).hexdigest(),
+            "media_type": "video",
+            "prompt": {"script_source_sha256": shot["script_source_sha256"]},
+        }
+        for shot in canon["shots"]
+    ]
+
+
+def _write_test_subtitles(path: Path, shots: list[dict]) -> None:
+    blocks = []
+    for index, shot in enumerate(shots, start=1):
+        blocks.append(
+            f"{index}\n{_srt_time(int(shot['start_seconds']))} --> {_srt_time(int(shot['end_seconds']))}\n"
+            f"{shot['subtitle_text']}"
+        )
+    path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+
+
+def _srt_time(seconds: int) -> str:
+    return f"{seconds // 3600:02d}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d},000"

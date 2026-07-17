@@ -110,10 +110,16 @@ def execute_real_story_production(
             "job_id": script["job_id"],
         })
         jobs.append({"capability": "llm", "job_id": script["job_id"], "status": "succeeded"})
+        script_authority = _read_persisted_script_authority(staging, script["public"])
+        script["public"]["downstream_authority"] = {
+            "source": "persisted_script_ref",
+            "script_ref": script_authority["script_ref"],
+            "script_sha256": script_authority["script_sha256"],
+        }
 
         canon = compile_story_canon(
             brief=request.brief,
-            script_text=script["script_text"],
+            script_text=script_authority["script_text"],
             target_duration_seconds=request.target_duration_seconds,
         )
         write_json(staging / "canonical_story_package.json", canon)
@@ -360,9 +366,12 @@ def run_creative_media_qa(
             findings.append(_finding("P1", "SCRIPT-PROMPT", "downstream prompt did not carry script source", str(shot.get("shot_id"))))
     if audio["provenance"].get("tts_source_duration_sec", 0) > canon["episode"]["duration_seconds"] + 0.25:
         findings.append(_finding("P1", "AUDIO-TRUNCATION", "TTS source exceeded final duration", "Audio must be rewritten, not truncated."))
-    if audio["provenance"].get("dialogue_repeated") is True:
-        findings.append(_finding("P1", "AUDIO-REPEAT", "dialogue stem repeated", "Narration/dialogue must be written once."))
-    if not _subtitles_match_shots(root / "subtitles.srt", shots):
+    subtitle_cues = _subtitle_cues(root / "subtitles.srt")
+    dialogue_repeated = _dialogue_repetition_detected(shots, subtitle_cues, audio)
+    if dialogue_repeated:
+        findings.append(_finding("P1", "AUDIO-REPEAT", "dialogue source text repeated", "Narration/dialogue must be written once."))
+    subtitles_match = _subtitles_match_shots(subtitle_cues, shots)
+    if not subtitles_match:
         findings.append(_finding("P1", "SUBTITLES", "subtitle cues do not derive from canonical shot text", "Timed text mismatch."))
     return {
         "artifact_type": "afs_creative_media_qa",
@@ -375,7 +384,7 @@ def run_creative_media_qa(
             {"name": "exact_duplicate_hashes", "status": "pass" if not repeated_hashes else "fail"},
             {"name": "perceptual_duplicate_scan", "status": "pass" if not perceptual else "fail"},
             {"name": "audio_not_truncated_or_repeated", "status": "pass" if not any(f["id"].startswith("AUDIO") for f in findings) else "fail"},
-            {"name": "subtitle_semantic_alignment", "status": "pass" if _subtitles_match_shots(root / "subtitles.srt", shots) else "fail"},
+            {"name": "subtitle_exact_timed_alignment", "status": "pass" if subtitles_match else "fail"},
         ],
         "non_claims": ["not_human_acceptance", "not_business_validation"],
     }
@@ -441,6 +450,20 @@ def _run_script_llm(
             "script_generation_body": result.get("script_generation_body"),
         },
     }
+
+
+def _read_persisted_script_authority(root: Path, public: dict[str, Any]) -> dict[str, Any]:
+    script_ref = str(public.get("script_ref") or "")
+    if script_ref != "llm_script_body.txt":
+        raise RealStoryProductionError("script authority ref is missing or unsupported")
+    path = (root / script_ref).resolve()
+    if root.resolve() not in path.parents:
+        raise RealStoryProductionError("script authority ref escapes production root")
+    script_text = path.read_text(encoding="utf-8")
+    script_sha256 = sha256_file(path)
+    if script_sha256 != str(public.get("script_sha256") or ""):
+        raise RealStoryProductionError("persisted script authority hash mismatch")
+    return {"script_ref": script_ref, "script_sha256": script_sha256, "script_text": script_text}
 
 
 def _run_keyframe(
@@ -629,7 +652,9 @@ def _run_audio(
 ) -> dict[str, Any]:
     job_id = store.new_job_id("audio_generation", project_id)
     output_dir = store.run_dir(project_id, job_id)
-    text = " ".join(shot["subtitle_text"] for shot in canon["shots"])
+    dialogue_lines = [_clean(shot["subtitle_text"]) for shot in canon["shots"]]
+    text = " ".join(dialogue_lines)
+    dialogue_line_hashes = [_sha256_text(line) for line in dialogue_lines]
     audio_request = AudioGenerationRequest(
         node_id="real-story-dialogue",
         prompt_text=text,
@@ -691,7 +716,10 @@ def _run_audio(
             "provider_candidate_id": "candidate_001",
             "tts_source_sha256": sha256_file(source),
             "tts_source_duration_sec": tts_duration,
-            "dialogue_repeated": False,
+            "dialogue_source_line_count": len(dialogue_line_hashes),
+            "dialogue_source_unique_line_count": len(set(dialogue_line_hashes)),
+            "dialogue_source_line_hashes": dialogue_line_hashes,
+            "dialogue_text_repetition_detected": len(set(dialogue_line_hashes)) != len(dialogue_line_hashes),
             "dialogue_stem": _controlled_asset(root, dialogue, asset_id="asset-dialogue-tts", revision_id="media-v001", media_type="audio"),
             "music_stem": _controlled_asset(root, music, asset_id="asset-music-local", revision_id="local-v001", media_type="audio"),
             "sfx_stem": _controlled_asset(root, sfx, asset_id="asset-sfx-local", revision_id="local-v001", media_type="audio"),
@@ -858,11 +886,85 @@ def _write_subtitles(path: Path, shots: list[dict[str, Any]]) -> None:
     path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
 
 
-def _subtitles_match_shots(path: Path, shots: list[dict[str, Any]]) -> bool:
+def _subtitle_cues(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
-        return False
+        return []
     text = path.read_text(encoding="utf-8")
-    return all(str(shot["subtitle_text"]) in text for shot in shots)
+    blocks = re.split(r"\r?\n\s*\r?\n", text.strip()) if text.strip() else []
+    cues: list[dict[str, Any]] = []
+    for block in blocks:
+        lines = block.splitlines()
+        if len(lines) < 3 or "-->" not in lines[1]:
+            return []
+        try:
+            number = int(lines[0].strip())
+            start_text, end_text = (part.strip() for part in lines[1].split("-->", 1))
+            cues.append(
+                {
+                    "number": number,
+                    "start_seconds": _srt_seconds(start_text),
+                    "end_seconds": _srt_seconds(end_text),
+                    "text": "\n".join(lines[2:]).strip(),
+                }
+            )
+        except (TypeError, ValueError):
+            return []
+    return cues
+
+
+def _subtitles_match_shots(cues: list[dict[str, Any]], shots: list[dict[str, Any]]) -> bool:
+    if len(cues) != len(shots):
+        return False
+    for index, (cue, shot) in enumerate(zip(cues, shots, strict=True), start=1):
+        if cue.get("number") != index:
+            return False
+        if cue.get("start_seconds") != int(shot["start_seconds"]):
+            return False
+        if cue.get("end_seconds") != int(shot["end_seconds"]):
+            return False
+        if _clean(cue.get("text")) != _clean(shot.get("subtitle_text")):
+            return False
+    return True
+
+
+def _dialogue_repetition_detected(
+    shots: list[dict[str, Any]],
+    cues: list[dict[str, Any]],
+    audio: dict[str, Any],
+) -> bool:
+    expected_hashes = [_sha256_text(_clean(shot.get("subtitle_text"))) for shot in shots]
+    cue_hashes = [_sha256_text(_clean(cue.get("text"))) for cue in cues]
+    provenance = audio.get("provenance") if isinstance(audio.get("provenance"), dict) else {}
+    source_hashes = [
+        str(value)
+        for value in provenance.get("dialogue_source_line_hashes", [])
+        if isinstance(value, str)
+    ]
+    line_count = int(provenance.get("dialogue_source_line_count") or len(source_hashes) or 0)
+    unique_count = int(provenance.get("dialogue_source_unique_line_count") or len(set(source_hashes)) or 0)
+    return (
+        _has_duplicates(expected_hashes)
+        or _has_duplicates(cue_hashes)
+        or _has_duplicates(source_hashes)
+        or bool(provenance.get("dialogue_text_repetition_detected"))
+        or (line_count > 0 and unique_count > 0 and unique_count < line_count)
+        or (line_count > 0 and line_count != len(shots))
+    )
+
+
+def _has_duplicates(values: list[str]) -> bool:
+    cleaned = [value for value in values if value]
+    return len(cleaned) != len(set(cleaned))
+
+
+def _srt_seconds(value: str) -> int:
+    match = re.fullmatch(r"(\d{2}):(\d{2}):(\d{2})[,.](\d{3})", value.strip())
+    if not match:
+        raise ValueError("invalid srt timestamp")
+    hours, minutes, seconds, millis = (int(part) for part in match.groups())
+    if millis != 0:
+        raise ValueError("real story subtitles use whole-second shot boundaries")
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def _write_contact_sheet(episode: Path, output: Path, shot_count: int) -> None:
