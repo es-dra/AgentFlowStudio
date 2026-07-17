@@ -146,6 +146,11 @@ def test_canvas_projection_has_single_studio_chrome_and_minimal_empty_state() ->
 
     assert "if (isEditableContentNode(node) && store)" in node_body
     assert "输入想法、剧本文字或参考说明" in node_body
+    assert "function persistEditorValue(textarea, node, store)" in node_body
+    assert 'textarea.addEventListener("compositionend", () => persistEditorValue(textarea, node, store))' in node_body
+    assert 'textarea.addEventListener("blur", () => persistEditorValue(textarea, node, store))' in node_body
+    assert 'textarea.addEventListener("keydown", (event) => event.stopPropagation())' in node_body
+    assert 'textarea.addEventListener("beforeinput", (event) => event.stopPropagation())' in node_body
     assert 'if (!document.getElementById("drawer")) return false' in keyboard
 
 

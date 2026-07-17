@@ -224,27 +224,37 @@ function editableContentBlock(node, store, expanding) {
   textarea.placeholder = node.type === "script" ? "输入剧本、分镜或制作说明" : "输入想法、剧本文字或参考说明";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
-  textarea.addEventListener("input", () => {
-    store.set((s) => {
-      const target = s.nodes[node.id];
-      if (!target) return;
-      target.content = textarea.value;
-      target.prompt = textarea.value;
-      target.status = target.status === "empty" ? "complete" : target.status;
-      if (target.params?.assetCardDraft) {
-        target.params.assetCardDraft.user_edited_text = textarea.value;
-        target.params.assetCardDraft.updated_by_user = true;
-      }
-    }, { history: false });
-  });
+  textarea.addEventListener("input", () => persistEditorValue(textarea, node, store));
+  textarea.addEventListener("compositionend", () => persistEditorValue(textarea, node, store));
+  textarea.addEventListener("blur", () => persistEditorValue(textarea, node, store));
   bindAssetMentionSuggestions(textarea, store, node.id);
   textarea.addEventListener("pointerdown", (event) => event.stopPropagation());
+  textarea.addEventListener("keydown", (event) => event.stopPropagation());
+  textarea.addEventListener("keyup", (event) => event.stopPropagation());
+  textarea.addEventListener("beforeinput", (event) => event.stopPropagation());
+  textarea.addEventListener("compositionstart", (event) => event.stopPropagation());
+  textarea.addEventListener("compositionupdate", (event) => event.stopPropagation());
+  textarea.addEventListener("compositionend", (event) => event.stopPropagation());
   textarea.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
   return textarea;
 }
 
 function isEditableContentNode(node) {
   return node.type === "text" || node.type === "script" || Boolean(node.params?.assetCardDraft);
+}
+
+function persistEditorValue(textarea, node, store) {
+  store.set((s) => {
+    const target = s.nodes[node.id];
+    if (!target) return;
+    target.content = textarea.value;
+    target.prompt = textarea.value;
+    target.status = target.status === "empty" ? "complete" : target.status;
+    if (target.params?.assetCardDraft) {
+      target.params.assetCardDraft.user_edited_text = textarea.value;
+      target.params.assetCardDraft.updated_by_user = true;
+    }
+  }, { history: false });
 }
 
 function errorBody(node) {
