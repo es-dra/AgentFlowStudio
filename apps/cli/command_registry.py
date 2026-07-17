@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from apps.cli.auth_invite_commands import auth_invites_app
+from apps.cli.adaptive_canvas_commands import real_anime_4shot_paid_v1_command
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.memory_review_command import memory_evidence_reuse_review_command
 from apps.cli.real_slicing_commands import slice_real_command
@@ -23,6 +24,7 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="inspect-run")(inspect_run_command)
     app.command(name="review-run")(review_run_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
+    app.command(name="real-anime-4shot-paid-v1")(real_anime_4shot_paid_v1_command)
     app.command(name="runtime-service")(runtime_service_command)
     app.command(name="runtime-service-openapi-export")(runtime_service_openapi_export_command)
     app.add_typer(runtime_backup_app, name="runtime-backup")

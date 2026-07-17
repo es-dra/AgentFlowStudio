@@ -48,6 +48,7 @@ from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_ro
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
+from apps.api.runtime_adaptive_canvas_v2 import register_runtime_adaptive_canvas_v2_routes
 from apps.api.runtime_audio_routes import register_runtime_audio_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_creator_golden_trial import register_runtime_creator_golden_trial_routes
@@ -385,6 +386,7 @@ def create_runtime_app(
     register_runtime_creator_production_saga_routes(app, store, auth)
     register_runtime_product_read_model_routes(app, store, auth)
     register_runtime_manga_first_l4a_routes(app, store, auth)
+    register_runtime_adaptive_canvas_v2_routes(app, store, auth)
     register_runtime_provider_script_routes(app, store)
     register_runtime_storyboard_routes(app, store)
     register_runtime_shot_asset_plan_routes(app, store)
