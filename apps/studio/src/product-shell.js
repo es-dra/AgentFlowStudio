@@ -516,17 +516,19 @@ export function createProductShell(options = {}) {
       return body;
     }
     const refs = [
-      ["脚本场景", currentScene().name, "当前"],
-      ["相邻镜头", selection.shotIndex > 0 ? currentScene().shots[selection.shotIndex - 1].title : "场景开场", "上下文"],
-      ["当前候选", currentShot().title, "v3"],
+      ["当前场景", currentScene().name, "事实"],
+      ["当前镜头", currentShot().title, "事实"],
     ];
+    if (selection.shotIndex > 0) {
+      refs.push(["相邻镜头", currentScene().shots[selection.shotIndex - 1].title, "上下文"]);
+    }
     for (const [type, title, meta] of refs) {
       const item = node("article", "director-reference-item");
       item.append(node("span", "", icon("image", 15)), node("div", "", `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`), node("span", "", meta));
       item.children[1].innerHTML = `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`;
       body.appendChild(item);
     }
-    body.appendChild(node("p", "director-note", "引用只用于当前建议，不会自动改变已确认事实。"));
+    body.appendChild(node("p", "director-note", "当前没有可验证的 ReferenceSet 或候选素材版本；AI 导演只使用项目、场景与镜头上下文。"));
     return body;
   }
 
@@ -536,17 +538,11 @@ export function createProductShell(options = {}) {
       body.appendChild(node("p", "director-note", "还没有可恢复的故事版本；确认创作简报后才会产生版本记录。"));
       return body;
     }
-    body.append(
-      node("p", "director-note", "版本与恢复按需展开；当前仅显示与所选镜头有关的记录。"),
-      versionRow("当前候选", "v3", "待审核"),
-      versionRow("已确认版本", "v2", "可恢复"),
-    );
-    const recovery = node("button", "studio-secondary-button", "恢复上一确认版本");
+    body.appendChild(node("p", "director-note", "还没有已确认版本、恢复点或可恢复候选。当前仅保存草稿；审核与导出能力正在合并到统一 Studio。"));
+    const recovery = node("button", "studio-secondary-button", "暂无可恢复版本");
     recovery.type = "button";
-    recovery.addEventListener("click", () => {
-      notice = "已进入恢复预览；确认前不会覆盖当前草稿。";
-      render();
-    });
+    recovery.disabled = true;
+    recovery.setAttribute("aria-disabled", "true");
     body.appendChild(recovery);
     return body;
   }

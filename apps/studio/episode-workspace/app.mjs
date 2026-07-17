@@ -35,6 +35,13 @@ const params = new URLSearchParams(window.location.search);
 const projectId = params.get("project");
 const episodeId = params.get("episode");
 const episodeVersionId = params.get("version");
+
+if (projectId && (!episodeId || !episodeVersionId)) {
+  const target = new URL("/studio/", window.location.origin);
+  target.searchParams.set("project", projectId);
+  window.location.replace(target.toString());
+}
+
 const client = projectId && episodeId && episodeVersionId
   ? createEpisodeWorkspaceClient(projectId, episodeId, episodeVersionId)
   : null;

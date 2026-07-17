@@ -26,7 +26,7 @@ NumberSanitizer = Callable[[Any, float], float]
 PreviewUrlSanitizer = Callable[..., str]
 
 SAFE_NODE_PARAM_KEYS = (
-    "model", "spec", "camera", "motion", "styleRef", "attachments", "directorSetup", "directorRef",
+    "model", "spec", "camera", "motion", "styleRef", "attachments", "directorSetup", "directorRef", "directorDraft",
     "isReference", "intent", "uploads", "previewAspectRatio", "visualAssets", "visual_asset_ids",
     "firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastVideoPreviewUrl",
     "assetReferenceMode", "referenceTransformMode",
@@ -151,6 +151,8 @@ def _sanitize_param(
         return sanitize_quality_feedback_candidates(value, text=text)
     if key == "scriptSegmentIndex":
         return int(max(0, min(9999, number(value, 0))))
+    if key == "directorDraft":
+        return param_values.safe_object(value, text=text, number=number, max_items=12)
     if key in {"nodeRole", "sourceTextNodeId", "directorRef"}:
         return text(value, "", 120)
     if key == "scriptExpansionSourceIdea":

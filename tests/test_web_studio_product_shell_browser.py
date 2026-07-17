@@ -124,6 +124,27 @@ def test_scene_and_shot_selection_use_one_context_sync_path() -> None:
     assert "state.selection = { nodeIds: [], edgeId: null }" in bootstrap
 
 
+def test_director_review_panel_does_not_fabricate_versions_or_recovery_actions() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+
+    assert '"当前候选", "v3"' not in shell
+    assert '"已确认版本", "v2"' not in shell
+    assert "恢复上一确认版本" not in shell
+    assert "暂无可恢复版本" in shell
+    assert "recovery.disabled = true" in shell
+    assert "当前没有可验证的 ReferenceSet 或候选素材版本" in shell
+
+
+def test_project_only_episode_workspace_redirects_to_unified_studio() -> None:
+    app = (STUDIO / "episode-workspace" / "app.mjs").read_text(encoding="utf-8")
+
+    assert 'if (projectId && (!episodeId || !episodeVersionId)) {' in app
+    assert 'new URL("/studio/", window.location.origin)' in app
+    assert 'target.searchParams.set("project", projectId)' in app
+    assert "window.location.replace(target.toString())" in app
+    assert "projectId && episodeId && episodeVersionId" in app
+
+
 def test_director_context_and_next_action_helpers_partition_and_target_real_work() -> None:
     script = r'''
 import {
