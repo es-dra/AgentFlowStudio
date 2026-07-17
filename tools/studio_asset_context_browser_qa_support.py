@@ -22,8 +22,19 @@ from fastapi.testclient import TestClient
 from apps.api.runtime_service import create_runtime_app
 
 
-REMOTE_PROVIDER_GATES = ("AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_LLM", "AFS_ALLOW_REMOTE_ASR", "AFS_ALLOW_REMOTE_VIDEO")
-MEDIA_PROVIDER_GATES = ("AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_ASR", "AFS_ALLOW_REMOTE_VIDEO")
+REMOTE_PROVIDER_GATES = (
+    "AFS_ALLOW_REMOTE_IMAGE",
+    "AFS_ALLOW_REMOTE_LLM",
+    "AFS_ALLOW_REMOTE_ASR",
+    "AFS_ALLOW_REMOTE_VIDEO",
+    "AFS_ALLOW_REMOTE_AUDIO",
+)
+MEDIA_PROVIDER_GATES = (
+    "AFS_ALLOW_REMOTE_IMAGE",
+    "AFS_ALLOW_REMOTE_ASR",
+    "AFS_ALLOW_REMOTE_VIDEO",
+    "AFS_ALLOW_REMOTE_AUDIO",
+)
 
 
 def gates_to_close(*, allow_live_llm: bool = False) -> tuple[str, ...]:

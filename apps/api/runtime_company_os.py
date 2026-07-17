@@ -38,6 +38,7 @@ def company_os_gfr_projection_payload() -> dict[str, Any]:
             {"id": "llm", "default": "closed"},
             {"id": "image", "default": "closed"},
             {"id": "video", "default": "closed"},
+            {"id": "audio", "default": "closed"},
             {"id": "vision", "default": "closed"},
             {"id": "asr", "default": "closed"},
             {"id": "external_download", "default": "closed"},

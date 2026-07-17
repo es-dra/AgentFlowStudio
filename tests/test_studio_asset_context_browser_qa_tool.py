@@ -71,6 +71,7 @@ def test_browser_qa_proxy_closes_all_remote_provider_gates_by_default(monkeypatc
     for key in browser_qa_support.REMOTE_PROVIDER_GATES:
         assert browser_qa_support.os.environ[key] == "true"
     assert "AFS_ALLOW_REMOTE_VIDEO" in browser_qa_support.REMOTE_PROVIDER_GATES
+    assert "AFS_ALLOW_REMOTE_AUDIO" in browser_qa_support.REMOTE_PROVIDER_GATES
 
 
 def test_browser_qa_proxy_can_keep_explicit_llm_gate(monkeypatch) -> None:

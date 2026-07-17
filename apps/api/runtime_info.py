@@ -71,6 +71,7 @@ def runtime_provider_gates(env: dict[str, str] | None = None) -> dict[str, bool]
         "llm": _enabled(source.get("AFS_ALLOW_REMOTE_LLM")),
         "image": _enabled(source.get("AFS_ALLOW_REMOTE_IMAGE")),
         "video": _enabled(source.get("AFS_ALLOW_REMOTE_VIDEO")),
+        "audio": _enabled(source.get("AFS_ALLOW_REMOTE_AUDIO")),
         "asr": _enabled(source.get("AFS_ALLOW_REMOTE_ASR")),
         "vision": _enabled(source.get("AFS_ALLOW_REMOTE_VISION")),
         "external_download": _enabled(source.get("AFS_ALLOW_EXTERNAL_DOWNLOAD")),
