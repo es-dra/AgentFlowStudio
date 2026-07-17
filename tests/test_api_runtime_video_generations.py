@@ -427,6 +427,35 @@ def test_video_provider_prompt_removes_image_edit_language() -> None:
     assert "周彤" in prompt
 
 
+def test_video_provider_prompt_uses_positive_abstract_contract_for_safe_ui_motion() -> None:
+    request = runtime_video_routes.VideoGenerationRequest(
+        prompt_text=(
+            "A safe abstract geometric storyboard with canvas nodes and timeline blocks. "
+            "No people, no faces, no text, no logos."
+        ),
+        provider_service_id="fake_video",
+        first_frame_image_asset_id="img_first_frame",
+        duration_sec=10,
+        motion="slow camera drift, soft interface glow, gentle geometric motion",
+        generated_at="2026-07-17T12:00:00+00:00",
+    )
+
+    prompt = runtime_video_routes._video_provider_prompt(request, None)
+    lowered = prompt.lower()
+
+    assert "geometric storyboard" in lowered
+    assert "canvas nodes" in lowered
+    assert "timeline blocks" in lowered
+    assert "preserve the first-frame layout" in lowered
+    assert "first frame as a strict visual anchor" not in prompt
+    assert "Professional video reference:" not in prompt
+    assert "Director scenario video guidance:" not in prompt
+    assert "Second-level director timeline:" not in prompt
+    assert "forbidden_changes" not in prompt
+    for unsafe_term in ("people", "face", "body", "clothing", "hairstyle", "text", "watermark", "logo", "ui"):
+        assert unsafe_term not in lowered
+
+
 def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
