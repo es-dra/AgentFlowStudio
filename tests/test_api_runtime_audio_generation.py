@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 import wave
 from pathlib import Path
 
@@ -93,6 +95,138 @@ def test_audio_generation_dispatch_writes_safe_wav_manifest_and_replays_idempote
     assert audio.status_code == 200
     assert audio.headers["content-type"].startswith("audio/wav")
     assert audio.content == audio_bytes
+
+
+def test_audio_generation_normalizes_mp3_to_safe_wav_and_replays_idempotently(tmp_path, monkeypatch) -> None:
+    config_path = _provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    mp3_bytes = _mp3_bytes()
+    wav_bytes = _wav_bytes(tmp_path / "normalized.wav")
+    calls: list[dict[str, object]] = []
+    normalizer_calls: list[list[str]] = []
+
+    class Response:
+        headers = {"Content-Type": "audio/mpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self) -> bytes:
+            return mp3_bytes
+
+    def fake_urlopen(request, timeout):
+        calls.append({"url": request.full_url, "payload": json.loads(request.data.decode("utf-8"))})
+        return Response()
+
+    def fake_run(command, **kwargs):
+        normalizer_calls.append(command)
+        assert kwargs["shell"] is False
+        assert kwargs["timeout"] == 25
+        Path(command[-1]).write_bytes(wav_bytes)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    normalizer = tmp_path / "ffmpeg-normalizer"
+    normalizer.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    normalizer.chmod(0o755)
+    monkeypatch.setenv("AFS_AUDIO_NORMALIZER_FFMPEG", str(normalizer))
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.subprocess.run", fake_run)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    client.post("/projects", json={"project_id": "audio-mp3-project", "goal": "音频生成"})
+    body = {
+        "node_id": "audio-node-1",
+        "episode_id": "episode-001",
+        "scene_id": "scene-001",
+        "shot_id": "shot-001",
+        "prompt_text": "一句安静、清晰的中文旁白。",
+        "generated_at": "2026-07-17T09:30:00Z",
+        "cost_cap_cny": 5,
+    }
+    headers = {"X-Client-Request-ID": "audio-mp3-once-001"}
+
+    first = client.post("/projects/audio-mp3-project/audio-generations", json=body, headers=headers)
+    replay = client.post("/projects/audio-mp3-project/audio-generations", json=body, headers=headers)
+
+    assert first.status_code == 200, first.text
+    assert replay.status_code == 200, replay.text
+    payload = first.json()
+    assert len(calls) == 1
+    assert len(normalizer_calls) == 1
+    assert replay.json()["job"]["job_id"] == payload["job"]["job_id"]
+    assert payload["status"] == "succeeded"
+    assert payload["call_accounting"]["actual_calls"] == 1
+    assert payload["call_accounting"]["retry_count"] == 0
+    candidate = payload["candidate_previews"][0]
+    assert candidate["provider_audio_format"] == "mp3"
+    normalization = candidate["audio_normalization"]
+    assert normalization["provider_returned_format"] == "mp3"
+    assert normalization["normalized_locally"] is True
+    assert normalization["provider_native_wav"] is False
+    assert normalization["source_sha256"] == hashlib.sha256(mp3_bytes).hexdigest()
+    assert normalization["destination_sha256"] == hashlib.sha256(wav_bytes).hexdigest()
+    assert payload["safe_manifest"]["provenance"]["provider_returned_format"] == "mp3"
+    assert payload["safe_manifest"]["provenance"]["audio_normalization"]["normalized_locally"] is True
+    audio = client.get(candidate["audio_url"])
+    assert audio.status_code == 200
+    assert audio.headers["content-type"].startswith("audio/wav")
+    assert audio.content == wav_bytes
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "test-audio-key" not in serialized
+    assert "signed_url" not in serialized
+    assert "/tmp/" not in serialized
+
+
+def test_audio_generation_fails_closed_for_non_audio_provider_payload(tmp_path, monkeypatch) -> None:
+    config_path = _provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    calls: list[object] = []
+
+    class Response:
+        headers = {"Content-Type": "audio/wav"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self) -> bytes:
+            return b"<html>not audio</html>"
+
+    def fake_urlopen(*_args, **_kwargs):
+        calls.append(object())
+        return Response()
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", fake_urlopen)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    client.post("/projects", json={"project_id": "audio-corrupt-project", "goal": "音频生成"})
+
+    response = client.post(
+        "/projects/audio-corrupt-project/audio-generations",
+        json={"prompt_text": "不会返回有效音频", "generated_at": "2026-07-17T09:31:00Z"},
+        headers={"X-Client-Request-ID": "audio-corrupt-once-001"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(calls) == 1
+    assert payload["status"] == "failed"
+    assert payload["provider_calls_started"] is True
+    assert payload["candidate_previews"] == []
+    assert payload["call_accounting"]["actual_calls"] == 1
+    assert payload["call_accounting"]["retry_count"] == 0
+    assert payload["safe_manifest"]["blocks"][0]["reason"] == "TTS provider returned an unsupported audio container"
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "<html>" not in serialized
+    assert "test-audio-key" not in serialized
+    assert "/tmp/" not in serialized
 
 
 def test_audio_generation_closed_gate_blocks_before_provider_dispatch(tmp_path, monkeypatch) -> None:
@@ -234,3 +368,7 @@ def _wav_bytes(path: Path) -> bytes:
         handle.setframerate(16_000)
         handle.writeframes(b"\x00\x00" * 16_000)
     return path.read_bytes()
+
+
+def _mp3_bytes() -> bytes:
+    return b"ID3\x04\x00\x00\x00\x00\x00\x21" + b"\x00" * 64

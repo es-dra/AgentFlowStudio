@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import base64
+import hashlib
 import wave
 from pathlib import Path
 
@@ -137,6 +138,10 @@ def _wav_bytes(path: Path) -> bytes:
         stream.setframerate(48_000)
         stream.writeframes(b"\0\0" * 480)
     return path.read_bytes()
+
+
+def _mp3_bytes() -> bytes:
+    return b"ID3\x04\x00\x00\x00\x00\x00\x21" + b"\x00" * 64
 
 
 def test_provider_registry_rejects_missing_descriptor(tmp_path) -> None:
@@ -277,10 +282,150 @@ def test_openai_compatible_tts_dispatch_writes_safe_wav_artifact(tmp_path, monke
     assert output["audio_path"] == "audio_candidates/candidate_001.wav"
     assert output["mime_type"] == "audio/wav"
     assert output["byte_count"] == len(audio_bytes)
+    assert output["provider_audio_format"] == "wav"
+    assert output["audio_normalization"]["provider_native_wav"] is True
+    assert output["audio_normalization"]["normalized_locally"] is False
     assert written.read_bytes() == audio_bytes
     assert "test-audio-key" not in serialized
     assert "signed_url" not in serialized
     assert "/tmp/" not in serialized
+
+
+def test_openai_compatible_tts_normalizes_mp3_provider_bytes_to_safe_wav(tmp_path, monkeypatch) -> None:
+    store = _store(tmp_path, _openai_tts_provider_config())
+    registry = ProviderRegistry.from_store(store)
+    mp3_bytes = _mp3_bytes()
+    normalized_wav = _wav_bytes(tmp_path / "normalized.wav")
+    commands: list[list[str]] = []
+
+    class Response:
+        headers = {"Content-Type": "audio/mpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            return mp3_bytes
+
+    def fake_urlopen(request, timeout):
+        return Response()
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        assert kwargs["shell"] is False
+        assert kwargs["timeout"] == 25
+        assert "Authorization" not in json.dumps(kwargs)
+        source = Path(command[7])
+        destination = Path(command[-1])
+        assert source.read_bytes() == mp3_bytes
+        destination.write_bytes(normalized_wav)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    normalizer = tmp_path / "ffmpeg-normalizer"
+    normalizer.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    normalizer.chmod(0o755)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    monkeypatch.setenv("AFS_AUDIO_NORMALIZER_FFMPEG", str(normalizer))
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.subprocess.run", fake_run)
+
+    result = registry.dispatch(
+        "audio",
+        "tts_relay",
+        ProviderDispatchRequest(
+            prompt="Alpha narration line.",
+            output_dir=tmp_path / "outputs",
+            timeout_sec=7,
+        ),
+    )
+
+    output = result["outputs"][0]
+    written = tmp_path / "outputs" / output["audio_path"]
+    assert commands and commands[0][0] == str(normalizer.resolve())
+    assert written.read_bytes() == normalized_wav
+    assert not (tmp_path / "outputs" / "audio_processing").exists()
+    assert output["provider_audio_format"] == "mp3"
+    assert output["audio_normalization"] == {
+        "provider_returned_format": "mp3",
+        "provider_content_type": "audio/mpeg",
+        "source_sha256": hashlib.sha256(mp3_bytes).hexdigest(),
+        "destination_format": "wav",
+        "normalized_locally": True,
+        "provider_native_wav": False,
+        "normalizer": "ffmpeg",
+        "destination_sha256": hashlib.sha256(normalized_wav).hexdigest(),
+        "duration_sec": output["duration_sec"],
+        "sample_rate_hz": 48000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+    }
+    serialized = json.dumps(result, ensure_ascii=False).lower()
+    assert "test-audio-key" not in serialized
+    assert "signed_url" not in serialized
+    assert "/tmp/" not in serialized
+
+
+def test_openai_compatible_tts_fails_closed_when_mp3_normalizer_is_unavailable(tmp_path, monkeypatch) -> None:
+    store = _store(tmp_path, _openai_tts_provider_config())
+    registry = ProviderRegistry.from_store(store)
+
+    class Response:
+        headers = {"Content-Type": "audio/mpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            return _mp3_bytes()
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    monkeypatch.delenv("AFS_AUDIO_NORMALIZER_FFMPEG", raising=False)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.shutil.which", lambda _name: None)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", lambda *_args, **_kwargs: Response())
+
+    with pytest.raises(ModelGatewayError, match="normalization tool is unavailable"):
+        registry.dispatch(
+            "audio",
+            "tts_relay",
+            ProviderDispatchRequest(prompt="Alpha narration line.", output_dir=tmp_path / "outputs", timeout_sec=7),
+        )
+
+
+@pytest.mark.parametrize("provider_bytes", [b'{"error":"not audio"}', b"<html>not audio</html>", b"not-audio"])
+def test_openai_compatible_tts_fails_closed_for_unsupported_audio_payloads(tmp_path, monkeypatch, provider_bytes) -> None:
+    store = _store(tmp_path, _openai_tts_provider_config())
+    registry = ProviderRegistry.from_store(store)
+
+    class Response:
+        headers = {"Content-Type": "audio/wav"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            return provider_bytes
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", lambda *_args, **_kwargs: Response())
+
+    with pytest.raises(ModelGatewayError, match="unsupported audio container"):
+        registry.dispatch(
+            "audio",
+            "tts_relay",
+            ProviderDispatchRequest(prompt="Alpha narration line.", output_dir=tmp_path / "outputs", timeout_sec=7),
+        )
 
 
 def test_openai_compatible_tts_can_omit_unsupported_instructions(tmp_path, monkeypatch) -> None:

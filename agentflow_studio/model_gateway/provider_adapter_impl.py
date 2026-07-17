@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import io
 import hashlib
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +24,10 @@ DEFAULT_DEEPSEEK_TEXT_MODEL = "deepseek-chat"
 DEFAULT_TTS_MODEL = "gpt-4o-mini-tts"
 DEFAULT_TTS_VOICE = "coral"
 DEFAULT_TTS_RESPONSE_FORMAT = "wav"
+TTS_AUDIO_NORMALIZER_FFMPEG_ENV = "AFS_AUDIO_NORMALIZER_FFMPEG"
+TTS_AUDIO_NORMALIZER_TIMEOUT_SEC = 25
+TTS_MAX_PROVIDER_AUDIO_BYTES = 25 * 1024 * 1024
+TTS_MAX_NORMALIZED_WAV_BYTES = 80 * 1024 * 1024
 TTS_FORMAT_MIME = {
     "wav": "audio/wav",
     "mp3": "audio/mpeg",
@@ -373,20 +382,178 @@ def _write_tts_output(
     content_type: str,
 ) -> dict[str, Any]:
     expected_mime = TTS_FORMAT_MIME[response_format]
-    if content_type and content_type not in {expected_mime, "application/octet-stream"}:
-        raise ModelGatewayError("TTS provider returned an unexpected media type")
+    if len(payload) > TTS_MAX_PROVIDER_AUDIO_BYTES:
+        raise ModelGatewayError("TTS provider audio exceeded safe size bounds")
+    source_format = _detect_tts_audio_container(payload)
+    source_sha256 = hashlib.sha256(payload).hexdigest()
+    normalization = {
+        "provider_returned_format": source_format,
+        "provider_content_type": _safe_content_type(content_type),
+        "source_sha256": source_sha256,
+        "destination_format": "wav",
+        "normalized_locally": False,
+        "provider_native_wav": source_format == "wav",
+    }
+    if source_format == "wav":
+        wav_payload = payload
+        probe = _probe_wav_bytes(wav_payload)
+        normalizer = "not_required"
+    elif source_format == "mp3":
+        wav_payload, probe, normalizer = _normalize_mp3_payload_to_wav(output_dir, payload)
+        normalization["normalized_locally"] = True
+        normalization["provider_native_wav"] = False
+    else:
+        raise ModelGatewayError("TTS provider returned an unsupported audio container")
+    if not probe["valid"] or float(probe["duration_sec"]) <= 0:
+        raise ModelGatewayError("TTS provider returned invalid WAV audio")
+    if len(wav_payload) > TTS_MAX_NORMALIZED_WAV_BYTES:
+        raise ModelGatewayError("TTS normalized WAV exceeded safe size bounds")
+    destination_sha256 = hashlib.sha256(wav_payload).hexdigest()
+    normalization.update(
+        {
+            "normalizer": normalizer,
+            "destination_sha256": destination_sha256,
+            "duration_sec": probe["duration_sec"],
+            "sample_rate_hz": probe["sample_rate_hz"],
+            "channels": probe["channels"],
+            "sample_width_bytes": probe["sample_width_bytes"],
+        }
+    )
     relative = Path("audio_candidates") / f"candidate_001.{response_format}"
     path = output_dir / relative
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(payload)
+    path.write_bytes(wav_payload)
     return {
         "candidate_id": "candidate_001",
         "audio_path": relative.as_posix(),
         "mime_type": expected_mime,
-        "byte_count": len(payload),
-        "sha256": hashlib.sha256(payload).hexdigest(),
+        "byte_count": len(wav_payload),
+        "sha256": destination_sha256,
+        "duration_sec": probe["duration_sec"],
+        "provider_audio_format": source_format,
+        "audio_normalization": normalization,
         "provider_url_persisted": False,
     }
+
+
+def _detect_tts_audio_container(payload: bytes) -> str:
+    header = payload[:16]
+    if header.startswith(b"RIFF") and payload[8:12] == b"WAVE":
+        return "wav"
+    if header.startswith(b"ID3") or header[:2] in {b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"}:
+        return "mp3"
+    if header.lstrip().startswith((b"{", b"[", b"<")):
+        return "text_or_json"
+    return "unsupported"
+
+
+def _normalize_mp3_payload_to_wav(output_dir: Path, payload: bytes) -> tuple[bytes, dict[str, Any], str]:
+    ffmpeg = _resolve_tts_normalizer_ffmpeg()
+    if not ffmpeg:
+        raise ModelGatewayError("TTS audio normalization tool is unavailable")
+    processing_dir = output_dir / "audio_processing"
+    processing_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
+    source_path: Path | None = None
+    wav_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=processing_dir, suffix=".mp3", delete=False) as source:
+            source.write(payload)
+            source_path = Path(source.name)
+        os.chmod(source_path, 0o600)
+        with tempfile.NamedTemporaryFile(dir=processing_dir, suffix=".wav", delete=False) as dest:
+            wav_path = Path(dest.name)
+        os.chmod(wav_path, 0o600)
+        command = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-i",
+            str(source_path),
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-c:a",
+            "pcm_s16le",
+            str(wav_path),
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                cwd=str(processing_dir),
+                capture_output=True,
+                text=True,
+                timeout=TTS_AUDIO_NORMALIZER_TIMEOUT_SEC,
+                check=False,
+                shell=False,
+                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"},
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ModelGatewayError("TTS audio normalization timed out") from exc
+        except OSError as exc:
+            raise ModelGatewayError("TTS audio normalization failed to start") from exc
+        if result.returncode != 0:
+            raise ModelGatewayError("TTS audio normalization failed")
+        wav_payload = wav_path.read_bytes()
+        probe = _probe_wav_bytes(wav_payload)
+        return wav_payload, probe, "ffmpeg"
+    finally:
+        for item in (source_path, wav_path):
+            if item is not None:
+                try:
+                    item.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        try:
+            processing_dir.rmdir()
+        except OSError:
+            pass
+
+
+def _resolve_tts_normalizer_ffmpeg() -> str:
+    configured = os.environ.get(TTS_AUDIO_NORMALIZER_FFMPEG_ENV, "").strip()
+    candidates = [configured] if configured else []
+    discovered = shutil.which("ffmpeg")
+    if discovered:
+        candidates.append(discovered)
+    for candidate in candidates:
+        path = Path(candidate)
+        if not path.is_file() or not os.access(path, os.X_OK):
+            continue
+        return str(path.resolve())
+    return ""
+
+
+def _probe_wav_bytes(payload: bytes) -> dict[str, Any]:
+    if not payload.startswith(b"RIFF") or payload[8:12] != b"WAVE":
+        return {"valid": False, "duration_sec": 0.0, "sample_rate_hz": 0, "channels": 0, "sample_width_bytes": 0}
+    try:
+        with wave.open(io.BytesIO(payload), "rb") as stream:
+            frame_rate = stream.getframerate()
+            frames = stream.getnframes()
+            duration = frames / float(frame_rate) if frame_rate else 0.0
+            return {
+                "valid": duration > 0,
+                "duration_sec": round(duration, 3),
+                "sample_rate_hz": frame_rate,
+                "channels": stream.getnchannels(),
+                "sample_width_bytes": stream.getsampwidth(),
+            }
+    except (EOFError, wave.Error):
+        return {"valid": False, "duration_sec": 0.0, "sample_rate_hz": 0, "channels": 0, "sample_width_bytes": 0}
+
+
+def _safe_content_type(value: str) -> str:
+    text = str(value or "").split(";", 1)[0].strip().lower()
+    if len(text) > 80 or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789!#$&^_.+-/" for ch in text):
+        return "unsafe_or_unset"
+    return text or "unset"
 
 
 __all__ = (

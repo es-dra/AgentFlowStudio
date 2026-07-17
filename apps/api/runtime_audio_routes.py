@@ -293,6 +293,12 @@ def _safe_manifest(
     provider_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     provider_cost = provider_result.get("cost") if isinstance(provider_result, dict) and isinstance(provider_result.get("cost"), dict) else {}
+    first_output = outputs[0] if outputs else {}
+    audio_normalization = (
+        first_output.get("audio_normalization")
+        if isinstance(first_output, dict) and isinstance(first_output.get("audio_normalization"), dict)
+        else None
+    )
     actual_calls = 1 if provider_calls_started else 0
     manifest = {
         "artifact_type": "afs_audio_generation_safe_manifest",
@@ -322,6 +328,8 @@ def _safe_manifest(
             "prompt_sha256": hashlib.sha256(request.prompt_text.encode("utf-8")).hexdigest(),
             "model": str((provider_result or {}).get("model") or "configured_provider_model"),
             "voice": str((provider_result or {}).get("voice") or request.voice or "configured_provider_voice"),
+            "provider_returned_format": str(first_output.get("provider_audio_format") or "unknown") if isinstance(first_output, dict) else "unknown",
+            "audio_normalization": audio_normalization,
             "created_at": datetime.now(timezone.utc).isoformat(),
         },
         "outputs": outputs or [],
@@ -359,6 +367,8 @@ def _safe_output_from_manifest(
         "byte_count": int(first.get("byte_count") or path.stat().st_size),
         "sha256": str(first.get("sha256") or _sha256(path)),
         "duration_sec": duration_sec,
+        "provider_audio_format": str(first.get("provider_audio_format") or "unknown"),
+        "audio_normalization": first.get("audio_normalization") if isinstance(first.get("audio_normalization"), dict) else None,
         "storage": "runtime_managed_project_artifact",
         "provider_url_persisted": False,
     }
@@ -372,6 +382,8 @@ def _candidate_preview(project_id: str, job_id: str, output: dict[str, Any]) -> 
         "byte_count": output["byte_count"],
         "sha256": output["sha256"],
         "duration_sec": output["duration_sec"],
+        "provider_audio_format": output.get("provider_audio_format", "unknown"),
+        "audio_normalization": output.get("audio_normalization"),
     }
 
 
