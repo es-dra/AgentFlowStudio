@@ -1221,7 +1221,7 @@ export function createProductShell(options = {}) {
     showReview,
     syncSelectionFromCanvasNode,
     setSection(next) {
-      if (next === "canvas") return showCanvas();
+      if (next === "canvas") return openCanvas();
       if (next === "review") return showReview();
       return showOverview();
     },
