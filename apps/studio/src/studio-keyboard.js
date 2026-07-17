@@ -47,6 +47,7 @@ function handleEscape(e, store) {
     store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; }, { history: false, persist: false });
     return true;
   }
+  if (!document.getElementById("drawer")) return false;
   store.set((s) => { s.ui.drawerOpen = !s.ui.drawerOpen; }, { history: false, persist: false });
   return true;
 }

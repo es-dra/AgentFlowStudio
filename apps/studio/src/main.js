@@ -317,29 +317,31 @@ function renderAll(state) {
   syncDomainCrewContext();
   productShell?.updateStudioState(state);
   if (!editorMounted) return;
-  renderTopbar({
-    state,
-    store,
-    runtime,
-    projectSummaries: projectController.summaries,
-    projectOptions: projectController.projectOptions(state),
-    hiddenProjectCount: projectController.hiddenProjectCount(state),
-    showAllProjects: projectController.showAllProjects,
-    onToggleProjectFilter: () => projectController.toggleProjectFilter(),
-    onSwitchProject: projectController.switchProject,
-    onCreateProject: projectController.createNewProject,
-    onOpenHome: openProductOverview,
-    onBeforeSiteHome: () => store.flushRuntimeSave(),
-    authUser: projectController.authUser,
-    onRetrySave: () => store.flushRuntimeSave(),
-    runtimeSurfaceStatus,
-    onSignOut: handleSignOut,
-  });
+  if (document.getElementById("topbar")) {
+    renderTopbar({
+      state,
+      store,
+      runtime,
+      projectSummaries: projectController.summaries,
+      projectOptions: projectController.projectOptions(state),
+      hiddenProjectCount: projectController.hiddenProjectCount(state),
+      showAllProjects: projectController.showAllProjects,
+      onToggleProjectFilter: () => projectController.toggleProjectFilter(),
+      onSwitchProject: projectController.switchProject,
+      onCreateProject: projectController.createNewProject,
+      onOpenHome: openProductOverview,
+      onBeforeSiteHome: () => store.flushRuntimeSave(),
+      authUser: projectController.authUser,
+      onRetrySave: () => store.flushRuntimeSave(),
+      runtimeSurfaceStatus,
+      onSignOut: handleSignOut,
+    });
+  }
   renderCanvas(state, store);
-  renderDrawer(state, store, runtimeRef);
-  renderInspectorPanel(state, store, runtimeRef);
+  if (document.getElementById("drawer")) renderDrawer(state, store, runtimeRef);
+  if (document.getElementById("inspector")) renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
-  renderSpriteWidget(state, runtimeRef);
+  if (document.getElementById("sprite-root")) renderSpriteWidget(state, runtimeRef);
 }
 function syncDomainCrewContext() {
   if (!domainCrewController || !projectController) return;
@@ -380,6 +382,7 @@ function openCanvasWorkspace() {
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
+  if (!row) return;
   row.replaceChildren();
   for (const starter of WORKFLOW_STARTERS) {
     const card = el("button", "starter-card workflow-starter-card");

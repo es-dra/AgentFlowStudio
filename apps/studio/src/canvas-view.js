@@ -20,7 +20,9 @@ export function renderCanvas(state, store) {
 function renderEmptyState(state) {
   const rail = starterRailState(state);
   const starterRow = document.getElementById("starter-row");
-  document.getElementById("canvas-empty-hint").hidden = !rail.empty;
+  const emptyHint = document.getElementById("canvas-empty-hint");
+  if (emptyHint) emptyHint.hidden = !rail.empty;
+  if (!starterRow) return;
   starterRow.hidden = !rail.show;
   starterRow.dataset.mode = rail.mode;
 }

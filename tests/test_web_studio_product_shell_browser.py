@@ -99,9 +99,50 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     assert 'options.onSelectCanvasNode?.(currentShot().nodeId || "")' in shell
     assert 'state.ui.inspectorOpen = false' in main
     assert '.canvas-workspace-stage #studio-editor-shell' in styles
-    assert '.canvas-workspace-stage #sprite-root { display: none; }' in styles
+    assert '<aside id="drawer">' not in bootstrap
+    assert '<header id="topbar">' not in bootstrap
+    assert '<aside id="inspector">' not in bootstrap
+    assert '<div id="corner-controls">' not in bootstrap
+    assert '<div id="starter-row"' not in bootstrap
+    assert 'if (document.getElementById("drawer")) renderDrawer' in main
+    assert 'if (document.getElementById("inspector")) renderInspectorPanel' in main
+    assert '.canvas-workspace-stage #drawer,' in styles
+    assert '.canvas-workspace-stage #sprite-root { display: none; }' not in styles
     assert '.canvas-mode #product-shell-root' not in styles
     assert 'app?.classList.remove("product-mode")' not in shell
+
+
+def test_canvas_projection_has_single_studio_chrome_and_minimal_empty_state() -> None:
+    bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
+    dock = (STUDIO / "src" / "panels" / "dock.js").read_text(encoding="utf-8")
+    node_body = (STUDIO / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    keyboard = (STUDIO / "src" / "studio-keyboard.js").read_text(encoding="utf-8")
+
+    assert 'class="canvas-empty-title">双击画布创建文本节点' in bootstrap
+    assert 'id="prompt-bar-layer"' in bootstrap
+    assert 'id="dock"' in bootstrap
+    for forbidden in ("制作团队", "9 个专业岗位", "历史资产", "计划预览（已阻断）"):
+        assert forbidden not in bootstrap
+
+    assert 'canvasActive ? "canvas-section" : ""' in shell
+    assert 'emptyCanvas ? "canvas-empty-project" : ""' in shell
+    assert "if (!emptyCanvas) shell.appendChild(buildSceneRail())" in shell
+
+    assert ".studio-unified-workspace.canvas-empty-project" in styles
+    assert ".canvas-workspace-stage #starter-row { display: none !important; }" in styles
+    assert "left: calc(var(--drawer-w)" not in styles
+
+    assert '"添加节点", "primary"' in dock
+    assert '"适应画布"' in dock
+    assert '"快捷键"' in dock
+    for forbidden in ("我的工具箱", "素材库", "历史资产", "计划预览（已阻断）", "帮助"):
+        assert forbidden not in dock
+
+    assert "if (isEditableContentNode(node) && store)" in node_body
+    assert "输入想法、剧本文字或参考说明" in node_body
+    assert 'if (!document.getElementById("drawer")) return false' in keyboard
 
 
 def test_review_delivery_is_merged_into_unified_studio_and_legacy_project_links_redirect() -> None:

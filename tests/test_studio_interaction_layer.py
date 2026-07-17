@@ -316,6 +316,13 @@ def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
     assert '"advanced-create-list"' in source
     assert '"advanced-create-content"' in source
     assert "bindDynamicMenuPosition" in source
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    assert "let lastBlankClick = null" in canvas_input
+    assert "let lastBlankPointerUp = null" in canvas_input
+    assert "function maybeOpenBlankPointerMenu" in canvas_input
+    assert "session?.kind !== \"marquee\" || session.rect" in canvas_input
+    assert "now - previous.at <= 460" in canvas_input
+    assert "openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY })" in canvas_input
     assert ".compact-create-menu" in styles
     assert "max-height: min(560px, calc(100vh - 32px))" in styles
     assert "window.innerHeight - height - 8" in overlay

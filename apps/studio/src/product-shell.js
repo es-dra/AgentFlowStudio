@@ -201,9 +201,16 @@ export function createProductShell(options = {}) {
   }
 
   function buildWorkspace() {
-    const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
+    const canvasActive = section === "canvas";
+    const emptyCanvas = canvasActive && !hasStoryFacts();
+    const shell = node("div", [
+      "studio-unified-workspace",
+      directorCollapsed ? "director-collapsed" : "",
+      canvasActive ? "canvas-section" : "",
+      emptyCanvas ? "canvas-empty-project" : "",
+    ].filter(Boolean).join(" "));
     shell.dataset.contextKey = currentContextKey();
-    shell.appendChild(buildSceneRail());
+    if (!emptyCanvas) shell.appendChild(buildSceneRail());
     const main = section === "canvas"
       ? buildCanvasWorkspace()
       : section === "review"

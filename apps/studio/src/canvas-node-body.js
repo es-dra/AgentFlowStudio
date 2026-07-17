@@ -26,6 +26,10 @@ export function buildNodeBody(node, def, store = null) {
     out.push(contentBlock(node, store));
     return withCreativeRuntimeContract(node, out);
   }
+  if (isEditableContentNode(node) && store) {
+    out.push(editableContentBlock(node, store, false));
+    return withCreativeRuntimeContract(node, out);
+  }
   return withCreativeRuntimeContract(node, emptyBody(node, def));
 }
 
@@ -217,6 +221,7 @@ function editableContentBlock(node, store, expanding) {
   const assetCardEditor = node.params?.assetCardDraft ? " asset-card-content-editor" : "";
   textarea.className = `text-content-view node-content-editor${assetCardEditor}${expanding ? " content-shimmer" : ""}`;
   textarea.value = node.content || "";
+  textarea.placeholder = node.type === "script" ? "输入剧本、分镜或制作说明" : "输入想法、剧本文字或参考说明";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
   textarea.addEventListener("input", () => {

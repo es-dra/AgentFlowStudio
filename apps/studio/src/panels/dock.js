@@ -1,14 +1,12 @@
-import { el, showPopover } from "../overlay.js";
+import { el } from "../overlay.js";
 import { openAddNodeMenu } from "./add-node-menu.js";
-import { openGalleryModal } from "./gallery-modal.js";
-import { openHistoryModal } from "./history-modal.js";
 import { openShortcutsPanel } from "./shortcuts-panel.js";
-import { openAcceptedGenerationPlanPanel } from "./accepted-generation-plan-panel.js";
 import { fitVisibleCanvasViewport, visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 
 export function renderDock(store, runtime) {
   const dock = document.getElementById("dock");
+  if (!dock) return;
   if (dock.dataset.built) return;
   dock.dataset.built = "1";
 
@@ -18,51 +16,17 @@ export function renderDock(store, runtime) {
   });
   dock.appendChild(addBtn);
 
-  const toolboxBtn = dockBtn("grid", "我的工具箱");
-  toolboxBtn.addEventListener("click", () => openGalleryModal(store, "toolbox", null));
-  dock.appendChild(toolboxBtn);
-
-  const libraryBtn = dockBtn("wand", "素材库");
-  libraryBtn.appendChild(el("span", "dot"));
-  libraryBtn.addEventListener("click", () => {
-    const pop = el("div");
-    pop.appendChild(el("div", "menu-title", "素材库"));
-    const styleItem = el("button", "menu-item");
-    styleItem.innerHTML = `<span class="mi-icon">${icon("wand", 13)}</span><span>风格库</span><span class="mi-tag new">NEW</span>`;
-    styleItem.addEventListener("click", () => { close(); openGalleryModal(store, "styles", selectedNodeId(store)); });
-    const effectItem = el("button", "menu-item");
-    effectItem.innerHTML = `<span class="mi-icon">${icon("sparkles", 13)}</span><span>特效库</span><span class="mi-tag new">NEW</span>`;
-    effectItem.addEventListener("click", () => { close(); openGalleryModal(store, "effects", selectedNodeId(store)); });
-    pop.appendChild(styleItem);
-    pop.appendChild(effectItem);
-    const close = showPopover(libraryBtn, pop, { place: "top" });
-  });
-  dock.appendChild(libraryBtn);
-
-  const historyBtn = dockBtn("clock", "历史资产");
-  historyBtn.addEventListener("click", () => openHistoryModal(store));
-  dock.appendChild(historyBtn);
-
-  const planBtn = dockBtn("lock", "计划预览（已阻断）");
-  planBtn.addEventListener("click", () => openAcceptedGenerationPlanPanel(runtime));
-  dock.appendChild(planBtn);
-
-  dock.appendChild(el("span", "dock-sep"));
+  const fitBtn = dockBtn("fit", "适应画布");
+  fitBtn.addEventListener("click", () => store.set((s) => {
+    s.viewport = fitVisibleCanvasViewport(s.nodes);
+  }, { history: false, persist: false }));
+  dock.appendChild(fitBtn);
 
   const keysBtn = dockBtn("keyboard", "快捷键");
   keysBtn.addEventListener("click", () => openShortcutsPanel());
   dock.appendChild(keysBtn);
 
-  const helpBtn = dockBtn("help", "帮助");
-  helpBtn.addEventListener("click", () => openShortcutsPanel());
-  dock.appendChild(helpBtn);
-
   renderCorner(store);
-}
-
-function selectedNodeId(store) {
-  const sel = store.get().selection.nodeIds;
-  return sel.length === 1 ? sel[0] : null;
 }
 
 function dockBtn(iconName, title, extra = "") {
@@ -74,6 +38,7 @@ function dockBtn(iconName, title, extra = "") {
 
 function renderCorner(store) {
   const corner = document.getElementById("corner-controls");
+  if (!corner) return;
   if (corner.dataset.built) return;
   corner.dataset.built = "1";
 

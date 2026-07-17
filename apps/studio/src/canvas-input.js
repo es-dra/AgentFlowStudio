@@ -18,6 +18,7 @@ export function bindCanvasInput(store, runtime) {
   const rootEl = document.getElementById("canvas-root");
   let spaceHeld = false;
   let session = null;
+  let lastBlankPointerUp = null;
   let cancelPanMomentum = null;
   const stopPanMomentum = () => {
     if (cancelPanMomentum) cancelPanMomentum();
@@ -47,7 +48,9 @@ export function bindCanvasInput(store, runtime) {
   });
   rootEl.addEventListener("pointerup", (e) => {
     if (!session) return;
+    const finishedSession = session;
     cancelPanMomentum = handlePointerUp(e, { store, runtime, session, viewportEl, rootEl });
+    lastBlankPointerUp = maybeOpenBlankPointerMenu(e, { session: finishedSession, runtime, store, previous: lastBlankPointerUp });
     session = null;
   });
   rootEl.addEventListener("click", (e) => handleCanvasNodeClick(store, runtime, e));
@@ -93,7 +96,29 @@ function bindViewportWheel(rootEl, store, stopPanMomentum) {
 }
 
 function bindQuickMenus(rootEl, store, runtime) {
+  let lastBlankClick = null;
+  rootEl.addEventListener("click", (e) => {
+    if (hasOpenOverlay()) {
+      lastBlankClick = null;
+      return;
+    }
+    if (!isBlankCanvasDoubleClick(e)) {
+      lastBlankClick = null;
+      return;
+    }
+    const now = performance.now();
+    const previous = lastBlankClick;
+    lastBlankClick = { x: e.clientX, y: e.clientY, at: now };
+    if (!previous) return;
+    const closeInTime = now - previous.at <= 460;
+    const closeInSpace = Math.abs(e.clientX - previous.x) + Math.abs(e.clientY - previous.y) <= 10;
+    if (!closeInTime || !closeInSpace) return;
+    lastBlankClick = null;
+    e.preventDefault();
+    openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
+  });
   rootEl.addEventListener("dblclick", (e) => {
+    if (hasOpenOverlay()) return;
     const nodeEl = closestFromEvent(e, ".node");
     if (nodeEl) {
       if (!closestFromEvent(e, ".node-content-editor")) {
@@ -103,6 +128,7 @@ function bindQuickMenus(rootEl, store, runtime) {
       return;
     }
     if (!isBlankCanvasDoubleClick(e)) return;
+    lastBlankClick = null;
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
   rootEl.addEventListener("contextmenu", (e) => {
@@ -111,6 +137,21 @@ function bindQuickMenus(rootEl, store, runtime) {
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
+}
+
+function maybeOpenBlankPointerMenu(e, { session, runtime, store, previous }) {
+  if (hasOpenOverlay()) return null;
+  if (session?.kind !== "marquee" || session.rect) return null;
+  if (!isBlankCanvasDoubleClick(e)) return null;
+  const now = performance.now();
+  const current = { x: e.clientX, y: e.clientY, at: now };
+  if (!previous) return current;
+  const closeInTime = now - previous.at <= 460;
+  const closeInSpace = Math.abs(e.clientX - previous.x) + Math.abs(e.clientY - previous.y) <= 10;
+  if (!closeInTime || !closeInSpace) return current;
+  e.preventDefault();
+  openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
+  return null;
 }
 
 function isBlankCanvasDoubleClick(e) {
