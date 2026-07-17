@@ -283,6 +283,55 @@ def test_openai_compatible_tts_dispatch_writes_safe_wav_artifact(tmp_path, monke
     assert "/tmp/" not in serialized
 
 
+def test_openai_compatible_tts_can_omit_unsupported_instructions(tmp_path, monkeypatch) -> None:
+    payload = _openai_tts_provider_config()
+    payload["services"]["tts_relay"]["model"] = "tts-1"
+    payload["services"]["tts_relay"]["voice"] = "alloy"
+    payload["services"]["tts_relay"]["supports_instructions"] = False
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+    audio_bytes = _wav_bytes(tmp_path / "speech.wav")
+    captured: dict[str, object] = {}
+
+    class Response:
+        headers = {"Content-Type": "audio/wav"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            return audio_bytes
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return Response()
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
+    monkeypatch.setenv("AUDIO_RELAY_API_KEY", "test-audio-key")
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.urllib.request.urlopen", fake_urlopen)
+
+    registry.dispatch(
+        "audio",
+        "tts_relay",
+        ProviderDispatchRequest(
+            prompt="Alpha narration line.",
+            output_dir=tmp_path / "outputs",
+            timeout_sec=7,
+            instructions="Speak with calm energy.",
+        ),
+    )
+
+    assert captured["payload"] == {
+        "model": "tts-1",
+        "voice": "alloy",
+        "input": "Alpha narration line.",
+        "response_format": "wav",
+    }
+
+
 def test_provider_registry_builds_future_image_edit_descriptor_v03(tmp_path) -> None:
     payload = _codex_image_provider_config()
     payload["services"]["codex_image"]["descriptor"].update(

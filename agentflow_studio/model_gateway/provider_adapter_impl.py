@@ -137,7 +137,11 @@ class OpenAICompatibleTTSAdapter:
             "model": str(model or DEFAULT_TTS_MODEL),
             "voice": _safe_tts_token(request.voice or service.get("voice") or DEFAULT_TTS_VOICE, DEFAULT_TTS_VOICE),
             "response_format": _tts_response_format(request.response_format or service.get("response_format")),
-            "instructions": _safe_optional_text(request.instructions or service.get("instructions")),
+            "instructions": (
+                _safe_optional_text(request.instructions or service.get("instructions"))
+                if _service_supports_tts_instructions(service)
+                else ""
+            ),
             "timeout_sec": request.timeout_sec,
             "output_dir": request.output_dir,
         }
@@ -295,6 +299,15 @@ def _safe_optional_text(value: Any) -> str:
     if any(marker in lowered for marker in ("api_key", "secret", "token", "authorization", "signed_url")):
         raise ModelConfigError("unsafe TTS instructions")
     return text[:1000]
+
+
+def _service_supports_tts_instructions(service: dict[str, Any]) -> bool:
+    value = service.get("supports_instructions")
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _post_audio_speech(
