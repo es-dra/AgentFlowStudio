@@ -36,8 +36,10 @@ import { submitDedicatedProductionExport, submitDedicatedQualityApproval } from 
 import { selectedDeliverySubmission } from "./review-delivery-state.js";
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
+import { approveMangaFirstL4BReferenceSet, loadMangaFirstL4BWorkspace } from "./manga-first-l4b-workspace.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
+const MANGA_FIRST_REFERENCE_APPROVAL_EVENT = "afs:manga-first-reference-approval-requested";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -83,6 +85,7 @@ async function bootstrap() {
   bindQualityFeedback();
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
+  bindMangaFirstReferenceApproval();
   bindStudioWorkflowEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
@@ -104,6 +107,7 @@ async function bootstrap() {
   const startupSection = initialStudioSection();
   if (startupSection === "review") productShell?.setSection("review");
   else if (startupSection === "canvas") productShell?.setSection("canvas");
+  else if (startupSection === "manga_first") productShell?.setSection("manga_first");
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
@@ -125,6 +129,7 @@ function initializeStudio(authUser) {
     },
     onRetry: refreshProductOverview,
     onRefreshReview: refreshProductOverview,
+    onRefreshMangaFirst: () => refreshMangaFirstWorkspace({ open: true }),
     onReviewAction: handleUnifiedReviewAction,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
     createRuntime: createRuntimeClient,
@@ -167,6 +172,11 @@ function bindHumanGateDecisionEvents() {
 }
 function bindVideoAssetCardDraft() {
   window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => handleVideoAssetCardDraft(event));
+}
+function bindMangaFirstReferenceApproval() {
+  window.addEventListener(MANGA_FIRST_REFERENCE_APPROVAL_EVENT, (event) => {
+    void handleMangaFirstReferenceApproval(event.detail || {});
+  });
 }
 function bindStudioWorkflowEvents() {
   window.addEventListener("afs:studio-open-generation-panel", (event) => {
@@ -457,7 +467,62 @@ function safeError(error) {
 }
 
 async function refreshProductOverview() {
-  if (runtime?.workspaceOverview && productShell) await productShell.refresh(runtime, projectController?.authUser || null);
+  if (runtime?.workspaceOverview && productShell) {
+    await productShell.refresh(runtime, projectController?.authUser || null);
+    await refreshMangaFirstWorkspace({ silent: true });
+  }
+}
+
+async function refreshMangaFirstWorkspace({ open = false, silent = false } = {}) {
+  if (!runtime?.loadMangaFirstWorkspace || !productShell || !runtime.projectId || runtime.projectId === "studio-empty") return null;
+  try {
+    const view = await loadMangaFirstL4BWorkspace({ projectId: runtime.projectId, runtimeClient: runtime });
+    productShell.setMangaFirstWorkspace?.(view);
+    if (open) productShell.setSection?.("manga_first");
+    return view;
+  } catch (error) {
+    if (Number(error?.status || 0) === 404) {
+      productShell.setMangaFirstWorkspace?.(null);
+      if (open && !silent) productShell.setSection?.("manga_first");
+      return null;
+    }
+    if (!silent) {
+      reportClientError({
+        event_type: "manga_first_workspace_load_failed",
+        action: "load_manga_first_l4b_workspace",
+        message: safeError(error),
+        error,
+        getRuntime: () => runtime,
+        getProjectId: () => runtime?.projectId || "",
+      });
+    }
+    throw error;
+  }
+}
+
+async function handleMangaFirstReferenceApproval(detail) {
+  const gate = detail?.reference_approval_gate || {};
+  if (!gate.reference_set_digest || !gate.aggregate_version || gate.status === "confirmed") return;
+  const decisionId = `manga-reference-approval-${runtime.projectId}-${gate.aggregate_version}`;
+  try {
+    const view = await approveMangaFirstL4BReferenceSet({
+      projectId: runtime.projectId,
+      referenceApprovalGate: gate,
+      runtimeClient: runtime,
+      decisionId,
+    });
+    productShell?.setMangaFirstWorkspace?.(view);
+    productShell?.setSection?.("manga_first");
+  } catch (error) {
+    reportClientError({
+      event_type: "manga_first_reference_approval_failed",
+      action: "approve_manga_first_reference_set",
+      message: safeError(error),
+      error,
+      getRuntime: () => runtime,
+      getProjectId: () => runtime?.projectId || "",
+    });
+  }
 }
 
 async function handleUnifiedReviewAction(action, { state, note, checklist } = {}) {
@@ -476,6 +541,7 @@ function initialStudioSection() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("stage") === "review" || params.get("mode") === "review") return "review";
     if (params.get("stage") === "canvas" || params.get("mode") === "canvas") return "canvas";
+    if (params.get("stage") === "manga-first" || params.get("mode") === "manga-first") return "manga_first";
     return "storyboard";
   } catch {
     return "storyboard";

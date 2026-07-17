@@ -35,6 +35,7 @@ export function createProductShell(options = {}) {
     workspace: null,
     project: null,
     reviewDelivery: null,
+    mangaFirst: null,
     studioState: null,
     error: "",
     authUser: null,
@@ -89,6 +90,7 @@ export function createProductShell(options = {}) {
     viewSwitch.setAttribute("aria-label", "工作区视图");
     viewSwitch.append(
       viewButton("storyboard", "故事板"),
+      viewButton("manga_first", "动漫制片"),
       viewButton("canvas", "画布"),
       viewButton("review", "审核交付"),
     );
@@ -142,6 +144,7 @@ export function createProductShell(options = {}) {
             loading: true,
             project: projectSummaryShell(item),
             reviewDelivery: null,
+            mangaFirst: null,
             studioState: null,
           };
           render();
@@ -202,23 +205,152 @@ export function createProductShell(options = {}) {
 
   function buildWorkspace() {
     const canvasActive = section === "canvas";
+    const mangaActive = section === "manga_first";
     const emptyCanvas = canvasActive && !hasStoryFacts();
     const shell = node("div", [
       "studio-unified-workspace",
       directorCollapsed ? "director-collapsed" : "",
       canvasActive ? "canvas-section" : "",
+      mangaActive ? "manga-first-section" : "",
       emptyCanvas ? "canvas-empty-project" : "",
     ].filter(Boolean).join(" "));
     shell.dataset.contextKey = currentContextKey();
-    if (!emptyCanvas) shell.appendChild(buildSceneRail());
+    if (!emptyCanvas && !mangaActive) shell.appendChild(buildSceneRail());
     const main = section === "canvas"
       ? buildCanvasWorkspace()
       : section === "review"
         ? buildReviewWorkspace()
+        : section === "manga_first"
+          ? buildMangaFirstWorkspace()
         : buildStoryboardWorkspace();
     shell.appendChild(main);
-    shell.appendChild(buildDirector());
+    if (!mangaActive) shell.appendChild(buildDirector());
     return shell;
+  }
+
+  function buildMangaFirstWorkspace() {
+    const main = node("main", "studio-workspace-main studio-manga-first-workspace");
+    main.id = "product-main";
+    main.tabIndex = -1;
+    const view = snapshot.mangaFirst;
+    if (!view) {
+      const empty = node("section", "studio-review-empty");
+      empty.append(
+        node("strong", "", "尚未读取动漫制片工作区"),
+        node("span", "", "这里只显示当前项目已持久化的 manga-first canonical production facts。"),
+      );
+      const refresh = node("button", "studio-secondary-button", "读取工作区");
+      refresh.type = "button";
+      refresh.addEventListener("click", () => options.onRefreshMangaFirst?.());
+      empty.appendChild(refresh);
+      main.appendChild(empty);
+      return main;
+    }
+    const gate = view.reference_approval_gate || {};
+    const heading = node("section", "manga-first-heading");
+    heading.append(
+      node("span", "eyebrow", "动漫/漫剧商业切片"),
+      node("h1", "", view.project?.title || snapshot.project?.name || "Manga-first production"),
+      node("p", "", gate.status_label || "参考设定待确认"),
+    );
+    const refresh = node("button", "studio-secondary-button", "刷新状态");
+    refresh.type = "button";
+    refresh.addEventListener("click", () => options.onRefreshMangaFirst?.());
+    heading.appendChild(refresh);
+
+    const grid = node("section", "manga-first-grid");
+    grid.append(
+      buildMangaReferenceGate(view),
+      buildMangaTimelinePanel(view),
+      buildMangaQaPanel(view),
+      buildMangaFinalDemoPanel(view),
+    );
+    main.append(heading, grid, buildMangaShotTable(view));
+    return main;
+  }
+
+  function buildMangaReferenceGate(view) {
+    const gate = view.reference_approval_gate || {};
+    const panel = node("article", "manga-first-panel reference-gate");
+    panel.append(
+      node("h2", "", "参考设定"),
+      mangaFact("状态", gate.status_label || "参考设定待确认"),
+      mangaFact("镜头绑定", `${Number(gate.bound_shot_count || 0)} / ${Number(gate.shot_count || 0)}`),
+      mangaFact("Provider 就绪", gate.provider_ready ? "可进入费用授权前置检查" : "不可进入付费生成"),
+    );
+    const approve = node("button", gate.status === "confirmed" ? "studio-secondary-button" : "studio-primary-button", gate.status === "confirmed" ? "已确认参考设定" : "确认参考设定");
+    approve.type = "button";
+    approve.disabled = gate.status === "confirmed" || !gate.reference_set_digest || !gate.aggregate_version;
+    approve.addEventListener("click", () => {
+      window.dispatchEvent(new CustomEvent("afs:manga-first-reference-approval-requested", {
+        detail: {
+          project_id: view.project_id,
+          reference_approval_gate: gate,
+        },
+      }));
+    });
+    panel.appendChild(approve);
+    panel.appendChild(node("small", "", "此确认只锁定参考设定，不代表 Creative QA、最终验收或商业验证。"));
+    return panel;
+  }
+
+  function buildMangaTimelinePanel(view) {
+    const panel = node("article", "manga-first-panel");
+    const duration = (view.timeline || []).reduce((sum, item) => sum + Math.max(0, Number(item.end_seconds || 0) - Number(item.start_seconds || 0)), 0);
+    panel.append(
+      node("h2", "", "时间线"),
+      mangaFact("镜头", `${(view.shot_status || []).length} 个`),
+      mangaFact("总时长", `${duration.toFixed(1)}s`),
+      mangaFact("人工剪辑", view.assembly_contract?.manual_editing_required ? "需要" : "不需要"),
+    );
+    return panel;
+  }
+
+  function buildMangaQaPanel(view) {
+    const panel = node("article", "manga-first-panel");
+    panel.append(
+      node("h2", "", "QA"),
+      mangaFact("技术 QA", view.qa?.technical_QA || "not_started"),
+      mangaFact("视觉创意 QA", view.qa?.visual_creative_QA || "not_started"),
+      mangaFact("Gate", "Before Audio"),
+    );
+    return panel;
+  }
+
+  function buildMangaFinalDemoPanel(view) {
+    const panel = node("article", "manga-first-panel");
+    panel.append(
+      node("h2", "", "最终 Demo"),
+      mangaFact("状态", view.final_demo?.status || "not_available"),
+      mangaFact("音频", view.final_demo?.audio_status || "blocked"),
+      mangaFact("Provider 调用", String(view.provider_dispatch_count ?? 0)),
+    );
+    return panel;
+  }
+
+  function buildMangaShotTable(view) {
+    const sectionEl = node("section", "manga-shot-table");
+    sectionEl.appendChild(node("h2", "", "镜头状态"));
+    const rows = node("div", "manga-shot-rows");
+    for (const shot of view.shot_status || []) {
+      const selected = shot.selected_candidate_id ? "已记录选择" : "未选择";
+      const row = node("article", "manga-shot-row");
+      row.append(
+        node("strong", "", `${String(shot.sequence || 0).padStart(2, "0")} · ${shot.title || shot.shot_id}`),
+        node("span", "", shot.summary || shot.scene_title || "镜头事实来自 canonical aggregate"),
+        node("small", "", `${shot.duration_seconds.toFixed ? shot.duration_seconds.toFixed(1) : Number(shot.duration_seconds || 0).toFixed(1)}s · ${shot.status} · 候选 ${shot.candidate_count || 0} · ${selected}`),
+      );
+      rows.appendChild(row);
+    }
+    if (!rows.children.length) rows.appendChild(node("p", "", "当前项目没有可显示的 canonical shots。"));
+    sectionEl.appendChild(rows);
+    return sectionEl;
+  }
+
+  function mangaFact(label, value) {
+    const row = node("div", "manga-fact");
+    row.append(node("span", "", label), node("strong", "", String(value)));
+    return row;
   }
 
   function buildStoryboardWorkspace() {
@@ -1086,7 +1218,7 @@ export function createProductShell(options = {}) {
         project = payload?.project || null;
         reviewDelivery = composeReviewDeliveryState({ workspace, project, runsPayload, projectId: activeProjectId });
       }
-      snapshot = { loading: false, workspace, project, reviewDelivery, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      snapshot = { loading: false, workspace, project, reviewDelivery, mangaFirst: snapshot.mangaFirst || null, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -1132,12 +1264,20 @@ export function createProductShell(options = {}) {
     render();
   }
 
+  function showMangaFirst() {
+    section = "manga_first";
+    mobileDirectorOpen = false;
+    syncSectionUrl("manga_first");
+    render();
+  }
+
   function syncSectionUrl(next) {
     try {
       const url = new URL(window.location.href);
       if (next === "review") url.searchParams.set("stage", "review");
       else if (next === "canvas") url.searchParams.set("stage", "canvas");
-      else if (["review", "canvas"].includes(url.searchParams.get("stage"))) url.searchParams.delete("stage");
+      else if (next === "manga_first") url.searchParams.set("stage", "manga-first");
+      else if (["review", "canvas", "manga-first"].includes(url.searchParams.get("stage"))) url.searchParams.delete("stage");
       window.history.replaceState({}, "", url.toString());
     } catch {
       // URL synchronization is best-effort; the Studio state remains authoritative.
@@ -1219,10 +1359,16 @@ export function createProductShell(options = {}) {
     showOverview,
     showCanvas,
     showReview,
+    showMangaFirst,
     syncSelectionFromCanvasNode,
+    setMangaFirstWorkspace(view) {
+      snapshot = { ...snapshot, mangaFirst: view || null };
+      if (document.getElementById("app")?.classList.contains("product-mode")) render();
+    },
     setSection(next) {
       if (next === "canvas") return openCanvas();
       if (next === "review") return showReview();
+      if (next === "manga_first") return showMangaFirst();
       return showOverview();
     },
     get section() { return section; },

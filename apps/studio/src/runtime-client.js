@@ -359,6 +359,9 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
+  if (/\/manga-first-l4b\/production-truth$/.test(route) && method === "POST") return "create_manga_first_l4b_production_truth";
+  if (/\/manga-first-l4b\/workspace$/.test(route) && method === "GET") return "load_manga_first_l4b_workspace";
+  if (/\/manga-first-l4b\/reference-set-approvals$/.test(route) && method === "POST") return "approve_manga_first_l4b_reference_set";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -653,6 +656,31 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     loadCreatorWorkspace() {
       return requestJson(`/projects/${encoded}/creator-workspace`);
+    },
+    createMangaFirstProductionTruth(brief, options = {}) {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
+        method: "POST",
+        payload: {
+          brief,
+          idempotency_key: String(options.idempotencyKey || `manga-first-l4b-${projectId}-v1`),
+          include_manifest: options.includeManifest === true,
+        },
+      });
+    },
+    loadMangaFirstWorkspace() {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/workspace`);
+    },
+    approveMangaFirstReferenceSet(payload, idempotencyKey = "") {
+      const decisionId = String(payload?.decision_id || "").trim();
+      return requestJson(`/projects/${encoded}/manga-first-l4b/reference-set-approvals`, {
+        method: "POST",
+        payload: {
+          decision_id: decisionId,
+          expected_aggregate_version: Number(payload?.expected_aggregate_version || 0),
+          reference_set_digest: String(payload?.reference_set_digest || "").trim(),
+          idempotency_key: String(idempotencyKey || payload?.idempotency_key || `${decisionId || "reference-approval"}-v1`),
+        },
+      });
     },
     previewShotImpact(payload) {
       return requestJson(`/projects/${encoded}/episode-production-aggregate/shot-impact-preview`, {
