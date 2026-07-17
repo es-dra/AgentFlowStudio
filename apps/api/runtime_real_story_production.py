@@ -42,6 +42,7 @@ REAL_STORY_ACTION = "real_story_canonical_production"
 TARGET_SECONDS = 120
 SHOT_DURATIONS = (9, 10, 8, 10, 9, 10, 8, 10, 9, 10, 8, 10, 9)
 PROVIDER_VIDEO_DURATION_SECONDS = 10
+MAX_KEYFRAME_POLLS = 72
 
 
 class RealStoryProductionRequest(BaseModel):
@@ -499,8 +500,10 @@ def _run_keyframe(
         request_id=request_id,
         client_request_id=client_request_id,
     )
-    while result["status"] in {"running", "submitted", "pending"}:
+    polls = 0
+    while result["status"] in {"running", "submitted", "pending"} and polls < MAX_KEYFRAME_POLLS:
         time.sleep(5)
+        polls += 1
         result = poll_keyframe_generation(store, project_id, output_dir, request_id=request_id, client_request_id=client_request_id)
     if result["status"] != "succeeded":
         raise RealStoryProductionError(f"keyframe generation failed for {shot['shot_id']}: {result['safe_manifest'].get('blocks')}")
@@ -536,6 +539,8 @@ def _run_keyframe(
             "route": "keyframe-generations",
             "shot_id": shot["shot_id"],
             "actual_calls": 1 if result["provider_calls_started"] else 0,
+            "provider_poll_calls": polls,
+            "poll_stop": "succeeded" if result["status"] == "succeeded" else "bounded_timeout",
             "retry_count": int(result["safe_manifest"].get("retry_count") or 0),
             "job_id": job_id,
         },
