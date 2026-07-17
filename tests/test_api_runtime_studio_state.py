@@ -121,6 +121,39 @@ def test_studio_state_uses_expected_version_to_prevent_stale_overwrite(tmp_path)
     assert response_contains_unsafe_marker(stale.json()) is False
 
 
+def test_studio_state_rejects_existing_state_overwrite_without_expected_version(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-version-required"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio version required"})
+    route = f"/projects/{project_id}/studio-state"
+
+    first = client.put(
+        route,
+        json={"state": {"meta": {"projectName": "First"}, "nodes": {"text_1": {"type": "text"}}}},
+    )
+    assert first.status_code == 200
+    version = first.json()["state_version"]
+
+    missing_version = client.put(
+        route,
+        json={"state": {"meta": {"projectName": "Second"}, "nodes": {"text_2": {"type": "text"}}}},
+    )
+    assert missing_version.status_code == 409
+    assert missing_version.json()["detail"]["error"] == "studio_state_conflict"
+
+    restored = client.get(route)
+    assert sorted(restored.json()["state"]["nodes"]) == ["text_1"]
+
+    current = client.put(
+        route,
+        json={
+            "expected_version": version,
+            "state": {"meta": {"projectName": "Second"}, "nodes": {"text_2": {"type": "text"}}},
+        },
+    )
+    assert current.status_code == 200
+
+
 def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
     monkeypatch.setenv("AFS_AUTH_ALLOW_OPEN_SIGNUP", "true")
@@ -278,6 +311,7 @@ def test_studio_state_candidate_authority_rejects_conflicting_or_unsafe_preview_
         "reusable_asset_authority",
     }
 
+    expected_version = ""
     for name, variant in variants.items():
         state = {
             "nodes": {
@@ -288,8 +322,12 @@ def test_studio_state_candidate_authority_rejects_conflicting_or_unsafe_preview_
                 }
             }
         }
-        saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+        body = {"state": state}
+        if expected_version:
+            body["expected_version"] = expected_version
+        saved = client.put(f"/projects/{project_id}/studio-state", json=body)
         assert saved.status_code == 200, name
+        expected_version = saved.json()["state_version"]
         projected = saved.json()["state"]["nodes"]["image_1"]["params"]["candidatePreviewUrls"][0]
         assert projected["url"] == candidate_url, name
         assert protected_keys.isdisjoint(projected), name
@@ -375,6 +413,7 @@ def test_studio_state_candidate_authority_mismatches_fail_closed(tmp_path) -> No
         "project_id",
         "reusable_asset_authority",
     }
+    expected_version = ""
     for field, variant in variants.items():
         state = {
             "nodes": {
@@ -385,8 +424,12 @@ def test_studio_state_candidate_authority_mismatches_fail_closed(tmp_path) -> No
                 }
             }
         }
-        saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+        body = {"state": state}
+        if expected_version:
+            body["expected_version"] = expected_version
+        saved = client.put(f"/projects/{project_id}/studio-state", json=body)
         assert saved.status_code == 200, field
+        expected_version = saved.json()["state_version"]
         projected = saved.json()["state"]["nodes"]["image_1"]["params"]["candidatePreviewUrls"][0]
         assert projected["url"] == candidate_url, field
         assert protected_keys.isdisjoint(projected), field

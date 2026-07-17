@@ -72,6 +72,8 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth
         try:
             with exclusive_file_lock(lock_path):
                 current_version = _current_state_version(path, project_id=project_id)
+                existing_state_requires_cas = bool(current_version)
+                strict_cas = strict_cas or existing_state_requires_cas
                 if strict_cas and expected_version != current_version:
                     raise HTTPException(status_code=409, detail="studio state version conflict")
 
