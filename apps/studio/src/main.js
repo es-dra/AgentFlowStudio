@@ -31,7 +31,9 @@ import { createStudioProductShell, mountStudioDom } from "./studio-product-boots
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
-import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
+import { restoreCandidateSelectionsAfterLoad, submitDedicatedReviewDecision } from "./candidate-selection-controller.js";
+import { submitDedicatedProductionExport, submitDedicatedQualityApproval } from "./production-delivery-controller.js";
+import { selectedDeliverySubmission } from "./review-delivery-state.js";
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 
@@ -99,6 +101,7 @@ async function bootstrap() {
     await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
+  if (initialStudioSection() === "review") productShell?.setSection("review");
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
@@ -119,6 +122,8 @@ function initializeStudio(authUser) {
       await refreshProductOverview();
     },
     onRetry: refreshProductOverview,
+    onRefreshReview: refreshProductOverview,
+    onReviewAction: handleUnifiedReviewAction,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
@@ -448,6 +453,26 @@ function safeError(error) {
 
 async function refreshProductOverview() {
   if (runtime?.workspaceOverview && productShell) await productShell.refresh(runtime, projectController?.authUser || null);
+}
+
+async function handleUnifiedReviewAction(action, { state, note, checklist } = {}) {
+  if (["select", "revise", "reject"].includes(action)) {
+    const intent = action === "select" ? "将当前方案设为制作基准。" : String(note || "").trim();
+    return submitDedicatedReviewDecision(runtime, state?.reviewSnapshot, action, intent);
+  }
+  const selectedDelivery = selectedDeliverySubmission(state);
+  if (action === "approve") return submitDedicatedQualityApproval(runtime, selectedDelivery?.snapshot, checklist || {});
+  if (action === "export") return submitDedicatedProductionExport(runtime, selectedDelivery?.snapshot);
+  return { ok: false, code: "unsupported_review_action", message: "当前操作暂不可用。" };
+}
+
+function initialStudioSection() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("stage") === "review" || params.get("mode") === "review" ? "review" : "storyboard";
+  } catch {
+    return "storyboard";
+  }
 }
 
 async function handleSignOut() {

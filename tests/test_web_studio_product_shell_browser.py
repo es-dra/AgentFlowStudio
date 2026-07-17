@@ -91,7 +91,8 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
 
     assert 'editorParking.id = "studio-canvas-parking"' in bootstrap
     assert "getCanvasShell: () => editorShell" in main
-    assert 'section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace()' in shell
+    assert 'section === "canvas"' in shell
+    assert 'section === "review"' in shell
     assert 'stage.appendChild(editor)' in shell
     assert 'root.dataset.view = section' in shell
     assert 'const active = section === key' in shell
@@ -101,6 +102,37 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     assert '.canvas-workspace-stage #sprite-root { display: none; }' in styles
     assert '.canvas-mode #product-shell-root' not in styles
     assert 'app?.classList.remove("product-mode")' not in shell
+
+
+def test_review_delivery_is_merged_into_unified_studio_and_legacy_project_links_redirect() -> None:
+    main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    review_main = (STUDIO / "src" / "review-delivery-main.js").read_text(encoding="utf-8")
+    styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
+
+    assert 'viewButton("review", "审核交付")' in shell
+    assert "buildReviewWorkspace()" in shell
+    assert 'showReview({ noticeText: "审核交付已绑定当前项目与选择。" })' in shell
+    assert 'showReview({ noticeText: "版本、恢复与交付状态已在当前 Studio 中打开。" })' in shell
+    assert "composeReviewDeliveryState" in shell
+    assert "selectedDeliverySubmission(reviewState)" in shell
+    assert "options.onReviewAction?.(action" in shell
+    assert 'url.searchParams.set("stage", "review")' in shell
+    assert "projectSummaryShell(item)" in shell
+    assert "reviewDelivery: null" in shell
+    assert 'current_stage: "正在切换项目"' in shell
+    assert "onReviewAction: handleUnifiedReviewAction" in main
+    assert "submitDedicatedReviewDecision(runtime" in main
+    assert "submitDedicatedQualityApproval(runtime" in main
+    assert "submitDedicatedProductionExport(runtime" in main
+    assert 'initialStudioSection() === "review"' in main
+    assert "if (!redirectProjectScopedReview()) bootstrap()" in review_main
+    assert 'new URL("/studio/", window.location.origin)' in review_main
+    assert 'target.searchParams.set("project", projectId)' in review_main
+    assert 'target.searchParams.set("stage", "review")' in review_main
+    assert "window.location.replace(target.toString())" in review_main
+    assert ".studio-review-workspace" in styles
+    assert ".studio-review-action-grid" in styles
 
 
 def test_scene_and_shot_selection_use_one_context_sync_path() -> None:

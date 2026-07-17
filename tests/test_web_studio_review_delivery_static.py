@@ -32,6 +32,9 @@ def test_review_delivery_is_a_dedicated_authenticated_chinese_creator_surface() 
     assert 'id="overlay-root"' in html
     for forbidden in ('id="review-delivery-root"', 'id="canvas-root"', 'id="node-layer"'):
         assert forbidden not in html
+    assert "if (!redirectProjectScopedReview()) bootstrap()" in main
+    assert 'target.searchParams.set("stage", "review")' in main
+    assert "window.location.replace(target.toString())" in main
     assert main.index("await ensureAuthSession(authRuntime)") < main.index("mountReviewSurface();")
     assert "reviewState.clearIdentity();" in main
     assert "mountedRoot?.replaceChildren();" in main

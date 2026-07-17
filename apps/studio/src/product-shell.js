@@ -1,11 +1,19 @@
 import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { createDirectorContextStore, findNextProductionTarget, productContextKey } from "./product-shell-context.js";
+import { composeReviewDeliveryState, focusReviewCandidate, selectedDeliverySubmission } from "./review-delivery-state.js";
 
 const DIRECTOR_TABS = [
   ["suggestion", "建议"],
   ["reference", "引用"],
   ["version", "版本"],
+];
+
+const REVIEW_QUALITY_FIELDS = [
+  ["story_intent_preserved", "叙事意图", "确认故事重点、情绪走向和信息层级没有偏离。", "narrative"],
+  ["character_continuity_checked", "画面一致性", "确认角色、场景与关键视觉设定保持连续。", "consistency"],
+  ["shot_coverage_checked", "镜头覆盖", "确认必要镜头与交付构图已覆盖。", "coverage"],
+  ["revision_addressed", "改版要求", "确认本轮修改原因已经被处理。", "revision"],
 ];
 
 export function createProductShell(options = {}) {
@@ -18,11 +26,15 @@ export function createProductShell(options = {}) {
   let contextOpen = false;
   let mobileDirectorOpen = false;
   let notice = "";
+  let reviewBusy = "";
+  let reviewNotice = "";
+  let reviewError = "";
   const directorContexts = createDirectorContextStore();
   let snapshot = {
     loading: true,
     workspace: null,
     project: null,
+    reviewDelivery: null,
     studioState: null,
     error: "",
     authUser: null,
@@ -78,6 +90,7 @@ export function createProductShell(options = {}) {
     viewSwitch.append(
       viewButton("storyboard", "故事板"),
       viewButton("canvas", "画布"),
+      viewButton("review", "审核交付"),
     );
 
     const summary = node("div", "studio-header-summary");
@@ -120,6 +133,19 @@ export function createProductShell(options = {}) {
       button.innerHTML = `<strong>${escapeHtml(item.name || "未命名项目")}</strong><span>${escapeHtml(item.episode || "单集制作")}</span>`;
       button.addEventListener("click", () => {
         contextOpen = false;
+        if (item.project_id !== snapshot.project?.project_id) {
+          reviewNotice = "";
+          reviewError = "";
+          notice = "";
+          snapshot = {
+            ...snapshot,
+            loading: true,
+            project: projectSummaryShell(item),
+            reviewDelivery: null,
+            studioState: null,
+          };
+          render();
+        }
         options.onSwitchProject?.(item.project_id);
       });
       menu.appendChild(button);
@@ -178,7 +204,11 @@ export function createProductShell(options = {}) {
     const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
     shell.dataset.contextKey = currentContextKey();
     shell.appendChild(buildSceneRail());
-    const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
+    const main = section === "canvas"
+      ? buildCanvasWorkspace()
+      : section === "review"
+        ? buildReviewWorkspace()
+        : buildStoryboardWorkspace();
     shell.appendChild(main);
     shell.appendChild(buildDirector());
     return shell;
@@ -262,11 +292,7 @@ export function createProductShell(options = {}) {
     const review = node("button", "studio-secondary-button", "进入审核");
     review.type = "button";
     review.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
-      notice = "审核范围已锁定为当前镜头。";
-      render();
+      showReview({ noticeText: "审核交付已绑定当前项目与选择。" });
     });
     const canvas = node("button", "studio-text-button");
     canvas.type = "button";
@@ -377,13 +403,316 @@ export function createProductShell(options = {}) {
     const versions = node("button", "studio-text-button", "查看版本与恢复");
     versions.type = "button";
     versions.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
-      render();
+      showReview({ noticeText: "版本、恢复与交付状态已在当前 Studio 中打开。" });
     });
     bar.append(script, node("p", "", currentShot().description), versions);
     return bar;
+  }
+
+  function buildReviewWorkspace() {
+    const main = node("main", "studio-workspace-main studio-review-workspace");
+    main.id = "product-main";
+    main.tabIndex = -1;
+    main.appendChild(buildContextBar());
+    const reviewState = currentReviewState();
+    const stage = node("section", "studio-review-stage");
+    stage.setAttribute("aria-label", "审核、恢复与交付");
+    stage.append(buildReviewHeading(reviewState), buildReviewContent(reviewState));
+    if (notice || reviewNotice || reviewError) {
+      const live = node("p", `studio-live-notice ${reviewError ? "error" : ""}`, reviewError || reviewNotice || notice);
+      live.setAttribute("aria-live", "polite");
+      stage.appendChild(live);
+    }
+    main.append(stage, buildVersionBar());
+    return main;
+  }
+
+  function buildReviewHeading(reviewState) {
+    const head = node("div", "studio-review-heading");
+    const copy = node("div");
+    copy.append(
+      node("span", "eyebrow", "审核交付"),
+      node("h1", "", snapshot.project?.name || "当前项目"),
+      node("p", "", hasStoryFacts()
+        ? `当前选择：${currentShot().title}`
+        : "当前项目还没有可审核的场景或镜头"),
+    );
+    const status = node("span", `studio-review-status ${reviewState.phase === "ready" ? "ready" : "pending"}`, reviewStatusLabel(reviewState));
+    head.append(copy, status);
+    return head;
+  }
+
+  function buildReviewContent(reviewState) {
+    if (!reviewState || reviewState.phase === "empty") return buildEmptyReviewContent();
+    if (reviewState.phase !== "ready") {
+      const panel = node("div", "studio-review-empty");
+      panel.append(node("strong", "", "暂时无法读取审核状态"), node("span", "", "请刷新当前项目后再继续。"));
+      return panel;
+    }
+    const layout = node("div", "studio-review-layout");
+    layout.append(buildReviewCandidatePanel(reviewState), buildReviewActionPanel(reviewState));
+    return layout;
+  }
+
+  function buildEmptyReviewContent() {
+    const panel = node("div", "studio-review-empty");
+    panel.append(
+      node("strong", "", "还没有可审核的制作版本"),
+      node("span", "", "候选、批准、恢复与交付包只会来自当前项目的制作记录；这里不会显示示例或推断结果。"),
+    );
+    const actions = node("div", "studio-review-empty-actions");
+    const brief = node("button", "studio-primary-button", "告诉 AI 导演你想做什么");
+    brief.type = "button";
+    brief.addEventListener("click", focusDirectorBrief);
+    const canvas = node("button", "studio-secondary-button", "查看同源画布");
+    canvas.type = "button";
+    canvas.addEventListener("click", openCanvas);
+    actions.append(brief, canvas);
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function buildReviewCandidatePanel(reviewState) {
+    const panel = node("section", "studio-review-candidates");
+    panel.setAttribute("aria-labelledby", "studio-review-candidates-heading");
+    const head = node("header", "");
+    head.append(
+      node("h2", "", "当前候选"),
+      node("span", "", `${reviewState.candidates.length} 个方案`),
+    );
+    head.querySelector("h2").id = "studio-review-candidates-heading";
+    panel.appendChild(head);
+    const list = node("div", "studio-review-candidate-list");
+    list.setAttribute("role", "list");
+    for (const [index, candidate] of reviewState.candidates.entries()) {
+      const card = node("button", `studio-review-candidate ${candidate.candidate_id === reviewState.focusedCandidateId ? "active" : ""}`);
+      card.type = "button";
+      card.setAttribute("role", "listitem");
+      card.setAttribute("aria-label", `${candidate.label}${candidate.candidate_id === reviewState.selectedCandidateId && !reviewState.rejected ? "，当前版本" : ""}`);
+      card.innerHTML = `<strong>${escapeHtml(candidate.label || `方案 ${index + 1}`)}</strong><span>${candidate.available ? "预览可用" : "预览暂不可用"}</span><small>${candidate.candidate_id === reviewState.selectedCandidateId && !reviewState.rejected ? "当前版本" : "待比较"}</small>`;
+      card.addEventListener("click", () => {
+        reviewNotice = `${candidate.label || "候选"} 已设为当前查看对象。`;
+        reviewError = "";
+        if (snapshot.reviewDelivery?.candidates) snapshot.reviewDelivery = focusReviewCandidate(snapshot.reviewDelivery, candidate.candidate_id);
+        render();
+      });
+      list.appendChild(card);
+    }
+    panel.appendChild(list);
+    panel.appendChild(buildReviewLineage(reviewState));
+    return panel;
+  }
+
+  function buildReviewLineage(reviewState) {
+    const details = node("details", "studio-review-lineage");
+    const summary = node("summary", "", "查看版本沿革");
+    const list = node("ol");
+    for (const item of reviewState.lineage || []) {
+      const row = node("li", "", item.label || "制作记录已更新");
+      list.appendChild(row);
+    }
+    if (!list.children.length) list.appendChild(node("li", "", "尚未形成版本沿革。"));
+    details.append(summary, list);
+    return details;
+  }
+
+  function buildReviewActionPanel(reviewState) {
+    const panel = node("aside", "studio-review-actions");
+    panel.setAttribute("aria-label", "审核决定与交付准备");
+    panel.append(buildReviewFacts(reviewState), buildReviewAnnotation(), buildReviewChecklist(reviewState));
+    const actions = node("div", "studio-review-action-grid");
+    actions.append(
+      reviewActionButton("select", "选为当前版本", reviewCanSelect(reviewState)),
+      reviewActionButton("revise", "要求返修", reviewCanRevise(reviewState)),
+      reviewActionButton("reject", "退回候选", Boolean(reviewState.reviewSnapshot)),
+      reviewActionButton("approve", reviewState.quality?.approved ? "质量门禁已通过" : "批准当前修订", reviewCanApprove(reviewState)),
+      reviewActionButton("export", reviewState.exports.length ? "再次生成交付包" : "生成交付包", reviewCanExport(reviewState)),
+    );
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function buildReviewFacts(reviewState) {
+    const facts = node("section", "studio-review-surface");
+    facts.appendChild(node("h2", "", "交付状态"));
+    const selected = reviewState.candidates.find((item) => item.candidate_id === reviewState.selectedCandidateId);
+    facts.append(
+      reviewFact("当前方案", selected && !reviewState.rejected ? selected.label : "未选择"),
+      reviewFact("质量门禁", reviewState.quality?.approved ? "已通过" : "待检查"),
+      reviewFact("交付包", reviewState.exports.length ? `${reviewState.exports.length} 个` : "未生成"),
+      reviewFact("恢复状态", reviewState.rejected ? "已退回，等待新修订" : "暂无可恢复版本"),
+    );
+    return facts;
+  }
+
+  function buildReviewAnnotation() {
+    const surface = node("section", "studio-review-surface");
+    surface.appendChild(node("h2", "", "本轮意见"));
+    const label = node("label", "studio-review-note");
+    label.appendChild(node("span", "", "给制作团队的修改说明"));
+    const textarea = document.createElement("textarea");
+    textarea.rows = 4;
+    textarea.maxLength = 800;
+    textarea.dataset.revisionNote = "true";
+    textarea.placeholder = "例如：保留构图，降低背景亮度，让人物表情更清楚。";
+    textarea.disabled = Boolean(reviewBusy);
+    label.appendChild(textarea);
+    surface.append(label, node("small", "", "说明只会随返修或退回决定保存。"));
+    return surface;
+  }
+
+  function buildReviewChecklist(reviewState) {
+    const surface = node("section", "studio-review-surface");
+    surface.appendChild(node("h2", "", "交付检查"));
+    const fieldset = node("fieldset", "studio-review-checklist");
+    fieldset.disabled = Boolean(reviewBusy || !reviewCanApprove(reviewState) || reviewState.quality?.approved);
+    const legend = node("legend", "sr-only", "质量门禁检查项");
+    fieldset.appendChild(legend);
+    for (const [name, title, copy, key] of REVIEW_QUALITY_FIELDS) {
+      const row = node("label", "studio-review-check");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.dataset.qualityCheck = name;
+      input.checked = reviewState.quality?.[key] === "passed";
+      const text = node("span");
+      text.append(node("strong", "", title), node("small", "", copy));
+      row.append(input, text, node("em", "", input.checked ? "已检查" : "未检查"));
+      fieldset.appendChild(row);
+    }
+    surface.append(fieldset, node("small", "", "音频与字幕检查未接入时保持不可用，不会显示为通过。"));
+    return surface;
+  }
+
+  function currentReviewState() {
+    return snapshot.reviewDelivery || {
+      phase: "empty",
+      candidates: [],
+      selectedCandidateId: "",
+      focusedCandidateId: "",
+      reviewSnapshot: null,
+      deliverySnapshot: null,
+      quality: null,
+      exports: [],
+      lineage: [],
+    };
+  }
+
+  function reviewStatusLabel(reviewState) {
+    if (reviewState.phase === "ready") return reviewState.quality?.approved ? "交付可复核" : "等待审核";
+    if (reviewState.phase === "empty") return "暂无制作版本";
+    return "读取受限";
+  }
+
+  function reviewSelectedCandidate(reviewState) {
+    return reviewState.candidates?.find((item) => item.candidate_id === reviewState.selectedCandidateId) || null;
+  }
+
+  function reviewFocusedCandidate(reviewState) {
+    return reviewState.candidates?.find((item) => item.candidate_id === reviewState.focusedCandidateId) || null;
+  }
+
+  function reviewCanSelect(reviewState) {
+    return Boolean(reviewState.reviewSnapshot && reviewFocusedCandidate(reviewState)?.available);
+  }
+
+  function reviewCanRevise(reviewState) {
+    return Boolean(reviewState.reviewSnapshot && reviewState.selectedCandidateId && reviewFocusedCandidate(reviewState)?.available);
+  }
+
+  function reviewCanApprove(reviewState) {
+    return Boolean(reviewSelectedCandidate(reviewState)?.available && selectedDeliverySubmission(reviewState) && !reviewState.quality?.approved);
+  }
+
+  function reviewCanExport(reviewState) {
+    return Boolean(reviewSelectedCandidate(reviewState)?.available && selectedDeliverySubmission(reviewState) && reviewState.quality?.approved);
+  }
+
+  function reviewFact(label, value) {
+    const row = node("div", "studio-review-fact");
+    row.append(node("span", "", label), node("strong", "", value));
+    return row;
+  }
+
+  function projectSummaryShell(item) {
+    return {
+      project_id: item.project_id || "",
+      name: item.name || item.studio_state_meta?.projectName || "未命名项目",
+      episode: item.episode || "未创建分集",
+      current_stage: "正在切换项目",
+      progress_percent: 0,
+      decision_inbox: { pending_count: 0 },
+      crew: { blocked_count: 0 },
+    };
+  }
+
+  function reviewSuccessMessage(action) {
+    return ({
+      select: "当前方案已保存，并已读取最新版本。",
+      revise: "返修要求已保存，并已读取最新版本。",
+      reject: "退回决定已保存，批准与导出已撤销。",
+      approve: "当前修订的质量门禁已通过。",
+      export: "交付包已生成，并已读取交付记录。",
+    })[action] || "状态已更新。";
+  }
+
+  function reviewWriteError(result) {
+    if (["auth_required", "delivery_auth_required"].includes(result?.code)) return "账户状态已变化，请重新登录后继续。";
+    if (result?.code === "missing_revision_intent") return "请先写明修改原因。";
+    if (result?.code === "delivery_checklist_incomplete") return "请完成所有可用的交付检查。";
+    if (result?.stale) return result.message || "版本已发生变化，请读取最新状态后重试。";
+    return result?.message || "这次操作没有保存。请读取最新状态后重试。";
+  }
+
+  function reviewActionButton(action, label, enabled) {
+    const button = node("button", action === "reject" ? "studio-danger-button" : action === "select" || action === "approve" ? "studio-primary-button" : "studio-secondary-button", label);
+    button.type = "button";
+    button.disabled = Boolean(reviewBusy || !enabled);
+    button.setAttribute("aria-disabled", String(button.disabled));
+    button.addEventListener("click", () => handleReviewAction(action));
+    return button;
+  }
+
+  async function handleReviewAction(action) {
+    const reviewState = currentReviewState();
+    if (!reviewState || reviewState.phase !== "ready" || reviewBusy) return;
+    const note = String(document.querySelector("[data-revision-note]")?.value || "").trim();
+    const checklist = Object.fromEntries([...document.querySelectorAll("[data-quality-check]")].map((input) => [input.dataset.qualityCheck, input.checked === true]));
+    if (["revise", "reject"].includes(action) && !note) {
+      reviewError = "请先写明修改原因，再提交这次主创决定。";
+      document.querySelector("[data-revision-note]")?.focus();
+      render();
+      return;
+    }
+    if (action === "approve" && Object.values(checklist).some((checked) => checked !== true)) {
+      reviewError = "请逐项完成叙事、画面一致性、镜头覆盖与改版要求检查。";
+      document.querySelector("[data-quality-check]:not(:checked)")?.focus();
+      render();
+      return;
+    }
+    if (["approve", "export"].includes(action) && !selectedDeliverySubmission(reviewState)) {
+      reviewError = "当前交付版本与权威选择不一致，请读取最新状态。";
+      render();
+      return;
+    }
+    reviewBusy = action;
+    reviewNotice = "";
+    reviewError = "";
+    render();
+    const result = await options.onReviewAction?.(action, { state: reviewState, note, checklist });
+    reviewBusy = "";
+    if (result?.ok) {
+      reviewNotice = reviewSuccessMessage(action);
+      reviewError = "";
+      await options.onRefreshReview?.();
+      if (reviewNotice) {
+        const messageText = reviewNotice;
+        reviewNotice = messageText;
+        render();
+      }
+      return;
+    }
+    reviewError = reviewWriteError(result);
+    render();
   }
 
   function buildDirector() {
@@ -555,9 +884,17 @@ export function createProductShell(options = {}) {
       button.type = "button";
       button.setAttribute("aria-current", section === key ? "page" : "false");
       button.addEventListener("click", () => {
+        if (key === "storyboard") {
+          showOverview();
+          return;
+        }
+        if (key === "review") {
+          showReview();
+          requestAnimationFrame(() => document.getElementById("product-main")?.focus());
+          return;
+        }
         section = key;
         if (key === "context") cockpitOpen = true;
-        if (key === "review") directorTab = "version";
         if (key === "review" || key === "director") {
           directorCollapsed = false;
           mobileDirectorOpen = true;
@@ -576,7 +913,11 @@ export function createProductShell(options = {}) {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(active));
-    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showOverview());
+    button.addEventListener("click", () => {
+      if (key === "canvas") openCanvas();
+      else if (key === "review") showReview();
+      else showOverview();
+    });
     return button;
   }
 
@@ -722,13 +1063,18 @@ export function createProductShell(options = {}) {
         ? requestRuntime.projectId
         : workspace?.projects?.[0]?.project_id || "";
       let project = null;
+      let reviewDelivery = null;
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
-        const payload = await projectRuntime?.projectOverview?.();
+        const [payload, runsPayload] = await Promise.all([
+          projectRuntime?.projectOverview?.(),
+          projectRuntime?.listProductionRuns?.().catch(() => ({ production_runs: [] })),
+        ]);
         if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
         project = payload?.project || null;
+        reviewDelivery = composeReviewDeliveryState({ workspace, project, runsPayload, projectId: activeProjectId });
       }
-      snapshot = { loading: false, workspace, project, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      snapshot = { loading: false, workspace, project, reviewDelivery, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -751,6 +1097,7 @@ export function createProductShell(options = {}) {
   function showOverview() {
     section = "storyboard";
     mobileDirectorOpen = false;
+    syncSectionUrl("storyboard");
     render();
   }
 
@@ -758,8 +1105,30 @@ export function createProductShell(options = {}) {
     if (!options.getCanvasShell?.()) return false;
     section = "canvas";
     syncCanvasSelection();
+    syncSectionUrl("canvas");
     render();
     return true;
+  }
+
+  function showReview({ noticeText = "" } = {}) {
+    section = "review";
+    directorTab = "version";
+    directorCollapsed = false;
+    mobileDirectorOpen = false;
+    if (noticeText) notice = noticeText;
+    syncSectionUrl("review");
+    render();
+  }
+
+  function syncSectionUrl(next) {
+    try {
+      const url = new URL(window.location.href);
+      if (next === "review") url.searchParams.set("stage", "review");
+      else if (url.searchParams.get("stage") === "review") url.searchParams.delete("stage");
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      // URL synchronization is best-effort; the Studio state remains authoritative.
+    }
   }
 
   function sceneModel() {
@@ -836,8 +1205,13 @@ export function createProductShell(options = {}) {
     updateStudioState,
     showOverview,
     showCanvas,
+    showReview,
     syncSelectionFromCanvasNode,
-    setSection(next) { section = next; render(); },
+    setSection(next) {
+      if (next === "canvas") return showCanvas();
+      if (next === "review") return showReview();
+      return showOverview();
+    },
     get section() { return section; },
   };
 }
