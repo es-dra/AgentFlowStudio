@@ -98,6 +98,8 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     assert 'url.searchParams.set("stage", "canvas")' in shell
     assert '["review", "canvas"].includes(url.searchParams.get("stage"))' in shell
     assert 'stage.appendChild(editor)' in shell
+    assert 'body.appendChild(live)' in shell
+    assert "画布编辑请在桌面打开" in shell
     assert 'root.dataset.view = section' in shell
     assert 'const active = section === key' in shell
     assert 'options.onSelectCanvasNode?.(currentShot().nodeId || "")' in shell

@@ -359,6 +359,11 @@ export function createProductShell(options = {}) {
     canvas.type = "button";
     canvas.addEventListener("click", openCanvas);
     actions.append(brief, canvas);
+    if (notice) {
+      const live = node("p", "studio-live-notice", notice);
+      live.setAttribute("aria-live", "polite");
+      body.appendChild(live);
+    }
     const counts = node("dl", "empty-canonical-counts");
     for (const [label, value] of [["场景", 0], ["镜头", 0], ["参考", 0], ["决策", 0]]) {
       counts.append(node("dt", "", label), node("dd", "", String(value)));
