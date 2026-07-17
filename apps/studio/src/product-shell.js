@@ -1131,7 +1131,8 @@ export function createProductShell(options = {}) {
     try {
       const url = new URL(window.location.href);
       if (next === "review") url.searchParams.set("stage", "review");
-      else if (url.searchParams.get("stage") === "review") url.searchParams.delete("stage");
+      else if (next === "canvas") url.searchParams.set("stage", "canvas");
+      else if (["review", "canvas"].includes(url.searchParams.get("stage"))) url.searchParams.delete("stage");
       window.history.replaceState({}, "", url.toString());
     } catch {
       // URL synchronization is best-effort; the Studio state remains authoritative.

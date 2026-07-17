@@ -93,6 +93,10 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     assert "getCanvasShell: () => editorShell" in main
     assert 'section === "canvas"' in shell
     assert 'section === "review"' in shell
+    assert 'params.get("stage") === "canvas"' in main
+    assert 'else if (startupSection === "canvas") productShell?.setSection("canvas")' in main
+    assert 'url.searchParams.set("stage", "canvas")' in shell
+    assert '["review", "canvas"].includes(url.searchParams.get("stage"))' in shell
     assert 'stage.appendChild(editor)' in shell
     assert 'root.dataset.view = section' in shell
     assert 'const active = section === key' in shell
@@ -166,7 +170,7 @@ def test_review_delivery_is_merged_into_unified_studio_and_legacy_project_links_
     assert "submitDedicatedReviewDecision(runtime" in main
     assert "submitDedicatedQualityApproval(runtime" in main
     assert "submitDedicatedProductionExport(runtime" in main
-    assert 'initialStudioSection() === "review"' in main
+    assert 'if (startupSection === "review") productShell?.setSection("review")' in main
     assert "if (!redirectLegacyReviewEntry()) bootstrap()" in review_main
     assert 'new URL("/studio/", window.location.origin)' in review_main
     assert 'if (projectId) target.searchParams.set("project", projectId)' in review_main

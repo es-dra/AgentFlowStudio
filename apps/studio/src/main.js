@@ -101,7 +101,9 @@ async function bootstrap() {
     await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
-  if (initialStudioSection() === "review") productShell?.setSection("review");
+  const startupSection = initialStudioSection();
+  if (startupSection === "review") productShell?.setSection("review");
+  else if (startupSection === "canvas") productShell?.setSection("canvas");
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
@@ -472,7 +474,9 @@ async function handleUnifiedReviewAction(action, { state, note, checklist } = {}
 function initialStudioSection() {
   try {
     const params = new URLSearchParams(window.location.search);
-    return params.get("stage") === "review" || params.get("mode") === "review" ? "review" : "storyboard";
+    if (params.get("stage") === "review" || params.get("mode") === "review") return "review";
+    if (params.get("stage") === "canvas" || params.get("mode") === "canvas") return "canvas";
+    return "storyboard";
   } catch {
     return "storyboard";
   }
