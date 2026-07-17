@@ -49,13 +49,12 @@ const handlers = {
   canonicalPreviewSession,
 };
 
-if (!redirectProjectScopedReview()) bootstrap().catch((error) => showSecureEntry(readError(error), { error: true }));
+if (!redirectLegacyReviewEntry()) bootstrap().catch((error) => showSecureEntry(readError(error), { error: true }));
 
-function redirectProjectScopedReview() {
+function redirectLegacyReviewEntry() {
   const projectId = requestedProjectId();
-  if (!projectId) return false;
   const target = new URL("/studio/", window.location.origin);
-  target.searchParams.set("project", projectId);
+  if (projectId) target.searchParams.set("project", projectId);
   target.searchParams.set("stage", "review");
   window.location.replace(target.toString());
   return true;

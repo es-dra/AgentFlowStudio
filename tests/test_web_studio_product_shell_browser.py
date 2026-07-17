@@ -126,10 +126,11 @@ def test_review_delivery_is_merged_into_unified_studio_and_legacy_project_links_
     assert "submitDedicatedQualityApproval(runtime" in main
     assert "submitDedicatedProductionExport(runtime" in main
     assert 'initialStudioSection() === "review"' in main
-    assert "if (!redirectProjectScopedReview()) bootstrap()" in review_main
+    assert "if (!redirectLegacyReviewEntry()) bootstrap()" in review_main
     assert 'new URL("/studio/", window.location.origin)' in review_main
-    assert 'target.searchParams.set("project", projectId)' in review_main
+    assert 'if (projectId) target.searchParams.set("project", projectId)' in review_main
     assert 'target.searchParams.set("stage", "review")' in review_main
+    assert "if (!projectId) return false" not in review_main
     assert "window.location.replace(target.toString())" in review_main
     assert ".studio-review-workspace" in styles
     assert ".studio-review-action-grid" in styles
