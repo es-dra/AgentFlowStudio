@@ -8,7 +8,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
+from agentflow_studio.model_gateway.company_secrets import (
+    SERVER_CODEX_SERVICE_ID,
+    CompanyProviderSecrets,
+)
 from agentflow_studio.model_gateway.codex_runtime_env import codex_subprocess_env, prune_codex_home
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
@@ -51,7 +54,10 @@ class CodexLocalAdapter:
             "prompt": request.prompt,
             "task_type": request.task_type,
             "reference_image_paths": tuple(request.reference_image_paths),
-            "cli_command": str(service.get("cli_command") or account.get("cli_command") or "codex"),
+            "cli_command": _codex_cli_command(
+                self.service_id,
+                str(service.get("cli_command") or account.get("cli_command") or "codex"),
+            ),
             "timeout_sec": float(service.get("timeout_sec") or account.get("timeout_sec") or request.timeout_sec),
             "account": account_selection.public_summary(),
         }
@@ -72,6 +78,25 @@ class CodexLocalAdapter:
 
     def safe_error(self, error: Exception) -> dict[str, str]:
         return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
+
+
+def _codex_cli_command(service_id: str, configured: str) -> str:
+    command = configured.strip() or "codex"
+    if service_id != SERVER_CODEX_SERVICE_ID:
+        return command
+    candidates = [
+        os.environ.get("AFS_CODEX_CLI", "").strip(),
+        str(Path.home() / ".codex" / "packages" / "standalone" / "current" / "bin" / "codex"),
+        str(Path.home() / ".local" / "bin" / "codex"),
+        shutil.which(command) or "",
+    ]
+    for raw in candidates:
+        if not raw:
+            continue
+        candidate = Path(raw).expanduser()
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return command
 
 
 def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:

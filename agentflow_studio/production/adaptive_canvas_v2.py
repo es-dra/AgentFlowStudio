@@ -26,6 +26,8 @@ Callback = Callable[[dict[str, Any]], None]
 ADAPTIVE_SCHEMA_VERSION = "afs.adaptive_canvas_v2.production_run.v0.1"
 LEDGER_SCHEMA_VERSION = "afs.adaptive_canvas_v2.charge_ledger.v0.1"
 DEFAULT_PROVIDER_ATTEMPT_CAP = 20
+IMAGE_PROVIDER_SERVICE_ID = "image_relay"
+VIDEO_PROVIDER_SERVICE_ID = "seedance_i2v"
 
 
 class AdaptiveCanvasError(RuntimeError):
@@ -64,6 +66,8 @@ class AdaptiveProductionProfile:
     characters: tuple[dict[str, Any], ...]
     scenes: tuple[dict[str, Any], ...]
     shots: tuple[AdaptiveShotSpec, ...]
+    llm_service_id: str = "prompt_optimizer"
+    script_candidate_id: str = "script-v1"
     provider_supported_video_durations_sec: tuple[int, ...] = (10, 5)
     reference_sheet_required: bool = True
     max_paid_attempts: int = DEFAULT_PROVIDER_ATTEMPT_CAP
@@ -77,6 +81,10 @@ class AdaptiveProductionProfile:
         return len(self.shots)
 
     def validate(self) -> None:
+        if not self.llm_service_id.strip():
+            raise AdaptiveCanvasError("llm_service_id must be non-empty")
+        if not self.script_candidate_id.strip():
+            raise AdaptiveCanvasError("script_candidate_id must be non-empty")
         if not self.shots:
             raise AdaptiveCanvasError("profile requires at least one shot")
         if self.max_paid_attempts > DEFAULT_PROVIDER_ATTEMPT_CAP:
@@ -508,7 +516,7 @@ def _ensure_script(
             stage="script",
             shot_id=None,
             chunk_id=None,
-            candidate_id="script-v1",
+            candidate_id=options.profile.script_candidate_id,
             capability="llm",
             prompt=prompt,
             artifact=_artifact_version("script", path, run_root, options.project_id, options.run_id),
@@ -521,11 +529,11 @@ def _ensure_script(
         ledger,
         registry,
         capability="llm",
-        service_id="prompt_optimizer",
+        service_id=options.profile.llm_service_id,
         stage="script",
         shot_id=None,
         chunk_id=None,
-        candidate_id="script-v1",
+        candidate_id=options.profile.script_candidate_id,
         prompt=prompt,
         request=ProviderDispatchRequest(prompt=prompt, output_dir=run_root / "provider_outputs" / "script", timeout_sec=240.0),
     )
@@ -576,7 +584,7 @@ def _ensure_reference_sheet(
         ledger,
         registry,
         capability="image",
-        service_id="image_relay",
+        service_id=IMAGE_PROVIDER_SERVICE_ID,
         stage="reference_sheet",
         shot_id=None,
         chunk_id=None,
@@ -646,7 +654,7 @@ def _ensure_keyframes(
             ledger,
             registry,
             capability="image",
-            service_id="image_relay",
+            service_id=IMAGE_PROVIDER_SERVICE_ID,
             stage="keyframe",
             shot_id=shot_id,
             chunk_id=None,
@@ -737,7 +745,7 @@ def _ensure_video_chunks(
             if registry is None:
                 raise AdaptiveCanvasError("provider registry is required in real mode")
             if shot["generation_strategy"] == "text_to_video":
-                descriptor = registry.descriptor("seedance_i2v")
+                descriptor = registry.descriptor(VIDEO_PROVIDER_SERVICE_ID)
                 if descriptor.frame_slots.get("first_frame") == "required":
                     raise AdaptiveCanvasError("configured video provider requires image_to_video first-frame input")
             if shot["generation_strategy"] == "image_to_video" and anchor is None:
@@ -1073,7 +1081,7 @@ def _real_video_attempt(
         chunk_id=chunk_id,
         candidate_id="candidate-001",
         capability="video",
-        service_id="seedance_i2v",
+        service_id=VIDEO_PROVIDER_SERVICE_ID,
         prompt=prompt,
     )
     try:
@@ -1090,11 +1098,11 @@ def _real_video_attempt(
             reference_image_paths=(first_frame,) if first_frame else (),
         )
         ledger.mark_started(str(attempt["attempt_id"]))
-        submitted = registry.submit("video", "seedance_i2v", request)
+        submitted = registry.submit("video", VIDEO_PROVIDER_SERVICE_ID, request)
         task_id = str((submitted.get("task") or {}).get("task_id") or "")
         deadline = time.monotonic() + options.video_poll_timeout_sec
         while True:
-            raw = registry.poll("video", "seedance_i2v", submitted)
+            raw = registry.poll("video", VIDEO_PROVIDER_SERVICE_ID, submitted)
             if str(raw.get("status") or "") == "succeeded":
                 return {**raw, "attempt_id": attempt["attempt_id"], "provider_task_id": task_id}
             if str(raw.get("status") or "") != "running":
@@ -1454,6 +1462,8 @@ def _safe_message(value: str) -> str:
 
 __all__ = [
     "AdaptiveCanvasError",
+    "IMAGE_PROVIDER_SERVICE_ID",
+    "VIDEO_PROVIDER_SERVICE_ID",
     "AdaptiveProductionProfile",
     "AdaptiveRunOptions",
     "AdaptiveShotSpec",

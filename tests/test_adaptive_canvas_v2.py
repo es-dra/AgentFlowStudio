@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+import agentflow_studio.production.adaptive_canvas_v2 as adaptive_canvas
 
 from agentflow_studio.production.adaptive_canvas_v2 import (
     AdaptiveRunOptions,
@@ -19,6 +22,8 @@ from fastapi.testclient import TestClient
 
 def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     profile = real_anime_4shot_paid_profile()
+    assert profile.llm_service_id == "server_codex"
+    assert profile.script_candidate_id == "script-v2"
     result = run_adaptive_canvas_production(
         AdaptiveRunOptions(
             runtime_root=tmp_path / "runtime",
@@ -39,6 +44,72 @@ def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     assert [shot["target_duration_sec"] for shot in workspace["shots"]] == [15.0, 15.0, 15.0, 15.0]
     assert {shot["generation_strategy"] for shot in workspace["shots"]} == {"image_to_video"}
     assert workspace["final_demo"]["duration_sec"] >= 59.0
+
+
+def test_failed_script_v1_is_preserved_and_script_v2_has_a_new_fingerprint(tmp_path: Path) -> None:
+    ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    old = ledger.reserve(
+        stage="script",
+        shot_id=None,
+        chunk_id=None,
+        candidate_id="script-v1",
+        capability="llm",
+        service_id="prompt_optimizer",
+        prompt="same script request",
+    )
+    ledger.mark_started(old["attempt_id"])
+    ledger.mark_failed(old["attempt_id"], RuntimeError("quota blocked"))
+    new = ledger.reserve(
+        stage="script",
+        shot_id=None,
+        chunk_id=None,
+        candidate_id="script-v2",
+        capability="llm",
+        service_id="server_codex",
+        prompt="same script request",
+    )
+
+    payload = read_json(ledger.path)
+    assert payload["paid_attempt_count"] == 1
+    assert payload["attempts"][0]["status"] == "failed"
+    assert payload["attempts"][0]["service_id"] == "prompt_optimizer"
+    assert payload["attempts"][1]["status"] == "reserved"
+    assert payload["attempts"][1]["provider_calls_started"] is False
+    assert new["service_id"] == "server_codex"
+    assert new["candidate_id"] == "script-v2"
+    assert old["charge_fingerprint"] != new["charge_fingerprint"]
+
+
+def test_paid_script_route_dispatches_only_to_server_codex(tmp_path: Path) -> None:
+    class RecordingRegistry:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            self.calls.append((capability, service_id))
+            return {
+                "text": json.dumps(build_script_truth_from_profile(real_anime_4shot_paid_profile())),
+                "provider_calls_started": True,
+            }
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(
+        runtime_root=tmp_path / "runtime",
+        project_id="project",
+        run_id="run",
+        profile=profile,
+        mode="real",
+    )
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    registry = RecordingRegistry()
+    adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+
+    assert registry.calls == [("llm", "server_codex")]
+    assert ledger.paid_attempt_count == 1
+    assert ledger.attempts[0]["service_id"] == "server_codex"
+    assert ledger.attempts[0]["candidate_id"] == "script-v2"
 
 
 def test_zero_provider_counterexample_has_dynamic_shots_durations_and_strategy(tmp_path: Path) -> None:

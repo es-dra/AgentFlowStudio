@@ -14,9 +14,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from agentflow_studio.model_gateway.company_secrets import SERVER_CODEX_SERVICE_ID  # noqa: E402
 from agentflow_studio.production.adaptive_canvas_v2 import (  # noqa: E402
     AdaptiveRunOptions,
     ChargeLedger,
+    IMAGE_PROVIDER_SERVICE_ID,
+    VIDEO_PROVIDER_SERVICE_ID,
     build_script_truth_from_profile,
     compile_duration_chunks,
     run_adaptive_canvas_production,
@@ -76,7 +79,7 @@ def evaluate(root: Path) -> dict[str, Any]:
         store = RuntimeStore(runtime_root)
         paid_workspace = store.load_production_run("eval-paid-profile", "run-001")
         counter_workspace = store.load_production_run("eval-counter-profile", "run-001")
-        _check_paid_profile(paid_result, paid_workspace, findings)
+        _check_paid_profile(paid, paid_result, paid_workspace, findings)
         _check_counter_profile(counter_result, counter_workspace, findings)
         _check_api_projection(runtime_root, findings)
         _check_ledger(runtime_root, findings)
@@ -99,7 +102,20 @@ def evaluate(root: Path) -> dict[str, Any]:
     }
 
 
-def _check_paid_profile(result: dict[str, Any], run: dict[str, Any], findings: list[dict[str, str]]) -> None:
+def _check_paid_profile(
+    profile: Any,
+    result: dict[str, Any],
+    run: dict[str, Any],
+    findings: list[dict[str, str]],
+) -> None:
+    if profile.llm_service_id != SERVER_CODEX_SERVICE_ID:
+        findings.append({"severity": "P0", "scope": "route", "issue": "paid LLM route is not server_codex"})
+    if profile.script_candidate_id != "script-v2":
+        findings.append({"severity": "P1", "scope": "ledger", "issue": "paid script candidate is not script-v2"})
+    if IMAGE_PROVIDER_SERVICE_ID != "image_relay":
+        findings.append({"severity": "P0", "scope": "route", "issue": "image route is not relay"})
+    if VIDEO_PROVIDER_SERVICE_ID != "seedance_i2v":
+        findings.append({"severity": "P0", "scope": "route", "issue": "video route is not relay"})
     if result["paid_attempt_count"] != 0:
         findings.append({"severity": "P0", "scope": "paid_fake", "issue": "fake evaluator started provider attempts"})
     durations = [shot["target_duration_sec"] for shot in run["shots"]]

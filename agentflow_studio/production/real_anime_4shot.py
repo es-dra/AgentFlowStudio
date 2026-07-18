@@ -18,6 +18,8 @@ def real_anime_4shot_paid_profile() -> AdaptiveProductionProfile:
     """The paid test profile. The adaptive executor itself is not four-shot specific."""
     return AdaptiveProductionProfile(
         project_type=PROJECT_TYPE,
+        llm_service_id="server_codex",
+        script_candidate_id="script-v2",
         title="Neon Courier Pact",
         logline=(
             "Two young couriers carry a glowing city charter across a vertical neon skyline before "
