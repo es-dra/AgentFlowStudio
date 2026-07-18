@@ -3,15 +3,18 @@ import { el } from "./overlay.js";
 import {
   cancelAgentCommand,
   executePendingAgentCommand,
+  executePendingAgentCommandWithRuntime,
   recordAgentCommandError,
   submitAgentChatMessage,
   undoAgentReceipt,
+  undoAgentReceiptWithRuntime,
 } from "./agent-chat-lifecycle.js";
 
 export function buildAgentChatPanel({
   session,
   context,
   store,
+  runtime = null,
   collapsed = false,
   mobileOpen = false,
   onToggleCollapse,
@@ -27,8 +30,8 @@ export function buildAgentChatPanel({
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
   body.appendChild(messageLog(session));
-  if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, onRender }));
-  body.appendChild(receiptList({ session, store, onRender }));
+  if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, runtime, onRender }));
+  body.appendChild(receiptList({ session, store, runtime, onRender }));
   body.appendChild(composer({ session, context, onOpen, onRender }));
   aside.appendChild(body);
   return aside;
@@ -80,7 +83,7 @@ function messageLog(session) {
   return log;
 }
 
-function commandPreview({ session, store, onRender }) {
+function commandPreview({ session, store, runtime, onRender }) {
   const command = session.pendingCommand;
   const preview = el("section", `agent-command-preview ${command.status}`);
   preview.dataset.commandType = command.command_type;
@@ -96,15 +99,21 @@ function commandPreview({ session, store, onRender }) {
   preview.appendChild(details);
   const actions = el("div", "agent-command-actions");
   if (command.status !== "blocked") {
-    const confirm = el("button", "studio-primary-button", "确认执行");
+    const confirm = el("button", "studio-primary-button", command.status === "executing" ? "执行中" : "确认执行");
     confirm.type = "button";
+    confirm.disabled = command.status === "executing";
     confirm.addEventListener("click", () => {
-      try {
-        store.set((state) => executePendingAgentCommand(session, state));
-      } catch (error) {
-        recordAgentCommandError(session, error);
-      }
+      command.status = "executing";
       onRender?.();
+      const run = command.execution_mode === "runtime"
+        ? executePendingAgentCommandWithRuntime(session, store, runtime)
+        : Promise.resolve().then(() => {
+          store.set((state) => executePendingAgentCommand(session, state));
+        });
+      run.catch((error) => {
+        command.status = "preview";
+        recordAgentCommandError(session, error);
+      }).finally(() => onRender?.());
     });
     actions.appendChild(confirm);
   }
@@ -119,7 +128,7 @@ function commandPreview({ session, store, onRender }) {
   return preview;
 }
 
-function receiptList({ session, store, onRender }) {
+function receiptList({ session, store, runtime, onRender }) {
   const receipts = (session?.receipts || []).slice(-3).reverse();
   const wrap = el("section", "agent-receipts");
   wrap.appendChild(el("span", "eyebrow", "执行回执"));
@@ -136,12 +145,16 @@ function receiptList({ session, store, onRender }) {
       undo.type = "button";
       undo.innerHTML = `${icon("retry", 13)}撤销`;
       undo.addEventListener("click", () => {
-        try {
-          store.set((state) => undoAgentReceipt(session, receipt, state));
-        } catch (error) {
+        undo.disabled = true;
+        const run = receipt.execution_mode === "runtime"
+          ? undoAgentReceiptWithRuntime(session, receipt, store, runtime)
+          : Promise.resolve().then(() => {
+            store.set((state) => undoAgentReceipt(session, receipt, state));
+          });
+        run.catch((error) => {
+          undo.disabled = false;
           recordAgentCommandError(session, error);
-        }
-        onRender?.();
+        }).finally(() => onRender?.());
       });
       item.appendChild(undo);
     }

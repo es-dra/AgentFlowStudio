@@ -1,4 +1,7 @@
+import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+
 const SCHEMA_VERSION = "afs_agent_chat_lifecycle.v0.1";
+const CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1";
 const MESSAGE_LIMIT = 28;
 const RECEIPT_LIMIT = 12;
 
@@ -16,8 +19,8 @@ export function createAgentChatContextStore() {
 export function agentChatContextKey(context = {}) {
   return [
     cleanToken(context.project_id, 120) || "local-project",
-    cleanToken(context.revision_id, 80) || "rev-0",
-    cleanToken(context.selected_node_id || context.current_shot_node_id, 120) || "canvas",
+    cleanToken(context.section, 80) || "canvas",
+    "agent-chat",
   ].join(":");
 }
 
@@ -34,10 +37,18 @@ export function agentChatContextSnapshot({
   const nodeValues = Object.values(nodes).filter(Boolean);
   const shotNodes = nodeValues.filter((node) => node?.params?.structuredShot || node?.params?.nodeRole === "storyboard_shot");
   const activeNode = selectedNode || null;
+  const scriptTruth = state.production?.script_core_truth_projection || {};
+  const selectedCoreAsset = activeNode?.params?.coreAssetTruth || null;
+  const scriptRevisionId = cleanToken(scriptTruth.current_revision_id, 140);
+  const scriptSourceDigest = cleanToken(scriptTruth.source_digest, 80);
   return {
     schema_version: SCHEMA_VERSION,
     project_id: cleanToken(project?.project_id || meta.projectId, 120),
-    revision_id: cleanToken(meta.seq ? `studio-state-${meta.seq}` : "", 80),
+    revision_id: scriptRevisionId || cleanToken(meta.seq ? `studio-state-${meta.seq}` : "", 80),
+    studio_state_revision_id: cleanToken(meta.seq ? `studio-state-${meta.seq}` : "", 80),
+    script_revision_id: scriptRevisionId,
+    script_source_digest: scriptSourceDigest,
+    script_analysis_state: cleanToken(scriptTruth.analysis_state || "", 80),
     canvas_name: cleanText(meta.canvasName || "画布", 40),
     project_name: cleanText(project?.name || meta.projectName || "未命名项目", 80),
     section: section === "storyboard" ? "storyboard_read_only" : "canvas",
@@ -45,6 +56,9 @@ export function agentChatContextSnapshot({
     selected_node_type: cleanToken(activeNode?.type, 40),
     selected_node_status: cleanToken(activeNode?.status, 40),
     selected_node_title: cleanText(activeNode?.title || activeNode?.label || "", 80),
+    selected_core_asset_id: cleanToken(selectedCoreAsset?.asset_id, 140),
+    selected_core_asset_type: cleanToken(selectedCoreAsset?.asset_type, 60),
+    selected_core_asset_status: cleanToken(selectedCoreAsset?.status, 80),
     current_shot_node_id: cleanToken(currentShot?.nodeId, 120),
     current_shot_title: cleanText(currentShot?.title || "", 80),
     counts: {
@@ -62,6 +76,8 @@ export function agentChatContextSnapshot({
       "safe_error_recovery",
       "undo_receipt",
       "storyboard_read_only_projection",
+      "script_revision_truth_contract",
+      "core_asset_truth_runtime_commands",
     ],
     storyboard_mode: "read_only_deferred",
     remote_dispatch_count: 0,
@@ -110,6 +126,102 @@ export function executePendingAgentCommand(session, state) {
   return receipt;
 }
 
+export async function executePendingAgentCommandWithRuntime(session, store, runtime) {
+  const command = session?.pendingCommand;
+  if (!command) throw new Error("agent command preview is empty");
+  if (command.status === "blocked") throw new Error(command.error_message || "agent command is blocked");
+  if (command.execution_mode !== "runtime") {
+    let receipt = null;
+    store.set((state) => {
+      receipt = executePendingAgentCommand(session, state);
+    });
+    return receipt;
+  }
+  if (!runtime) throw new Error("runtime client is unavailable");
+  let response = null;
+  let runtimeReceipt = null;
+  if (command.command_type === "create_script_revision") {
+    response = await runtime.createScriptRevision({
+      source_kind: command.source_kind || "script",
+      source_text: command.source_text || "",
+      parent_revision_id: command.parent_revision_id || null,
+      provenance: {
+        source: "agent_chat",
+        command_id: command.command_id,
+        context_key: command.context_key,
+      },
+      created_at: new Date().toISOString(),
+    });
+  } else if (command.command_type === "refresh_script_truth") {
+    response = await runtime.loadScriptTruth();
+  } else {
+    const payload = runtimeCoreAssetCommandPayload(command);
+    await runtime.previewCoreAssetCommand(payload);
+    response = await runtime.confirmCoreAssetCommand(payload);
+    runtimeReceipt = response?.receipt || null;
+  }
+  const projection = response?.projection;
+  let projectionSummary = null;
+  if (projection) {
+    store.set((state) => {
+      projectionSummary = applyScriptCoreTruthProjection(state, projection);
+    });
+  }
+  const receipt = runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary);
+  session.pendingCommand = null;
+  recordReceipt(session, receipt);
+  appendMessage(session, { role: "assistant", text: receipt.summary });
+  return receipt;
+}
+
+export async function undoAgentReceiptWithRuntime(session, receipt, store, runtime) {
+  if (receipt?.execution_mode !== "runtime") {
+    let undo = null;
+    store.set((state) => {
+      undo = undoAgentReceipt(session, receipt, state);
+    });
+    return undo;
+  }
+  if (!receipt?.runtime_receipt_id || !receipt?.undo_available) throw new Error("agent receipt is not undoable");
+  if (!runtime?.undoCoreAssetCommand) throw new Error("runtime undo is unavailable");
+  const response = await runtime.undoCoreAssetCommand({
+    project_id: receipt.project_id,
+    receipt_id: receipt.runtime_receipt_id,
+    revision_id: receipt.revision_id,
+    source_digest: receipt.source_digest,
+    schema_version: CORE_ASSET_COMMAND_SCHEMA_VERSION,
+  });
+  let projectionSummary = null;
+  if (response?.projection) {
+    store.set((state) => {
+      projectionSummary = applyScriptCoreTruthProjection(state, response.projection);
+    });
+  }
+  const undoReceipt = {
+    schema_version: SCHEMA_VERSION,
+    receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_id: receipt.command_id,
+    command_type: `${receipt.command_type}.undo`,
+    status: "undone",
+    executed_at: new Date().toISOString(),
+    context_key: receipt.context_key,
+    project_id: receipt.project_id,
+    revision_id: receipt.revision_id,
+    source_digest: receipt.source_digest,
+    summary: response?.receipt?.summary || "上一条 Core Asset 命令已撤销，画布投影已从 runtime truth 刷新。",
+    undo_available: false,
+    storyboard_write: false,
+    execution_mode: "runtime",
+    projection_summary: projectionSummary,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+  receipt.undo_available = false;
+  recordReceipt(session, undoReceipt);
+  appendMessage(session, { role: "assistant", text: undoReceipt.summary });
+  return undoReceipt;
+}
+
 export function undoAgentReceipt(session, receipt, state) {
   if (!receipt?.undo_available) throw new Error("agent receipt is not undoable");
   const undoReceipt = applyUndo(receipt, state);
@@ -145,6 +257,108 @@ function emptySession(contextKey) {
 }
 
 function previewAgentCommand(message, context = {}) {
+  const scriptText = matchCommand(message, [
+    /^\/script-revision\s+(.+)$/i,
+    /^创建(?:剧本)?修订[:：]\s*(.+)$/i,
+  ]);
+  if (scriptText) {
+    return scriptRevisionCommand({
+      context,
+      sourceKind: "script",
+      sourceText: scriptText,
+      title: "创建 ScriptRevision",
+      summary: "把输入文本写入 runtime ScriptRevision，并将 canonical projection 投到画布。",
+    });
+  }
+
+  const ideaText = matchCommand(message, [
+    /^\/idea\s+(.+)$/i,
+    /^创意[:：]\s*(.+)$/i,
+  ]);
+  if (ideaText) {
+    return scriptRevisionCommand({
+      context,
+      sourceKind: "idea",
+      sourceText: ideaText,
+      title: "创建 Idea Revision",
+      summary: "把想法写入 runtime ScriptRevision；没有 structured analysis 前只标记 analysis_required。",
+    });
+  }
+
+  if (/^\/refresh-script-truth$/i.test(message) || /^刷新(?:剧本)?事实$/i.test(message)) {
+    return runtimeCommand({
+      context,
+      commandType: "refresh_script_truth",
+      title: "刷新 Script/Core Asset Truth",
+      summary: "从 runtime canonical truth 重新投影 ScriptRevision、Character、Main Scene 与手动 Prop。",
+      requiresScriptRevision: false,
+    });
+  }
+
+  const manualProp = matchCommand(message, [
+    /^\/manual-prop\s+(.+)$/i,
+    /^\/add-prop\s+(.+)$/i,
+    /^手动道具[:：]\s*(.+)$/i,
+  ]);
+  if (manualProp) {
+    return coreAssetCommand({
+      context,
+      commandType: "create_manual_prop",
+      title: "创建手动 Prop",
+      summary: `创建绑定当前 ScriptRevision 的手动 Prop「${cleanText(manualProp, 60)}」`,
+      patch: { display_name: cleanText(manualProp, 120) },
+      allowMissingTarget: true,
+    });
+  }
+
+  const editAsset = matchCommand(message, [
+    /^\/edit-selected-asset\s+(.+)$/i,
+    /^编辑当前资产[:：]\s*(.+)$/i,
+  ]);
+  if (editAsset) {
+    return coreAssetCommand({
+      context,
+      commandType: "edit_asset",
+      title: "编辑当前 Core Asset",
+      summary: `把当前 Core Asset 名称改为「${cleanText(editAsset, 60)}」`,
+      patch: { display_name: cleanText(editAsset, 120) },
+    });
+  }
+
+  const aliasText = matchCommand(message, [
+    /^\/merge-alias\s+(.+)$/i,
+    /^合并别名[:：]\s*(.+)$/i,
+  ]);
+  if (aliasText) {
+    return coreAssetCommand({
+      context,
+      commandType: "merge_alias",
+      title: "合并角色别名",
+      summary: `把「${cleanText(aliasText, 60)}」合并为当前角色别名`,
+      patch: { alias: cleanText(aliasText, 120) },
+    });
+  }
+
+  if (/^\/retire-selected-asset$/i.test(message) || /^停用当前资产$/i.test(message)) {
+    return coreAssetCommand({
+      context,
+      commandType: context.selected_core_asset_type === "prop" ? "retire_manual_prop" : "retire_asset",
+      title: "停用当前 Core Asset",
+      summary: "将当前 Core Asset 标记为 retired，并保留审计历史和撤销入口。",
+      patch: {},
+    });
+  }
+
+  if (/^\/restore-selected-asset$/i.test(message) || /^恢复当前资产$/i.test(message)) {
+    return coreAssetCommand({
+      context,
+      commandType: "restore_asset",
+      title: "恢复当前 Core Asset",
+      summary: "将当前 retired Core Asset 恢复为可用状态。",
+      patch: {},
+    });
+  }
+
   const renameText = matchCommand(message, [
     /^\/rename-selected\s+(.+)$/i,
     /^\/rename-node\s+(.+)$/i,
@@ -187,6 +401,86 @@ function previewAgentCommand(message, context = {}) {
   }
 
   return { command_type: "none", status: "none" };
+}
+
+function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary }) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("create_script_revision", title, "故事板是只读投影。请切回画布后再创建 ScriptRevision。", context);
+  }
+  const text = cleanSourceText(sourceText, 200000);
+  if (!text) return blockedCommand("create_script_revision", title, "ScriptRevision source text is empty.", context);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "create_script_revision",
+    execution_mode: "runtime",
+    status: "preview",
+    title,
+    summary,
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    revision_id: cleanToken(context.script_revision_id, 140),
+    source_kind: sourceKind,
+    source_text: text,
+    parent_revision_id: cleanToken(context.script_revision_id, 140) || null,
+    impact: {
+      node_ids: [],
+      relation: "script_revision_canonical_projection",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function runtimeCommand({ context, commandType, title, summary, requiresScriptRevision = true }) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再执行写入命令。", context);
+  }
+  if (requiresScriptRevision && (!context.script_revision_id || !context.script_source_digest)) {
+    return blockedCommand(commandType, title, "请先创建或刷新 ScriptRevision，再执行 Core Asset 命令。", context);
+  }
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: commandType,
+    execution_mode: "runtime",
+    status: "preview",
+    title,
+    summary,
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    revision_id: cleanToken(context.script_revision_id, 140),
+    source_digest: cleanToken(context.script_source_digest, 80),
+    impact: {
+      node_ids: [],
+      relation: "runtime_script_core_truth_projection",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function coreAssetCommand({ context, commandType, title, summary, patch, allowMissingTarget = false }) {
+  const base = runtimeCommand({ context, commandType, title, summary });
+  if (base.status === "blocked") return base;
+  const targetAssetId = cleanToken(context.selected_core_asset_id, 140);
+  if (!allowMissingTarget && !targetAssetId) {
+    return blockedCommand(commandType, title, "请先选择一个 Character、Main Scene 或手动 Prop 投影节点。", context);
+  }
+  return {
+    ...base,
+    target_asset_id: targetAssetId || null,
+    patch: safeJsonClone(patch || {}),
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: "runtime_core_asset_truth",
+      storyboard_write: false,
+    },
+  };
 }
 
 function commandForSelectedNode({ context, commandType, title, summary, after, allowEmptyTitle = false }) {
@@ -284,6 +578,60 @@ function executeAgentCommand(command, state) {
   };
 }
 
+function runtimeCoreAssetCommandPayload(command) {
+  return {
+    project_id: command.project_id,
+    revision_id: command.revision_id,
+    source_digest: command.source_digest,
+    schema_version: CORE_ASSET_COMMAND_SCHEMA_VERSION,
+    command_type: command.command_type,
+    target_asset_id: command.target_asset_id || null,
+    patch: command.patch || {},
+    reason: "agent_chat_confirmed",
+    generated_at: new Date().toISOString(),
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+  };
+}
+
+function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary) {
+  const revision = response?.revision || response?.projection?.current_revision || {};
+  const projection = response?.projection || {};
+  const receipt = {
+    schema_version: SCHEMA_VERSION,
+    receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_id: command.command_id,
+    command_type: command.command_type,
+    status: "executed",
+    executed_at: new Date().toISOString(),
+    context_key: command.context_key,
+    project_id: command.project_id || response?.project_id || projection.project_id || "",
+    revision_id: runtimeReceipt?.revision_id || revision.revision_id || projection.current_revision_id || command.revision_id || "",
+    source_digest: runtimeReceipt?.source_digest || revision.source_digest || projection.current_revision?.source_digest || command.source_digest || "",
+    summary: runtimeReceipt?.summary || runtimeReceiptSummary(command, response),
+    undo_available: Boolean(runtimeReceipt?.undo_available),
+    runtime_receipt_id: runtimeReceipt?.receipt_id || "",
+    storyboard_write: false,
+    execution_mode: "runtime",
+    projection_summary: projectionSummary,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+  return receipt;
+}
+
+function runtimeReceiptSummary(command, response) {
+  if (command.command_type === "create_script_revision") {
+    const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
+    return `ScriptRevision 已创建；当前分析状态：${state}。`;
+  }
+  if (command.command_type === "refresh_script_truth") {
+    const state = response?.projection?.analysis_state || "analysis_required";
+    return `Script/Core Asset Truth 已刷新；当前分析状态：${state}。`;
+  }
+  return `${command.title || "Runtime 命令"}已执行。`;
+}
+
 function applyUndo(receipt, state) {
   const node = state?.nodes?.[receipt.node_id];
   if (!node) throw new Error("selected node no longer exists");
@@ -361,6 +709,15 @@ function cleanText(value, limit) {
   return String(value || "")
     .replace(/\b(Bearer|sk-[A-Za-z0-9_-]+|token=|secret=|authorization=)\S*/gi, "[redacted]")
     .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
+
+function cleanSourceText(value, limit) {
+  return String(value || "")
+    .replace(/\b(Bearer|sk-[A-Za-z0-9_-]+|token=|secret=|authorization=)\S*/gi, "[redacted]")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .trim()
     .slice(0, limit);
 }

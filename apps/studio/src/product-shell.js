@@ -387,6 +387,7 @@ export function createProductShell(options = {}) {
       session,
       context: { ...context, context_key: agentChatContextKey(context) },
       store: options.getStore?.(),
+      runtime: options.getRuntime?.(),
       collapsed: agentCollapsed,
       mobileOpen: mobileAgentOpen,
       onToggleCollapse: () => {

@@ -240,6 +240,7 @@ function editableContentBlock(node, store, expanding) {
 }
 
 function isEditableContentNode(node) {
+  if (node.params?.scriptCoreProjection) return false;
   return node.type === "text" || node.type === "script" || Boolean(node.params?.assetCardDraft);
 }
 

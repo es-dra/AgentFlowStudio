@@ -356,6 +356,12 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
+  if (/\/script-revisions$/.test(route) && method === "POST") return "create_script_revision";
+  if (/\/script-revisions\/[^/]+\/select$/.test(route) && method === "POST") return "select_script_revision";
+  if (/\/analysis-candidates$/.test(route) && method === "POST") return "submit_structured_analysis_candidate";
+  if (/\/core-assets\/commands\/preview$/.test(route) && method === "POST") return "preview_core_asset_command";
+  if (/\/core-assets\/commands\/confirm$/.test(route) && method === "POST") return "confirm_core_asset_command";
+  if (/\/core-assets\/commands\/undo$/.test(route) && method === "POST") return "undo_core_asset_command";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -581,6 +587,30 @@ export function createRuntimeClient(projectId = "") {
         method: "POST",
         payload: { fixture_mode: "default_unconfirmed", ...payload },
       });
+    },
+    createScriptRevision(payload) {
+      return requestJson(`/projects/${encoded}/script-revisions`, { method: "POST", payload });
+    },
+    selectScriptRevision(revisionId) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/select`, { method: "POST" });
+    },
+    loadScriptTruth() {
+      return requestJson(`/projects/${encoded}/script-truth`);
+    },
+    submitStructuredAnalysisCandidate(revisionId, payload) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates`, {
+        method: "POST",
+        payload,
+      });
+    },
+    previewCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/preview`, { method: "POST", payload });
+    },
+    confirmCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/confirm`, { method: "POST", payload });
+    },
+    undoCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/undo`, { method: "POST", payload });
     },
     createProductionRun(payload) {
       return requestJson(`/projects/${encoded}/production-runs`, { method: "POST", payload });

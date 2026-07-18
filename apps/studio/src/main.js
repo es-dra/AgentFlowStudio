@@ -35,6 +35,7 @@ import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-contr
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
+import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -97,7 +98,7 @@ async function bootstrap() {
   await projectController.ensureAccessibleStartupProject();
   if (hasActiveProject()) {
     await store.hydrateRuntime(runtime); await syncRuntimeAssets(store, runtime);
-    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
+    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime); await refreshScriptCoreTruth(runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
 }
@@ -114,6 +115,7 @@ function initializeStudio(authUser) {
     getStore: () => store,
     getCanvasShell: () => editorShell,
     getCanvasParking: () => editorParking,
+    getRuntime: () => runtime,
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
@@ -144,12 +146,33 @@ function initializeStudio(authUser) {
       if (editorMounted) {
         await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
         await refreshPendingKeyframeGenerations(store, runtimeClient);
+        await refreshScriptCoreTruth(runtimeClient);
       }
       await refreshProductOverview();
     },
     render: () => renderAll(store.get()),
   });
   projectController.setAuthUser(authUser);
+}
+async function refreshScriptCoreTruth(runtimeClient = runtime) {
+  if (!runtimeClient?.loadScriptTruth || !store) return;
+  try {
+    const payload = await runtimeClient.loadScriptTruth();
+    if (runtimeClient !== runtime) return;
+    store.set((state) => {
+      applyScriptCoreTruthProjection(state, payload?.projection || {});
+    }, { history: false, persist: false });
+  } catch (error) {
+    reportClientError({
+      event_type: "script_core_truth_refresh_failed",
+      severity: "warning",
+      action: "refresh_script_core_truth",
+      message: safeError(error),
+      error,
+      getRuntime: () => runtime,
+      getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
+    });
+  }
 }
 function bindDomainCrewEvents() {
   window.addEventListener("afs:studio-open-domain-crew", () => { syncDomainCrewContext(); openDomainCrewPanel(domainCrewController); });
