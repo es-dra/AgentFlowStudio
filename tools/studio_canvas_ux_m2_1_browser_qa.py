@@ -31,7 +31,7 @@ from apps.api.runtime_dynamic_production_plan import (  # noqa: E402
 
 ANALYSIS_CANDIDATE_SCHEMA_VERSION = "afs.structured_analysis_candidate.v0.1"
 PROJECT_ID = f"studio-canvas-ux-m21-browser-qa-{int(time.time())}"
-SCRIPT_TEXT = "Mira calibrates the lens in the observatory. Tao opens the signal room as a distant signal arrives."
+SCRIPT_TEXT = "米拉在观测台校准镜头。陶打开信号室，远处的信号逐渐抵达。"
 
 
 def main() -> int:
@@ -73,14 +73,21 @@ def parse_args() -> argparse.Namespace:
 
 def prepare_empty_project(runtime_root: Path) -> None:
     client = runtime_test_client(runtime_root)
-    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "Canvas UX M2.1 browser QA"})
+    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "画布 UX M2.1 浏览器核验"})
     if created.status_code not in {200, 409}:
         raise AssertionError(f"project setup failed: {created.status_code} {created.text}")
-    state = {
+    state = empty_studio_state()
+    saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": state})
+    if saved.status_code != 200:
+        raise AssertionError(f"studio state setup failed: {saved.status_code} {saved.text}")
+
+
+def empty_studio_state() -> dict[str, Any]:
+    return {
         "meta": {
             "projectId": PROJECT_ID,
-            "projectName": "Canvas UX QA",
-            "canvasName": "QA Canvas",
+            "projectName": "画布 UX 核验",
+            "canvasName": "制作画布",
             "seq": 1,
             "updated_at": "",
         },
@@ -94,9 +101,15 @@ def prepare_empty_project(runtime_root: Path) -> None:
         "production": {},
         "ui": {},
     }
-    saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": state})
-    if saved.status_code != 200:
-        raise AssertionError(f"studio state setup failed: {saved.status_code} {saved.text}")
+
+
+def reset_empty_project(base_url: str) -> None:
+    current = http_json(f"{base_url}/projects/{PROJECT_ID}/studio-state")
+    http_json(
+        f"{base_url}/projects/{PROJECT_ID}/studio-state",
+        method="PUT",
+        payload={"state": empty_studio_state(), "expected_version": current.get("state_version", "")},
+    )
 
 
 def start_gate_closed_runtime(repo: Path, runtime_root: Path, port: int) -> subprocess.Popen[str]:
@@ -163,6 +176,12 @@ def run_browser_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool
                 viewports[viewport_key] = assert_single_shell_default(page, viewport)
                 screenshots[f"default-{viewport_key}"] = str((screenshot_dir / f"default-{viewport_key}.png").resolve())
                 page.screenshot(path=screenshots[f"default-{viewport_key}"], full_page=True)
+                if viewport["width"] == 1024:
+                    viewports[viewport_key].update(assert_1024_selected_node_safe(page))
+                    screenshots["selected-node-1024x768"] = str((screenshot_dir / "selected-node-1024x768.png").resolve())
+                    page.screenshot(path=screenshots["selected-node-1024x768"], full_page=True)
+                    page.evaluate("localStorage.clear()")
+                    reset_empty_project(base_url)
                 page.close()
 
             page = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -234,15 +253,34 @@ def assert_single_shell_default(page: Page, viewport: dict[str, int]) -> dict[st
     snapshot = page.evaluate(
         """
         () => {
-          const text = document.body.textContent || "";
+          const visibleText = (root) => {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+              acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent || parent.closest("details:not([open])")) return NodeFilter.FILTER_REJECT;
+                const style = getComputedStyle(parent);
+                if (style.display === "none" || style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+              },
+            });
+            const parts = [];
+            while (walker.nextNode()) parts.push(walker.currentNode.nodeValue || "");
+            return parts.join(" ");
+          };
+          const intersects = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+          const text = visibleText(document.body);
           const root = document.querySelector("#product-shell-root");
           const workspace = document.querySelector(".studio-unified-workspace");
           const agent = document.querySelector(".studio-agent-chat");
           const canvas = document.querySelector("#canvas-root");
           const stage = document.querySelector(".canvas-workspace-stage");
+          const onboarding = document.querySelector(".canvas-empty-onboarding");
+          const primary = document.querySelector(".canvas-empty-onboarding .empty-primary-action");
           const agentRect = agent?.getBoundingClientRect();
           const canvasRect = canvas?.getBoundingClientRect();
           const stageRect = stage?.getBoundingClientRect();
+          const onboardingRect = onboarding?.getBoundingClientRect();
+          const primaryRect = primary?.getBoundingClientRect();
           const rail = document.querySelector(".studio-scene-rail");
           return {
             view: root?.dataset.view || "",
@@ -258,10 +296,14 @@ def assert_single_shell_default(page: Page, viewport: dict[str, int]) -> dict[st
             viewportRight: window.innerWidth,
             canvasWidth: canvasRect ? Math.round(canvasRect.width) : 0,
             stageWithinViewport: Boolean(stageRect && stageRect.left >= -1 && stageRect.right <= window.innerWidth + 1),
+            onboardingIntersectsAgent: intersects(onboardingRect, agentRect),
+            primaryIntersectsAgent: intersects(primaryRect, agentRect),
+            primaryFullyVisible: Boolean(primaryRect && primaryRect.left >= 0 && primaryRect.right <= window.innerWidth && primaryRect.top >= 56 && primaryRect.bottom <= window.innerHeight),
             noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
             noDuplicateOpenButton: !text.includes("打开 Agent Chat"),
+            noDuplicateAskAgent: !text.includes("询问智能体"),
             fakeCardLeak: ["故事到关键帧", "角色设定卡", "首帧到视频", "视频片段复用"].some((item) => text.includes(item)),
-            rawDefaultLeak: ["studio-state-", "planning_required", "{json}", "Story Plan Candidate JSON"].some((item) => text.includes(item)),
+            rawDefaultLeak: ["studio-state-", "planning_required", "{json}", "Story Plan Candidate JSON", "/script-revision", "/submit-story-plan", "/mark-failed"].some((item) => text.includes(item)),
             counts: ["节点", "场景", "镜头"].every((item) => text.includes(item)) && text.includes("0"),
           };
         }
@@ -286,10 +328,14 @@ def assert_single_shell_default(page: Page, viewport: dict[str, int]) -> dict[st
         problems.append(f"empty canvas zoom was {snapshot['zoomText']!r}")
     if not snapshot["noDuplicateOpenButton"]:
         problems.append("duplicate Agent Chat opener is visible")
+    if not snapshot["noDuplicateAskAgent"]:
+        problems.append("duplicate ask-agent empty-state button is visible")
     if snapshot["fakeCardLeak"]:
         problems.append("workflow starter card leaked into empty state")
     if snapshot["rawDefaultLeak"]:
         problems.append("raw state or command syntax leaked into default UI")
+    if viewport["width"] == 1024 and (snapshot["onboardingIntersectsAgent"] or snapshot["primaryIntersectsAgent"] or not snapshot["primaryFullyVisible"]):
+        problems.append("1024 empty onboarding does not respect Agent Chat safe area")
     if not snapshot["stageWithinViewport"] or not snapshot["noHorizontalScroll"]:
         problems.append("workspace overflows viewport")
     page.get_by_role("tab", name="故事板").click()
@@ -306,6 +352,42 @@ def assert_single_shell_default(page: Page, viewport: dict[str, int]) -> dict[st
         "true_zero_node_empty_state": True,
         "storyboard_read_only": True,
         "no_horizontal_scroll": True,
+        "no_onboarding_chat_intersection": not snapshot["onboardingIntersectsAgent"],
+        "no_duplicate_ask_agent": True,
+    }
+
+
+def assert_1024_selected_node_safe(page: Page) -> dict[str, Any]:
+    page.locator('.canvas-workspace-stage [data-empty-action="blank-node"]').click()
+    expect(page.locator(".node")).to_have_count(1)
+    snapshot = page.evaluate(
+        """
+        () => {
+          const intersects = (a, b) => Boolean(a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+          const agent = document.querySelector(".studio-agent-chat")?.getBoundingClientRect();
+          const node = document.querySelector(".node")?.getBoundingClientRect();
+          const editor = document.querySelector(".node-content-editor")?.getBoundingClientRect();
+          return {
+            nodeIntersectsAgent: intersects(node, agent),
+            editorIntersectsAgent: intersects(editor, agent),
+            nodeFullyVisible: Boolean(node && node.left >= 0 && node.right <= window.innerWidth && node.top >= 56 && node.bottom <= window.innerHeight),
+            editorVisible: Boolean(editor && editor.left >= 0 && editor.right <= window.innerWidth && editor.top >= 56 && editor.bottom <= window.innerHeight),
+            noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+          };
+        }
+        """
+    )
+    if (
+        snapshot["nodeIntersectsAgent"]
+        or snapshot["editorIntersectsAgent"]
+        or not snapshot["nodeFullyVisible"]
+        or not snapshot["editorVisible"]
+        or not snapshot["noHorizontalScroll"]
+    ):
+        raise AssertionError(f"1024 selected node does not respect Agent Chat safe area: {json.dumps(snapshot, ensure_ascii=False)}")
+    return {
+        "selected_node_safe_area": True,
+        "selected_node_no_chat_intersection": True,
     }
 
 
@@ -342,11 +424,42 @@ def assert_interactions(page: Page, base_url: str) -> dict[str, Any]:
     assert_dynamic_plan_flow(page, base_url)
     final_snapshot = page.evaluate(
         """
-        () => ({
-          noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
-          rawLeak: ["studio-state-", "planning_required", "{json}"].some((item) => (document.body.textContent || "").includes(item)),
-          nodeCount: document.querySelectorAll(".node").length,
-        })
+        () => {
+          const visibleText = (root) => {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+              acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent || parent.closest("details:not([open])")) return NodeFilter.FILTER_REJECT;
+                const style = getComputedStyle(parent);
+                if (style.display === "none" || style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+              },
+            });
+            const parts = [];
+            while (walker.nextNode()) parts.push(walker.currentNode.nodeValue || "");
+            return parts.join(" ");
+          };
+          const text = visibleText(document.body);
+          return {
+            noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+            rawLeak: [
+              "studio-state-",
+              "planning_required",
+              "{json}",
+              "/script-revision",
+              "/submit-story-plan",
+              "/mark-failed",
+              "/retry-failed",
+              "/replan-affected",
+              "Mark failed applied",
+              "Replan affected shots",
+              "Retry failed only",
+              "canonical production plan"
+            ].some((item) => text.includes(item)),
+            text,
+            nodeCount: document.querySelectorAll(".node").length,
+          };
+        }
         """
     )
     if not final_snapshot["noHorizontalScroll"] or final_snapshot["rawLeak"]:
@@ -398,59 +511,59 @@ def assert_text_revision_and_optimization(page: Page) -> None:
     editor = page.locator(".node-content-editor").first
     expect(editor).to_be_visible()
     editor.fill(SCRIPT_TEXT)
-    send_agent_command(page, f"/script-revision {SCRIPT_TEXT}", "创建 ScriptRevision")
+    send_agent_command(page, f"/script-revision {SCRIPT_TEXT}", "创建剧本版本")
     expect(page.locator(".node").filter(has_text="分析：待分析")).to_be_visible()
     select_node_by_title(page, "故事文本")
     page.get_by_title("默认优化文本").click()
     expect(page.locator(".agent-command-preview").filter(has_text="默认优化文本")).to_be_visible()
     page.locator(".agent-command-preview").filter(has_text="默认优化文本").get_by_role("button", name="确认执行").click()
-    expect(page.locator(".agent-receipt").filter(has_text="优化后的 ScriptRevision 已创建")).to_be_visible()
+    expect(page.locator(".agent-receipt").filter(has_text="优化后的剧本版本已创建")).to_be_visible()
     page.get_by_role("button", name="撤销").first.click()
-    expect(page.locator(".agent-receipt").filter(has_text="已恢复上一 ScriptRevision")).to_be_visible()
+    expect(page.locator(".agent-receipt").filter(has_text="已恢复上一个剧本版本")).to_be_visible()
     select_node_by_title(page, "故事文本")
     submit_agent_text(page, "/optimize-selected 按用户要求压缩节奏并保留结尾")
     expect(page.locator(".agent-command-preview").filter(has_text="按要求优化文本")).to_be_visible()
     page.locator(".agent-command-preview").filter(has_text="按要求优化文本").get_by_role("button", name="确认执行").click()
-    expect(page.locator(".agent-receipt").filter(has_text="优化后的 ScriptRevision 已创建")).to_be_visible()
+    expect(page.locator(".agent-receipt").filter(has_text="优化后的剧本版本已创建")).to_be_visible()
     page.get_by_role("button", name="撤销").first.click()
-    expect(page.locator(".agent-receipt").filter(has_text="已恢复上一 ScriptRevision")).to_be_visible()
+    expect(page.locator(".agent-receipt").filter(has_text="已恢复上一个剧本版本")).to_be_visible()
 
 
 def assert_dynamic_plan_flow(page: Page, base_url: str) -> None:
-    send_agent_command(page, "/refresh-script-truth", "刷新 Script/Core Asset Truth")
+    send_agent_command(page, "/refresh-script-truth", "刷新剧本与资产事实")
     truth = http_json(f"{base_url}/projects/{PROJECT_ID}/script-truth")
     revision = truth["projection"]["current_revision"]
     candidate = story_plan_candidate(revision, truth["projection"])
-    send_agent_command(page, f"/submit-story-plan {json.dumps(candidate, ensure_ascii=False, separators=(',', ':'))}", "提交 Story Plan Candidate")
-    expect(page.locator(".node").filter(has_text="Production Plan")).to_be_visible()
-    expect(page.locator(".node").filter(has_text="Dynamic shot 3")).to_be_visible()
+    send_agent_command(page, f"/submit-story-plan {json.dumps(candidate, ensure_ascii=False, separators=(',', ':'))}", "提交动态制作计划候选")
+    expect(page.locator(".node").filter(has_text="制作计划")).to_be_visible()
+    expect(page.locator(".node").filter(has_text="镜头三跟随陶打开信号室")).to_be_visible()
     assert_canvas_content_fits(page)
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/edit-shot-duration 7.25", "编辑镜头时长")
     expect(page.locator(".node").filter(has_text="7.25s")).to_be_visible()
     page.get_by_role("button", name="撤销").first.click()
     page.wait_for_function("() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('7.25s'))")
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_2", "Shot 2")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_2", "镜头 2")
     send_agent_command(page, "/split-shot 3 3.5", "拆分当前镜头")
-    expect(page.locator(".node").filter(has_text="part 2")).to_be_visible()
-    select_plan_node(page, "production_plan_shot_shot_dynamic_2a", "Shot 2")
+    expect(page.locator(".node").filter(has_text="拆分后的后半镜头")).to_be_visible()
+    select_plan_node(page, "production_plan_shot_shot_dynamic_2a", "镜头 2")
     send_agent_command(page, "/merge-shot-next", "合并下一镜头")
     page.wait_for_function("() => !document.querySelector('[data-node-id=\"production_plan_shot_shot_dynamic_2b\"]')")
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/mark-failed", "标记失败")
-    expect(page.locator(".node").filter(has_text="state: failed")).to_be_visible()
+    expect(page.locator(".node").filter(has_text="状态：失败")).to_be_visible()
     send_agent_command(page, "/retry-failed", "重试失败项")
-    page.wait_for_function("() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('state: failed'))")
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    page.wait_for_function("() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('状态：失败'))")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/replan-affected", "重算受影响计划")
 
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_function("document.querySelector('#product-shell-root')?.dataset.view === 'storyboard'")
-    expect(page.locator("#product-shell-root")).to_contain_text("Shot 1")
-    expect(page.locator("#product-shell-root")).to_contain_text("Shot 2")
+    expect(page.locator("#product-shell-root")).to_contain_text("镜头 1")
+    expect(page.locator("#product-shell-root")).to_contain_text("镜头 2")
     submit_agent_text(page, "/edit-shot-duration 8")
     expect(page.locator(".agent-command-preview.blocked").filter(has_text="故事板是只读投影")).to_be_visible()
     page.get_by_role("tab", name="画布").click()
@@ -523,19 +636,19 @@ def submit_analysis_candidate(base_url: str) -> None:
         "source_digest": revision["source_digest"],
         "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
         "named_characters": [
-            {"display_name": "Mira", "aliases": ["she"], "pronoun_links": [], "evidence_spans": [span(SCRIPT_TEXT, "Mira")], "confidence": 0.94, "status": "candidate"},
-            {"display_name": "Tao", "aliases": [], "pronoun_links": [], "evidence_spans": [span(SCRIPT_TEXT, "Tao")], "confidence": 0.9, "status": "candidate"},
+            {"display_name": "米拉", "aliases": ["她"], "pronoun_links": [], "evidence_spans": [span(SCRIPT_TEXT, "米拉")], "confidence": 0.94, "status": "candidate"},
+            {"display_name": "陶", "aliases": [], "pronoun_links": [], "evidence_spans": [span(SCRIPT_TEXT, "陶")], "confidence": 0.9, "status": "candidate"},
         ],
         "main_scenes": [
-            {"name": "Observatory", "evidence_spans": [span(SCRIPT_TEXT, "observatory")], "confidence": 0.92, "status": "candidate"},
-            {"name": "Signal Room", "evidence_spans": [span(SCRIPT_TEXT, "signal room")], "confidence": 0.91, "status": "candidate"},
+            {"name": "观测台", "evidence_spans": [span(SCRIPT_TEXT, "观测台")], "confidence": 0.92, "status": "candidate"},
+            {"name": "信号室", "evidence_spans": [span(SCRIPT_TEXT, "信号室")], "confidence": 0.91, "status": "candidate"},
         ],
-        "style": "precise luminous animation",
-        "genre": "short science drama",
-        "tone": "focused",
-        "actions": ["calibrates the lens", "opens the signal room"],
-        "events": ["a distant signal arrives"],
-        "beats": [{"summary": "signal setup"}, {"summary": "response"}],
+        "style": "克制明亮的动画短片",
+        "genre": "科幻短剧",
+        "tone": "专注",
+        "actions": ["校准镜头", "打开信号室"],
+        "events": ["远处信号抵达"],
+        "beats": [{"summary": "信号建立"}, {"summary": "回应开始"}],
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -553,22 +666,22 @@ def story_plan_candidate(revision: dict[str, Any], projection: dict[str, Any]) -
         {
             "beat_id": "beat_lens_setup",
             "order": 1,
-            "summary": "Mira prepares the lens as the signal arrives.",
-            "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision["revision_id"], "quote": "Mira calibrates the lens"}],
-            "narrative_purpose": "establish the signal source",
+            "summary": "米拉在观测台准备镜头，远处信号开始抵达。",
+            "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision["revision_id"], "quote": "米拉在观测台校准镜头"}],
+            "narrative_purpose": "建立信号来源和人物任务",
         },
         {
             "beat_id": "beat_signal_response",
             "order": 2,
-            "summary": "Tao opens the signal room and the response path.",
-            "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision["revision_id"], "quote": "Tao opens the signal room"}],
-            "narrative_purpose": "move the scene into response",
+            "summary": "陶打开信号室，让回应路径进入行动。",
+            "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision["revision_id"], "quote": "陶打开信号室"}],
+            "narrative_purpose": "把剧情推进到回应阶段",
         },
     ]
     shots = [
-        shot(revision["revision_id"], "shot_dynamic_1", beats[0]["beat_id"], 1, 2.5, "Dynamic shot 1 follows Mira setting the lens.", characters[:1], scenes[:1], "opening stillness", "lens rotates", t2v("text prompt is sufficient because no visual reference is locked")),
-        shot(revision["revision_id"], "shot_dynamic_2", beats[0]["beat_id"], 2, 6.5, "Dynamic shot 2 moves through the calibrated lens.", characters[:1], scenes[:1], "lens rotates", "signal line continues", i2v(PROJECT_ID, revision, characters[0])),
-        shot(revision["revision_id"], "shot_dynamic_3", beats[1]["beat_id"], 3, 3.0, "Dynamic shot 3 tracks Tao opening the signal room.", characters[:2], scenes[-1:], "signal line continues", "response path holds", t2v("creator intent names action without a reference artifact")),
+        shot(revision["revision_id"], "shot_dynamic_1", beats[0]["beat_id"], 1, 2.5, "镜头一跟随米拉校准观测台镜头。", characters[:1], scenes[:1], "开场静止", "镜头开始转动", t2v("没有锁定视觉参考，文本意图足够生成计划")),
+        shot(revision["revision_id"], "shot_dynamic_2", beats[0]["beat_id"], 2, 6.5, "镜头二穿过已经校准的镜片。", characters[:1], scenes[:1], "镜头持续转动", "信号线延续", i2v(PROJECT_ID, revision, characters[0])),
+        shot(revision["revision_id"], "shot_dynamic_3", beats[1]["beat_id"], 3, 3.0, "镜头三跟随陶打开信号室。", characters[:2], scenes[-1:], "信号线延续", "回应路径保持", t2v("创作者意图只指定动作，没有提供参考产物")),
     ]
     payload = {
         "project_id": PROJECT_ID,
@@ -620,7 +733,7 @@ def shot(
         "scene_refs": scene_refs,
         "continuity_in": continuity_in,
         "continuity_out": continuity_out,
-        "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision_id, "quote": "distant signal arrives"}],
+        "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision_id, "quote": "远处的信号逐渐抵达"}],
         "media_strategy": media_strategy,
     }
 
@@ -638,7 +751,7 @@ def t2v(reason: str) -> dict[str, Any]:
 def i2v(project_id: str, revision: dict[str, Any], asset_id: str) -> dict[str, Any]:
     return {
         "strategy": "i2v",
-        "strategy_reason": "locked keyframe lineage is available for the lens move",
+        "strategy_reason": "镜片运动已有锁定关键帧脉络",
         "input_requirements": ["reference_artifact_or_locked_keyframe"],
         "reference_asset_refs": [
             {

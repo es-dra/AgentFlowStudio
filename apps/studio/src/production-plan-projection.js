@@ -102,7 +102,7 @@ function projectionSummary(projectId, projection, plan) {
         shot_id: cleanToken(shot.shot_id, 120),
         beat_id: cleanToken(shot.beat_id, 120),
         order: Number(shot.order || 0),
-        title: `Shot ${Number(shot.order || 0) || ""}`.trim(),
+        title: `镜头 ${Number(shot.order || 0) || ""}`.trim(),
         intent: cleanText(shot.intent || "", 240),
         duration_seconds: round2(Number(shot.duration_seconds || 0)),
         strategy: cleanToken(shot.media_strategy?.strategy || "", 20),
@@ -123,7 +123,7 @@ function planNodeFor(projectId, plan, projection) {
   return {
     id: `production_plan_${planId}`,
     type: "text",
-    title: `Production Plan v${Number(plan.plan_version || 1)}`,
+    title: `制作计划 v${Number(plan.plan_version || 1)}`,
     x: 80,
     y: 410,
     w: 320,
@@ -136,10 +136,10 @@ function planNodeFor(projectId, plan, projection) {
       planning_state: planningState,
     }),
     content: [
-      `state: ${planningState}`,
-      `shots: ${Array.isArray(projection.shots) ? projection.shots.length : 0}`,
-      `chunks: ${Array.isArray(projection.chunks) ? projection.chunks.length : 0}`,
-      `storyboard: read_only_consumer`,
+      `状态：${planningStateLabel(planningState)}`,
+      `镜头：${Array.isArray(projection.shots) ? projection.shots.length : 0}`,
+      `分段：${Array.isArray(projection.chunks) ? projection.chunks.length : 0}`,
+      "故事板：只读投影",
     ].join("\n"),
     status: planningState === "planned" ? "complete" : "draft",
     result: null,
@@ -153,7 +153,7 @@ function beatNodeFor(projectId, plan, beat, index) {
   return {
     id: `production_plan_beat_${beatId}`,
     type: "text",
-    title: `Beat ${Number(beat.order || index + 1)}`,
+    title: `叙事段落 ${Number(beat.order || index + 1)}`,
     x: 470,
     y: 380 + index * 170,
     w: 300,
@@ -166,7 +166,7 @@ function beatNodeFor(projectId, plan, beat, index) {
     }),
     content: [
       cleanText(beat.summary || "", 160),
-      `purpose: ${cleanText(beat.narrative_purpose || "", 120)}`,
+      `目的：${cleanText(beat.narrative_purpose || "", 120)}`,
     ].filter(Boolean).join("\n"),
     status: "complete",
     result: null,
@@ -182,7 +182,7 @@ function shotNodeFor(projectId, plan, shot, index) {
   return {
     id: `production_plan_shot_${shotId}`,
     type: "video",
-    title: `Shot ${Number(shot.order || index + 1)}`,
+    title: `镜头 ${Number(shot.order || index + 1)}`,
     x: 850,
     y: 350 + index * 185,
     w: 330,
@@ -202,7 +202,7 @@ function shotNodeFor(projectId, plan, shot, index) {
     content: [
       `${round2(Number(shot.duration_seconds || 0))}s ${strategy.toUpperCase()}`,
       cleanText(shot.intent || "", 160),
-      `reason: ${cleanText(shot.media_strategy?.strategy_reason || "", 120)}`,
+      `策略依据：${cleanText(shot.media_strategy?.strategy_reason || "", 120)}`,
     ].filter(Boolean).join("\n"),
     status: status === "planned" ? "complete" : "draft",
     result: null,
@@ -217,7 +217,7 @@ function chunkNodeFor(projectId, plan, chunk, index) {
   return {
     id: `production_plan_chunk_${chunkId}`,
     type: "render",
-    title: `Chunk ${Number(chunk.sequence || index + 1)}`,
+    title: `分段 ${Number(chunk.sequence || index + 1)}`,
     x: 1240,
     y: 340 + index * 130,
     w: 300,
@@ -234,9 +234,9 @@ function chunkNodeFor(projectId, plan, chunk, index) {
     }),
     content: [
       `${round2(Number(chunk.target_duration_seconds || 0))}s`,
-      `state: ${state}`,
-      chunk.depends_on ? `depends_on: ${cleanToken(chunk.depends_on, 120)}` : "",
-      chunk.remainder_strategy ? `remainder: ${cleanToken(chunk.remainder_strategy, 80)}` : "",
+      `状态：${taskStateLabel(state)}`,
+      chunk.depends_on ? `依赖：${cleanToken(chunk.depends_on, 120)}` : "",
+      chunk.remainder_strategy ? `余量策略：${cleanToken(chunk.remainder_strategy, 80)}` : "",
     ].filter(Boolean).join("\n"),
     status: state === "ready" ? "complete" : "draft",
     result: null,
@@ -249,7 +249,7 @@ function concatNodeFor(projectId, plan, concatPlan) {
   return {
     id: `production_plan_concat_${cleanToken(concatPlan.concat_plan_id || plan.plan_id, 140)}`,
     type: "render",
-    title: "Concat Plan",
+    title: "最终拼接计划",
     x: 1620,
     y: 410,
     w: 300,
@@ -262,15 +262,38 @@ function concatNodeFor(projectId, plan, concatPlan) {
       executes_media: false,
     }),
     content: [
-      `state: ${cleanToken(concatPlan.state || "planned_not_executed", 80)}`,
-      `shots: ${Array.isArray(concatPlan.shot_order) ? concatPlan.shot_order.length : 0}`,
-      "executes_media: false",
+      `状态：${taskStateLabel(cleanToken(concatPlan.state || "planned_not_executed", 80))}`,
+      `镜头：${Array.isArray(concatPlan.shot_order) ? concatPlan.shot_order.length : 0}`,
+      "执行媒体：否",
     ].join("\n"),
     status: "draft",
     result: null,
     groupId: null,
     collapsed: false,
   };
+}
+
+function planningStateLabel(value) {
+  const state = String(value || "").trim();
+  if (!state || state === "planning_required") return "待规划";
+  if (state === "pending_capability") return "等待能力确认";
+  if (state === "planned") return "已规划";
+  if (state === "blocked") return "有阻断";
+  return state.replace(/_/g, " ");
+}
+
+function taskStateLabel(value) {
+  const state = String(value || "").trim();
+  if (state === "planned") return "已计划";
+  if (state === "ready") return "可执行";
+  if (state === "running") return "执行中";
+  if (state === "succeeded") return "已完成";
+  if (state === "failed") return "失败";
+  if (state === "cancelled") return "已取消";
+  if (state === "blocked") return "有阻断";
+  if (state === "planned_not_executed") return "已计划，未执行";
+  if (state === "planned_placeholder") return "计划占位";
+  return state.replace(/_/g, " ");
 }
 
 function baseParams(projectId, plan, entity) {

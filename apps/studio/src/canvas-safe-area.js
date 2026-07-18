@@ -1,6 +1,14 @@
 import { fitViewport } from "./geometry.js";
 
-const SAFE_OVERLAYS = ["#drawer", "#inspector", "#topbar", "#dock"];
+const SAFE_OVERLAYS = [
+  "#drawer",
+  "#inspector",
+  "#topbar",
+  "#dock",
+  ".studio-agent-chat",
+  ".studio-context-drawer",
+  ".product-mobile-nav",
+];
 
 export function fitVisibleCanvasViewport(nodes, padding = 90) {
   const frame = visibleCanvasFrame();

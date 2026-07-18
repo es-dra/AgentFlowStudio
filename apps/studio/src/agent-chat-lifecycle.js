@@ -112,9 +112,10 @@ export function submitAgentChatMessage(session, rawText, context) {
   const commandText = cleanSourceText(rawText, 12000);
   const displayText = cleanText(rawText, 900);
   if (!commandText) return { status: "empty" };
-  appendMessage(session, { role: "user", text: displayText || commandText });
   const command = previewAgentCommand(commandText, context);
   if (command.command_type !== "none") {
+    command.raw_command_text = commandText;
+    appendMessage(session, { role: "user", text: userCommandDisplayText(command, displayText || commandText) });
     session.pendingCommand = command;
     appendMessage(session, {
       role: command.status === "blocked" ? "assistant" : "assistant",
@@ -124,6 +125,7 @@ export function submitAgentChatMessage(session, rawText, context) {
     });
     return { status: command.status, command };
   }
+  appendMessage(session, { role: "user", text: displayText || commandText });
   appendMessage(session, {
     role: "assistant",
     text: "已记录到当前上下文。需要改动画布时，请发送可预览命令。",
@@ -161,7 +163,7 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
     });
     return receipt;
   }
-  if (!runtime) throw new Error("runtime client is unavailable");
+  if (!runtime) throw new Error("运行服务连接不可用");
   let response = null;
   let runtimeReceipt = null;
   let projectionDomain = "script_core";
@@ -260,7 +262,7 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
       revision_id: receipt.previous_revision_id,
       script_revision_id: receipt.previous_revision_id,
       source_digest: response?.projection?.source_digest || "",
-      summary: "已恢复上一 ScriptRevision，画布投影已从 runtime truth 刷新。",
+      summary: "已恢复上一个剧本版本，画布投影已同步更新。",
       undo_available: false,
       storyboard_write: false,
       execution_mode: "runtime",
@@ -275,8 +277,8 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
     return undoReceipt;
   }
   if (!receipt?.runtime_receipt_id) throw new Error("agent receipt is not undoable");
-  if (isProductionPlan && !runtime?.undoProductionPlanCommand) throw new Error("production plan undo is unavailable");
-  if (!isProductionPlan && !runtime?.undoCoreAssetCommand) throw new Error("runtime undo is unavailable");
+  if (isProductionPlan && !runtime?.undoProductionPlanCommand) throw new Error("制作计划撤销不可用");
+  if (!isProductionPlan && !runtime?.undoCoreAssetCommand) throw new Error("运行服务撤销不可用");
   const response = isProductionPlan
     ? await runtime.undoProductionPlanCommand({
       project_id: receipt.project_id,
@@ -315,7 +317,7 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
     script_revision_id: receipt.script_revision_id || receipt.revision_id,
     source_digest: receipt.source_digest,
     plan_digest: response?.receipt?.after_plan_digest || "",
-    summary: response?.receipt?.summary || (isProductionPlan ? "上一条 Production Plan 命令已撤销，画布投影已从 runtime truth 刷新。" : "上一条 Core Asset 命令已撤销，画布投影已从 runtime truth 刷新。"),
+    summary: isProductionPlan ? productionPlanUndoSummary(receipt) : coreAssetUndoSummary(receipt),
     undo_available: false,
     storyboard_write: false,
     execution_mode: "runtime",
@@ -374,8 +376,8 @@ function previewAgentCommand(message, context = {}) {
       context,
       sourceKind: "script",
       sourceText: scriptText,
-      title: "创建 ScriptRevision",
-      summary: "把输入文本写入 runtime ScriptRevision，并将 canonical projection 投到画布。",
+      title: "创建剧本版本",
+      summary: "把输入文本保存为新的剧本版本，并把同一事实投到画布。",
     });
   }
 
@@ -388,8 +390,8 @@ function previewAgentCommand(message, context = {}) {
       context,
       sourceKind: "idea",
       sourceText: ideaText,
-      title: "创建 Idea Revision",
-      summary: "把想法写入 runtime ScriptRevision；没有可信分析前保持待分析状态。",
+      title: "创建想法版本",
+      summary: "把想法保存为新的剧本版本；没有可信分析前保持待分析状态。",
     });
   }
 
@@ -418,8 +420,8 @@ function previewAgentCommand(message, context = {}) {
     return runtimeCommand({
       context,
       commandType: "refresh_script_truth",
-      title: "刷新 Script/Core Asset Truth",
-      summary: "从 runtime canonical truth 重新投影 ScriptRevision、Character、Main Scene 与手动 Prop。",
+      title: "刷新剧本与资产事实",
+      summary: "从运行服务事实重新投影剧本版本、角色、主要场景与手动道具。",
       requiresScriptRevision: false,
     });
   }
@@ -431,7 +433,7 @@ function previewAgentCommand(message, context = {}) {
   ]);
   if (storyPlanCandidate.matched) {
     if (!storyPlanCandidate.value) {
-      return blockedCommand("submit_story_plan_candidate", "提交 Story Plan Candidate", storyPlanCandidate.error || "Story Plan Candidate JSON 无法解析。", context);
+      return blockedCommand("submit_story_plan_candidate", "提交动态制作计划候选", storyPlanCandidate.error || "动态制作计划候选无法解析。", context);
     }
     return storyPlanCandidateCommand({
       context,
@@ -452,7 +454,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "edit_shot_duration",
       title: "编辑镜头时长",
-      summary: `把当前 Shot 时长改为 ${Number(durationText).toFixed(2)} 秒，并重算该 Shot 的 chunk plan。`,
+      summary: `把当前镜头时长改为 ${Number(durationText).toFixed(2)} 秒，并重算该镜头的分段计划。`,
       patch: { duration_seconds: Number(durationText) },
     });
   }
@@ -466,7 +468,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "edit_shot_intent",
       title: "编辑镜头意图",
-      summary: "更新当前 Shot 的 intent，并保留 plan history。",
+      summary: "更新当前镜头意图，并保留制作计划历史。",
       patch: { intent: cleanText(intentText, 900) },
     });
   }
@@ -480,7 +482,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "set_shot_strategy",
       title: "设置镜头媒体策略",
-      summary: `把当前 Shot 策略设为 ${strategyPatch.patch.strategy.toUpperCase()}，并重算输入状态和 chunk plan。`,
+      summary: `把当前镜头策略设为 ${strategyPatch.patch.strategy.toUpperCase()}，并重算输入状态和分段计划。`,
       patch: strategyPatch.patch,
     });
   }
@@ -494,7 +496,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "split_shot",
       title: "拆分当前镜头",
-      summary: "把当前 Shot 拆为两个新 Shot，并只重算受影响 chunk。",
+      summary: "把当前镜头拆为两个新镜头，并只重算受影响分段。",
       patch: splitPatch.patch,
     });
   }
@@ -504,7 +506,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "merge_shot_next",
       title: "合并下一镜头",
-      summary: "将当前 Shot 与后续 Shot 合并，并重算合并后 Shot 的 chunk plan。",
+      summary: "将当前镜头与后续镜头合并，并重算合并后的分段计划。",
       patch: {},
     });
   }
@@ -514,7 +516,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "replan_affected",
       title: "重算受影响计划",
-      summary: "只重算当前或 blocked/failed Shot 的 chunk plan，保留可证明未受影响项。",
+      summary: "只重算当前或受阻镜头的分段计划，保留可证明未受影响项。",
       patch: {},
       allowMissingTarget: true,
     });
@@ -525,7 +527,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "mark_failed",
       title: "标记失败",
-      summary: "将当前 Shot 或 Chunk 标记 failed，并记录失败尝试。",
+      summary: "将当前镜头或分段标记为失败，并记录失败尝试。",
       patch: { reason: "agent_chat_mark_failed" },
     });
   }
@@ -535,7 +537,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "retry_failed",
       title: "重试失败项",
-      summary: "只把 failed Chunk 重新置为 ready，不覆盖成功 artifact lineage。",
+      summary: "只把失败分段恢复为可重试状态，不覆盖已成功的产物脉络。",
       patch: {},
       allowMissingTarget: true,
     });
@@ -551,7 +553,7 @@ function previewAgentCommand(message, context = {}) {
       context,
       commandType: "create_manual_prop",
       title: "创建手动 Prop",
-      summary: `创建绑定当前 ScriptRevision 的手动 Prop「${cleanText(manualProp, 60)}」`,
+      summary: `创建绑定当前剧本版本的手动道具「${cleanText(manualProp, 60)}」`,
       patch: { display_name: cleanText(manualProp, 120) },
       allowMissingTarget: true,
     });
@@ -565,8 +567,8 @@ function previewAgentCommand(message, context = {}) {
     return coreAssetCommand({
       context,
       commandType: "edit_asset",
-      title: "编辑当前 Core Asset",
-      summary: `把当前 Core Asset 名称改为「${cleanText(editAsset, 60)}」`,
+      title: "编辑当前核心资产",
+      summary: `把当前核心资产名称改为「${cleanText(editAsset, 60)}」`,
       patch: { display_name: cleanText(editAsset, 120) },
     });
   }
@@ -589,8 +591,8 @@ function previewAgentCommand(message, context = {}) {
     return coreAssetCommand({
       context,
       commandType: context.selected_core_asset_type === "prop" ? "retire_manual_prop" : "retire_asset",
-      title: "停用当前 Core Asset",
-      summary: "将当前 Core Asset 标记为 retired，并保留审计历史和撤销入口。",
+      title: "停用当前核心资产",
+      summary: "将当前核心资产标记为停用，并保留审计历史和撤销入口。",
       patch: {},
     });
   }
@@ -599,8 +601,8 @@ function previewAgentCommand(message, context = {}) {
     return coreAssetCommand({
       context,
       commandType: "restore_asset",
-      title: "恢复当前 Core Asset",
-      summary: "将当前 retired Core Asset 恢复为可用状态。",
+      title: "恢复当前核心资产",
+      summary: "将当前已停用核心资产恢复为可用状态。",
       patch: {},
     });
   }
@@ -651,10 +653,10 @@ function previewAgentCommand(message, context = {}) {
 
 function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("create_script_revision", title, "故事板是只读投影。请切回画布后再创建 ScriptRevision。", context);
+    return blockedCommand("create_script_revision", title, "故事板是只读投影。请切回画布后再创建剧本版本。", context);
   }
   const text = cleanSourceText(sourceText, 200000);
-  if (!text) return blockedCommand("create_script_revision", title, "ScriptRevision source text is empty.", context);
+  if (!text) return blockedCommand("create_script_revision", title, "剧本文本为空，无法创建版本。", context);
   return {
     schema_version: SCHEMA_VERSION,
     command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -682,14 +684,14 @@ function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary
 
 function scriptOptimizationCommand({ context, mode, instruction }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "故事板是只读投影。请切回画布后再优化文本。", context);
+    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "故事板是只读投影。请切回画布后再优化文本。", context);
   }
   if (!["text", "script"].includes(context.selected_node_type)) {
-    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "请先选择一个文本或脚本节点。", context);
+    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "请先选择一个文本或脚本节点。", context);
   }
   const sourceText = cleanSourceText(context.selected_node_text, 12000);
   if (!sourceText) {
-    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "当前文本节点还没有内容。", context);
+    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "当前文本节点还没有内容。", context);
   }
   const optimized = optimizedScriptDraft(sourceText, instruction);
   return {
@@ -699,7 +701,7 @@ function scriptOptimizationCommand({ context, mode, instruction }) {
     execution_mode: "runtime",
     status: "preview",
     title: mode === "default" ? "默认优化文本" : "按要求优化文本",
-    summary: "生成可审阅的 ScriptRevision 修订草案；确认后写入 runtime canonical truth，故事板不反写。",
+    summary: "生成可审阅的剧本修订草案；确认后写入同一事实源，故事板不反写。",
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     revision_id: cleanToken(context.script_revision_id, 140),
@@ -763,7 +765,7 @@ function runtimeCommand({ context, commandType, title, summary, requiresScriptRe
     return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再执行写入命令。", context);
   }
   if (requiresScriptRevision && (!context.script_revision_id || !context.script_source_digest)) {
-    return blockedCommand(commandType, title, "请先创建或刷新 ScriptRevision，再执行 Core Asset 命令。", context);
+    return blockedCommand(commandType, title, "请先创建或刷新剧本版本，再执行核心资产命令。", context);
   }
   return {
     schema_version: SCHEMA_VERSION,
@@ -790,10 +792,10 @@ function runtimeCommand({ context, commandType, title, summary, requiresScriptRe
 
 function storyPlanCandidateCommand({ context, candidate }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("submit_story_plan_candidate", "提交 Story Plan Candidate", "故事板是只读投影。请切回画布后再确认动态制作计划。", context);
+    return blockedCommand("submit_story_plan_candidate", "提交动态制作计划候选", "故事板是只读投影。请切回画布后再确认动态制作计划。", context);
   }
   if (!context.script_revision_id || !context.script_source_digest) {
-    return blockedCommand("submit_story_plan_candidate", "提交 Story Plan Candidate", "请先创建或刷新 ScriptRevision，再提交 Story Plan Candidate。", context);
+    return blockedCommand("submit_story_plan_candidate", "提交动态制作计划候选", "请先创建或刷新剧本版本，再提交动态制作计划候选。", context);
   }
   const safeCandidate = safeJsonClone(candidate);
   if (
@@ -802,10 +804,10 @@ function storyPlanCandidateCommand({ context, candidate }) {
     || safeCandidate.source_digest !== context.script_source_digest
     || safeCandidate.schema_version !== STORY_PLAN_CANDIDATE_SCHEMA_VERSION
   ) {
-    return blockedCommand("submit_story_plan_candidate", "提交 Story Plan Candidate", "Story Plan Candidate 必须绑定当前 project、ScriptRevision、source_digest 和 schema_version。", context);
+    return blockedCommand("submit_story_plan_candidate", "提交动态制作计划候选", "动态制作计划候选必须绑定当前项目、剧本版本、文本摘要和合同版本。", context);
   }
   if (!safeCandidate.candidate_digest || !Array.isArray(safeCandidate.beats) || !Array.isArray(safeCandidate.shots)) {
-    return blockedCommand("submit_story_plan_candidate", "提交 Story Plan Candidate", "Story Plan Candidate 需要 candidate_digest、beats 和 shots。", context);
+    return blockedCommand("submit_story_plan_candidate", "提交动态制作计划候选", "动态制作计划候选需要候选摘要、叙事段落和镜头清单。", context);
   }
   return {
     schema_version: SCHEMA_VERSION,
@@ -813,8 +815,8 @@ function storyPlanCandidateCommand({ context, candidate }) {
     command_type: "submit_story_plan_candidate",
     execution_mode: "runtime",
     status: "preview",
-    title: "提交 Story Plan Candidate",
-    summary: `提交并确认 ${safeCandidate.beats.length} 个 beat、${safeCandidate.shots.length} 个动态 shot；确认后生成 canonical ProductionPlan。`,
+    title: "提交动态制作计划候选",
+    summary: `提交并确认 ${safeCandidate.beats.length} 个叙事段落、${safeCandidate.shots.length} 个动态镜头；确认后生成制作计划。`,
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     script_revision_id: cleanToken(context.script_revision_id, 140),
@@ -834,7 +836,7 @@ function storyPlanCandidateCommand({ context, candidate }) {
 
 function productionPlanRefreshCommand(context) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("refresh_production_plan", "刷新 Production Plan Truth", "故事板是只读投影。请切回画布后再刷新计划投影。", context);
+    return blockedCommand("refresh_production_plan", "刷新制作计划事实", "故事板是只读投影。请切回画布后再刷新计划投影。", context);
   }
   return {
     schema_version: SCHEMA_VERSION,
@@ -842,8 +844,8 @@ function productionPlanRefreshCommand(context) {
     command_type: "refresh_production_plan",
     execution_mode: "runtime",
     status: "preview",
-    title: "刷新 Production Plan Truth",
-    summary: "从 runtime canonical truth 重新投影 Beat、Shot、Chunk 与 Concat Plan。",
+    title: "刷新制作计划事实",
+    summary: "从运行服务事实重新投影叙事段落、镜头、分段与拼接计划。",
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     revision_id: cleanToken(context.script_revision_id, 140),
@@ -862,21 +864,21 @@ function productionPlanRefreshCommand(context) {
 
 function productionPlanCommand({ context, commandType, title, summary, patch, allowMissingTarget = false }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再预览和确认 Production Plan 命令。", context);
+    return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再预览和确认制作计划命令。", context);
   }
   if (!context.production_plan_id || !context.production_plan_digest) {
-    return blockedCommand(commandType, title, "请先提交或刷新 ProductionPlan，再执行 Shot/Chunk 命令。", context);
+    return blockedCommand(commandType, title, "请先提交或刷新制作计划，再执行镜头或分段命令。", context);
   }
   if (
     context.selected_plan_entity_plan_id
     && (context.selected_plan_entity_plan_id !== context.production_plan_id || context.selected_plan_entity_plan_digest !== context.production_plan_digest)
   ) {
-    return blockedCommand(commandType, title, "当前选中节点不属于最新 ProductionPlan，请刷新计划投影后重试。", context);
+    return blockedCommand(commandType, title, "当前选中节点不属于最新制作计划，请刷新计划投影后重试。", context);
   }
   const targetShotId = cleanToken(context.selected_plan_shot_id, 140);
   const targetChunkId = cleanToken(context.selected_plan_chunk_id, 160);
   if (!allowMissingTarget && !targetShotId && !targetChunkId) {
-    return blockedCommand(commandType, title, "请先选择一个 Shot 或 Chunk 投影节点。", context);
+    return blockedCommand(commandType, title, "请先选择一个镜头或分段投影节点。", context);
   }
   return {
     schema_version: SCHEMA_VERSION,
@@ -913,7 +915,7 @@ function coreAssetCommand({ context, commandType, title, summary, patch, allowMi
   if (base.status === "blocked") return base;
   const targetAssetId = cleanToken(context.selected_core_asset_id, 140);
   if (!allowMissingTarget && !targetAssetId) {
-    return blockedCommand(commandType, title, "请先选择一个 Character、Main Scene 或手动 Prop 投影节点。", context);
+    return blockedCommand(commandType, title, "请先选择一个角色、主要场景或手动道具投影节点。", context);
   }
   return {
     ...base,
@@ -1078,7 +1080,7 @@ function productionPlanAgentReceipt(command, response, runtimeReceipt, projectio
     after_plan_id: runtimeReceipt?.after_plan_id || plan.plan_id || "",
     before_plan_digest: runtimeReceipt?.before_plan_digest || "",
     after_plan_digest: runtimeReceipt?.after_plan_digest || plan.plan_digest || "",
-    summary: runtimeReceipt?.summary || productionPlanReceiptSummary(command, response),
+    summary: productionPlanReceiptSummary(command, response),
     undo_available: Boolean(runtimeReceipt?.undo_available),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,
@@ -1106,7 +1108,7 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
     project_id: command.project_id || response?.project_id || projection.project_id || "",
     revision_id: runtimeReceipt?.revision_id || revision.revision_id || projection.current_revision_id || command.revision_id || "",
     source_digest: runtimeReceipt?.source_digest || revision.source_digest || projection.current_revision?.source_digest || command.source_digest || "",
-    summary: runtimeReceipt?.summary || runtimeReceiptSummary(command, response),
+    summary: runtimeReceiptSummary(command, response),
     undo_available: Boolean(runtimeReceipt?.undo_available) || Boolean(command.command_type === "optimize_script_revision" && command.parent_revision_id),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,
@@ -1124,29 +1126,83 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
 function productionPlanReceiptSummary(command, response) {
   if (command.command_type === "refresh_production_plan") {
     const state = response?.projection?.planning_state || "planning_required";
-    return `Production Plan Truth 已刷新；当前规划状态：${productionPlanStateLabel(state)}。`;
+    return `制作计划事实已刷新；当前规划状态：${productionPlanStateLabel(state)}。`;
   }
   if (command.command_type === "submit_story_plan_candidate") {
     const plan = response?.projection?.current_plan || {};
-    return `ProductionPlan 已确认；动态镜头数：${Number(response?.projection?.shots?.length || 0)}，计划版本：${Number(plan.plan_version || 1)}。`;
+    return `动态制作计划已确认；镜头数：${Number(response?.projection?.shots?.length || 0)}，计划版本：${Number(plan.plan_version || 1)}。`;
   }
-  return `${command.title || "Production Plan 命令"}已执行。`;
+  return `${productionPlanCommandLabel(command.command_type)}已执行，画布和故事板投影已同步。`;
 }
 
 function runtimeReceiptSummary(command, response) {
   if (command.command_type === "optimize_script_revision") {
     const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
-    return `优化后的 ScriptRevision 已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
+    return `优化后的剧本版本已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
   }
   if (command.command_type === "create_script_revision") {
     const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
-    return `ScriptRevision 已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
+    return `剧本版本已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
   }
   if (command.command_type === "refresh_script_truth") {
     const state = response?.projection?.analysis_state || "analysis_required";
-    return `Script/Core Asset Truth 已刷新；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
+    return `剧本与核心资产事实已刷新；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
   }
-  return `${command.title || "Runtime 命令"}已执行。`;
+  return `${coreAssetCommandLabel(command.command_type) || command.title || "命令"}已执行，画布投影已同步。`;
+}
+
+function productionPlanUndoSummary(receipt) {
+  return `${productionPlanCommandLabel(receipt?.command_type)}已撤销，制作计划回到上一个可追溯版本。`;
+}
+
+function coreAssetUndoSummary(receipt) {
+  return `${coreAssetCommandLabel(receipt?.command_type) || "上一条核心资产命令"}已撤销，画布投影已同步更新。`;
+}
+
+function productionPlanCommandLabel(commandType) {
+  return ({
+    submit_story_plan_candidate: "确认动态制作计划",
+    refresh_production_plan: "刷新制作计划事实",
+    edit_shot_duration: "镜头时长调整",
+    edit_shot_intent: "镜头意图调整",
+    set_shot_strategy: "镜头媒体策略调整",
+    split_shot: "镜头拆分",
+    merge_shot_next: "镜头合并",
+    replan_affected: "受影响计划重算",
+    mark_failed: "失败状态标记",
+    retry_failed: "失败项重试准备",
+  })[String(commandType || "").replace(/\.undo$/, "")] || "制作计划命令";
+}
+
+function coreAssetCommandLabel(commandType) {
+  return ({
+    refresh_script_truth: "刷新剧本与资产事实",
+    create_manual_prop: "手动道具创建",
+    edit_asset: "核心资产编辑",
+    merge_alias: "角色别名合并",
+    retire_asset: "核心资产停用",
+    retire_manual_prop: "手动道具停用",
+    restore_asset: "核心资产恢复",
+  })[String(commandType || "").replace(/\.undo$/, "")] || "";
+}
+
+function userCommandDisplayText(command, fallbackText) {
+  const type = command?.command_type || "";
+  if (type === "create_script_revision") {
+    return command.source_kind === "idea" ? "提交创作想法" : "提交剧本文本";
+  }
+  if (type === "optimize_script_revision") {
+    return command.optimization_mode === "instructed_local_structure"
+      ? `按要求优化当前文本：${cleanText(command.optimization_instruction, 140)}`
+      : "默认优化当前文本";
+  }
+  if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
+  if (type === "refresh_script_truth") return "刷新剧本与资产事实";
+  if (type === "refresh_production_plan") return "刷新制作计划事实";
+  if (isProductionPlanRuntimeCommand(type)) return productionPlanCommandLabel(type);
+  const coreAsset = coreAssetCommandLabel(type);
+  if (coreAsset) return coreAsset;
+  return fallbackText;
 }
 
 function productionPlanStateLabel(value) {
@@ -1240,11 +1296,11 @@ function jsonPayloadCommand(text, prefixes) {
     try {
       const value = JSON.parse(jsonText);
       if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return { matched: true, value: null, error: "Story Plan Candidate 必须是 JSON object。" };
+        return { matched: true, value: null, error: "动态制作计划候选必须是结构化对象。" };
       }
       return { matched: true, value, error: "" };
     } catch {
-      return { matched: true, value: null, error: "Story Plan Candidate JSON 无法解析。" };
+      return { matched: true, value: null, error: "动态制作计划候选无法解析。" };
     }
   }
   return { matched: false, value: null, error: "" };
@@ -1257,7 +1313,7 @@ function strategyCommandPatch(message) {
   const strategy = cleanToken(match[1], 20).toLowerCase();
   const reason = cleanText(match[2], 600);
   if (!["t2v", "i2v"].includes(strategy) || !reason) {
-    return { matched: true, patch: null, error: "媒体策略必须是 t2v 或 i2v，并包含 strategy_reason。" };
+    return { matched: true, patch: null, error: "媒体策略必须是 t2v 或 i2v，并包含策略依据。" };
   }
   const patch = {
     strategy,
@@ -1277,7 +1333,15 @@ function splitCommandPatch(message) {
   if (!Number.isFinite(left) || !Number.isFinite(right) || left <= 0 || right <= 0) {
     return { matched: true, patch: null, error: "拆分镜头需要两个正数时长。" };
   }
-  return { matched: true, patch: { durations: [left, right] }, error: "" };
+  return {
+    matched: true,
+    patch: {
+      durations: [left, right],
+      first_intent: "拆分后的前半镜头",
+      second_intent: "拆分后的后半镜头",
+    },
+    error: "",
+  };
 }
 
 function matchCommand(text, patterns) {

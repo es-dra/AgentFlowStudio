@@ -37,7 +37,7 @@ import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 import { applyProductionPlanProjection } from "./production-plan-projection.js";
-import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
+import { fitVisibleCanvasViewport, visibleCanvasCenter } from "./canvas-safe-area.js";
 import { createNode } from "./nodes.js";
 import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 
@@ -88,6 +88,7 @@ async function bootstrap() {
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
   bindStudioWorkflowEvents();
+  bindCanvasSafeAreaEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
   bindProjectAccessRecovery();
@@ -466,9 +467,6 @@ function bindCanvasEmptyOnboarding() {
   form.querySelector('[data-empty-action="blank-node"]')?.addEventListener("click", () => {
     createEmptyTextNode("故事文本");
   });
-  form.querySelector('[data-empty-action="ask-agent"]')?.addEventListener("click", () => {
-    window.dispatchEvent(new CustomEvent("afs:agent-chat-focus"));
-  });
 }
 
 function createEmptyTextNode(title) {
@@ -487,13 +485,12 @@ function createEmptyTextNode(title) {
 }
 
 function canvasCenterWorldPoint() {
-  const root = document.getElementById("canvas-root");
-  const rect = root?.getBoundingClientRect();
   const viewport = store.get().viewport || { x: 0, y: 0, scale: 1 };
+  const center = visibleCanvasCenter();
   const scale = Number(viewport.scale || 1) || 1;
   return {
-    x: Math.round(((rect?.width || 900) / 2 - Number(viewport.x || 0)) / scale),
-    y: Math.round(((rect?.height || 620) / 2 - Number(viewport.y || 0)) / scale),
+    x: Math.round(((center.x || 450) - Number(viewport.x || 0)) / scale),
+    y: Math.round(((center.y || 310) - Number(viewport.y || 0)) / scale),
   };
 }
 async function launchStarter(id) {
@@ -558,6 +555,17 @@ function fitCanvasProjection(state) {
   const nodes = state?.nodes || {};
   if (!document.getElementById("canvas-root") || !Object.keys(nodes).length) return;
   state.viewport = fitVisibleCanvasViewport(nodes);
+}
+
+function bindCanvasSafeAreaEvents() {
+  let raf = 0;
+  window.addEventListener("afs:canvas-safe-area-changed", () => {
+    window.cancelAnimationFrame(raf);
+    raf = window.requestAnimationFrame(() => {
+      if (!store || !document.getElementById("canvas-root")) return;
+      store.set((state) => fitCanvasProjection(state), { history: false, persist: false });
+    });
+  });
 }
 
 async function refreshProductOverview() {

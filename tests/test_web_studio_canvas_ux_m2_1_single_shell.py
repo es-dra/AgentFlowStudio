@@ -11,6 +11,7 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     shell = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     panel = (STUDIO_ROOT / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
+    safe_area = (STUDIO_ROOT / "src" / "canvas-safe-area.js").read_text(encoding="utf-8")
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     canvas = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
@@ -24,7 +25,8 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "输入想法" in bootstrap
     assert "导入剧本" in bootstrap
     assert "空白节点" in bootstrap
-    assert "询问智能体" in bootstrap
+    assert "询问智能体" not in bootstrap
+    assert 'data-empty-action="ask-agent"' not in bootstrap
     for fake_card in ("故事到关键帧", "角色设定卡", "首帧到视频", "视频片段复用"):
         assert fake_card not in bootstrap
 
@@ -43,8 +45,11 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "`/idea ${text}`" in main
     assert "importScriptFileIntoTextNode(store, node)" in main
     assert "createEmptyTextNode(\"故事文本\")" in main
+    assert "visibleCanvasCenter()" in main
+    assert "afs:canvas-safe-area-changed" in main
 
     assert "agent-resize-handle" in panel
+    assert "raw_command_text" in panel
     assert "planStateLabel" in panel
     assert "\"待规划\"" in panel
     assert "planning_required" in panel
@@ -65,11 +70,15 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
 
     assert ".studio-unified-workspace.storyboard-section" in styles
     assert ".studio-unified-workspace.agent-collapsed" in styles
+    assert ".studio-unified-workspace.agent-mobile-open" in styles
     assert ".studio-context-drawer" in styles
     assert ".agent-resize-handle" in styles
+    assert ".studio-unified-workspace:not(.agent-collapsed) .canvas-workspace-stage #canvas-empty-hint" in styles
     assert "grid-template-columns: minmax(0, 1fr) minmax(360px, var(--agent-chat-width, 392px));" in styles
     assert "@media (max-width: 1180px)" in styles
     assert "overflow: hidden" in styles
+    assert ".studio-agent-chat" in safe_area
+    assert ".studio-context-drawer" in safe_area
 
 
 def test_agent_chat_text_optimization_uses_runtime_script_revision_and_undo() -> None:
@@ -182,10 +191,13 @@ const preview = submitAgentChatMessage(session, "/optimize-selected-default", co
 const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
 const undo = await undoAgentReceiptWithRuntime(session, receipt, store, runtime);
 const instructedPreview = submitAgentChatMessage(session, "/optimize-selected 按用户要求压缩节奏并保留结尾", context);
+const visibleRawCommandLeak = session.messages.some((message) => String(message.text || "").includes("/optimize-selected"));
 process.stdout.write(JSON.stringify({
   previewStatus: preview.status,
   commandType: preview.command.command_type,
   title: preview.command.title,
+  rawCommandPreserved: preview.command.raw_command_text === "/optimize-selected-default",
+  visibleRawCommandLeak,
   providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count + undo.provider_dispatch_count,
   parentRevisionId: createPayload.parent_revision_id,
   sourceKind: createPayload.source_kind,
@@ -215,6 +227,8 @@ process.stdout.write(JSON.stringify({
         "previewStatus": "preview",
         "commandType": "optimize_script_revision",
         "title": "默认优化文本",
+        "rawCommandPreserved": True,
+        "visibleRawCommandLeak": False,
         "providerDispatchCount": 0,
         "parentRevisionId": "rev_old",
         "sourceKind": "script",

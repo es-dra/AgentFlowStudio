@@ -112,6 +112,7 @@ function commandPreview({ session, store, runtime, onRender }) {
   preview.appendChild(evidenceDetails("查看证据/开发详情", [
     ["command_id", command.command_id],
     ["command_type", command.command_type],
+    ["raw_command_text", command.raw_command_text],
     ["schema_version", command.schema_version],
     ["node_id", command.node_id],
     ["revision_id", command.revision_id || command.script_revision_id],
@@ -232,8 +233,8 @@ function planStateLabel(value) {
 }
 
 function humanCommandTarget(command) {
-  if (command.target_chunk_id) return "当前 Chunk";
-  if (command.target_shot_id) return "当前 Shot";
+  if (command.target_chunk_id) return "当前分段";
+  if (command.target_shot_id) return "当前镜头";
   if (command.target_asset_id) return "当前资产";
   if (command.node_id) return "当前节点";
   return "当前上下文";

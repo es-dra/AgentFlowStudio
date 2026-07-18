@@ -902,9 +902,17 @@ body,
     box-shadow: 0 22px 68px rgba(0, 0, 0, .48);
   }
 
+  .studio-unified-workspace:not(.agent-collapsed) .canvas-workspace-stage #canvas-empty-hint {
+    right: calc(min(420px, calc(100vw - 24px)) + 24px);
+  }
+
   .studio-agent-chat.collapsed {
     width: 52px;
     overflow: hidden;
+  }
+
+  .studio-unified-workspace.agent-collapsed .canvas-workspace-stage #canvas-empty-hint {
+    right: 76px;
   }
 
   .agent-resize-handle {
@@ -923,6 +931,16 @@ body,
 
   .studio-agent-chat:not(.mobile-open) {
     display: none;
+  }
+
+  .studio-unified-workspace .canvas-workspace-stage #canvas-empty-hint,
+  .studio-unified-workspace.agent-collapsed .canvas-workspace-stage #canvas-empty-hint {
+    right: 0;
+    bottom: 0;
+  }
+
+  .studio-unified-workspace.agent-mobile-open:not(.agent-collapsed) .canvas-workspace-stage #canvas-empty-hint {
+    bottom: calc(70dvh + 62px + env(safe-area-inset-bottom));
   }
 
   .canvas-empty-onboarding {

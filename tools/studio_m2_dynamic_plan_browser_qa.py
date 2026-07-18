@@ -284,24 +284,24 @@ def assert_default_canvas(page: Page, viewport: dict[str, int]) -> dict[str, Any
 
 def assert_dynamic_plan_interaction(page: Page, base_url: str) -> dict[str, Any]:
     expect(page.locator("#canvas-root")).to_be_visible()
-    send_agent_command(page, f"/script-revision {SCRIPT_TEXT}", "ScriptRevision")
+    send_agent_command(page, f"/script-revision {SCRIPT_TEXT}", "创建剧本版本")
     expect(page.locator(".node").filter(has_text="分析：待分析")).to_be_visible()
 
     truth = http_json(f"{base_url}/projects/{PROJECT_ID}/script-truth")
     revision = truth["projection"]["current_revision"]
     submit_analysis_candidate(base_url, revision)
-    send_agent_command(page, "/refresh-script-truth", "Script/Core Asset Truth")
+    send_agent_command(page, "/refresh-script-truth", "刷新剧本与资产事实")
     expect(page.locator(".node").filter(has_text="Mira")).to_be_visible()
     expect(page.locator(".node").filter(has_text="Observatory")).to_be_visible()
 
     truth = http_json(f"{base_url}/projects/{PROJECT_ID}/script-truth")
     candidate = story_plan_candidate(revision, truth["projection"])
-    send_agent_command(page, f"/submit-story-plan {json.dumps(candidate, ensure_ascii=False, separators=(',', ':'))}", "Story Plan Candidate")
-    expect(page.locator(".node").filter(has_text="Production Plan")).to_be_visible()
+    send_agent_command(page, f"/submit-story-plan {json.dumps(candidate, ensure_ascii=False, separators=(',', ':'))}", "提交动态制作计划候选")
+    expect(page.locator(".node").filter(has_text="制作计划")).to_be_visible()
     expect(page.locator(".node").filter(has_text="Dynamic shot 3")).to_be_visible()
     expect(page.locator(".node").filter(has_text="Concat Plan")).to_be_visible()
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/edit-shot-duration 7.25", "编辑镜头时长")
     expect(page.locator(".node").filter(has_text="7.25s")).to_be_visible()
     page.get_by_role("button", name="撤销").first.click()
@@ -309,33 +309,33 @@ def assert_dynamic_plan_interaction(page: Page, base_url: str) -> dict[str, Any]
         "() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('7.25s'))"
     )
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_1", "Shot 1")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_1", "镜头 1")
     send_agent_command(page, "/set-shot-strategy t2v reason=creator keeps this shot text-only", "设置镜头媒体策略")
     expect(page.locator(".node").filter(has_text="creator keeps this shot text-only")).to_be_visible()
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_2", "Shot 2")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_2", "镜头 2")
     send_agent_command(page, "/split-shot 3 3.5", "拆分当前镜头")
-    expect(page.locator(".node").filter(has_text="part 2")).to_be_visible()
-    select_plan_node(page, "production_plan_shot_shot_dynamic_2a", "Shot 2")
+    expect(page.locator(".node").filter(has_text="拆分后的后半镜头")).to_be_visible()
+    select_plan_node(page, "production_plan_shot_shot_dynamic_2a", "镜头 2")
     send_agent_command(page, "/merge-shot-next", "合并下一镜头")
     page.wait_for_function(
         "() => !document.getElementById('production_plan_shot_shot_dynamic_2b') && !document.querySelector('[data-node-id=\"production_plan_shot_shot_dynamic_2b\"]')"
     )
 
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/mark-failed", "标记失败")
-    expect(page.locator(".node").filter(has_text="state: failed")).to_be_visible()
+    expect(page.locator(".node").filter(has_text="状态：失败")).to_be_visible()
     send_agent_command(page, "/retry-failed", "重试失败项")
     page.wait_for_function(
-        "() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('state: failed'))"
+        "() => !Array.from(document.querySelectorAll('.node')).some((node) => (node.textContent || '').includes('状态：失败'))"
     )
-    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "Shot 3")
+    select_plan_node(page, "production_plan_shot_shot_dynamic_3", "镜头 3")
     send_agent_command(page, "/replan-affected", "重算受影响计划")
 
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_function("document.querySelector('#product-shell-root')?.dataset.view === 'storyboard'")
-    expect(page.locator("#product-shell-root")).to_contain_text("Shot 1")
-    expect(page.locator("#product-shell-root")).to_contain_text("Shot 2")
+    expect(page.locator("#product-shell-root")).to_contain_text("镜头 1")
+    expect(page.locator("#product-shell-root")).to_contain_text("镜头 2")
     submit_agent_text(page, "/edit-shot-duration 8")
     expect(page.locator(".agent-command-preview.blocked").filter(has_text="故事板是只读投影")).to_be_visible()
 

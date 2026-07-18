@@ -69,6 +69,7 @@ export function createProductShell(options = {}) {
     navigator.addEventListener("click", () => {
       projectDrawerOpen = !projectDrawerOpen;
       render();
+      requestCanvasSafeAreaUpdate();
     });
 
     const viewSwitch = node("div", "studio-view-switch");
@@ -209,7 +210,7 @@ export function createProductShell(options = {}) {
   function buildWorkspace() {
     const emptyCanvas = section === "canvas" && !hasStoryFacts();
     const canvasActive = section === "canvas";
-    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${emptyCanvas ? "canvas-empty-project" : ""}`);
+    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
     shell.style.setProperty("--agent-chat-width", `${agentChatWidth}px`);
     if (section === "storyboard" && !emptyCanvas) shell.appendChild(buildSceneRail());
@@ -418,6 +419,7 @@ export function createProductShell(options = {}) {
         agentCollapsed = !agentCollapsed;
         mobileAgentOpen = !agentCollapsed;
         render();
+        requestCanvasSafeAreaUpdate();
       },
       onOpen: () => {
         agentCollapsed = false;
@@ -449,6 +451,7 @@ export function createProductShell(options = {}) {
           mobileAgentOpen = true;
         }
         render();
+        requestCanvasSafeAreaUpdate();
         requestAnimationFrame(() => document.getElementById("product-main")?.focus());
       });
       nav.appendChild(button);
@@ -491,6 +494,7 @@ export function createProductShell(options = {}) {
       notice = noticeText || "先完成创作简报，确认后再创建故事事实。";
       syncCanvasSelection();
       render();
+      requestCanvasSafeAreaUpdate();
       requestAnimationFrame(() => document.getElementById("product-main")?.focus());
       return;
     }
@@ -509,6 +513,7 @@ export function createProductShell(options = {}) {
     }
     syncCanvasSelection();
     render();
+    requestCanvasSafeAreaUpdate();
     requestAnimationFrame(focusCurrentContext);
   }
 
@@ -521,6 +526,7 @@ export function createProductShell(options = {}) {
     mobileAgentOpen = true;
     notice = "Agent Chat 已绑定当前画布上下文；确认前不会创建场景或镜头。";
     render();
+    requestCanvasSafeAreaUpdate();
     requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
   }
 
@@ -532,6 +538,7 @@ export function createProductShell(options = {}) {
     mobileAgentOpen = true;
     if (result.status === "empty") focusAgentComposer();
     else render();
+    requestCanvasSafeAreaUpdate();
     requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
     return result;
   }
@@ -548,6 +555,7 @@ export function createProductShell(options = {}) {
         contextOpen = false;
         mobileAgentOpen = false;
         render();
+        requestCanvasSafeAreaUpdate();
       }
     });
   }
@@ -570,6 +578,7 @@ export function createProductShell(options = {}) {
       window.removeEventListener("pointercancel", onEnd);
       storeAgentChatWidth(agentChatWidth);
       render();
+      requestCanvasSafeAreaUpdate();
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onEnd, { once: true });
@@ -788,6 +797,7 @@ export function createProductShell(options = {}) {
         section = "canvas";
       }
       render();
+      requestCanvasSafeAreaUpdate();
     },
     get section() { return section; },
   };
@@ -894,4 +904,8 @@ function storeAgentChatWidth(width) {
 
 function clampAgentChatWidth(value) {
   return Math.max(360, Math.min(420, Math.round(Number(value) || 392)));
+}
+
+function requestCanvasSafeAreaUpdate() {
+  requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("afs:canvas-safe-area-changed")));
 }

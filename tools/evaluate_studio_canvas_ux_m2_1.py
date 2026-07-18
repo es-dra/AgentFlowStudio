@@ -54,6 +54,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         "shell": root / "apps/studio/src/product-shell.js",
         "panel": root / "apps/studio/src/agent-chat-panel.js",
         "lifecycle": root / "apps/studio/src/agent-chat-lifecycle.js",
+        "safe_area": root / "apps/studio/src/canvas-safe-area.js",
         "prompt_bar": root / "apps/studio/src/prompt-bar.js",
         "canvas_input": root / "apps/studio/src/canvas-input.js",
         "canvas_view": root / "apps/studio/src/canvas-view.js",
@@ -76,7 +77,6 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             'data-empty-action="idea-text"',
             'data-empty-action="import-script"',
             'data-empty-action="blank-node"',
-            'data-empty-action="ask-agent"',
         ],
         "shell": [
             'let section = "canvas";',
@@ -86,10 +86,13 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             "onResizeStart: bindAgentResize",
             "afs:agent-chat-submit",
             "afs:agent-chat-focus",
+            "afs:canvas-safe-area-changed",
+            "agent-mobile-open",
             "Escape",
         ],
         "panel": [
             "agent-resize-handle",
+            "raw_command_text",
             "planStateLabel",
             '"待规划"',
             "evidenceDetails(\"查看证据/开发详情\"",
@@ -132,9 +135,16 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             ".studio-context-drawer",
             ".agent-resize-handle",
             ".studio-unified-workspace.storyboard-section",
+            ".studio-unified-workspace.agent-mobile-open",
             "grid-template-columns: minmax(0, 1fr) minmax(360px, var(--agent-chat-width, 392px));",
             "@media (max-width: 1180px)",
             ".canvas-workspace-stage #canvas-empty-hint::before",
+            ".studio-unified-workspace:not(.agent-collapsed) .canvas-workspace-stage #canvas-empty-hint",
+        ],
+        "safe_area": [
+            ".studio-agent-chat",
+            ".studio-context-drawer",
+            ".product-mobile-nav",
         ],
     }
     for key, markers in required.items():
@@ -158,6 +168,8 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         ("script_projection", "`source_kind:"),
         ("script_projection", "`source_mode:"),
         ("panel", "{json}"),
+        ("bootstrap", 'data-empty-action="ask-agent"'),
+        ("bootstrap", "询问智能体"),
         ("bootstrap", "故事到关键帧"),
         ("bootstrap", "角色设定卡"),
         ("bootstrap", "首帧到视频"),
@@ -274,9 +286,12 @@ const undo = await undoAgentReceiptWithRuntime(session, receipt, store, runtime)
 const instructed = submitAgentChatMessage(session, "/optimize-selected tighten rhythm and preserve ending", context);
 const storyboardContext = agentChatContextSnapshot({ project: { project_id: "p1", name: "Eval" }, studioState: state, section: "storyboard", selectedNode: state.nodes.n1 });
 const storyboardBlocked = submitAgentChatMessage(session, "/optimize-selected-default", storyboardContext);
+const visibleRawCommandLeak = session.messages.some((message) => String(message.text || "").includes("/optimize-selected"));
 process.stdout.write(JSON.stringify({
   previewStatus: preview.status,
   commandType: preview.command.command_type,
+  rawCommandPreserved: preview.command.raw_command_text === "/optimize-selected-default",
+  visibleRawCommandLeak,
   defaultMode: createPayload.provenance.optimization_mode,
   sourceIncludesCoreIntent: createPayload.source_text.includes("核心意图"),
   parentRevisionId: createPayload.parent_revision_id,
@@ -309,6 +324,8 @@ process.stdout.write(JSON.stringify({
     expected = {
         "previewStatus": "preview",
         "commandType": "optimize_script_revision",
+        "rawCommandPreserved": True,
+        "visibleRawCommandLeak": False,
         "defaultMode": "default_local_structure",
         "sourceIncludesCoreIntent": True,
         "parentRevisionId": "rev_old",
