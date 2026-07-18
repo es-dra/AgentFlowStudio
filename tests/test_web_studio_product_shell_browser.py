@@ -66,9 +66,9 @@ def test_new_project_enters_unified_studio_and_empty_storyboard_has_no_demo_fact
     assert "created?.episode_bootstrap?.workspace_entry?.href" not in controller
     assert 'uniqueProjectName("未命名项目", existingProjects)' in controller
     assert "AFS 内测项目" not in controller
-    for label in ("从空白开始", "粘贴/导入剧本或故事材料", "使用示例", "示例："):
-        assert label in controller
+    assert "exampleProjectName" not in controller
 
+    assert 'let section = "canvas";' in shell
     assert "FALLBACK_SCENES" not in shell
     for forbidden in ("巷口", "雨巷", "老宅"):
         assert forbidden not in shell

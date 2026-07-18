@@ -377,6 +377,7 @@ function openCanvasWorkspace() {
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
+  if (!row) return;
   row.replaceChildren();
   for (const starter of WORKFLOW_STARTERS) {
     const card = el("button", "starter-card workflow-starter-card");

@@ -1,6 +1,6 @@
 import { createProductShell } from "./product-shell.js";
 
-const CANVAS_SHELL_HTML = `<main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">Canvas</div><div class="canvas-empty-title">双击画布创建文本节点</div><div class="canvas-empty-copy">从一个想法、剧本片段或参考说明开始，内容会保存到当前项目。</div><div class="canvas-empty-shortcuts"><span class="hint-chip primary">双击创建</span><span class="hint-dim">也可按 Tab 或使用底部 +</span></div></div><div id="prompt-bar-layer"></div></main><footer id="dock"></footer>`;
+const CANVAS_SHELL_HTML = `<header id="topbar"></header><aside id="drawer"></aside><main id="canvas-root"><div id="canvas-viewport"><div id="world"><svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg><div id="node-layer"></div></div></div><div id="canvas-empty-hint" hidden><div class="empty-kicker">AgentFlow Studio</div><div class="canvas-empty-title">开始制作一集内容</div><div class="canvas-empty-copy">从一个想法、剧本片段或参考说明开始，继续组织剧本、角色、场景、分镜和媒体节点。</div><div class="canvas-empty-shortcuts"><span class="hint-chip">双击画布</span><span class="hint-chip">Tab 添加节点</span><span class="hint-dim">拖动连线组织制作关系</span></div></div><div id="starter-row" hidden></div><div id="prompt-bar-layer"></div></main><aside id="inspector"></aside><footer id="dock"></footer><div id="corner-controls"></div><div id="sprite-root"></div>`;
 
 export function mountStudioDom() {
   const app = document.getElementById("app");

@@ -739,3 +739,57 @@ def test_runtime_workspace_api_exposes_safe_projection(tmp_path: Path) -> None:
     assert "/tmp/" not in raw
     assert "/var/" not in raw
     assert ".mp4" not in raw
+
+
+def test_runtime_workspace_api_requires_authenticated_project_owner(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "adaptive-owner,adaptive-other")
+    runtime_root = tmp_path / "runtime"
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    path = "/projects/auth-adaptive/adaptive-canvas-v2/workspace?run_id=run-001"
+    assert client.get(path).status_code == 401
+
+    owner = client.post(
+        "/auth/register",
+        json={
+            "email": "adaptive-owner@example.com",
+            "password": "strong-password-123",
+            "display_name": "owner",
+            "invite_code": "adaptive-owner",
+        },
+    )
+    assert owner.status_code == 200, owner.text
+    owner_headers = {"Authorization": f"Bearer {owner.json()['session_token']}"}
+    created = client.post(
+        "/projects",
+        headers=owner_headers,
+        json={"project_id": "auth-adaptive", "goal": "auth contract"},
+    )
+    assert created.status_code == 200, created.text
+
+    run_adaptive_canvas_production(
+        AdaptiveRunOptions(
+            runtime_root=runtime_root,
+            project_id="auth-adaptive",
+            run_id="run-001",
+            profile=alternate_no_provider_profile(),
+            mode="fake",
+        )
+    )
+    allowed = client.get(path, headers=owner_headers)
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["schema_version"] == "afs.adaptive_canvas_v2.workspace.v0.1"
+    assert allowed.json()["provider_dispatch_count"] == 0
+
+    other = client.post(
+        "/auth/register",
+        json={
+            "email": "adaptive-other@example.com",
+            "password": "strong-password-123",
+            "display_name": "other",
+            "invite_code": "adaptive-other",
+        },
+    )
+    assert other.status_code == 200, other.text
+    other_headers = {"Authorization": f"Bearer {other.json()['session_token']}"}
+    assert client.get(path, headers=other_headers).status_code == 403

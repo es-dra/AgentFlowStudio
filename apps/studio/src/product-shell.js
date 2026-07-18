@@ -2,7 +2,6 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { createDirectorContextStore, findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 
-const FALLBACK_SCENES = ["巷口", "雨巷", "老宅", "天台", "尾声"];
 const DIRECTOR_TABS = [
   ["suggestion", "建议"],
   ["reference", "引用"],
@@ -11,7 +10,7 @@ const DIRECTOR_TABS = [
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
-  let section = "storyboard";
+  let section = "canvas";
   let selection = { sceneIndex: 0, shotIndex: 0 };
   let directorTab = "suggestion";
   let directorCollapsed = false;
@@ -92,7 +91,7 @@ export function createProductShell(options = {}) {
     if (options.onOpenExternalVideoDemo) {
       const externalVideo = node("button", "studio-secondary-button studio-external-video-button");
       externalVideo.type = "button";
-      externalVideo.innerHTML = `${icon("video", 13)}<span>AI 漫剧</span>`;
+      externalVideo.innerHTML = icon("video", 13) + "<span>AI 漫剧</span>";
       externalVideo.addEventListener("click", () => options.onOpenExternalVideoDemo?.());
       actions.appendChild(externalVideo);
     }
@@ -207,7 +206,7 @@ export function createProductShell(options = {}) {
     main.appendChild(buildContextBar());
     const stage = node("section", "canvas-workspace-stage");
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
-    stage.dataset.canvasTarget = currentShot().nodeId || "empty-shot";
+    stage.dataset.canvasTarget = currentShot().nodeId || "empty-project";
     const editor = options.getCanvasShell?.();
     if (editor) stage.appendChild(editor);
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
@@ -228,6 +227,15 @@ export function createProductShell(options = {}) {
     aside.appendChild(head);
     const list = node("nav", "scene-list");
     list.setAttribute("aria-label", "场景列表");
+    if (!scenes.length) {
+      list.classList.add("scene-list-empty");
+      list.appendChild(node("p", "", "尚未创建场景"));
+      aside.appendChild(list);
+      const progress = node("div", "scene-progress");
+      progress.innerHTML = '<span>本集进度</span><strong>0 / 0 镜头</strong><div><i style="width:0%"></i></div>';
+      aside.appendChild(progress);
+      return aside;
+    }
     scenes.forEach((scene, index) => {
       const button = node("button", index === selection.sceneIndex ? "active" : "");
       button.type = "button";
@@ -248,10 +256,16 @@ export function createProductShell(options = {}) {
   function buildContextBar() {
     const scene = currentScene();
     const shot = currentShot();
+    const empty = !hasStoryFacts();
     const bar = node("header", "storyboard-context-bar");
     const selectionContext = node("div", "selection-context");
-    selectionContext.innerHTML = `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
+    selectionContext.innerHTML = empty
+      ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>尚未创建场景或镜头</span>`
+      : `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
+    const brief = node("button", "studio-secondary-button", "告诉 AI 导演");
+    brief.type = "button";
+    brief.addEventListener("click", focusDirectorBrief);
     const review = node("button", "studio-secondary-button", "进入审核");
     review.type = "button";
     review.addEventListener("click", () => {
@@ -267,12 +281,14 @@ export function createProductShell(options = {}) {
       ? `${icon("grid", 13)}在故事板查看`
       : `查看画布${icon("expand", 13)}`;
     canvas.addEventListener("click", () => section === "canvas" ? showOverview() : openCanvas());
-    actions.append(review, canvas);
+    if (empty) actions.append(brief, canvas);
+    else actions.append(review, canvas);
     bar.append(selectionContext, actions);
     return bar;
   }
 
   function buildStoryboardContent() {
+    if (!hasStoryFacts()) return buildEmptyStoryboardContent();
     const scene = currentScene();
     const sectionEl = node("section", "storyboard-content");
     const sparse = scene.shots.length <= 2;
@@ -293,6 +309,35 @@ export function createProductShell(options = {}) {
       live.setAttribute("aria-live", "polite");
       sectionEl.appendChild(live);
     }
+    return sectionEl;
+  }
+
+  function buildEmptyStoryboardContent() {
+    const sectionEl = node("section", "storyboard-content storyboard-empty-state");
+    const heading = node("div", "storyboard-heading");
+    heading.append(
+      node("div", "", '<span class="eyebrow">故事板</span><h1>等待创作简报</h1>'),
+      node("span", "storyboard-duration", "0 场景 · 0 镜头"),
+    );
+    heading.firstElementChild.innerHTML = '<span class="eyebrow">故事板</span><h1>等待创作简报</h1>';
+    const body = node("div", "storyboard-empty-body");
+    body.append(
+      node("p", "", "这个项目还没有场景、镜头、进度、决策、参考或示例素材。"),
+      node("p", "", "先告诉 AI 导演你想做什么，或粘贴/导入故事材料；确认前不会创建故事事实。"),
+    );
+    const actions = node("div", "storyboard-empty-actions");
+    const brief = node("button", "studio-primary-button", "告诉 AI 导演你想做什么");
+    brief.type = "button";
+    brief.addEventListener("click", focusDirectorBrief);
+    const canvas = node("button", "studio-secondary-button", "打开空白画布");
+    canvas.type = "button";
+    canvas.addEventListener("click", openCanvas);
+    actions.append(brief, canvas);
+    const counts = node("dl", "empty-canonical-counts");
+    for (const [label, value] of [["场景", 0], ["镜头", 0], ["参考", 0], ["决策", 0]]) {
+      counts.append(node("dt", "", label), node("dd", "", String(value)));
+    }
+    sectionEl.append(heading, body, actions, counts);
     return sectionEl;
   }
 
@@ -353,7 +398,9 @@ export function createProductShell(options = {}) {
     aside.dataset.contextKey = currentContextKey();
     const head = node("header", "director-head");
     const title = node("div");
-    title.innerHTML = `<span class="director-mark">AI</span><span><strong>导演 · 当前镜头</strong><small>${escapeHtml(currentShot().title)}</small></span>`;
+    title.innerHTML = hasStoryFacts()
+      ? `<span class="director-mark">AI</span><span><strong>导演 · 当前镜头</strong><small>${escapeHtml(currentShot().title)}</small></span>`
+      : `<span class="director-mark">AI</span><span><strong>导演 · 项目简报</strong><small>${escapeHtml(snapshot.project?.name || "未命名项目")}</small></span>`;
     const collapse = node("button", "studio-icon-button");
     collapse.type = "button";
     collapse.setAttribute("aria-label", directorCollapsed ? "展开 AI 导演" : "收起 AI 导演");
@@ -389,6 +436,7 @@ export function createProductShell(options = {}) {
   }
 
   function buildDirectorSuggestion() {
+    if (!hasStoryFacts()) return buildEmptyDirectorSuggestion();
     const body = node("div", "director-body");
     const chat = node("div", "director-chat");
     const shot = currentShot();
@@ -425,10 +473,30 @@ export function createProductShell(options = {}) {
     proposal.appendChild(apply);
     body.appendChild(proposal);
 
+    body.appendChild(buildDirectorComposer("围绕当前镜头继续讨论…"));
+    return body;
+  }
+
+  function buildEmptyDirectorSuggestion() {
+    const body = node("div", "director-body");
+    const chat = node("div", "director-chat");
+    const context = directorContext();
+    chat.appendChild(chatBubble("assistant", "先告诉我你想做什么，或粘贴/导入剧本材料。我会先整理 Brief、Bible、Arc、Episode、Scene、Shot 和 ProductionRecipe，等你确认后再创建场景与镜头。"));
+    for (const item of context.conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
+    body.appendChild(chat);
+    const proposal = node("section", "director-proposal");
+    proposal.innerHTML = '<span class="eyebrow">当前下一步</span><strong>等待创作简报</strong><p>空项目不会自动带入示例、进度、参考或分镜。</p>';
+    body.appendChild(proposal);
+    body.appendChild(buildDirectorComposer("描述你想制作的 90–120 秒内容…"));
+    return body;
+  }
+
+  function buildDirectorComposer(placeholder) {
+    const context = directorContext();
     const form = node("form", "director-composer");
     const input = document.createElement("textarea");
     input.rows = 2;
-    input.placeholder = "围绕当前镜头继续讨论…";
+    input.placeholder = placeholder;
     input.setAttribute("aria-label", "向 AI 导演提问");
     const send = node("button", "studio-icon-button");
     send.type = "submit";
@@ -441,16 +509,19 @@ export function createProductShell(options = {}) {
       if (!text) return;
       context.conversations.push(
         { role: "user", text },
-        { role: "assistant", text: "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" },
+        { role: "assistant", text: hasStoryFacts() ? "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" : "我会先整理成创作简报和制作配方草案，等你确认后再创建场景与镜头。" },
       );
       render();
     });
-    body.appendChild(form);
-    return body;
+    return form;
   }
 
   function buildDirectorReferences() {
     const body = node("div", "director-body director-reference-list");
+    if (!hasStoryFacts()) {
+      body.appendChild(node("p", "director-note", "还没有绑定脚本、镜头、参考集或候选素材。"));
+      return body;
+    }
     const refs = [
       ["脚本场景", currentScene().name, "当前"],
       ["相邻镜头", selection.shotIndex > 0 ? currentScene().shots[selection.shotIndex - 1].title : "场景开场", "上下文"],
@@ -468,6 +539,10 @@ export function createProductShell(options = {}) {
 
   function buildDirectorVersions() {
     const body = node("div", "director-body director-version-panel");
+    if (!hasStoryFacts()) {
+      body.appendChild(node("p", "director-note", "还没有可恢复的故事版本；确认创作简报后才会产生版本记录。"));
+      return body;
+    }
     body.append(
       node("p", "director-note", "版本与恢复按需展开；当前仅显示与所选镜头有关的记录。"),
       versionRow("当前候选", "v3", "待审核"),
@@ -518,7 +593,10 @@ export function createProductShell(options = {}) {
 
   function activateNextAction() {
     const target = findNextProductionTarget(sceneModel(), selection);
-    if (!target) return;
+    if (!target) {
+      focusDirectorBrief();
+      return;
+    }
     const actionLabel = snapshot.project?.next_action || "继续当前镜头制作";
     cockpitOpen = false;
     directorTab = "suggestion";
@@ -532,6 +610,17 @@ export function createProductShell(options = {}) {
 
   function selectContext(sceneIndex, shotIndex, { actionLabel = "", noticeText = "" } = {}) {
     const scenes = sceneModel();
+    if (!scenes.length) {
+      selection = { sceneIndex: 0, shotIndex: 0 };
+      directorTab = "suggestion";
+      directorCollapsed = false;
+      mobileDirectorOpen = true;
+      notice = noticeText || "先完成创作简报，确认后再创建故事事实。";
+      syncCanvasSelection();
+      render();
+      requestAnimationFrame(() => document.getElementById("product-main")?.focus());
+      return;
+    }
     const nextSceneIndex = Math.max(0, Math.min(Number(sceneIndex || 0), scenes.length - 1));
     const nextShotIndex = Math.max(0, Math.min(Number(shotIndex || 0), scenes[nextSceneIndex].shots.length - 1));
     selection = { sceneIndex: nextSceneIndex, shotIndex: nextShotIndex };
@@ -550,6 +639,15 @@ export function createProductShell(options = {}) {
 
   function syncCanvasSelection() {
     options.onSelectCanvasNode?.(currentShot().nodeId || "");
+  }
+
+  function focusDirectorBrief() {
+    directorTab = "suggestion";
+    directorCollapsed = false;
+    mobileDirectorOpen = true;
+    notice = "AI 导演已切到项目简报；确认前不会创建场景或镜头。";
+    render();
+    requestAnimationFrame(() => document.querySelector(".director-composer textarea")?.focus());
   }
 
   function focusCurrentContext() {
@@ -648,16 +746,19 @@ export function createProductShell(options = {}) {
 
   function sceneModel() {
     const shots = shotModel();
-    const sceneCount = Math.max(3, Math.min(5, Math.ceil(shots.length / 7)));
+    if (!shots.length) {
+      selection = { sceneIndex: 0, shotIndex: 0 };
+      return [];
+    }
+    const sceneCount = Math.max(1, Math.min(5, Math.ceil(shots.length / 7)));
     const scenes = Array.from({ length: sceneCount }, (_, index) => ({
-      name: FALLBACK_SCENES[index] || `场景 ${index + 1}`,
+      name: `场景 ${index + 1}`,
       shots: [],
       duration: "00:00",
       blocked: false,
     }));
     shots.forEach((shot, index) => scenes[Math.min(sceneCount - 1, Math.floor(index / 7))].shots.push(shot));
     for (const scene of scenes) {
-      if (!scene.shots.length) scene.shots.push(emptyShot(scene.name));
       scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0));
       scene.blocked = scene.shots.some((shot) => shot.state === "blocked");
     }
@@ -692,21 +793,15 @@ export function createProductShell(options = {}) {
       };
     });
     if (mapped.length) return mapped;
-    return Array.from({ length: 15 }, (_, index) => ({
-      nodeId: "",
-      title: shotTitle(index),
-      description: ["建立空间与天气", "人物进入画面", "视线转向雨巷", "细节切入", "继续前行"][index % 5],
-      duration: `${(3 + (index % 3) * 0.5).toFixed(1)}s`,
-      preview: "",
-      state: index < 2 ? "ready" : index === 2 ? "blocked" : "draft",
-    }));
+    return [];
   }
 
-  function currentScene() { return sceneModel()[selection.sceneIndex]; }
-  function currentShot() { return currentScene().shots[selection.shotIndex]; }
+  function currentScene() { return sceneModel()[selection.sceneIndex] || emptyScene(); }
+  function currentShot() { return currentScene().shots[selection.shotIndex] || emptyShot(); }
+  function hasStoryFacts() { return shotModel().length > 0; }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function totalReadyShots() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => shot.state === "ready").length; }
-  function completionPercent() { return Math.round((totalReadyShots() / Math.max(1, totalShots())) * 100); }
+  function completionPercent() { return totalShots() ? Math.round((totalReadyShots() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
 
@@ -766,8 +861,19 @@ function versionRow(label, version, state) {
   return row;
 }
 
-function emptyShot(scene) {
-  return { title: `${scene}开场`, description: "等待补充镜头内容", duration: "3.0s", preview: "", state: "draft" };
+function emptyScene() {
+  return { name: "尚未创建场景", shots: [], duration: "00:00", blocked: false };
+}
+
+function emptyShot() {
+  return {
+    nodeId: "",
+    title: "等待创作简报",
+    description: "确认创作简报前不会创建场景或镜头。",
+    duration: "0.0s",
+    preview: "",
+    state: "draft",
+  };
 }
 
 function shotTitle(index) {
