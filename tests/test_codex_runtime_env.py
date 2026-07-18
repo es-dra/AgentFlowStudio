@@ -54,6 +54,24 @@ def test_bootstrap_codex_home_copies_only_minimal_runtime_files(tmp_path) -> Non
     assert not (target / "logs_2.sqlite").exists()
 
 
+def test_bootstrap_codex_home_refreshes_existing_login_projection(tmp_path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    (source / "auth.json").write_text("current-login", encoding="utf-8")
+    (source / "config.toml").write_text("current-config", encoding="utf-8")
+    (target / "auth.json").write_text("stale-login", encoding="utf-8")
+    (target / "config.toml").write_text("stale-config", encoding="utf-8")
+
+    bootstrap_codex_home(target, source_home=source)
+
+    assert (target / "auth.json").read_text(encoding="utf-8") == "current-login"
+    assert (target / "config.toml").read_text(encoding="utf-8") == "current-config"
+    assert (target / "auth.json").stat().st_mode & 0o777 == 0o600
+    assert (target / "config.toml").stat().st_mode & 0o777 == 0o600
+
+
 def test_prune_codex_home_removes_runtime_history_logs_and_state(tmp_path) -> None:
     codex_home = tmp_path / "codex-home"
     codex_home.mkdir()
