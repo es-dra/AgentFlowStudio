@@ -537,10 +537,17 @@ def _ensure_script(
         prompt=prompt,
         request=ProviderDispatchRequest(prompt=prompt, output_dir=run_root / "provider_outputs" / "script", timeout_sec=240.0),
     )
-    script = _parse_script_json(str(result.get("text") or ""), options.profile)
-    _validate_script(script, options.profile)
-    write_json(path, script)
-    ledger.mark_succeeded(str(result["attempt_id"]), _artifact_version("script", path, run_root, options.project_id, options.run_id))
+    try:
+        script = _parse_script_json(str(result.get("text") or ""), options.profile)
+        _validate_script(script, options.profile)
+        write_json(path, script)
+        ledger.mark_succeeded(
+            str(result["attempt_id"]),
+            _artifact_version("script", path, run_root, options.project_id, options.run_id),
+        )
+    except Exception as exc:
+        ledger.mark_failed(str(result["attempt_id"]), exc)
+        raise
     _emit(callback, "SCRIPT", "succeeded", paid_attempt_count=ledger.paid_attempt_count)
     return script
 
@@ -599,9 +606,13 @@ def _ensure_reference_sheet(
             timeout_sec=360.0,
         ),
     )
-    _copy_bytes(_first_output_path(output_dir, result, "image_path"), path)
-    artifact = _image_artifact("reference_sheet", path, run_root, options.project_id, options.run_id)
-    ledger.mark_succeeded(str(result["attempt_id"]), artifact)
+    try:
+        _copy_bytes(_first_output_path(output_dir, result, "image_path"), path)
+        artifact = _image_artifact("reference_sheet", path, run_root, options.project_id, options.run_id)
+        ledger.mark_succeeded(str(result["attempt_id"]), artifact)
+    except Exception as exc:
+        ledger.mark_failed(str(result["attempt_id"]), exc)
+        raise
     _emit(callback, "REFERENCE", "succeeded", paid_attempt_count=ledger.paid_attempt_count)
     return artifact
 
@@ -672,9 +683,13 @@ def _ensure_keyframes(
                 timeout_sec=360.0,
             ),
         )
-        _copy_bytes(_first_output_path(output_dir, result, "image_path"), path)
-        artifact = _image_artifact("keyframe", path, run_root, options.project_id, options.run_id, shot_id=shot_id)
-        ledger.mark_succeeded(str(result["attempt_id"]), artifact)
+        try:
+            _copy_bytes(_first_output_path(output_dir, result, "image_path"), path)
+            artifact = _image_artifact("keyframe", path, run_root, options.project_id, options.run_id, shot_id=shot_id)
+            ledger.mark_succeeded(str(result["attempt_id"]), artifact)
+        except Exception as exc:
+            ledger.mark_failed(str(result["attempt_id"]), exc)
+            raise
         keyframes[shot_id] = artifact
         _emit(callback, f"KEYFRAME_{index}", "succeeded", paid_attempt_count=ledger.paid_attempt_count)
     return keyframes
@@ -761,18 +776,33 @@ def _ensure_video_chunks(
                 duration_sec=int(chunk["provider_duration_sec"]),
                 output_dir=run_root / "provider_outputs" / "video_chunks" / shot_id / chunk_id,
             )
-            _copy_bytes(_first_output_path(run_root / "provider_outputs" / "video_chunks" / shot_id / chunk_id, result, "video_path"), path)
-            artifact = _video_artifact(
-                "video_chunk",
-                path,
-                run_root,
-                options.project_id,
-                options.run_id,
-                shot_id=shot_id,
-                chunk_id=chunk_id,
-                continuity_anchor_path=anchor,
-            )
-            ledger.mark_succeeded(str(result["attempt_id"]), artifact, provider_task_id=str(result.get("provider_task_id") or ""))
+            try:
+                _copy_bytes(
+                    _first_output_path(
+                        run_root / "provider_outputs" / "video_chunks" / shot_id / chunk_id,
+                        result,
+                        "video_path",
+                    ),
+                    path,
+                )
+                artifact = _video_artifact(
+                    "video_chunk",
+                    path,
+                    run_root,
+                    options.project_id,
+                    options.run_id,
+                    shot_id=shot_id,
+                    chunk_id=chunk_id,
+                    continuity_anchor_path=anchor,
+                )
+                ledger.mark_succeeded(
+                    str(result["attempt_id"]),
+                    artifact,
+                    provider_task_id=str(result.get("provider_task_id") or ""),
+                )
+            except Exception as exc:
+                ledger.mark_failed(str(result["attempt_id"]), exc)
+                raise
             chunks.append(artifact)
             _emit(callback, f"VIDEO_SHOT_{shot_index}_CHUNK_{chunk_index}", "succeeded", paid_attempt_count=ledger.paid_attempt_count)
     return chunks

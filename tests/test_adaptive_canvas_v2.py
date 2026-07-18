@@ -4,11 +4,14 @@ import json
 from pathlib import Path
 
 import agentflow_studio.production.adaptive_canvas_v2 as adaptive_canvas
+import pytest
 
 from agentflow_studio.production.adaptive_canvas_v2 import (
+    AdaptiveCanvasError,
     AdaptiveRunOptions,
     ChargeLedger,
     PaidAttemptLimitExceeded,
+    ProviderArtifactRetryExceeded,
     build_script_truth_from_profile,
     compile_duration_chunks,
     load_adaptive_workspace,
@@ -110,6 +113,193 @@ def test_paid_script_route_dispatches_only_to_server_codex(tmp_path: Path) -> No
     assert ledger.paid_attempt_count == 1
     assert ledger.attempts[0]["service_id"] == "server_codex"
     assert ledger.attempts[0]["candidate_id"] == "script-v2"
+
+
+@pytest.mark.parametrize(
+    ("response_text", "message"),
+    [
+        ("not json", "LLM did not return a JSON object"),
+        (json.dumps({"title": "robot"}), "forbidden fixed template leaked into script"),
+    ],
+)
+def test_script_post_dispatch_contract_failure_marks_attempt_failed(
+    tmp_path: Path,
+    response_text: str,
+    message: str,
+) -> None:
+    class InvalidRegistry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            return {"text": response_text, "provider_calls_started": True}
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(
+        runtime_root=tmp_path / "runtime",
+        project_id="project",
+        run_id="run",
+        profile=profile,
+        mode="real",
+    )
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(AdaptiveCanvasError, match=message):
+        adaptive_canvas._ensure_script(run_root, options, ledger, InvalidRegistry(), None)
+
+    assert ledger.paid_attempt_count == 1
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["provider_calls_started"] is True
+    assert ledger.attempts[0]["service_id"] == "server_codex"
+    assert ledger.attempts[0]["candidate_id"] == "script-v2"
+    assert ledger.attempts[0]["attempt_index"] == 1
+    assert ledger.attempts[0]["safe_error"]["type"] == "AdaptiveCanvasError"
+
+
+def test_script_parser_exception_marks_attempt_failed(tmp_path: Path, monkeypatch) -> None:
+    class Registry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            return {"text": "{}", "provider_calls_started": True}
+
+    def parser_failure(text: str, profile: object) -> dict[str, object]:
+        raise RuntimeError("parser failed")
+
+    monkeypatch.setattr(adaptive_canvas, "_parse_script_json", parser_failure)
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(RuntimeError, match="parser failed"):
+        adaptive_canvas._ensure_script(run_root, options, ledger, Registry(), None)
+
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["safe_error"]["type"] == "RuntimeError"
+
+
+def test_script_recovery_after_two_contract_failures_does_not_buy_or_overwrite(tmp_path: Path) -> None:
+    class InvalidRegistry:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            self.calls += 1
+            return {"text": "not json", "provider_calls_started": True}
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    registry = InvalidRegistry()
+    for _ in range(2):
+        with pytest.raises(AdaptiveCanvasError, match="LLM did not return a JSON object"):
+            adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+
+    before = json.loads(json.dumps(ledger.attempts))
+    with pytest.raises(ProviderArtifactRetryExceeded):
+        adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+
+    assert registry.calls == 2
+    assert ledger.paid_attempt_count == 2
+    assert ledger.attempts == before
+    assert [attempt["status"] for attempt in ledger.attempts] == ["failed", "failed"]
+    assert [attempt["attempt_index"] for attempt in ledger.attempts] == [1, 2]
+
+
+def test_reference_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> None:
+    class InvalidImageRegistry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            return {"outputs": [{"image_path": "missing.png"}], "provider_calls_started": True}
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(FileNotFoundError):
+        adaptive_canvas._ensure_reference_sheet(
+            run_root,
+            options,
+            ledger,
+            InvalidImageRegistry(),
+            build_script_truth_from_profile(profile),
+            None,
+        )
+
+    assert ledger.attempts[0]["stage"] == "reference_sheet"
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["provider_calls_started"] is True
+    assert ledger.attempts[0]["safe_error"]["type"] == "FileNotFoundError"
+
+
+def test_keyframe_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> None:
+    class InvalidImageRegistry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            return {"outputs": [{"image_path": "missing.png"}], "provider_calls_started": True}
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    reference = run_root / "reference.png"
+    reference.write_bytes(b"reference")
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(FileNotFoundError):
+        adaptive_canvas._ensure_keyframes(
+            run_root,
+            options,
+            ledger,
+            InvalidImageRegistry(),
+            build_script_truth_from_profile(profile),
+            {"path": str(reference)},
+            None,
+        )
+
+    assert ledger.attempts[0]["stage"] == "keyframe"
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["provider_calls_started"] is True
+
+
+def test_video_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> None:
+    class InvalidVideoRegistry:
+        def submit(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            return {"task": {"task_id": "task"}}
+
+        def poll(self, capability: str, service_id: str, submitted: object) -> dict[str, object]:
+            return {"status": "succeeded", "outputs": [{"video_path": "missing.mp4"}]}
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(
+        tmp_path / "runtime",
+        "project",
+        "run",
+        profile,
+        mode="real",
+        video_poll_interval_sec=0.01,
+    )
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    keyframe = run_root / "keyframe.png"
+    keyframe.write_bytes(b"keyframe")
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(FileNotFoundError):
+        adaptive_canvas._ensure_video_chunks(
+            run_root,
+            options,
+            ledger,
+            InvalidVideoRegistry(),
+            build_script_truth_from_profile(profile),
+            {"shot-001": {"path": str(keyframe)}},
+            None,
+        )
+
+    assert ledger.attempts[0]["stage"] == "video_chunk"
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["provider_calls_started"] is True
 
 
 def test_zero_provider_counterexample_has_dynamic_shots_durations_and_strategy(tmp_path: Path) -> None:
