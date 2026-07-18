@@ -14,16 +14,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from agentflow_studio.model_gateway.company_secrets import SERVER_CODEX_SERVICE_ID  # noqa: E402
-from agentflow_studio.model_gateway.provider_adapter import structured_output_schema_digest  # noqa: E402
 from agentflow_studio.production.adaptive_canvas_v2 import (  # noqa: E402
     AdaptiveRunOptions,
     ChargeLedger,
     IMAGE_PROVIDER_SERVICE_ID,
-    SCRIPT_V3_CONTRACT_ID,
     VIDEO_PROVIDER_SERVICE_ID,
     build_script_truth_from_profile,
-    build_script_v3_output_schema,
     compile_duration_chunks,
     run_adaptive_canvas_production,
 )
@@ -111,15 +107,30 @@ def _check_paid_profile(
     run: dict[str, Any],
     findings: list[dict[str, str]],
 ) -> None:
-    if profile.llm_service_id != SERVER_CODEX_SERVICE_ID:
-        findings.append({"severity": "P0", "scope": "route", "issue": "paid LLM route is not server_codex"})
-    if profile.script_candidate_id != "script-v3":
-        findings.append({"severity": "P1", "scope": "ledger", "issue": "paid script candidate is not script-v3"})
-    if profile.script_contract_id != SCRIPT_V3_CONTRACT_ID:
-        findings.append({"severity": "P0", "scope": "route", "issue": "paid script contract is not adaptive_canvas_script_v3"})
-    schema_digest = structured_output_schema_digest(build_script_v3_output_schema(profile))
-    if len(schema_digest) != 64:
-        findings.append({"severity": "P1", "scope": "contract", "issue": "script-v3 schema digest is invalid"})
+    if profile.llm_service_id != "disabled_agent_authored":
+        findings.append({"severity": "P0", "scope": "script_source", "issue": "agent-authored profile left an active LLM route"})
+    if profile.script_source_type != "agent_authored_test_input":
+        findings.append({"severity": "P0", "scope": "script_source", "issue": "paid profile did not freeze agent-authored input"})
+    if profile.script_candidate_id != "agent-authored-script-v1":
+        findings.append({"severity": "P1", "scope": "script_source", "issue": "agent-authored candidate id changed"})
+    if profile.script_contract_id is not None:
+        findings.append({"severity": "P0", "scope": "script_source", "issue": "agent-authored profile still declares a Provider contract"})
+    if profile.script_decision_source != "OWNER_DECISION_A_AGENT_AUTHORED_SCRIPT_RELEASED":
+        findings.append({"severity": "P0", "scope": "script_source", "issue": "agent-authored decision source is missing"})
+    provenance = run["script"].get("provenance") or {}
+    expected_lineage = {
+        "source_type": "agent_authored_test_input",
+        "author_type": "agent",
+        "provider_generated": False,
+        "llm_success": False,
+        "owner_acceptance": False,
+        "purpose": "paid_media_vertical_slice",
+    }
+    for key, value in expected_lineage.items():
+        if provenance.get(key) != value:
+            findings.append({"severity": "P0", "scope": "script_lineage", "issue": f"script provenance mismatch: {key}"})
+    if len(str(provenance.get("script_body_sha256") or "")) != 64:
+        findings.append({"severity": "P1", "scope": "script_lineage", "issue": "script body hash is missing"})
     if IMAGE_PROVIDER_SERVICE_ID != "image_relay":
         findings.append({"severity": "P0", "scope": "route", "issue": "image route is not relay"})
     if VIDEO_PROVIDER_SERVICE_ID != "seedance_i2v":
@@ -169,6 +180,8 @@ def _check_api_projection(runtime_root: Path, findings: list[dict[str, str]]) ->
 def _check_ledger(runtime_root: Path, findings: list[dict[str, str]]) -> None:
     ledger = read_json(runtime_root / "projects" / "eval-paid-profile" / "adaptive_canvas_v2" / "run-001" / "charge_ledger.json")
     attempts = ledger["attempts"]
+    if any(item["stage"] == "script" for item in attempts):
+        findings.append({"severity": "P0", "scope": "ledger", "issue": "agent-authored input created a script ledger attempt"})
     image = next(item for item in attempts if item["stage"] == "keyframe" and item["shot_id"] == "shot-001")
     video = next(item for item in attempts if item["stage"] == "video_chunk" and item["shot_id"] == "shot-001")
     if image["charge_fingerprint"] == video["charge_fingerprint"]:

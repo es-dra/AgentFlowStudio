@@ -8,11 +8,30 @@ from typing import Literal
 
 import typer
 
-from agentflow_studio.production.adaptive_canvas_v2 import AdaptiveRunOptions, run_adaptive_canvas_production
+from agentflow_studio.production.adaptive_canvas_v2 import (
+    AdaptiveRunOptions,
+    run_adaptive_canvas_production,
+    seed_agent_authored_script_truth,
+)
 from agentflow_studio.production.real_anime_4shot import real_anime_4shot_paid_profile
 
 
 DEFAULT_RUNTIME_ROOT = Path(os.environ.get("AFS_RUNTIME_ROOT") or os.environ.get("AFS_RUNTIME_SERVICE_ROOT") or "/var/lib/afs-runtime")
+
+def real_anime_4shot_agent_script_seed_command(
+    project_id: str = typer.Option(..., "--project-id", help="Existing project id."),
+    run_id: str = typer.Option(..., "--run-id", help="Existing production run id."),
+    runtime_root: Path = typer.Option(DEFAULT_RUNTIME_ROOT, "--runtime-root", help="RuntimeStore root."),
+) -> None:
+    """Seed the approved agent-authored script truth without any Provider dispatch."""
+    result = seed_agent_authored_script_truth(
+        runtime_root=runtime_root,
+        project_id=project_id,
+        run_id=run_id,
+        profile=real_anime_4shot_paid_profile(),
+    )
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+
 
 
 def real_anime_4shot_paid_v1_command(

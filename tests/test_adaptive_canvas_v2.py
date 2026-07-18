@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import agentflow_studio.production.adaptive_canvas_v2 as adaptive_canvas
 import pytest
 
+from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.production.adaptive_canvas_v2 import (
     AdaptiveCanvasError,
@@ -13,10 +15,12 @@ from agentflow_studio.production.adaptive_canvas_v2 import (
     ChargeLedger,
     PaidAttemptLimitExceeded,
     ProviderArtifactRetryExceeded,
+    build_agent_authored_script_input,
     build_script_truth_from_profile,
     compile_duration_chunks,
     load_adaptive_workspace,
     run_adaptive_canvas_production,
+    seed_agent_authored_script_truth,
 )
 from agentflow_studio.production.real_anime_4shot import alternate_no_provider_profile, real_anime_4shot_paid_profile
 from apps.api.runtime_service import create_runtime_app
@@ -26,9 +30,11 @@ from fastapi.testclient import TestClient
 
 def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     profile = real_anime_4shot_paid_profile()
-    assert profile.llm_service_id == "server_codex"
-    assert profile.script_candidate_id == "script-v3"
-    assert profile.script_contract_id == "adaptive_canvas_script_v3"
+    assert profile.llm_service_id == "disabled_agent_authored"
+    assert profile.script_candidate_id == "agent-authored-script-v1"
+    assert profile.script_contract_id is None
+    assert profile.script_source_type == "agent_authored_test_input"
+    assert profile.script_decision_source == "OWNER_DECISION_A_AGENT_AUTHORED_SCRIPT_RELEASED"
     result = run_adaptive_canvas_production(
         AdaptiveRunOptions(
             runtime_root=tmp_path / "runtime",
@@ -46,6 +52,11 @@ def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     store = RuntimeStore(tmp_path / "runtime")
     workspace = load_adaptive_workspace(store, project_id="paid-profile-fake", run_id="run-001")
     assert workspace["script"]["shot_count"] == 4
+    assert workspace["script"]["provenance"]["source_type"] == "agent_authored_test_input"
+    assert workspace["script"]["provenance"]["provider_generated"] is False
+    assert workspace["script"]["provenance"]["llm_success"] is False
+    assert workspace["script"]["provenance"]["owner_acceptance"] is False
+    assert workspace["script"]["provenance"]["purpose"] == "paid_media_vertical_slice"
     assert [shot["target_duration_sec"] for shot in workspace["shots"]] == [15.0, 15.0, 15.0, 15.0]
     assert {shot["generation_strategy"] for shot in workspace["shots"]} == {"image_to_video"}
     assert workspace["final_demo"]["duration_sec"] >= 59.0
@@ -85,8 +96,19 @@ def test_failed_script_v1_is_preserved_and_script_v2_has_a_new_fingerprint(tmp_p
     assert old["charge_fingerprint"] != new["charge_fingerprint"]
 
 
+def _provider_script_v3_profile():
+    return replace(
+        real_anime_4shot_paid_profile(),
+        llm_service_id="server_codex",
+        script_candidate_id="script-v3",
+        script_contract_id="adaptive_canvas_script_v3",
+        script_source_type="provider",
+        script_decision_source=None,
+    )
+
+
 def _script_v3_payload() -> dict[str, object]:
-    truth = build_script_truth_from_profile(real_anime_4shot_paid_profile())
+    truth = build_script_truth_from_profile(_provider_script_v3_profile())
     shot_fields = (
         "shot_id",
         "summary",
@@ -125,7 +147,7 @@ def test_paid_script_v3_route_dispatches_only_to_server_codex_with_schema_digest
                 "provider_calls_started": True,
             }
 
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -159,7 +181,7 @@ def test_script_v3_provider_failure_paths_mark_attempt_failed(tmp_path: Path, re
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
             raise ModelGatewayError(reason)
 
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -188,7 +210,7 @@ def test_script_v3_schema_invalid_final_marks_attempt_failed(tmp_path: Path) -> 
                 "provider_calls_started": True,
             }
 
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -212,7 +234,7 @@ def test_script_v3_profile_contract_mismatch_marks_attempt_failed(tmp_path: Path
                 "provider_calls_started": True,
             }
 
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -262,7 +284,7 @@ def test_script_v3_parser_exception_marks_attempt_failed(tmp_path: Path, monkeyp
         raise RuntimeError("parser failed")
 
     monkeypatch.setattr(adaptive_canvas, "_parse_script_payload", parser_failure)
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -284,7 +306,7 @@ def test_script_v3_recovery_after_one_failure_does_not_dispatch_again(tmp_path: 
             self.calls += 1
             raise ModelGatewayError("invalid structured final")
 
-    profile = real_anime_4shot_paid_profile()
+    profile = _provider_script_v3_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
@@ -302,6 +324,145 @@ def test_script_v3_recovery_after_one_failure_does_not_dispatch_again(tmp_path: 
     assert ledger.attempts == before
     assert ledger.attempts[0]["status"] == "failed"
     assert ledger.attempts[0]["attempt_index"] == 1
+
+
+
+def _record_four_failed_script_attempts(ledger: ChargeLedger) -> None:
+    history = (
+        ("prompt_optimizer", "script-v1", None, None),
+        ("server_codex", "script-v2", None, None),
+        ("server_codex", "script-v2", None, None),
+        ("server_codex", "script-v3", "adaptive_canvas_script_v3", "a" * 64),
+    )
+    for service_id, candidate_id, contract_id, schema_digest in history:
+        attempt = ledger.reserve(
+            stage="script",
+            shot_id=None,
+            chunk_id=None,
+            candidate_id=candidate_id,
+            capability="llm",
+            service_id=service_id,
+            prompt=f"frozen-{candidate_id}",
+            contract_id=contract_id,
+            contract_schema_digest=schema_digest,
+            max_provider_starts=2,
+        )
+        ledger.mark_started(attempt["attempt_id"])
+        ledger.mark_failed(attempt["attempt_id"], AdaptiveCanvasError("historical script failure"))
+
+
+def test_agent_authored_seed_preserves_failed_history_and_explicit_lineage(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "runtime"
+    run_root = runtime_root / "projects" / "project" / "adaptive_canvas_v2" / "run"
+    run_root.mkdir(parents=True)
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    _record_four_failed_script_attempts(ledger)
+    ledger_before = ledger.path.read_bytes()
+
+    result = seed_agent_authored_script_truth(
+        runtime_root=runtime_root,
+        project_id="project",
+        run_id="run",
+        profile=real_anime_4shot_paid_profile(),
+    )
+
+    assert result["status"] == "seeded"
+    assert result["paid_attempt_count"] == 4
+    assert result["attempt_count"] == 4
+    assert result["ledger_mutated"] is False
+    assert result["provider_dispatch_count"] == 0
+    assert ledger.path.read_bytes() == ledger_before
+    script = read_json(run_root / "script_truth.json")
+    lineage = script["provenance"]
+    assert lineage == read_json(run_root / "agent_authored_script_input.json")["lineage"]
+    assert lineage["source_type"] == "agent_authored_test_input"
+    assert lineage["author_type"] == "agent"
+    assert lineage["provider_generated"] is False
+    assert lineage["llm_success"] is False
+    assert lineage["owner_acceptance"] is False
+    assert lineage["purpose"] == "paid_media_vertical_slice"
+    assert lineage["decision_source"] == "OWNER_DECISION_A_AGENT_AUTHORED_SCRIPT_RELEASED"
+    assert len(lineage["script_body_sha256"]) == 64
+    assert [shot["order"] for shot in script["shots"]] == [1, 2, 3, 4]
+    assert [shot["target_duration_sec"] for shot in script["shots"]] == [15.0, 15.0, 15.0, 15.0]
+    assert all(shot["character_ids"] == ["aoi", "nori"] for shot in script["shots"])
+    assert {shot["scene_id"] for shot in script["shots"]} == {
+        "rooftop-lantern-garden",
+        "dawn-observatory-bridge",
+    }
+
+    truth_before = (run_root / "script_truth.json").read_bytes()
+    replay = seed_agent_authored_script_truth(
+        runtime_root=runtime_root,
+        project_id="project",
+        run_id="run",
+        profile=real_anime_4shot_paid_profile(),
+    )
+    assert replay["status"] == "reused"
+    assert (run_root / "script_truth.json").read_bytes() == truth_before
+    assert ledger.path.read_bytes() == ledger_before
+
+
+def test_agent_authored_recovery_never_dispatches_or_adds_script_ledger(tmp_path: Path) -> None:
+    class NoDispatchRegistry:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            self.calls += 1
+            raise AssertionError("agent-authored recovery must not dispatch")
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    _record_four_failed_script_attempts(ledger)
+    before = ledger.path.read_bytes()
+    registry = NoDispatchRegistry()
+
+    first = adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+    truth_before = (run_root / "script_truth.json").read_bytes()
+    second = adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+
+    assert first == second
+    assert registry.calls == 0
+    assert ledger.path.read_bytes() == before
+    assert ledger.paid_attempt_count == 4
+    assert (run_root / "script_truth.json").read_bytes() == truth_before
+
+
+def test_agent_authored_profile_mismatch_fails_before_any_provider(tmp_path: Path) -> None:
+    class NoDispatchRegistry:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            self.calls += 1
+            raise AssertionError("invalid canonical input must fail before Provider")
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    payload = build_agent_authored_script_input(profile)
+    payload["script"]["shots"][0]["target_duration_sec"] = 99.0
+    payload["lineage"]["script_body_sha256"] = adaptive_canvas.sha256_text(
+        json.dumps(payload["script"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    )
+    write_json(run_root / "agent_authored_script_input.json", payload)
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    registry = NoDispatchRegistry()
+
+    with pytest.raises(AdaptiveCanvasError, match="shot duration must match profile"):
+        adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
+
+    assert registry.calls == 0
+    assert ledger.paid_attempt_count == 0
+    assert ledger.attempts == []
+    assert not (run_root / "script_truth.json").exists()
+
+
 
 
 def test_reference_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> None:

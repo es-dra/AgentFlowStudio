@@ -23,13 +23,17 @@ from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 
 
 GenerationStrategy = Literal["text_to_video", "image_to_video"]
+ScriptSourceType = Literal["provider", "agent_authored_test_input"]
 Callback = Callable[[dict[str, Any]], None]
 ADAPTIVE_SCHEMA_VERSION = "afs.adaptive_canvas_v2.production_run.v0.1"
 LEDGER_SCHEMA_VERSION = "afs.adaptive_canvas_v2.charge_ledger.v0.1"
+AGENT_SCRIPT_INPUT_SCHEMA_VERSION = "afs.adaptive_canvas_v2.agent_authored_script_input.v0.1"
+SCRIPT_TRUTH_AGGREGATE_VERSION = "afs.adaptive_canvas_v2.script_truth.aggregate.v0.2"
 DEFAULT_PROVIDER_ATTEMPT_CAP = 20
 IMAGE_PROVIDER_SERVICE_ID = "image_relay"
 VIDEO_PROVIDER_SERVICE_ID = "seedance_i2v"
 SCRIPT_V3_CONTRACT_ID = "adaptive_canvas_script_v3"
+AGENT_SCRIPT_INPUT_FILENAME = "agent_authored_script_input.json"
 
 
 class AdaptiveCanvasError(RuntimeError):
@@ -71,6 +75,8 @@ class AdaptiveProductionProfile:
     llm_service_id: str = "prompt_optimizer"
     script_candidate_id: str = "script-v1"
     script_contract_id: str | None = None
+    script_source_type: ScriptSourceType = "provider"
+    script_decision_source: str | None = None
     provider_supported_video_durations_sec: tuple[int, ...] = (10, 5)
     reference_sheet_required: bool = True
     max_paid_attempts: int = DEFAULT_PROVIDER_ATTEMPT_CAP
@@ -90,7 +96,14 @@ class AdaptiveProductionProfile:
             raise AdaptiveCanvasError("script_candidate_id must be non-empty")
         if self.script_contract_id is not None and not self.script_contract_id.strip():
             raise AdaptiveCanvasError("script_contract_id must be non-empty when provided")
-        if self.script_candidate_id == "script-v3" and self.script_contract_id != SCRIPT_V3_CONTRACT_ID:
+        if self.script_source_type not in {"provider", "agent_authored_test_input"}:
+            raise AdaptiveCanvasError("unsupported script source type")
+        if self.script_source_type == "agent_authored_test_input":
+            if not str(self.script_decision_source or "").strip():
+                raise AdaptiveCanvasError("agent-authored script requires a decision source")
+            if self.script_contract_id is not None:
+                raise AdaptiveCanvasError("agent-authored script must not declare a Provider contract")
+        elif self.script_candidate_id == "script-v3" and self.script_contract_id != SCRIPT_V3_CONTRACT_ID:
             raise AdaptiveCanvasError("script-v3 requires the adaptive_canvas_script_v3 contract")
         if not self.shots:
             raise AdaptiveCanvasError("profile requires at least one shot")
@@ -368,13 +381,24 @@ def compile_duration_chunks(target_duration_sec: float, supported_durations_sec:
 def build_script_truth_from_profile(profile: AdaptiveProductionProfile) -> dict[str, Any]:
     profile.validate()
     shots = []
-    for shot in profile.shots:
+    character_ids = {
+        str(item.get("name") or ""): str(item.get("character_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.characters
+    }
+    scene_ids = {
+        str(item.get("name") or ""): str(item.get("scene_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.scenes
+    }
+    for order, shot in enumerate(profile.shots, start=1):
         shots.append(
             {
                 "shot_id": shot.shot_id,
+                "order": order,
                 "summary": shot.summary,
                 "location": shot.location,
                 "characters": list(shot.characters),
+                "character_ids": [character_ids.get(name, safe_id(name)) for name in shot.characters],
+                "scene_id": scene_ids.get(shot.location, safe_id(shot.location)),
                 "action": shot.action,
                 "camera": shot.camera,
                 "target_duration_sec": float(shot.duration_sec),
@@ -407,6 +431,163 @@ def build_script_truth_from_profile(profile: AdaptiveProductionProfile) -> dict[
             "scene_count": len(profile.scenes),
             "style_reference": "profile_style_bible",
         },
+    }
+
+
+def build_agent_authored_script_input(profile: AdaptiveProductionProfile) -> dict[str, Any]:
+    profile.validate()
+    if profile.script_source_type != "agent_authored_test_input":
+        raise AdaptiveCanvasError("profile is not approved for agent-authored script input")
+    script_body = build_script_truth_from_profile(profile)
+    script_body_sha256 = sha256_text(
+        json.dumps(script_body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    )
+    return {
+        "artifact_type": "afs_adaptive_canvas_agent_authored_script_input",
+        "schema_version": AGENT_SCRIPT_INPUT_SCHEMA_VERSION,
+        "aggregate_version": SCRIPT_TRUTH_AGGREGATE_VERSION,
+        "script": script_body,
+        "lineage": {
+            "source_type": "agent_authored_test_input",
+            "author_type": "agent",
+            "provider_generated": False,
+            "llm_success": False,
+            "owner_acceptance": False,
+            "purpose": "paid_media_vertical_slice",
+            "decision_source": profile.script_decision_source,
+            "script_body_sha256": script_body_sha256,
+            "canonical_schema_version": AGENT_SCRIPT_INPUT_SCHEMA_VERSION,
+            "aggregate_version": SCRIPT_TRUTH_AGGREGATE_VERSION,
+        },
+    }
+
+
+def _validate_agent_authored_script_input(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> None:
+    if payload.get("artifact_type") != "afs_adaptive_canvas_agent_authored_script_input":
+        raise AdaptiveCanvasError("agent-authored input artifact type is invalid")
+    if payload.get("schema_version") != AGENT_SCRIPT_INPUT_SCHEMA_VERSION:
+        raise AdaptiveCanvasError("agent-authored input schema version is invalid")
+    if payload.get("aggregate_version") != SCRIPT_TRUTH_AGGREGATE_VERSION:
+        raise AdaptiveCanvasError("agent-authored input aggregate version is invalid")
+    lineage = payload.get("lineage")
+    if not isinstance(lineage, dict):
+        raise AdaptiveCanvasError("agent-authored input lineage is required")
+    exact = {
+        "source_type": "agent_authored_test_input",
+        "author_type": "agent",
+        "provider_generated": False,
+        "llm_success": False,
+        "owner_acceptance": False,
+        "purpose": "paid_media_vertical_slice",
+        "decision_source": profile.script_decision_source,
+        "canonical_schema_version": AGENT_SCRIPT_INPUT_SCHEMA_VERSION,
+        "aggregate_version": SCRIPT_TRUTH_AGGREGATE_VERSION,
+    }
+    for key, value in exact.items():
+        if lineage.get(key) != value:
+            raise AdaptiveCanvasError(f"agent-authored input lineage mismatch: {key}")
+    script = payload.get("script")
+    if not isinstance(script, dict):
+        raise AdaptiveCanvasError("agent-authored input script must be an object")
+    digest = sha256_text(json.dumps(script, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    if lineage.get("script_body_sha256") != digest:
+        raise AdaptiveCanvasError("agent-authored input script hash mismatch")
+    _validate_script(script, profile)
+    expected_character_ids = {
+        str(item.get("name") or ""): str(item.get("character_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.characters
+    }
+    expected_scene_ids = {
+        str(item.get("name") or ""): str(item.get("scene_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.scenes
+    }
+    for order, (shot, expected) in enumerate(zip(script["shots"], profile.shots, strict=True), start=1):
+        if int(shot.get("order") or 0) != order:
+            raise AdaptiveCanvasError("agent-authored script shot order must match profile")
+        expected_ids = [expected_character_ids.get(name, safe_id(name)) for name in expected.characters]
+        if shot.get("character_ids") != expected_ids:
+            raise AdaptiveCanvasError("agent-authored script character ids must match profile")
+        if shot.get("scene_id") != expected_scene_ids.get(expected.location, safe_id(expected.location)):
+            raise AdaptiveCanvasError("agent-authored script scene id must match profile")
+        for key in ("action", "strategy_reason", "continuity_in", "continuity_out"):
+            if not str(shot.get(key) or "").strip():
+                raise AdaptiveCanvasError(f"agent-authored script field is required: {key}")
+
+
+def _materialize_agent_authored_script(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> dict[str, Any]:
+    _validate_agent_authored_script_input(payload, profile)
+    script = json.loads(json.dumps(payload["script"], ensure_ascii=False))
+    script["aggregate_version"] = SCRIPT_TRUTH_AGGREGATE_VERSION
+    script["provenance"] = dict(payload["lineage"])
+    return script
+
+
+def _ensure_agent_authored_script_truth(run_root: Path, profile: AdaptiveProductionProfile) -> tuple[dict[str, Any], bool]:
+    expected = build_agent_authored_script_input(profile)
+    input_path = run_root / AGENT_SCRIPT_INPUT_FILENAME
+    if input_path.exists():
+        canonical = read_json(input_path)
+        _validate_agent_authored_script_input(canonical, profile)
+        if canonical["lineage"]["script_body_sha256"] != expected["lineage"]["script_body_sha256"]:
+            raise AdaptiveCanvasError("existing agent-authored input does not match approved profile")
+    else:
+        canonical = expected
+        write_json(input_path, canonical)
+    script = _materialize_agent_authored_script(canonical, profile)
+    truth_path = run_root / "script_truth.json"
+    if truth_path.exists():
+        existing = read_json(truth_path)
+        _validate_script(existing, profile)
+        provenance = existing.get("provenance")
+        existing_body = {
+            key: value
+            for key, value in existing.items()
+            if key not in {"aggregate_version", "provenance"}
+        }
+        existing_digest = sha256_text(
+            json.dumps(existing_body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        )
+        if (
+            not isinstance(provenance, dict)
+            or provenance != script["provenance"]
+            or existing_digest != provenance.get("script_body_sha256")
+        ):
+            raise AdaptiveCanvasError("existing script truth provenance does not match approved agent input")
+        return existing, False
+    write_json(truth_path, script)
+    return script, True
+
+
+def seed_agent_authored_script_truth(
+    *,
+    runtime_root: Path,
+    project_id: str,
+    run_id: str,
+    profile: AdaptiveProductionProfile,
+) -> dict[str, Any]:
+    profile.validate()
+    store = RuntimeStore(runtime_root)
+    _ensure_project(store, project_id, profile)
+    run_root = _run_root(store, project_id, run_id)
+    run_root.mkdir(parents=True, exist_ok=True)
+    ledger_path = run_root / "charge_ledger.json"
+    ledger_sha256_before = sha256_file(ledger_path) if ledger_path.exists() else None
+    script, created = _ensure_agent_authored_script_truth(run_root, profile)
+    ledger_sha256_after = sha256_file(ledger_path) if ledger_path.exists() else None
+    if ledger_sha256_before != ledger_sha256_after:
+        raise AdaptiveCanvasError("agent-authored script seeding must not mutate the charge ledger")
+    ledger = read_json(ledger_path) if ledger_path.exists() else {"attempts": [], "paid_attempt_count": 0}
+    return {
+        "status": "seeded" if created else "reused",
+        "project_id": project_id,
+        "run_id": run_id,
+        "source_type": script["provenance"]["source_type"],
+        "script_body_sha256": script["provenance"]["script_body_sha256"],
+        "script_truth_sha256": sha256_file(run_root / "script_truth.json"),
+        "paid_attempt_count": int(ledger.get("paid_attempt_count") or 0),
+        "attempt_count": len(ledger.get("attempts") or []),
+        "ledger_mutated": False,
+        "provider_dispatch_count": 0,
     }
 
 
@@ -599,6 +780,17 @@ def _ensure_script(
     registry: ProviderRegistry | None,
     callback: Callback | None,
 ) -> dict[str, Any]:
+    if options.profile.script_source_type == "agent_authored_test_input":
+        _emit(callback, "SCRIPT", "started", source_type="agent_authored_test_input")
+        script, created = _ensure_agent_authored_script_truth(run_root, options.profile)
+        _emit(
+            callback,
+            "SCRIPT",
+            "succeeded" if created else "reused",
+            source_type="agent_authored_test_input",
+            provider_dispatch_count=0,
+        )
+        return script
     path = run_root / "script_truth.json"
     prompt = _script_prompt(options.profile)
     if path.exists():
@@ -1099,14 +1291,20 @@ def _production_run_payload(
         shots.append(
             {
                 "shot_id": shot["shot_id"],
+                "order": shot.get("order"),
                 "summary": shot["summary"],
                 "location": shot["location"],
                 "characters": shot["characters"],
+                "character_ids": shot.get("character_ids", []),
+                "scene_id": shot.get("scene_id"),
+                "action": shot["action"],
                 "target_duration_sec": duration,
                 "timeline_in_sec": round(cursor, 3),
                 "timeline_out_sec": round(cursor + duration, 3),
                 "generation_strategy": shot["generation_strategy"],
                 "strategy_reason": shot["strategy_reason"],
+                "continuity_in": shot["continuity_in"],
+                "continuity_out": shot["continuity_out"],
                 "reference_binding": _shot_reference_binding(shot, reference),
                 "selected_keyframe": _shot_keyframe_binding(shot, keyframes),
                 "chunk_plan": shot["chunk_plan"],
@@ -1126,6 +1324,8 @@ def _production_run_payload(
             "logline": script["logline"],
             "target_duration_sec": script["target_duration_sec"],
             "shot_count": script["shot_count"],
+            "aggregate_version": script.get("aggregate_version"),
+            "provenance": script.get("provenance"),
         },
         "assets": {
             "characters": script["characters"],
@@ -1642,8 +1842,11 @@ def _safe_message(value: str) -> str:
 
 __all__ = [
     "AdaptiveCanvasError",
+    "AGENT_SCRIPT_INPUT_FILENAME",
+    "AGENT_SCRIPT_INPUT_SCHEMA_VERSION",
     "IMAGE_PROVIDER_SERVICE_ID",
     "SCRIPT_V3_CONTRACT_ID",
+    "SCRIPT_TRUTH_AGGREGATE_VERSION",
     "VIDEO_PROVIDER_SERVICE_ID",
     "AdaptiveProductionProfile",
     "AdaptiveRunOptions",
@@ -1651,10 +1854,13 @@ __all__ = [
     "ChargeLedger",
     "GenerationStrategy",
     "PaidAttemptLimitExceeded",
+    "ScriptSourceType",
+    "build_agent_authored_script_input",
     "compile_duration_chunks",
     "build_script_truth_from_profile",
     "build_script_v3_output_schema",
     "load_adaptive_workspace",
     "run_adaptive_canvas_production",
+    "seed_agent_authored_script_truth",
     "sha256_file",
 ]
