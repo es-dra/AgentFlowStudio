@@ -6,7 +6,10 @@ import { icon } from "../icons.js";
 
 export function renderDock(store, runtime) {
   const dock = document.getElementById("dock");
-  if (!dock) return;
+  if (!dock) {
+    renderCorner(store, runtime);
+    return;
+  }
   if (dock.dataset.built) return;
   dock.dataset.built = "1";
 
@@ -26,7 +29,7 @@ export function renderDock(store, runtime) {
   keysBtn.addEventListener("click", () => openShortcutsPanel());
   dock.appendChild(keysBtn);
 
-  renderCorner(store);
+  renderCorner(store, runtime);
 }
 
 function dockBtn(iconName, title, extra = "") {
@@ -36,23 +39,23 @@ function dockBtn(iconName, title, extra = "") {
   return btn;
 }
 
-function renderCorner(store) {
+function renderCorner(store, runtime) {
   const corner = document.getElementById("corner-controls");
   if (!corner) return;
   if (corner.dataset.built) return;
   corner.dataset.built = "1";
 
-  const assets = el("button", "icon-btn");
-  assets.innerHTML = `${icon("panel", 14)}<span>资产管理</span>`;
-  assets.addEventListener("click", () => store.set((s) => {
-    s.ui.drawerOpen = !s.ui.drawerOpen;
-    s.ui.drawerTab = "assets";
-  }));
-  corner.appendChild(assets);
+  const add = el("button", "icon-btn");
+  add.innerHTML = icon("plus", 14);
+  add.title = "添加节点";
+  add.setAttribute("aria-label", "添加节点");
+  add.addEventListener("click", () => openAddNodeMenu(store, runtime, visibleCanvasCenter(), add));
+  corner.appendChild(add);
 
   const fit = el("button", "icon-btn");
   fit.innerHTML = icon("fit", 14);
   fit.title = "适应画布";
+  fit.setAttribute("aria-label", "适应画布");
   fit.addEventListener("click", () => store.set((s) => {
     s.viewport = fitVisibleCanvasViewport(s.nodes);
   }));

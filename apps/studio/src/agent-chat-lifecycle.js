@@ -1,5 +1,6 @@
 import { applyProductionPlanProjection } from "./production-plan-projection.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
 
 const SCHEMA_VERSION = "afs_agent_chat_lifecycle.v0.1";
 const CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1";
@@ -66,6 +67,7 @@ export function agentChatContextSnapshot({
     selected_node_type: cleanToken(activeNode?.type, 40),
     selected_node_status: cleanToken(activeNode?.status, 40),
     selected_node_title: cleanText(activeNode?.title || activeNode?.label || "", 80),
+    selected_node_text: cleanSourceText(activeNode?.content || activeNode?.prompt || "", 12000),
     selected_core_asset_id: cleanToken(selectedCoreAsset?.asset_id, 140),
     selected_core_asset_type: cleanToken(selectedCoreAsset?.asset_type, 60),
     selected_core_asset_status: cleanToken(selectedCoreAsset?.status, 80),
@@ -163,15 +165,17 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   let response = null;
   let runtimeReceipt = null;
   let projectionDomain = "script_core";
-  if (command.command_type === "create_script_revision") {
+  if (command.command_type === "create_script_revision" || command.command_type === "optimize_script_revision") {
     response = await runtime.createScriptRevision({
       source_kind: command.source_kind || "script",
       source_text: command.source_text || "",
       parent_revision_id: command.parent_revision_id || null,
       provenance: {
-        source: "agent_chat",
+        source: command.command_type === "optimize_script_revision" ? "agent_chat_script_optimization" : "agent_chat",
         command_id: command.command_id,
         context_key: command.context_key,
+        optimization_mode: command.optimization_mode || "",
+        optimization_instruction: command.optimization_instruction || "",
       },
       created_at: new Date().toISOString(),
     });
@@ -211,6 +215,7 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
       projectionSummary = projectionDomain === "production_plan"
         ? applyProductionPlanProjection(state, projection)
         : applyScriptCoreTruthProjection(state, projection);
+      fitCanvasProjection(state);
     });
   }
   const receipt = projectionDomain === "production_plan"
@@ -230,8 +235,46 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
     });
     return undo;
   }
-  if (!receipt?.runtime_receipt_id || !receipt?.undo_available) throw new Error("agent receipt is not undoable");
+  if (!receipt?.undo_available) throw new Error("agent receipt is not undoable");
   const isProductionPlan = receipt.runtime_domain === "production_plan";
+  const isScriptRevision = receipt.runtime_domain === "script_revision";
+  if (isScriptRevision) {
+    if (!receipt.previous_revision_id || !runtime?.selectScriptRevision) throw new Error("script revision undo is unavailable");
+    const response = await runtime.selectScriptRevision(receipt.previous_revision_id);
+    let projectionSummary = null;
+    if (response?.projection) {
+      store.set((state) => {
+        projectionSummary = applyScriptCoreTruthProjection(state, response.projection);
+        fitCanvasProjection(state);
+      });
+    }
+    const undoReceipt = {
+      schema_version: SCHEMA_VERSION,
+      receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      command_id: receipt.command_id,
+      command_type: `${receipt.command_type}.undo`,
+      status: "undone",
+      executed_at: new Date().toISOString(),
+      context_key: receipt.context_key,
+      project_id: receipt.project_id,
+      revision_id: receipt.previous_revision_id,
+      script_revision_id: receipt.previous_revision_id,
+      source_digest: response?.projection?.source_digest || "",
+      summary: "已恢复上一 ScriptRevision，画布投影已从 runtime truth 刷新。",
+      undo_available: false,
+      storyboard_write: false,
+      execution_mode: "runtime",
+      runtime_domain: "script_revision",
+      projection_summary: projectionSummary,
+      remote_dispatch_count: 0,
+      provider_dispatch_count: 0,
+    };
+    receipt.undo_available = false;
+    recordReceipt(session, undoReceipt);
+    appendMessage(session, { role: "assistant", text: undoReceipt.summary });
+    return undoReceipt;
+  }
+  if (!receipt?.runtime_receipt_id) throw new Error("agent receipt is not undoable");
   if (isProductionPlan && !runtime?.undoProductionPlanCommand) throw new Error("production plan undo is unavailable");
   if (!isProductionPlan && !runtime?.undoCoreAssetCommand) throw new Error("runtime undo is unavailable");
   const response = isProductionPlan
@@ -256,6 +299,7 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
       projectionSummary = isProductionPlan
         ? applyProductionPlanProjection(state, response.projection)
         : applyScriptCoreTruthProjection(state, response.projection);
+      fitCanvasProjection(state);
     });
   }
   const undoReceipt = {
@@ -345,7 +389,28 @@ function previewAgentCommand(message, context = {}) {
       sourceKind: "idea",
       sourceText: ideaText,
       title: "创建 Idea Revision",
-      summary: "把想法写入 runtime ScriptRevision；没有 structured analysis 前只标记 analysis_required。",
+      summary: "把想法写入 runtime ScriptRevision；没有可信分析前保持待分析状态。",
+    });
+  }
+
+  if (/^\/optimize-selected-default$/i.test(message) || /^默认优化(?:当前)?文本$/i.test(message) || /^优化当前文本$/i.test(message)) {
+    return scriptOptimizationCommand({
+      context,
+      mode: "default",
+      instruction: "保留核心意图，改善结构、表达、节奏和可生产性。",
+    });
+  }
+
+  const optimizeInstruction = matchCommand(message, [
+    /^\/optimize-selected\s+(.+)$/i,
+    /^按照(?:我的)?要求优化[:：]\s*(.+)$/i,
+    /^按要求优化[:：]\s*(.+)$/i,
+  ]);
+  if (optimizeInstruction) {
+    return scriptOptimizationCommand({
+      context,
+      mode: "instructed",
+      instruction: optimizeInstruction,
     });
   }
 
@@ -613,6 +678,84 @@ function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
+}
+
+function scriptOptimizationCommand({ context, mode, instruction }) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "故事板是只读投影。请切回画布后再优化文本。", context);
+  }
+  if (!["text", "script"].includes(context.selected_node_type)) {
+    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "请先选择一个文本或脚本节点。", context);
+  }
+  const sourceText = cleanSourceText(context.selected_node_text, 12000);
+  if (!sourceText) {
+    return blockedCommand("optimize_script_revision", "优化文本为 ScriptRevision", "当前文本节点还没有内容。", context);
+  }
+  const optimized = optimizedScriptDraft(sourceText, instruction);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "optimize_script_revision",
+    execution_mode: "runtime",
+    status: "preview",
+    title: mode === "default" ? "默认优化文本" : "按要求优化文本",
+    summary: "生成可审阅的 ScriptRevision 修订草案；确认后写入 runtime canonical truth，故事板不反写。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    revision_id: cleanToken(context.script_revision_id, 140),
+    source_kind: "script",
+    source_text: optimized,
+    before_text: sourceText,
+    parent_revision_id: cleanToken(context.script_revision_id, 140) || null,
+    optimization_mode: mode === "default" ? "default_local_structure" : "instructed_local_structure",
+    optimization_instruction: cleanText(instruction, 500),
+    preview_diff: scriptDiffSummary(sourceText, optimized),
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: "script_revision_canonical_projection",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function optimizedScriptDraft(sourceText, instruction) {
+  const paragraphs = sourceText
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean);
+  const lines = paragraphs.length ? paragraphs : sourceText.split(/\r?\n/).map((part) => part.trim()).filter(Boolean);
+  const lead = lines[0] || sourceText.trim();
+  const body = lines.slice(1);
+  const beats = body.length ? body : [lead];
+  return [
+    "核心意图",
+    trimSentence(lead, 360),
+    "",
+    "叙事推进",
+    ...beats.slice(0, 8).map((line, index) => `${index + 1}. ${trimSentence(line, 420)}`),
+    "",
+    "制作优化",
+    `- 优化方向：${cleanText(instruction, 260)}`,
+    "- 保留原始人物、地点、因果和关键情绪，不引入未确认角色或场景。",
+    "- 让下一步角色、主要场景、动态镜头和媒体计划更容易从同一版本追溯。",
+  ].join("\n").trim();
+}
+
+function scriptDiffSummary(before, after) {
+  return {
+    before_chars: before.length,
+    after_chars: after.length,
+    before_excerpt: cleanText(before, 220),
+    after_excerpt: cleanText(after, 260),
+  };
+}
+
+function trimSentence(value, limit) {
+  const text = cleanSourceText(value, limit + 80).replace(/\s+/g, " ").trim();
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
 function runtimeCommand({ context, commandType, title, summary, requiresScriptRevision = true }) {
@@ -951,6 +1094,7 @@ function productionPlanAgentReceipt(command, response, runtimeReceipt, projectio
 function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary) {
   const revision = response?.revision || response?.projection?.current_revision || {};
   const projection = response?.projection || {};
+  const scriptRevisionCommand = command.command_type === "create_script_revision" || command.command_type === "optimize_script_revision";
   const receipt = {
     schema_version: SCHEMA_VERSION,
     receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -963,11 +1107,13 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
     revision_id: runtimeReceipt?.revision_id || revision.revision_id || projection.current_revision_id || command.revision_id || "",
     source_digest: runtimeReceipt?.source_digest || revision.source_digest || projection.current_revision?.source_digest || command.source_digest || "",
     summary: runtimeReceipt?.summary || runtimeReceiptSummary(command, response),
-    undo_available: Boolean(runtimeReceipt?.undo_available),
+    undo_available: Boolean(runtimeReceipt?.undo_available) || Boolean(command.command_type === "optimize_script_revision" && command.parent_revision_id),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,
     execution_mode: "runtime",
-    runtime_domain: "script_core",
+    runtime_domain: scriptRevisionCommand ? "script_revision" : "script_core",
+    previous_revision_id: command.parent_revision_id || "",
+    created_revision_id: revision.revision_id || projection.current_revision_id || "",
     projection_summary: projectionSummary,
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
@@ -978,7 +1124,7 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
 function productionPlanReceiptSummary(command, response) {
   if (command.command_type === "refresh_production_plan") {
     const state = response?.projection?.planning_state || "planning_required";
-    return `Production Plan Truth 已刷新；当前规划状态：${state}。`;
+    return `Production Plan Truth 已刷新；当前规划状态：${productionPlanStateLabel(state)}。`;
   }
   if (command.command_type === "submit_story_plan_candidate") {
     const plan = response?.projection?.current_plan || {};
@@ -988,15 +1134,37 @@ function productionPlanReceiptSummary(command, response) {
 }
 
 function runtimeReceiptSummary(command, response) {
+  if (command.command_type === "optimize_script_revision") {
+    const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
+    return `优化后的 ScriptRevision 已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
+  }
   if (command.command_type === "create_script_revision") {
     const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
-    return `ScriptRevision 已创建；当前分析状态：${state}。`;
+    return `ScriptRevision 已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
   }
   if (command.command_type === "refresh_script_truth") {
     const state = response?.projection?.analysis_state || "analysis_required";
-    return `Script/Core Asset Truth 已刷新；当前分析状态：${state}。`;
+    return `Script/Core Asset Truth 已刷新；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
   }
   return `${command.title || "Runtime 命令"}已执行。`;
+}
+
+function productionPlanStateLabel(value) {
+  const state = String(value || "").trim();
+  if (!state || state === "planning_required") return "待规划";
+  if (state === "pending_capability") return "等待能力确认";
+  if (state === "planned") return "已规划";
+  if (state === "blocked") return "有阻断";
+  return state.replace(/_/g, " ");
+}
+
+function scriptAnalysisStateLabel(value) {
+  const state = String(value || "").trim();
+  if (!state || state === "analysis_required") return "待分析";
+  if (state === "low_confidence_pending") return "待确认";
+  if (state === "pending_confirmation") return "待确认";
+  if (state === "confirmed") return "已确认";
+  return state.replace(/_/g, " ");
 }
 
 function applyUndo(receipt, state) {
@@ -1156,4 +1324,11 @@ function safeJsonClone(value) {
   } catch {
     return {};
   }
+}
+
+function fitCanvasProjection(state) {
+  if (typeof document === "undefined" || !document.getElementById("canvas-root")) return;
+  const nodes = state?.nodes || {};
+  if (!Object.keys(nodes).length) return;
+  state.viewport = fitVisibleCanvasViewport(nodes);
 }

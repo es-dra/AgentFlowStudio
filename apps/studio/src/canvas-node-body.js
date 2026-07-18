@@ -276,20 +276,8 @@ function errorBody(node) {
 
 function emptyBody(node, def) {
   const out = [iconBlock(def.icon)];
-  if (def.intents.length && !["image", "video"].includes(node.type)) {
-    out.push(textBlock("node-empty-label", "尝试:"));
-    const list = document.createElement("div");
-    list.className = "node-intents";
-    for (const intent of def.intents) {
-      const btn = document.createElement("button");
-      btn.className = "node-intent";
-      btn.dataset.action = "intent";
-      btn.dataset.intent = intent.label;
-      btn.innerHTML = `<span class="intent-icon">${icon(intent.icon, 13)}</span><span>${intent.label}</span>`;
-      list.appendChild(btn);
-    }
-    out.push(list);
-  }
+  if (node.type === "text" || node.type === "script") out.push(textBlock("node-empty-label", "输入故事、剧本或制作说明后，可从节点工具条默认优化。"));
+  else out.push(textBlock("node-empty-label", def.upload ? "上传或连接参考后继续。" : "选择该节点后查看可用动作。"));
   return out;
 }
 

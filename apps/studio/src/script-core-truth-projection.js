@@ -78,7 +78,7 @@ function revisionNodeFor(projectId, revision, projection) {
   return {
     id: `script_truth_revision_${revisionId}`,
     type: "script",
-    title: `ScriptRevision ${revisionId.slice(-6)}`,
+    title: "剧本版本",
     x: 80,
     y: 80,
     w: 300,
@@ -103,11 +103,11 @@ function revisionNodeFor(projectId, revision, projection) {
       remote_dispatch_count: 0,
     },
     content: [
-      `source_kind: ${sourceKind}`,
-      `analysis_state: ${analysisState}`,
-      `characters: ${counts.characters || 0}`,
-      `main_scenes: ${counts.main_scenes || 0}`,
-      `manual_props: ${counts.manual_props || 0}`,
+      `来源：${sourceKindLabel(sourceKind)}`,
+      `分析：${analysisStateLabel(analysisState)}`,
+      `角色：${counts.characters || 0}`,
+      `主要场景：${counts.main_scenes || 0}`,
+      `手动道具：${counts.manual_props || 0}`,
     ].join("\n"),
     status: analysisState === "confirmed" ? "complete" : "draft",
     result: null,
@@ -152,11 +152,11 @@ function assetNodeFor(projectId, revisionNode, asset, index) {
       remote_dispatch_count: 0,
     },
     content: [
-      `${assetType}: ${label}`,
-      `status: ${status}`,
-      `source_mode: ${sourceMode}`,
-      Array.isArray(asset.aliases) && asset.aliases.length ? `aliases: ${asset.aliases.join(", ")}` : "",
-      Number(asset.confidence || 0) ? `confidence: ${Number(asset.confidence).toFixed(2)}` : "",
+      `类型：${assetTypeLabel(assetType)}`,
+      `状态：${assetStatusLabel(status)}`,
+      sourceMode ? `来源：${sourceModeLabel(sourceMode)}` : "",
+      Array.isArray(asset.aliases) && asset.aliases.length ? `别名：${asset.aliases.join(", ")}` : "",
+      Number(asset.confidence || 0) ? `置信度：${Number(asset.confidence).toFixed(2)}` : "",
     ].filter(Boolean).join("\n"),
     status: status === "confirmed" ? "complete" : "draft",
     result: null,
@@ -193,4 +193,45 @@ function cleanDigest(value) {
 
 function cleanLabel(value) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, 120) || "Core Asset";
+}
+
+function sourceKindLabel(value) {
+  const kind = String(value || "").trim();
+  if (kind === "idea") return "想法";
+  if (kind === "script") return "剧本";
+  if (kind === "uploaded_text") return "上传文本";
+  return kind.replace(/_/g, " ") || "文本";
+}
+
+function analysisStateLabel(value) {
+  const state = String(value || "").trim();
+  if (!state || state === "analysis_required") return "待分析";
+  if (state === "low_confidence_pending") return "低置信待确认";
+  if (state === "pending_confirmation") return "待确认";
+  if (state === "confirmed") return "已确认";
+  return state.replace(/_/g, " ");
+}
+
+function assetTypeLabel(value) {
+  const type = String(value || "").trim();
+  if (type === "character") return "角色";
+  if (type === "main_scene") return "主要场景";
+  if (type === "prop") return "手动道具";
+  return type.replace(/_/g, " ") || "资产";
+}
+
+function assetStatusLabel(value) {
+  const status = String(value || "").trim();
+  if (status === "confirmed") return "已确认";
+  if (status === "pending_confirmation") return "待确认";
+  if (status === "retired") return "已停用";
+  if (status === "low_confidence_pending") return "低置信待确认";
+  return status.replace(/_/g, " ") || "待确认";
+}
+
+function sourceModeLabel(value) {
+  const mode = String(value || "").trim();
+  if (mode === "analysis_candidate") return "结构化候选";
+  if (mode === "manual") return "手动";
+  return mode.replace(/_/g, " ");
 }

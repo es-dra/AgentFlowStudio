@@ -1,10 +1,8 @@
-import { createNode, connect } from "./nodes.js";
-import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { imageAssetFromVisualAsset, lastImageAsset } from "./node-image-assets.js";
-import { safeError, setNodeError } from "./node-action-utils.js";
+import { safeError } from "./node-action-utils.js";
 import { canStartGenerationForNode, startNodeGeneration as runNodeGeneration } from "./node-generation-actions.js";
-import { importScriptFileIntoTextNode, splitTextNodeToStoryboardNodes } from "./script-breakdown.js";
+import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 import { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
 import {
   createKeyframeLocalEditDraft as createStudioLocalKeyframeLocalEditDraft,
@@ -22,24 +20,10 @@ export function canRunNodeGeneration(node) {
   return canStartGenerationForNode(node);
 }
 
-// Empty-state intent: script starter lays out a safe local upstream example flow.
+// Empty-state intents only select a real input path; story planning and text rewrites go through Agent Chat.
 export function handleNodeIntent(store, node, intent) {
   if (node.type === "text" && intent === "上传完整剧本") {
     importScriptFileIntoTextNode(store, node);
-    return;
-  }
-  if (node.type === "text" && intent === "想法扩写剧本") {
-    setNodeError(store, node.id, "请先在底部输入想法，再点击扩写剧本。");
-    return;
-  }
-  if (node.type === "text" && intent === "剧本拆分分镜") {
-    splitTextNodeToStoryboardNodes(store, node).then((created) => {
-      if (!created.length) setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
-    });
-    return;
-  }
-  if (node.type === "script" && intent === "剧本生成分镜脚本") {
-    spawnSampleScriptFlow(store, node);
     return;
   }
   if (node.type === "script" && intent === "识别资产") {
@@ -55,29 +39,6 @@ export function handleNodeIntent(store, node, intent) {
     if (target) target.params.intent = intent;
     s.selection = { nodeIds: [node.id], edgeId: null };
   });
-}
-
-export function spawnSampleScriptFlow(store, scriptNode) {
-  const textNode = createNode(store, "text", scriptNode.x - 420, scriptNode.y + 140);
-  const groupId = store.nextId("group");
-  store.set((s) => {
-    const t = s.nodes[textNode.id];
-    t.title = "文本";
-    t.content = SAMPLE_SCRIPT;
-    t.h = 320;
-    t.status = "complete";
-    const sc = s.nodes[scriptNode.id];
-    sc.params.attachments = [{ id: textNode.id, label: SAMPLE_SCRIPT_TITLE }];
-    s.groups[groupId] = {
-      id: groupId,
-      title: `预设 - ${SAMPLE_SCRIPT_TITLE}`,
-      nodeIds: [scriptNode.id, textNode.id],
-    };
-    t.groupId = groupId;
-    sc.groupId = groupId;
-    s.selection = { nodeIds: [scriptNode.id], edgeId: null };
-  });
-  connect(store, textNode.id, scriptNode.id);
 }
 
 export function fixNodeVisualAsset(store, runtime, node) {

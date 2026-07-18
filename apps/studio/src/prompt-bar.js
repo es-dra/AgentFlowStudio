@@ -25,11 +25,6 @@ import {
   canUseAssetReferenceMode,
   buildUserAssetCardRevisionState,
 } from "./asset-revision-references.js";
-import {
-  expandTextIdeaToScript,
-  importScriptFileIntoTextNode,
-  splitTextNodeToStoryboardNodes,
-} from "./script-breakdown.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
@@ -37,7 +32,7 @@ export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && (node.type === "script" || !node.content || state.ui?.promptBarNodeId === node.id);
+  const show = node && PROMPT_NODE_TYPES.has(node.type) && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {
@@ -203,10 +198,12 @@ function buildBottomRow(store, runtime, node, textarea) {
   const p = node.params;
   const model = findModel(node.type, p.model);
 
-  const modelBtn = el("button", "bar-select");
-  modelBtn.innerHTML = `<span class="sel-icon">${icon("sparkle1", 13)}</span><span>${model.name}</span><span class="caret">▾</span>`;
-  modelBtn.addEventListener("click", () => openModelPopover(store, node, modelBtn));
-  row.appendChild(modelBtn);
+  if (!isTextContentNode(node)) {
+    const modelBtn = el("button", "bar-select");
+    modelBtn.innerHTML = `<span class="sel-icon">${icon("sparkle1", 13)}</span><span>${model.name}</span><span class="caret">▾</span>`;
+    modelBtn.addEventListener("click", () => openModelPopover(store, node, modelBtn));
+    row.appendChild(modelBtn);
+  }
 
   if (node.type === "video" || node.type === "video_merge") {
     const specBtn = el("button", "bar-select");
@@ -220,25 +217,20 @@ function buildBottomRow(store, runtime, node, textarea) {
     row.appendChild(motionBtn);
   }
 
-  if (node.type === "text") {
-    row.appendChild(textAction("upload", "导入剧本", () => importScriptFileIntoTextNode(store, node, textarea)));
-    row.appendChild(textAction("sparkles", "扩写剧本", () => expandTextIdeaToScript(store, runtime, node, textarea)));
-    row.appendChild(textAction("frames", "拆分分镜", () => {
-      splitTextNodeToStoryboardNodes(store, node, runtime).then((created) => {
-        if (!created.length) flashTooltip(textarea, "先输入或导入剧本");
-      });
-    }));
-  }
-
   row.appendChild(el("span", "row-spacer"));
 
   const optimizeBtn = el("button", "bar-tool optimize-btn");
   optimizeBtn.dataset.action = "optimize-prompt";
   optimizeBtn.innerHTML = `${icon("sparkles", 14)}<span>优化</span>`;
-  optimizeBtn.title = "优化提示词";
+  optimizeBtn.title = isTextContentNode(node) ? "默认优化文本" : "优化提示词";
   optimizeBtn.addEventListener("click", () => {
     if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
-      flashTooltip(optimizeBtn, "先输入提示词");
+      flashTooltip(optimizeBtn, isTextContentNode(node) ? "先输入文本" : "先输入提示词");
+      return;
+    }
+    if (isTextContentNode(node)) {
+      syncTextAreaToNode(store, node.id, textarea);
+      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/optimize-selected-default" } }));
       return;
     }
     openOptimizer(store, runtime, node.id, optimizeBtn, textarea);
@@ -282,6 +274,23 @@ function isTextContentNode(node) {
   return node.type === "text" || node.type === "script";
 }
 
+function isEditableTextPromptNode(node) {
+  if (!isTextContentNode(node)) return false;
+  if (node.params?.scriptCoreProjection || node.params?.productionPlanProjection) return false;
+  return true;
+}
+
+function syncTextAreaToNode(store, nodeId, textarea) {
+  if (!textarea) return;
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.content = textarea.value;
+    node.prompt = textarea.value;
+    if (node.status === "empty" && textarea.value.trim()) node.status = "complete";
+  }, { history: false });
+}
+
 export function syncPromptBarState(bar, node) {
   const task = activePromptTaskProgress(node);
   const running = Boolean(task);
@@ -320,7 +329,7 @@ function syncAssetReferenceModeTabs(root, activeMode) {
 function activePromptTaskProgress(node) {
   const tasks = [
     { label: "优化", state: node.params?.promptOptimizationState },
-    { label: "扩写", state: node.params?.scriptExpansionState },
+    { label: "文本处理", state: node.params?.scriptExpansionState },
     { label: "拆分", state: node.params?.storyboardBreakdownState },
   ];
   return tasks.find((item) => item.state?.status === "running") || null;

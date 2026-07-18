@@ -18,12 +18,14 @@ export function buildAgentChatPanel({
   collapsed = false,
   mobileOpen = false,
   onToggleCollapse,
+  onResizeStart,
   onOpen,
   onRender,
 } = {}) {
   const aside = el("aside", `studio-agent-chat${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`);
   aside.dataset.contextKey = context?.context_key || "";
   aside.setAttribute("aria-label", "Agent Chat");
+  if (!collapsed) aside.appendChild(resizeHandle(onResizeStart));
   aside.appendChild(panelHeader({ context, collapsed, onToggleCollapse }));
   if (collapsed) return aside;
 
@@ -61,14 +63,22 @@ function contextStrip(context) {
   const strip = el("dl", "agent-context-strip");
   for (const [label, value] of [
     ["项目", context?.project_name || "未命名项目"],
-    ["版本", context?.revision_id || "未保存"],
-    ["节点", context?.selected_node_title || context?.selected_node_id || "未选择"],
+    ["版本", context?.script_revision_id ? "已绑定剧本版本" : "未创建剧本版本"],
+    ["节点", context?.selected_node_title || "未选择"],
   ]) {
     strip.append(el("dt", "", label), el("dd", "", value));
   }
   const counts = context?.counts || {};
   strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
-  strip.append(el("dt", "", "计划"), el("dd", "", context?.production_plan_state || "planning_required"));
+  strip.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
+  strip.appendChild(evidenceDetails("上下文证据", [
+    ["project_id", context?.project_id],
+    ["script_revision_id", context?.script_revision_id],
+    ["source_digest", context?.script_source_digest],
+    ["production_plan_id", context?.production_plan_id],
+    ["production_plan_digest", context?.production_plan_digest],
+    ["selected_node_id", context?.selected_node_id],
+  ]));
   return strip;
 }
 
@@ -94,10 +104,20 @@ function commandPreview({ session, store, runtime, onRender }) {
     el("p", "", command.error_message || command.summary || "确认前不会改变画布。"),
   );
   const details = el("dl", "agent-command-details");
-  if (command.node_id) details.append(el("dt", "", "目标"), el("dd", "", command.node_id));
+  if (command.node_id || command.target_asset_id || command.target_shot_id || command.target_chunk_id) details.append(el("dt", "", "目标"), el("dd", "", humanCommandTarget(command)));
   if (command.impact?.node_ids?.length) details.append(el("dt", "", "影响"), el("dd", "", `${command.impact.node_ids.length} 个画布节点`));
   details.append(el("dt", "", "故事板"), el("dd", "", command.impact?.storyboard_write ? "需要确认写入" : "不写入"));
   preview.appendChild(details);
+  if (command.preview_diff) preview.appendChild(diffPreview(command.preview_diff));
+  preview.appendChild(evidenceDetails("查看证据/开发详情", [
+    ["command_id", command.command_id],
+    ["command_type", command.command_type],
+    ["schema_version", command.schema_version],
+    ["node_id", command.node_id],
+    ["revision_id", command.revision_id || command.script_revision_id],
+    ["source_digest", command.source_digest],
+    ["plan_digest", command.plan_digest],
+  ]));
   const actions = el("div", "agent-command-actions");
   if (command.status !== "blocked") {
     const confirm = el("button", "studio-primary-button", command.status === "executing" ? "执行中" : "确认执行");
@@ -132,11 +152,10 @@ function commandPreview({ session, store, runtime, onRender }) {
 function receiptList({ session, store, runtime, onRender }) {
   const receipts = (session?.receipts || []).slice(-3).reverse();
   const wrap = el("section", "agent-receipts");
-  wrap.appendChild(el("span", "eyebrow", "执行回执"));
   if (!receipts.length) {
-    wrap.appendChild(el("p", "agent-empty-copy", "还没有已确认的命令。"));
     return wrap;
   }
+  wrap.appendChild(el("span", "eyebrow", "执行回执"));
   for (const receipt of receipts) {
     const item = el("article", `agent-receipt ${receipt.status}`);
     item.append(el("strong", "", receipt.status === "undone" ? "已撤销" : "已执行"));
@@ -170,8 +189,8 @@ function composer({ session, context, onOpen, onRender }) {
   input.rows = 3;
   input.maxLength = 12000;
   input.placeholder = context?.selected_node_id
-    ? "发送上下文，或输入 /edit-shot-duration 6.5"
-    : "发送上下文，或输入 /submit-story-plan {json}";
+    ? "描述你想怎么调整当前节点或镜头"
+    : "输入想法、剧本要求或下一步计划";
   input.setAttribute("aria-label", "向 Agent Chat 发送消息或命令");
   const send = el("button", "studio-icon-button");
   send.type = "submit";
@@ -192,6 +211,54 @@ function contextLabel(context) {
   if (context?.selected_node_title) return context.selected_node_title;
   if (context?.section === "storyboard_read_only") return "故事板只读投影";
   return "画布上下文";
+}
+
+function resizeHandle(onResizeStart) {
+  const handle = el("div", "agent-resize-handle");
+  handle.setAttribute("role", "separator");
+  handle.setAttribute("aria-label", "调整 Agent Chat 宽度");
+  handle.setAttribute("aria-orientation", "vertical");
+  handle.addEventListener("pointerdown", (event) => onResizeStart?.(event));
+  return handle;
+}
+
+function planStateLabel(value) {
+  const state = String(value || "").trim();
+  if (!state || state === "planning_required") return "待规划";
+  if (state === "pending_capability") return "等待能力确认";
+  if (state === "planned") return "已规划";
+  if (state === "blocked") return "有阻断";
+  return state.replace(/_/g, " ");
+}
+
+function humanCommandTarget(command) {
+  if (command.target_chunk_id) return "当前 Chunk";
+  if (command.target_shot_id) return "当前 Shot";
+  if (command.target_asset_id) return "当前资产";
+  if (command.node_id) return "当前节点";
+  return "当前上下文";
+}
+
+function diffPreview(diff) {
+  const wrap = el("section", "agent-diff-preview");
+  wrap.appendChild(el("strong", "", "修订预览"));
+  const before = el("p", "", `原文 ${Number(diff.before_chars || 0)} 字：${diff.before_excerpt || "空"}`);
+  const after = el("p", "", `修订 ${Number(diff.after_chars || 0)} 字：${diff.after_excerpt || "空"}`);
+  wrap.append(before, after);
+  return wrap;
+}
+
+function evidenceDetails(title, entries) {
+  const details = el("details", "agent-evidence-details");
+  details.appendChild(el("summary", "", title));
+  const list = el("dl", "");
+  for (const [label, value] of entries) {
+    if (!value) continue;
+    list.append(el("dt", "", label), el("dd", "", String(value)));
+  }
+  if (!list.children.length) list.appendChild(el("p", "", "暂无开发详情。"));
+  details.appendChild(list);
+  return details;
 }
 
 function escapeHtml(value) {

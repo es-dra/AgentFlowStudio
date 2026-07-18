@@ -319,6 +319,8 @@ function finishMarquee(store, session) {
 
 function isChromeTarget(e) {
   return e.target.closest(".prompt-bar")
+    || e.target.closest("#canvas-empty-hint")
+    || e.target.closest("button,input,textarea,select,a")
     || e.target.closest("#dock")
     || e.target.closest("#drawer")
     || e.target.closest("#topbar")

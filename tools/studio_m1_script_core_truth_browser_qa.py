@@ -261,7 +261,7 @@ def assert_script_core_truth_interaction(page: Page, base_url: str) -> dict[str,
     page.get_by_role("button", name="确认执行").click()
     expect(page.locator(".agent-receipt").filter(has_text="ScriptRevision 已创建")).to_be_visible()
     page.wait_for_function("document.querySelectorAll('.node').length >= 1")
-    expect(page.locator(".node").filter(has_text="analysis_state: analysis_required")).to_be_visible()
+    expect(page.locator(".node").filter(has_text="分析：待分析")).to_be_visible()
 
     truth = http_json(f"{base_url}/projects/{PROJECT_ID}/script-truth")
     revision = truth["projection"]["current_revision"]

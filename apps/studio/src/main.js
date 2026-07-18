@@ -37,6 +37,9 @@ import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 import { applyProductionPlanProjection } from "./production-plan-projection.js";
+import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
+import { createNode } from "./nodes.js";
+import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -75,8 +78,8 @@ async function bootstrap() {
   initializeStudio(authState?.user || null);
   projectController.rememberStartupProject(runtime.projectId);
   if (editorMounted) {
-    renderStarters();
     renderDock(store, runtimeRef);
+    bindCanvasEmptyOnboarding();
     bindCanvasInput(store, runtimeRef);
     bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
     bindStudioKeyboard({ store, runtime: runtimeRef });
@@ -163,6 +166,7 @@ async function refreshScriptCoreTruth(runtimeClient = runtime) {
     if (runtimeClient !== runtime) return;
     store.set((state) => {
       applyScriptCoreTruthProjection(state, payload?.projection || {});
+      fitCanvasProjection(state);
     }, { history: false, persist: false });
   } catch (error) {
     reportClientError({
@@ -183,6 +187,7 @@ async function refreshProductionPlanTruth(runtimeClient = runtime) {
     if (runtimeClient !== runtime) return;
     store.set((state) => {
       applyProductionPlanProjection(state, payload?.projection || {});
+      fitCanvasProjection(state);
     }, { history: false, persist: false });
   } catch (error) {
     reportClientError({
@@ -358,28 +363,31 @@ function renderAll(state) {
   syncDomainCrewContext();
   productShell?.updateStudioState(state);
   if (!editorMounted) return;
-  renderTopbar({
-    state,
-    store,
-    runtime,
-    projectSummaries: projectController.summaries,
-    projectOptions: projectController.projectOptions(state),
-    hiddenProjectCount: projectController.hiddenProjectCount(state),
-    showAllProjects: projectController.showAllProjects,
-    onToggleProjectFilter: () => projectController.toggleProjectFilter(),
-    onSwitchProject: projectController.switchProject,
-    onCreateProject: projectController.createNewProject,
-    onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
-    onOpenHome: openProductOverview,
-    onBeforeSiteHome: () => store.flushRuntimeSave(),
-    authUser: projectController.authUser,
-    onRetrySave: () => store.flushRuntimeSave(),
-    runtimeSurfaceStatus,
-    onSignOut: handleSignOut,
-  });
+  bindCanvasEmptyOnboarding();
+  if (document.getElementById("topbar")) {
+    renderTopbar({
+      state,
+      store,
+      runtime,
+      projectSummaries: projectController.summaries,
+      projectOptions: projectController.projectOptions(state),
+      hiddenProjectCount: projectController.hiddenProjectCount(state),
+      showAllProjects: projectController.showAllProjects,
+      onToggleProjectFilter: () => projectController.toggleProjectFilter(),
+      onSwitchProject: projectController.switchProject,
+      onCreateProject: projectController.createNewProject,
+      onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
+      onOpenHome: openProductOverview,
+      onBeforeSiteHome: () => store.flushRuntimeSave(),
+      authUser: projectController.authUser,
+      onRetrySave: () => store.flushRuntimeSave(),
+      runtimeSurfaceStatus,
+      onSignOut: handleSignOut,
+    });
+  }
   renderCanvas(state, store);
-  renderDrawer(state, store, runtimeRef);
-  renderInspectorPanel(state, store, runtimeRef);
+  if (document.getElementById("drawer")) renderDrawer(state, store, runtimeRef);
+  if (document.getElementById("inspector")) renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
   renderSpriteWidget(state, runtimeRef);
 }
@@ -435,6 +443,58 @@ function renderStarters() {
     card.addEventListener("click", () => launchStarter(starter.id));
     row.appendChild(card);
   }
+}
+
+function bindCanvasEmptyOnboarding() {
+  const form = document.querySelector(".canvas-empty-onboarding");
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = "1";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = form.querySelector('[data-empty-action="idea-text"]');
+    const text = String(input?.value || "").trim();
+    if (!text) {
+      input?.focus();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: `/idea ${text}` } }));
+  });
+  form.querySelector('[data-empty-action="import-script"]')?.addEventListener("click", () => {
+    const node = createEmptyTextNode("剧本文本");
+    importScriptFileIntoTextNode(store, node);
+  });
+  form.querySelector('[data-empty-action="blank-node"]')?.addEventListener("click", () => {
+    createEmptyTextNode("故事文本");
+  });
+  form.querySelector('[data-empty-action="ask-agent"]')?.addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("afs:agent-chat-focus"));
+  });
+}
+
+function createEmptyTextNode(title) {
+  const point = canvasCenterWorldPoint();
+  const node = createNode(store, "text", point.x - 150, point.y - 120);
+  store.set((state) => {
+    const target = state.nodes[node.id];
+    if (!target) return;
+    target.title = title;
+    target.status = "empty";
+    target.content = "";
+    target.prompt = "";
+    state.selection = { nodeIds: [node.id], edgeId: null };
+  });
+  return store.get().nodes[node.id] || node;
+}
+
+function canvasCenterWorldPoint() {
+  const root = document.getElementById("canvas-root");
+  const rect = root?.getBoundingClientRect();
+  const viewport = store.get().viewport || { x: 0, y: 0, scale: 1 };
+  const scale = Number(viewport.scale || 1) || 1;
+  return {
+    x: Math.round(((rect?.width || 900) / 2 - Number(viewport.x || 0)) / scale),
+    y: Math.round(((rect?.height || 620) / 2 - Number(viewport.y || 0)) / scale),
+  };
 }
 async function launchStarter(id) {
   if (!hasActiveProject()) {
@@ -492,6 +552,12 @@ function promptCreateProjectBeforeStarter() {
 
 function safeError(error) {
   return formatRuntimeError(error, "暂时无法读取制作状态，请稍后重试。");
+}
+
+function fitCanvasProjection(state) {
+  const nodes = state?.nodes || {};
+  if (!document.getElementById("canvas-root") || !Object.keys(nodes).length) return;
+  state.viewport = fitVisibleCanvasViewport(nodes);
 }
 
 async function refreshProductOverview() {

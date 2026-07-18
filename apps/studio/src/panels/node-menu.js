@@ -9,9 +9,7 @@ import {
   enableVideoRevisionDraft,
   fixNodeVisualAsset,
   createKeyframeLocalEditDraft,
-  createStoryboardKeyframeLayer,
   pollNodeVideoGeneration,
-  identifyScriptAssets,
   setNodeVideoFrame,
   startNodeGeneration,
   canRunNodeGeneration,
@@ -19,16 +17,10 @@ import {
 } from "../node-actions.js";
 import { canContinueKeyframeToVideo, createVideoNodeFromKeyframe } from "../keyframe-video-continuation.js";
 import {
-  expandTextIdeaToScript,
-  importScriptFileIntoTextNode,
-  splitTextNodeToStoryboardNodes,
-} from "../script-breakdown.js";
-import {
   ASSET_REFERENCE_MODES,
   assetReferenceMode,
   canUseAssetReferenceMode,
 } from "../asset-revision-references.js";
-import { openAddAssetModal } from "./add-asset-modal.js";
 import { openAssetCardPanel } from "./asset-card-panel.js";
 import { openRetireAssetModal } from "./drawer-asset-actions.js";
 
@@ -51,20 +43,6 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     addItem("retry", retryMenuLabel(node), () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) startNodeGeneration(store, runtime, fresh);
-    });
-  }
-  if (node.type === "text") {
-    addItem("upload", "导入/替换剧本", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) importScriptFileIntoTextNode(store, fresh);
-    });
-    addItem("sparkles", "扩写当前文本", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) expandTextIdeaToScript(store, runtime, fresh);
-    });
-    addItem("frames", "拆分为分镜", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) splitTextNodeToStoryboardNodes(store, fresh, runtime);
     });
   }
   if (node.type === "image") {
@@ -157,20 +135,6 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
         if (fresh) openQualityFeedbackMenu(fresh, anchor.point || anchor.el);
       });
     }
-  }
-  if (node.type === "script") {
-    addItem("sparkles", "识别资产", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) identifyScriptAssets(store, runtime, fresh);
-    });
-    addItem("plus", "新增资产", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) openAddAssetModal(store, fresh);
-    });
-    addItem("image", "生成关键帧层", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) createStoryboardKeyframeLayer(store, fresh);
-    });
   }
   if (humanGateTargets(node).length) {
     addItem("check", "记录人工 Gate", () => {

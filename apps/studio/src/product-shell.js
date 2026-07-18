@@ -2,17 +2,18 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore } from "./agent-chat-lifecycle.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
   let section = "canvas";
   let selection = { sceneIndex: 0, shotIndex: 0 };
   let agentCollapsed = false;
-  let cockpitOpen = false;
+  let projectDrawerOpen = false;
   let contextOpen = false;
   let mobileAgentOpen = false;
   let notice = "";
+  let agentChatWidth = readAgentChatWidth();
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -22,6 +23,7 @@ export function createProductShell(options = {}) {
     error: "",
     authUser: null,
   };
+  bindShellEvents();
 
   function render(next = {}) {
     snapshot = { ...snapshot, ...next };
@@ -29,11 +31,11 @@ export function createProductShell(options = {}) {
     const root = document.getElementById("product-shell-root");
     if (!root) return;
     options.parkCanvas?.();
-    root.className = `unified-studio-shell ${cockpitOpen ? "cockpit-open" : ""}`;
+    root.className = `unified-studio-shell ${projectDrawerOpen ? "project-drawer-open" : ""}`;
     root.dataset.view = section;
     root.replaceChildren();
     root.appendChild(buildHeader());
-    if (cockpitOpen && snapshot.project) root.appendChild(buildCockpit());
+    if (projectDrawerOpen && snapshot.project) root.appendChild(buildProjectDrawer());
     if (snapshot.loading) root.appendChild(statePanel("loading"));
     else if (snapshot.error) root.appendChild(statePanel("error"));
     else if (!snapshot.project) root.appendChild(statePanel("empty"));
@@ -58,12 +60,14 @@ export function createProductShell(options = {}) {
     project.appendChild(projectLabel);
     if (contextOpen) project.appendChild(buildProjectMenu());
 
-    const stage = node("button", `studio-stage-button ${cockpitOpen ? "active" : ""}`);
-    stage.type = "button";
-    stage.setAttribute("aria-expanded", String(cockpitOpen));
-    stage.innerHTML = `<span>${escapeHtml(snapshot.project?.current_stage || "分镜制作")}</span>${icon("chevronDown", 13)}`;
-    stage.addEventListener("click", () => {
-      cockpitOpen = !cockpitOpen;
+    const navigator = node("button", `studio-stage-button ${projectDrawerOpen ? "active" : ""}`);
+    navigator.type = "button";
+    navigator.setAttribute("aria-label", "打开项目导航");
+    navigator.setAttribute("aria-controls", "studio-context-drawer");
+    navigator.setAttribute("aria-expanded", String(projectDrawerOpen));
+    navigator.innerHTML = `<span>项目导航</span>${icon("chevronDown", 13)}`;
+    navigator.addEventListener("click", () => {
+      projectDrawerOpen = !projectDrawerOpen;
       render();
     });
 
@@ -107,7 +111,7 @@ export function createProductShell(options = {}) {
       actions.appendChild(account);
     }
 
-    header.append(brand, project, stage, viewSwitch, summary, actions);
+    header.append(brand, project, navigator, viewSwitch, summary, actions);
     return header;
   }
 
@@ -153,13 +157,22 @@ export function createProductShell(options = {}) {
     return cluster;
   }
 
-  function buildCockpit() {
+  function buildProjectDrawer() {
     const project = snapshot.project;
-    const panel = node("section", "studio-cockpit");
-    panel.setAttribute("aria-label", "项目状态与下一步");
+    const panel = node("section", "studio-context-drawer");
+    panel.id = "studio-context-drawer";
+    panel.setAttribute("aria-label", "项目导航");
+    const close = node("button", "studio-icon-button context-drawer-close");
+    close.type = "button";
+    close.setAttribute("aria-label", "关闭项目导航");
+    close.innerHTML = icon("x", 15);
+    close.addEventListener("click", () => {
+      projectDrawerOpen = false;
+      render();
+    });
     const copy = node("div", "cockpit-copy");
     copy.append(
-      node("span", "eyebrow", "当前阶段"),
+      node("span", "eyebrow", "项目"),
       node("strong", "", project.current_stage || "分镜制作"),
       node("p", "", project.next_action || "复核当前场景并继续制作"),
     );
@@ -172,15 +185,34 @@ export function createProductShell(options = {}) {
     const next = node("button", "cockpit-next", project.next_action || "继续制作");
     next.type = "button";
     next.addEventListener("click", activateNextAction);
-    panel.append(copy, stages, next);
+    const scenes = node("div", "context-drawer-scenes");
+    scenes.appendChild(node("strong", "", "场景 / 镜头"));
+    const model = sceneModel();
+    if (!model.length) {
+      scenes.appendChild(node("p", "", "还没有确认的场景或镜头。"));
+    } else {
+      model.forEach((scene, index) => {
+        const item = node("button", index === selection.sceneIndex ? "active" : "");
+        item.type = "button";
+        item.innerHTML = `<span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(scene.name)}</strong><small>${scene.shots.length} 镜头 · ${scene.duration}</small>`;
+        item.addEventListener("click", () => {
+          projectDrawerOpen = false;
+          selectContext(index, 0);
+        });
+        scenes.appendChild(item);
+      });
+    }
+    panel.append(close, copy, stages, scenes, next);
     return panel;
   }
 
   function buildWorkspace() {
     const emptyCanvas = section === "canvas" && !hasStoryFacts();
-    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${section === "canvas" ? "canvas-section" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
+    const canvasActive = section === "canvas";
+    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
-    if (!emptyCanvas) shell.appendChild(buildSceneRail());
+    shell.style.setProperty("--agent-chat-width", `${agentChatWidth}px`);
+    if (section === "storyboard" && !emptyCanvas) shell.appendChild(buildSceneRail());
     const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
     shell.appendChild(main);
     shell.appendChild(buildAgentChat());
@@ -199,7 +231,6 @@ export function createProductShell(options = {}) {
     const main = node("main", "studio-workspace-main studio-canvas-workspace");
     main.id = "product-main";
     main.tabIndex = -1;
-    main.appendChild(buildContextBar());
     const stage = node("section", "canvas-workspace-stage");
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
     stage.dataset.canvasTarget = currentShot().nodeId || "empty-project";
@@ -211,7 +242,7 @@ export function createProductShell(options = {}) {
       live.setAttribute("aria-live", "polite");
       stage.appendChild(live);
     }
-    main.append(stage, buildVersionBar());
+    main.appendChild(stage);
     return main;
   }
 
@@ -259,17 +290,13 @@ export function createProductShell(options = {}) {
       ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>0 场景 · 0 镜头 · 尚未创建故事事实</span>`
       : `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
-    const brief = node("button", "studio-secondary-button", "打开 Agent Chat");
-    brief.type = "button";
-    brief.addEventListener("click", focusAgentComposer);
     const canvas = node("button", "studio-text-button");
     canvas.type = "button";
     canvas.innerHTML = section === "canvas"
       ? `${icon("grid", 13)}在故事板查看`
       : `查看画布${icon("expand", 13)}`;
     canvas.addEventListener("click", () => section === "canvas" ? showStoryboard() : openCanvas());
-    if (empty) actions.append(brief, canvas);
-    else actions.append(brief, canvas);
+    actions.append(canvas);
     bar.append(selectionContext, actions);
     return bar;
   }
@@ -313,13 +340,10 @@ export function createProductShell(options = {}) {
       node("p", "", "故事板当前只读取画布确认后的事实；空项目不会自动创建示例分镜。"),
     );
     const actions = node("div", "storyboard-empty-actions");
-    const brief = node("button", "studio-primary-button", "打开 Agent Chat");
-    brief.type = "button";
-    brief.addEventListener("click", focusAgentComposer);
     const canvas = node("button", "studio-secondary-button", "打开空白画布");
     canvas.type = "button";
     canvas.addEventListener("click", openCanvas);
-    actions.append(brief, canvas);
+    actions.append(canvas);
     const counts = node("dl", "empty-canonical-counts");
     for (const [label, value] of [["场景", 0], ["镜头", 0], ["参考", 0], ["决策", 0]]) {
       counts.append(node("dt", "", label), node("dd", "", String(value)));
@@ -399,6 +423,7 @@ export function createProductShell(options = {}) {
         agentCollapsed = false;
         mobileAgentOpen = true;
       },
+      onResizeStart: bindAgentResize,
       onRender: () => render(),
     });
   }
@@ -417,7 +442,7 @@ export function createProductShell(options = {}) {
         } else if (key === "storyboard") {
           showStoryboard();
         } else if (key === "context") {
-          cockpitOpen = true;
+          projectDrawerOpen = true;
           mobileAgentOpen = false;
         } else {
           agentCollapsed = false;
@@ -448,7 +473,7 @@ export function createProductShell(options = {}) {
       return;
     }
     const actionLabel = snapshot.project?.next_action || "继续当前镜头制作";
-    cockpitOpen = false;
+    projectDrawerOpen = false;
     agentCollapsed = false;
     mobileAgentOpen = true;
     selectContext(target.sceneIndex, target.shotIndex, {
@@ -497,6 +522,58 @@ export function createProductShell(options = {}) {
     notice = "Agent Chat 已绑定当前画布上下文；确认前不会创建场景或镜头。";
     render();
     requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
+  }
+
+  function submitToAgentChat(messageText) {
+    const context = currentAgentChatContext();
+    const session = agentChatContexts.get(agentChatContextKey(context));
+    const result = submitAgentChatMessage(session, messageText, context);
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    if (result.status === "empty") focusAgentComposer();
+    else render();
+    requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
+    return result;
+  }
+
+  function bindShellEvents() {
+    window.addEventListener("afs:agent-chat-submit", (event) => {
+      submitToAgentChat(event.detail?.message || "");
+    });
+    window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (projectDrawerOpen || contextOpen || mobileAgentOpen) {
+        projectDrawerOpen = false;
+        contextOpen = false;
+        mobileAgentOpen = false;
+        render();
+      }
+    });
+  }
+
+  function bindAgentResize(event) {
+    if (!event?.pointerId || agentCollapsed) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = agentChatWidth;
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("is-resizing-agent-chat");
+    const onMove = (moveEvent) => {
+      agentChatWidth = clampAgentChatWidth(startWidth + (startX - moveEvent.clientX));
+      document.querySelector(".studio-unified-workspace")?.style?.setProperty("--agent-chat-width", `${agentChatWidth}px`);
+    };
+    const onEnd = () => {
+      document.body.classList.remove("is-resizing-agent-chat");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      storeAgentChatWidth(agentChatWidth);
+      render();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd, { once: true });
+    window.addEventListener("pointercancel", onEnd, { once: true });
   }
 
   function focusCurrentContext() {
@@ -757,7 +834,7 @@ function emptyShot() {
 }
 
 function shotTitle(index) {
-  return ["建立空间", "脚步特写", "人物回望", "眼神细节", "继续前行", "环境过渡"][index % 6];
+  return `镜头 ${Number(index || 0) + 1}`;
 }
 
 function cleanTitle(value) {
@@ -795,4 +872,26 @@ function node(tag, className = "", text = "") {
   if (className) element.className = className;
   if (text !== "") element.textContent = String(text);
   return element;
+}
+
+function readAgentChatWidth() {
+  let stored = 392;
+  try {
+    stored = Number(window.localStorage?.getItem("afs_agent_chat_width") || stored);
+  } catch {
+    stored = 392;
+  }
+  return clampAgentChatWidth(stored);
+}
+
+function storeAgentChatWidth(width) {
+  try {
+    window.localStorage?.setItem("afs_agent_chat_width", String(clampAgentChatWidth(width)));
+  } catch {
+    // Storage can be unavailable; the current session width is already applied.
+  }
+}
+
+function clampAgentChatWidth(value) {
+  return Math.max(360, Math.min(420, Math.round(Number(value) || 392)));
 }
