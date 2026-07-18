@@ -363,7 +363,7 @@ function openStudioHome(state = store.get()) {
   });
 }
 function openProductOverview() {
-  productShell?.showOverview();
+  productShell?.showCanvas();
   void refreshProductOverview();
 }
 function openCanvasWorkspace() {

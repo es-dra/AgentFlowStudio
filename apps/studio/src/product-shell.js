@@ -1,24 +1,19 @@
 import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
-import { createDirectorContextStore, findNextProductionTarget, productContextKey } from "./product-shell-context.js";
-
-const DIRECTOR_TABS = [
-  ["suggestion", "建议"],
-  ["reference", "引用"],
-  ["version", "版本"],
-];
+import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
+import { buildAgentChatPanel } from "./agent-chat-panel.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore } from "./agent-chat-lifecycle.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
   let section = "canvas";
   let selection = { sceneIndex: 0, shotIndex: 0 };
-  let directorTab = "suggestion";
-  let directorCollapsed = false;
+  let agentCollapsed = false;
   let cockpitOpen = false;
   let contextOpen = false;
-  let mobileDirectorOpen = false;
+  let mobileAgentOpen = false;
   let notice = "";
-  const directorContexts = createDirectorContextStore();
+  const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
     workspace: null,
@@ -76,8 +71,8 @@ export function createProductShell(options = {}) {
     viewSwitch.setAttribute("role", "tablist");
     viewSwitch.setAttribute("aria-label", "工作区视图");
     viewSwitch.append(
-      viewButton("storyboard", "故事板"),
       viewButton("canvas", "画布"),
+      viewButton("storyboard", "故事板"),
     );
 
     const summary = node("div", "studio-header-summary");
@@ -182,12 +177,13 @@ export function createProductShell(options = {}) {
   }
 
   function buildWorkspace() {
-    const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
+    const emptyCanvas = section === "canvas" && !hasStoryFacts();
+    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${section === "canvas" ? "canvas-section" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
-    shell.appendChild(buildSceneRail());
+    if (!emptyCanvas) shell.appendChild(buildSceneRail());
     const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
     shell.appendChild(main);
-    shell.appendChild(buildDirector());
+    shell.appendChild(buildAgentChat());
     return shell;
   }
 
@@ -260,29 +256,20 @@ export function createProductShell(options = {}) {
     const bar = node("header", "storyboard-context-bar");
     const selectionContext = node("div", "selection-context");
     selectionContext.innerHTML = empty
-      ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>尚未创建场景或镜头</span>`
+      ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>0 场景 · 0 镜头 · 尚未创建故事事实</span>`
       : `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
-    const brief = node("button", "studio-secondary-button", "告诉 AI 导演");
+    const brief = node("button", "studio-secondary-button", "打开 Agent Chat");
     brief.type = "button";
-    brief.addEventListener("click", focusDirectorBrief);
-    const review = node("button", "studio-secondary-button", "进入审核");
-    review.type = "button";
-    review.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
-      notice = "审核范围已锁定为当前镜头。";
-      render();
-    });
+    brief.addEventListener("click", focusAgentComposer);
     const canvas = node("button", "studio-text-button");
     canvas.type = "button";
     canvas.innerHTML = section === "canvas"
       ? `${icon("grid", 13)}在故事板查看`
       : `查看画布${icon("expand", 13)}`;
-    canvas.addEventListener("click", () => section === "canvas" ? showOverview() : openCanvas());
+    canvas.addEventListener("click", () => section === "canvas" ? showStoryboard() : openCanvas());
     if (empty) actions.append(brief, canvas);
-    else actions.append(review, canvas);
+    else actions.append(brief, canvas);
     bar.append(selectionContext, actions);
     return bar;
   }
@@ -323,12 +310,12 @@ export function createProductShell(options = {}) {
     const body = node("div", "storyboard-empty-body");
     body.append(
       node("p", "", "这个项目还没有场景、镜头、进度、决策、参考或示例素材。"),
-      node("p", "", "先告诉 AI 导演你想做什么，或粘贴/导入故事材料；确认前不会创建故事事实。"),
+      node("p", "", "故事板当前只读取画布确认后的事实；空项目不会自动创建示例分镜。"),
     );
     const actions = node("div", "storyboard-empty-actions");
-    const brief = node("button", "studio-primary-button", "告诉 AI 导演你想做什么");
+    const brief = node("button", "studio-primary-button", "打开 Agent Chat");
     brief.type = "button";
-    brief.addEventListener("click", focusDirectorBrief);
+    brief.addEventListener("click", focusAgentComposer);
     const canvas = node("button", "studio-secondary-button", "打开空白画布");
     canvas.type = "button";
     canvas.addEventListener("click", openCanvas);
@@ -381,197 +368,59 @@ export function createProductShell(options = {}) {
       notice = "脚本上下文已绑定当前场景；详细内容保持折叠。";
       render();
     });
-    const versions = node("button", "studio-text-button", "查看版本与恢复");
+    const versions = node("button", "studio-text-button", "查看版本记录");
     versions.type = "button";
     versions.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = "版本记录只随画布事实读取；恢复命令需要在 Agent Chat 中预览和确认。";
       render();
     });
     bar.append(script, node("p", "", currentShot().description), versions);
     return bar;
   }
 
-  function buildDirector() {
-    const aside = node("aside", `studio-director ${mobileDirectorOpen ? "mobile-open" : ""}`);
-    aside.dataset.contextKey = currentContextKey();
-    const head = node("header", "director-head");
-    const title = node("div");
-    title.innerHTML = hasStoryFacts()
-      ? `<span class="director-mark">AI</span><span><strong>导演 · 当前镜头</strong><small>${escapeHtml(currentShot().title)}</small></span>`
-      : `<span class="director-mark">AI</span><span><strong>导演 · 项目简报</strong><small>${escapeHtml(snapshot.project?.name || "未命名项目")}</small></span>`;
-    const collapse = node("button", "studio-icon-button");
-    collapse.type = "button";
-    collapse.setAttribute("aria-label", directorCollapsed ? "展开 AI 导演" : "收起 AI 导演");
-    collapse.setAttribute("aria-expanded", String(!directorCollapsed));
-    collapse.innerHTML = icon(directorCollapsed ? "panel" : "chevronDown", 15);
-    collapse.addEventListener("click", () => {
-      directorCollapsed = !directorCollapsed;
-      mobileDirectorOpen = !directorCollapsed;
-      render();
-    });
-    head.append(title, collapse);
-    aside.appendChild(head);
-    if (directorCollapsed) return aside;
-
-    const tabs = node("div", "director-tabs");
-    tabs.setAttribute("role", "tablist");
-    for (const [key, label] of DIRECTOR_TABS) {
-      const tab = node("button", directorTab === key ? "active" : "", label);
-      tab.type = "button";
-      tab.setAttribute("role", "tab");
-      tab.setAttribute("aria-selected", String(directorTab === key));
-      tab.addEventListener("click", () => {
-        directorTab = key;
+  function buildAgentChat() {
+    const context = currentAgentChatContext();
+    const session = agentChatContexts.get(agentChatContextKey(context));
+    return buildAgentChatPanel({
+      session,
+      context: { ...context, context_key: agentChatContextKey(context) },
+      store: options.getStore?.(),
+      collapsed: agentCollapsed,
+      mobileOpen: mobileAgentOpen,
+      onToggleCollapse: () => {
+        agentCollapsed = !agentCollapsed;
+        mobileAgentOpen = !agentCollapsed;
         render();
-      });
-      tabs.appendChild(tab);
-    }
-    aside.appendChild(tabs);
-    if (directorTab === "reference") aside.appendChild(buildDirectorReferences());
-    else if (directorTab === "version") aside.appendChild(buildDirectorVersions());
-    else aside.appendChild(buildDirectorSuggestion());
-    return aside;
-  }
-
-  function buildDirectorSuggestion() {
-    if (!hasStoryFacts()) return buildEmptyDirectorSuggestion();
-    const body = node("div", "director-body");
-    const chat = node("div", "director-chat");
-    const shot = currentShot();
-    const context = directorContext();
-    chat.appendChild(chatBubble("assistant", `建议先检查“${shot.title}”的主体方向与环境关系，再决定是否进入审核。`));
-    for (const item of context.conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
-    body.appendChild(chat);
-
-    const references = node("button", "director-reference-summary");
-    references.type = "button";
-    references.innerHTML = `${icon("link", 14)}<span><strong>参考已绑定</strong><small>脚本场景 · 相邻镜头 · 当前候选</small></span>${icon("chevronDown", 13)}`;
-    references.addEventListener("click", () => {
-      directorTab = "reference";
-      render();
+      },
+      onOpen: () => {
+        agentCollapsed = false;
+        mobileAgentOpen = true;
+      },
+      onRender: () => render(),
     });
-    body.appendChild(references);
-
-    const proposal = node("section", `director-proposal ${context.proposalApplied ? "applied" : ""}`);
-    proposal.innerHTML = `<span class="eyebrow">${context.actionLabel ? "当前下一步 · 已定位" : "建议调整 · 不自动执行"}</span><strong>${context.proposalApplied ? "调整已加入当前镜头草稿" : escapeHtml(context.proposalText)}</strong><p>只影响当前镜头；相邻镜头、已确认事实和版本仍保持不变。</p>`;
-    const apply = node("button", "studio-primary-button", context.proposalApplied ? "已加入草稿" : "应用到草稿");
-    apply.type = "button";
-    apply.disabled = context.proposalApplied;
-    apply.addEventListener("click", () => {
-      const applied = options.onApplyDirectorDraft?.(shot.nodeId, context.proposalText);
-      if (applied === false) {
-        notice = "当前镜头还没有可写入的画布节点，建议已保留在本次讨论中。";
-        render();
-        return;
-      }
-      context.proposalApplied = true;
-      notice = "导演建议已加入当前镜头草稿，正在保存；尚未提交审核。";
-      render();
-    });
-    proposal.appendChild(apply);
-    body.appendChild(proposal);
-
-    body.appendChild(buildDirectorComposer("围绕当前镜头继续讨论…"));
-    return body;
-  }
-
-  function buildEmptyDirectorSuggestion() {
-    const body = node("div", "director-body");
-    const chat = node("div", "director-chat");
-    const context = directorContext();
-    chat.appendChild(chatBubble("assistant", "先告诉我你想做什么，或粘贴/导入剧本材料。我会先整理 Brief、Bible、Arc、Episode、Scene、Shot 和 ProductionRecipe，等你确认后再创建场景与镜头。"));
-    for (const item of context.conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
-    body.appendChild(chat);
-    const proposal = node("section", "director-proposal");
-    proposal.innerHTML = '<span class="eyebrow">当前下一步</span><strong>等待创作简报</strong><p>空项目不会自动带入示例、进度、参考或分镜。</p>';
-    body.appendChild(proposal);
-    body.appendChild(buildDirectorComposer("描述你想制作的 90–120 秒内容…"));
-    return body;
-  }
-
-  function buildDirectorComposer(placeholder) {
-    const context = directorContext();
-    const form = node("form", "director-composer");
-    const input = document.createElement("textarea");
-    input.rows = 2;
-    input.placeholder = placeholder;
-    input.setAttribute("aria-label", "向 AI 导演提问");
-    const send = node("button", "studio-icon-button");
-    send.type = "submit";
-    send.setAttribute("aria-label", "发送");
-    send.innerHTML = icon("arrowUp", 16);
-    form.append(input, send);
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
-      context.conversations.push(
-        { role: "user", text },
-        { role: "assistant", text: hasStoryFacts() ? "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" : "我会先整理成创作简报和制作配方草案，等你确认后再创建场景与镜头。" },
-      );
-      render();
-    });
-    return form;
-  }
-
-  function buildDirectorReferences() {
-    const body = node("div", "director-body director-reference-list");
-    if (!hasStoryFacts()) {
-      body.appendChild(node("p", "director-note", "还没有绑定脚本、镜头、参考集或候选素材。"));
-      return body;
-    }
-    const refs = [
-      ["脚本场景", currentScene().name, "当前"],
-      ["相邻镜头", selection.shotIndex > 0 ? currentScene().shots[selection.shotIndex - 1].title : "场景开场", "上下文"],
-      ["当前候选", currentShot().title, "v3"],
-    ];
-    for (const [type, title, meta] of refs) {
-      const item = node("article", "director-reference-item");
-      item.append(node("span", "", icon("image", 15)), node("div", "", `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`), node("span", "", meta));
-      item.children[1].innerHTML = `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`;
-      body.appendChild(item);
-    }
-    body.appendChild(node("p", "director-note", "引用只用于当前建议，不会自动改变已确认事实。"));
-    return body;
-  }
-
-  function buildDirectorVersions() {
-    const body = node("div", "director-body director-version-panel");
-    if (!hasStoryFacts()) {
-      body.appendChild(node("p", "director-note", "还没有可恢复的故事版本；确认创作简报后才会产生版本记录。"));
-      return body;
-    }
-    body.append(
-      node("p", "director-note", "版本与恢复按需展开；当前仅显示与所选镜头有关的记录。"),
-      versionRow("当前候选", "v3", "待审核"),
-      versionRow("已确认版本", "v2", "可恢复"),
-    );
-    const recovery = node("button", "studio-secondary-button", "恢复上一确认版本");
-    recovery.type = "button";
-    recovery.addEventListener("click", () => {
-      notice = "已进入恢复预览；确认前不会覆盖当前草稿。";
-      render();
-    });
-    body.appendChild(recovery);
-    return body;
   }
 
   function buildMobileNav() {
     const nav = node("nav", "product-mobile-nav");
-    nav.setAttribute("aria-label", "移动端项目与审核导航");
-    for (const [key, label] of [["storyboard", "故事板"], ["context", "项目"], ["review", "审核"], ["director", "导演"]]) {
-      const button = node("button", section === key ? "active" : "", label);
+    nav.setAttribute("aria-label", "移动端 Studio 导航");
+    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["agent", "Agent"]]) {
+      const active = key === "agent" ? mobileAgentOpen : section === key;
+      const button = node("button", active ? "active" : "", label);
       button.type = "button";
-      button.setAttribute("aria-current", section === key ? "page" : "false");
+      button.setAttribute("aria-current", active ? "page" : "false");
       button.addEventListener("click", () => {
-        section = key;
-        if (key === "context") cockpitOpen = true;
-        if (key === "review") directorTab = "version";
-        if (key === "review" || key === "director") {
-          directorCollapsed = false;
-          mobileDirectorOpen = true;
+        if (key === "canvas") {
+          openCanvas();
+        } else if (key === "storyboard") {
+          showStoryboard();
+        } else if (key === "context") {
+          cockpitOpen = true;
+          mobileAgentOpen = false;
+        } else {
+          agentCollapsed = false;
+          mobileAgentOpen = true;
         }
         render();
         requestAnimationFrame(() => document.getElementById("product-main")?.focus());
@@ -587,24 +436,23 @@ export function createProductShell(options = {}) {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(active));
-    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showOverview());
+    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showStoryboard());
     return button;
   }
 
   function activateNextAction() {
     const target = findNextProductionTarget(sceneModel(), selection);
     if (!target) {
-      focusDirectorBrief();
+      focusAgentComposer();
       return;
     }
     const actionLabel = snapshot.project?.next_action || "继续当前镜头制作";
     cockpitOpen = false;
-    directorTab = "suggestion";
-    directorCollapsed = false;
-    mobileDirectorOpen = true;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
     selectContext(target.sceneIndex, target.shotIndex, {
       actionLabel,
-      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，导演建议已按当前下一步准备。`,
+      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，Agent Chat 已绑定当前上下文。`,
     });
   }
 
@@ -612,9 +460,8 @@ export function createProductShell(options = {}) {
     const scenes = sceneModel();
     if (!scenes.length) {
       selection = { sceneIndex: 0, shotIndex: 0 };
-      directorTab = "suggestion";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
       notice = noticeText || "先完成创作简报，确认后再创建故事事实。";
       syncCanvasSelection();
       render();
@@ -624,13 +471,15 @@ export function createProductShell(options = {}) {
     const nextSceneIndex = Math.max(0, Math.min(Number(sceneIndex || 0), scenes.length - 1));
     const nextShotIndex = Math.max(0, Math.min(Number(shotIndex || 0), scenes[nextSceneIndex].shots.length - 1));
     selection = { sceneIndex: nextSceneIndex, shotIndex: nextShotIndex };
-    directorTab = "suggestion";
     notice = noticeText;
-    const context = directorContext();
     if (actionLabel) {
-      context.actionLabel = actionLabel;
-      context.proposalText = `${actionLabel}：先复核“${currentShot().title}”的画面目标与阻塞项`;
-      context.proposalApplied = false;
+      const context = currentAgentChatContext();
+      const session = agentChatContexts.get(agentChatContextKey(context));
+      session.messages.push({
+        role: "assistant",
+        text: `${actionLabel} 已绑定当前镜头。请发送命令获取预览，确认前不会写入画布。`,
+        created_at: new Date().toISOString(),
+      });
     }
     syncCanvasSelection();
     render();
@@ -641,13 +490,12 @@ export function createProductShell(options = {}) {
     options.onSelectCanvasNode?.(currentShot().nodeId || "");
   }
 
-  function focusDirectorBrief() {
-    directorTab = "suggestion";
-    directorCollapsed = false;
-    mobileDirectorOpen = true;
-    notice = "AI 导演已切到项目简报；确认前不会创建场景或镜头。";
+  function focusAgentComposer() {
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "Agent Chat 已绑定当前画布上下文；确认前不会创建场景或镜头。";
     render();
-    requestAnimationFrame(() => document.querySelector(".director-composer textarea")?.focus());
+    requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
   }
 
   function focusCurrentContext() {
@@ -666,15 +514,27 @@ export function createProductShell(options = {}) {
     });
   }
 
-  function directorContext() {
-    return directorContexts.get(currentContextKey());
+  function currentAgentChatContext() {
+    return agentChatContextSnapshot({
+      project: snapshot.project,
+      studioState: snapshot.studioState,
+      section,
+      selectedNode: selectedCanvasNode(),
+      currentShot: currentShot(),
+    });
+  }
+
+  function selectedCanvasNode() {
+    const state = snapshot.studioState || {};
+    const selectedId = state.selection?.nodeIds?.[0] || currentShot().nodeId || "";
+    return selectedId ? state.nodes?.[selectedId] || null : null;
   }
 
   function openCanvas() {
     const opened = options.onOpenCanvas?.();
     if (opened === false) {
       section = "storyboard";
-      mobileDirectorOpen = false;
+      mobileAgentOpen = false;
       notice = "移动端保留项目上下文与审核；画布编辑请在桌面打开。";
       render();
     }
@@ -730,10 +590,14 @@ export function createProductShell(options = {}) {
     if (document.getElementById("app")?.classList.contains("product-mode")) render();
   }
 
-  function showOverview() {
+  function showStoryboard() {
     section = "storyboard";
-    mobileDirectorOpen = false;
+    mobileAgentOpen = false;
     render();
+  }
+
+  function showOverview() {
+    showStoryboard();
   }
 
   function showCanvas() {
@@ -817,8 +681,19 @@ export function createProductShell(options = {}) {
     refresh,
     updateStudioState,
     showOverview,
+    showStoryboard,
     showCanvas,
-    setSection(next) { section = next; render(); },
+    setSection(next) {
+      if (next === "agent") {
+        agentCollapsed = false;
+        mobileAgentOpen = true;
+      } else if (next === "storyboard") {
+        section = "storyboard";
+      } else {
+        section = "canvas";
+      }
+      render();
+    },
     get section() { return section; },
   };
 }
@@ -846,19 +721,6 @@ function statusItem(iconName, label, tone) {
 
 function candidateDeliveryProgress(project) {
   return project?.delivery?.candidate_selected ? 40 : 0;
-}
-
-function chatBubble(role, text) {
-  const bubble = node("div", `director-bubble ${role}`);
-  bubble.append(node("span", "director-avatar", role === "user" ? "我" : "AI"), node("p", "", text));
-  return bubble;
-}
-
-function versionRow(label, version, state) {
-  const row = node("article", "director-version-row");
-  row.append(node("div", "", `<strong>${escapeHtml(label)}</strong><small>${escapeHtml(version)}</small>`), node("span", "", state));
-  row.firstElementChild.innerHTML = `<strong>${escapeHtml(label)}</strong><small>${escapeHtml(version)}</small>`;
-  return row;
 }
 
 function emptyScene() {
