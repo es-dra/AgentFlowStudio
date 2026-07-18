@@ -100,6 +100,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         ],
         "lifecycle": [
             "optimize_script_revision",
+            "request_story_plan_candidate",
             "default_local_structure",
             "instructed_local_structure",
             "selectScriptRevision(receipt.previous_revision_id)",
@@ -109,7 +110,9 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         ],
         "prompt_bar": [
             "/optimize-selected-default",
+            "/plan-selected-script-shots",
             "默认优化文本",
+            "自动拆分分镜",
             "优化提示词",
             "isEditableTextPromptNode",
         ],
@@ -161,7 +164,6 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         ("prompt_bar", "expandTextIdeaToScript"),
         ("prompt_bar", "splitTextNodeToStoryboardNodes"),
         ("prompt_bar", "扩写剧本"),
-        ("prompt_bar", "拆分分镜"),
         ("node_menu", "扩写当前文本"),
         ("node_menu", "拆分为分镜"),
         ("script_projection", "`analysis_state:"),

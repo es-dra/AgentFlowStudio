@@ -195,6 +195,9 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
     });
     runtimeReceipt = response?.receipt || null;
     projectionDomain = "production_plan";
+  } else if (command.command_type === "request_story_plan_candidate") {
+    response = await runtime.loadProductionPlanTruth();
+    projectionDomain = "production_plan";
   } else if (command.command_type === "refresh_production_plan") {
     response = await runtime.loadProductionPlanTruth();
     projectionDomain = "production_plan";
@@ -424,6 +427,10 @@ function previewAgentCommand(message, context = {}) {
       summary: "从运行服务事实重新投影剧本版本、角色、主要场景与手动道具。",
       requiresScriptRevision: false,
     });
+  }
+
+  if (/^\/plan-selected-script-shots$/i.test(message) || /^自动拆分分镜$/i.test(message) || /^自动分镜$/i.test(message)) {
+    return storyPlanRequestCommand(context);
   }
 
   const storyPlanCandidate = jsonPayloadCommand(message, [
@@ -834,6 +841,41 @@ function storyPlanCandidateCommand({ context, candidate }) {
   };
 }
 
+function storyPlanRequestCommand(context) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "故事板是只读投影。请切回画布后再请求动态分镜。", context);
+  }
+  if (!["text", "script"].includes(context.selected_node_type)) {
+    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "请先选择一个文本或脚本节点。", context);
+  }
+  if (!context.script_revision_id || !context.script_source_digest) {
+    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "请先把当前文本创建为剧本版本；动态分镜必须绑定可追溯的剧本版本。", context);
+  }
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "request_story_plan_candidate",
+    execution_mode: "runtime",
+    status: "preview",
+    title: "自动拆分分镜",
+    summary: "检查当前剧本版本是否已有可信动态分镜候选；没有可信候选时返回待规划，需要智能规划器生成候选。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    revision_id: cleanToken(context.script_revision_id, 140),
+    script_revision_id: cleanToken(context.script_revision_id, 140),
+    source_digest: cleanToken(context.script_source_digest, 80),
+    planning_state: "planning_required",
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: "script_revision_to_story_plan_candidate_request",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
 function productionPlanRefreshCommand(context) {
   if (context?.section === "storyboard_read_only") {
     return blockedCommand("refresh_production_plan", "刷新制作计划事实", "故事板是只读投影。请切回画布后再刷新计划投影。", context);
@@ -1124,6 +1166,13 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
 }
 
 function productionPlanReceiptSummary(command, response) {
+  if (command.command_type === "request_story_plan_candidate") {
+    const state = response?.projection?.planning_state || "planning_required";
+    if (!response?.projection?.current_plan?.plan_id) {
+      return `当前剧本版本还没有可信动态分镜候选；规划状态：${productionPlanStateLabel(state)}。需要智能规划器提交结构化候选后再确认生成镜头。`;
+    }
+    return `已找到当前剧本版本的动态分镜计划；规划状态：${productionPlanStateLabel(state)}。`;
+  }
   if (command.command_type === "refresh_production_plan") {
     const state = response?.projection?.planning_state || "planning_required";
     return `制作计划事实已刷新；当前规划状态：${productionPlanStateLabel(state)}。`;
@@ -1161,6 +1210,7 @@ function coreAssetUndoSummary(receipt) {
 
 function productionPlanCommandLabel(commandType) {
   return ({
+    request_story_plan_candidate: "自动拆分分镜",
     submit_story_plan_candidate: "确认动态制作计划",
     refresh_production_plan: "刷新制作计划事实",
     edit_shot_duration: "镜头时长调整",
@@ -1197,6 +1247,7 @@ function userCommandDisplayText(command, fallbackText) {
       : "默认优化当前文本";
   }
   if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
+  if (type === "request_story_plan_candidate") return "自动拆分分镜";
   if (type === "refresh_script_truth") return "刷新剧本与资产事实";
   if (type === "refresh_production_plan") return "刷新制作计划事实";
   if (isProductionPlanRuntimeCommand(type)) return productionPlanCommandLabel(type);
@@ -1394,5 +1445,6 @@ function fitCanvasProjection(state) {
   if (typeof document === "undefined" || !document.getElementById("canvas-root")) return;
   const nodes = state?.nodes || {};
   if (!Object.keys(nodes).length) return;
-  state.viewport = fitVisibleCanvasViewport(nodes);
+  const viewport = fitVisibleCanvasViewport(nodes);
+  if (viewport) state.viewport = viewport;
 }

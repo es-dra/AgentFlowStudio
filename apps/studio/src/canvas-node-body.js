@@ -7,6 +7,7 @@ import { generationStatusCard } from "./generation-status-view.js";
 import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
+import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -224,18 +225,8 @@ function editableContentBlock(node, store, expanding) {
   textarea.placeholder = node.type === "script" ? "输入剧本、分镜或制作说明" : "输入想法、剧本文字或参考说明";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
-  textarea.addEventListener("input", () => persistEditorValue(textarea, node, store));
-  textarea.addEventListener("compositionend", () => persistEditorValue(textarea, node, store));
-  textarea.addEventListener("blur", () => persistEditorValue(textarea, node, store));
+  bindStableTextInputLifecycle(textarea, () => persistEditorValue(textarea, node, store));
   bindAssetMentionSuggestions(textarea, store, node.id);
-  textarea.addEventListener("pointerdown", (event) => event.stopPropagation());
-  textarea.addEventListener("keydown", (event) => event.stopPropagation());
-  textarea.addEventListener("keyup", (event) => event.stopPropagation());
-  textarea.addEventListener("beforeinput", (event) => event.stopPropagation());
-  textarea.addEventListener("compositionstart", (event) => event.stopPropagation());
-  textarea.addEventListener("compositionupdate", (event) => event.stopPropagation());
-  textarea.addEventListener("compositionend", (event) => event.stopPropagation());
-  textarea.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
   return textarea;
 }
 
@@ -256,7 +247,7 @@ function persistEditorValue(textarea, node, store) {
       target.params.assetCardDraft.user_edited_text = textarea.value;
       target.params.assetCardDraft.updated_by_user = true;
     }
-  }, { history: false });
+  }, { history: false, renderScope: "canvas-local-edit" });
 }
 
 function errorBody(node) {

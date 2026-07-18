@@ -62,7 +62,8 @@ function syncEdgeElement(item, edge, from, to, state, relations, store) {
   path.classList.toggle("director-edge", relation === "director");
   path.classList.toggle("reference-edge", relation === "reference");
   path.classList.toggle("selected-edge", state.selection.edgeId === edge.id);
-  path.classList.toggle("just-connected", state.ui.lastConnectedEdgeId === edge.id);
+  path.classList.toggle("just-connected", state.ui?.lastConnectedEdgeId === edge.id);
+  syncEdgeStateClass(path, item, edge, state);
   item.dataset.edgeSelected = state.selection.edgeId === edge.id ? "true" : "false";
   path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
   label.textContent = relation === "director" ? "导演台" : relation === "reference" ? "参考" : "";
@@ -82,11 +83,28 @@ function syncEdgeActionButton(action, item, edge, store, x, y, selected) {
 }
 
 function syncEdgeSpark(spark, edge, state) {
-  const selected = new Set(state.selection.nodeIds || []);
-  const touchesSelection = selected.has(edge.from) || selected.has(edge.to) || state.selection.edgeId === edge.id;
-  const reverse = selected.has(edge.to) && !selected.has(edge.from);
-  spark.classList.toggle("active", touchesSelection);
+  const lifecycle = edgeLifecycleState(edge, state);
+  const active = ["pending", "running", "recovery"].includes(lifecycle) || state.ui?.lastConnectedEdgeId === edge.id;
+  const reverse = lifecycle === "recovery";
+  spark.classList.toggle("active", active);
   spark.classList.toggle("reverse", reverse);
+  spark.dataset.lifecycle = lifecycle;
+}
+
+function syncEdgeStateClass(path, item, edge, state) {
+  const lifecycle = edgeLifecycleState(edge, state);
+  item.dataset.edgeLifecycle = lifecycle;
+  path.classList.remove("edge-running", "edge-pending", "edge-recovery", "edge-failed", "edge-paused");
+  if (["running", "pending", "recovery", "failed", "paused"].includes(lifecycle)) {
+    path.classList.add(`edge-${lifecycle}`);
+  }
+}
+
+function edgeLifecycleState(edge, state) {
+  const raw = String(edge.status || edge.lifecycle_state || edge.lifecycle || "").toLowerCase();
+  if (["running", "pending", "recovery", "failed", "paused"].includes(raw)) return raw;
+  if (state.ui?.lastConnectedEdgeId === edge.id) return "pending";
+  return "idle";
 }
 
 function syncEdgeRelationClass(path, edge, relations) {

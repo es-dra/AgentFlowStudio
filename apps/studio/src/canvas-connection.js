@@ -1,4 +1,4 @@
-import { bezier, screenToWorld } from "./geometry.js";
+import { bezier, clientToWorld } from "./geometry.js";
 import { pulseConnectionSource } from "./interaction/feedback-layer.js";
 import { nodePortWorldPoint } from "./interaction/port-geometry.js";
 import { effectiveHeight, connect } from "./nodes.js";
@@ -45,7 +45,7 @@ export function startConnectSession(store, fromId, port, e) {
 
 export function moveConnectSession(store, session, e) {
   const state = store.get();
-  const cursor = screenToWorld(state.viewport, e.clientX, e.clientY);
+  const cursor = clientToWorld(state.viewport, e.clientX, e.clientY);
   const target = hitTargetNode(session, e);
   clearPreviousTarget(session, target);
   let end = cursor;

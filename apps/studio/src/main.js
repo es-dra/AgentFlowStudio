@@ -7,11 +7,8 @@ import { bindCanvasContextMenu } from "./canvas-context-menu.js";
 import { renderPromptBar } from "./prompt-bar.js";
 import { renderDrawer } from "./panels/drawer.js";
 import { renderInspectorPanel } from "./panels/inspector-panel.js";
-import { openGenerationPanel } from "./panels/generation-panel.js";
-import { openCreationProcessPanel } from "./panels/creation-process-panel.js";
 import { renderDock } from "./panels/dock.js";
 import { el, showModal } from "./overlay.js";
-import { fixNodeVisualAsset, startNodeGeneration } from "./node-actions.js";
 import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { WORKFLOW_STARTERS, createWorkflowStarter } from "./workflow-starters.js";
 import { openProjectHub } from "./project-hub.js";
@@ -20,7 +17,6 @@ import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT } from "./quality-feedback.js";
 import { handleQualityFeedbackRuntime } from "./quality-feedback-runtime-flow.js";
-import { HUMAN_GATE_DECISION_EVENT, HUMAN_GATE_DECISION_RESULT_EVENT } from "./human-gate.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { clearProjectSession, initialProjectId } from "./studio-project-session.js";
@@ -40,8 +36,7 @@ import { applyProductionPlanProjection } from "./production-plan-projection.js";
 import { fitVisibleCanvasViewport, visibleCanvasCenter } from "./canvas-safe-area.js";
 import { createNode } from "./nodes.js";
 import { importScriptFileIntoTextNode } from "./script-breakdown.js";
-
-const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
+import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCardDraft } from "./studio-runtime-events.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -85,9 +80,9 @@ async function bootstrap() {
     bindStudioKeyboard({ store, runtime: runtimeRef });
   }
   bindQualityFeedback();
-  bindHumanGateDecisionEvents();
-  bindVideoAssetCardDraft();
-  bindStudioWorkflowEvents();
+  bindHumanGateDecisionEvents({ getRuntime: () => runtime, store, safeError });
+  bindVideoAssetCardDraft({ getRuntime: () => runtime, store, safeError });
+  bindStudioWorkflowEvents({ store, runtimeRef });
   bindCanvasSafeAreaEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
@@ -208,32 +203,6 @@ function bindDomainCrewEvents() {
 function bindQualityFeedback() {
   window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => handleQualityFeedbackRuntime({ event, runtime, store }));
 }
-function bindHumanGateDecisionEvents() {
-  window.addEventListener(HUMAN_GATE_DECISION_EVENT, (event) => handleHumanGateDecision(event));
-}
-function bindVideoAssetCardDraft() {
-  window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => handleVideoAssetCardDraft(event));
-}
-function bindStudioWorkflowEvents() {
-  window.addEventListener("afs:studio-open-generation-panel", (event) => {
-    openGenerationForNode(event.detail?.node);
-  });
-  window.addEventListener("afs:studio-open-creation-process", (event) => {
-    const node = resolveEventNode(event);
-    if (node) openCreationProcessPanel(store.get(), node);
-  });
-  window.addEventListener("afs:studio-fix-visual-asset", (event) => {
-    const node = resolveEventNode(event);
-    if (node) fixNodeVisualAsset(store, runtimeRef, node);
-  });
-  window.addEventListener("afs:studio-select-node", (event) => {
-    const node = resolveEventNode(event);
-    if (!node) return;
-    store.set((s) => {
-      s.selection = { nodeIds: [node.id], edgeId: null };
-    }, { history: false, persist: false });
-  });
-}
 function bindSaveAuthRecovery() {
   let recoveryInFlight = false;
   window.addEventListener("afs:studio-save-auth-required", (event) => {
@@ -257,112 +226,9 @@ function bindProjectAccessRecovery() {
 function bindSessionExpiryBoundary() {
   window.addEventListener("afs:auth-session-expired", () => void recoverExpiredSession());
 }
-function openGenerationForNode(inputNode) {
-  const node = inputNode?.id ? store.get().nodes[inputNode.id] : selectedNode();
-  if (!node) return null;
-  return openGenerationPanel({
-    store,
-    node,
-    onRun: (fresh) => startNodeGeneration(store, runtimeRef, fresh),
-  });
-}
-function resolveEventNode(event) {
-  const nodeId = String(event.detail?.node_id || event.detail?.node?.id || "");
-  if (!nodeId) return selectedNode();
-  return store.get().nodes[nodeId] || null;
-}
-function selectedNode() {
-  const id = store.get().selection.nodeIds[0];
-  return id ? store.get().nodes[id] || null : null;
-}
-async function handleVideoAssetCardDraft(event) {
-  const node = resolveEventNode(event) || event.detail?.node;
-  const nodeId = String(node?.id || event.detail?.node_id || "");
-  if (!nodeId || !runtime?.draftAssetCard) return;
-  const sourceVideoArtifactId = String(
-    node?.params?.lastVideoArtifactId || node?.params?.lastVideoJobId || "",
-  ).trim();
-  if (!sourceVideoArtifactId) {
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.result = `${current.result || ""}\n请先生成视频，再识别视频资产卡。`.trim();
-    });
-    return;
-  }
-  store.set((s) => {
-    const current = s.nodes[nodeId];
-    if (!current) return;
-    current.params.lastVideoAssetCardDraftStatus = "running";
-    current.result = `${current.result || ""}\n正在识别视频资产卡...`.trim();
-  }, { history: false, persist: false });
-  try {
-    const response = await runtime.draftAssetCard({
-      asset_type: "video",
-      source_video_artifact_id: sourceVideoArtifactId,
-      sampled_image_asset_refs: [],
-      node_id: nodeId,
-      prompt_text: node.prompt || node.result || node.title || "",
-      provider_service_id: "vision_video",
-      generated_at: new Date().toISOString(),
-    });
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.params.lastVideoAssetCardDraft = response?.draft || null;
-      current.params.lastVideoAssetCardDraftStatus = response?.job?.status || "unknown";
-      current.result = `${current.result || ""}\n视频资产卡草稿：${response?.job?.status || "unknown"}`.trim();
-    });
-  } catch (error) {
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.params.lastVideoAssetCardDraftStatus = "failed";
-      current.result = `${current.result || ""}\n视频资产卡识别失败：${safeError(error)}`.trim();
-    });
-  }
-}
-async function handleHumanGateDecision(event) {
-  const requestId = String(event.detail?.request_id || "");
-  const payload = event.detail?.payload;
-  try {
-    if (!payload || typeof payload !== "object") throw new Error("human gate payload is empty");
-    const response = await runtime.recordHumanGateDecision(payload);
-    const humanGateId = response?.human_gate_decision?.human_gate_id || response?.artifact?.artifact_id || "";
-    recordHumanGateDecisionOnNode(payload, humanGateId, response?.job?.status || "succeeded");
-    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
-      detail: { request_id: requestId, ok: true, human_gate_id: humanGateId },
-    }));
-  } catch (error) {
-    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
-      detail: { request_id: requestId, ok: false, error: safeError(error) },
-    }));
-  }
-}
-function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
-  const nodeId = String(payload?.node_id || "");
-  if (!nodeId) return;
-  store.set((s) => {
-    const node = s.nodes[nodeId];
-    if (!node) return;
-    const decisions = Array.isArray(node.params.humanGateDecisions) ? node.params.humanGateDecisions : [];
-    node.params.humanGateDecisions = [
-      ...decisions,
-      {
-        human_gate_id: String(humanGateId || ""),
-        target_type: String(payload.target_type || ""),
-        target_id: String(payload.target_id || ""),
-        decision: String(payload.decision || ""),
-        status: String(status || ""),
-        recorded_at: new Date().toISOString(),
-        writes_long_term_memory: false,
-      },
-    ].slice(-12);
-  }, { history: false });
-}
-function renderAll(state) {
+function renderAll(state, meta = {}) {
   syncDomainCrewContext();
-  productShell?.updateStudioState(state);
+  productShell?.updateStudioState(state, { render: shouldRenderProductShell(meta) });
   if (!editorMounted) return;
   bindCanvasEmptyOnboarding();
   if (document.getElementById("topbar")) {
@@ -391,6 +257,21 @@ function renderAll(state) {
   if (document.getElementById("inspector")) renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
   renderSpriteWidget(state, runtimeRef);
+}
+
+function shouldRenderProductShell(meta = {}) {
+  if (isCanvasTextEditingActive()) return false;
+  if (meta.full) return true;
+  const scopes = Array.isArray(meta.renderScopes) ? meta.renderScopes : [];
+  if (!scopes.length) return true;
+  const shellSafeScopes = new Set(["canvas-local-edit", "save-status"]);
+  return !scopes.every((scope) => shellSafeScopes.has(scope));
+}
+
+function isCanvasTextEditingActive() {
+  const active = document.activeElement;
+  if (!active || !["TEXTAREA", "INPUT"].includes(active.tagName)) return false;
+  return Boolean(active.closest?.(".node-content-editor, .prompt-bar, .canvas-empty-onboarding"));
 }
 function syncDomainCrewContext() {
   if (!domainCrewController || !projectController) return;
@@ -554,7 +435,8 @@ function safeError(error) {
 function fitCanvasProjection(state) {
   const nodes = state?.nodes || {};
   if (!document.getElementById("canvas-root") || !Object.keys(nodes).length) return;
-  state.viewport = fitVisibleCanvasViewport(nodes);
+  const viewport = fitVisibleCanvasViewport(nodes);
+  if (viewport) state.viewport = viewport;
 }
 
 function bindCanvasSafeAreaEvents() {

@@ -1,4 +1,5 @@
 import { loadPersisted, migrateLegacyCanvasStorage, persist } from "./store-persistence.js";
+import { emptyNotifyMeta, mergeNotifyMeta } from "./store-notify-meta.js";
 import { runtimeSaveFailureState, shouldKeepLocalOverRemote, snapshotKey } from "./store-runtime-save.js";
 import {
   hasStudioContent,
@@ -25,10 +26,9 @@ export function createStore(projectId = "") {
   let lastRuntimeSavedSnapshot = "";
   let saveInFlight = false;
   let saveQueuedAfterSuccess = false;
+  let pendingNotifyMeta = emptyNotifyMeta();
 
-  function get() {
-    return state;
-  }
+  function get() { return state; }
 
   function set(mutator, options = {}) {
     const before = snapshotStudioState(state);
@@ -45,18 +45,12 @@ export function createStore(projectId = "") {
     }
     persist(state);
     if (options.persist !== false && changed) scheduleRuntimeSave();
-    notifySoon();
+    notifySoon(options);
   }
 
-  function subscribe(fn) {
-    listeners.add(fn);
-    return () => listeners.delete(fn);
-  }
+  function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-  function nextId(prefix) {
-    state.meta.seq += 1;
-    return `${prefix}_${state.meta.seq}`;
-  }
+  function nextId(prefix) { state.meta.seq += 1; return `${prefix}_${state.meta.seq}`; }
 
   function attachRuntime(runtime) {
     runtimeClient = runtime;
@@ -150,7 +144,7 @@ export function createStore(projectId = "") {
     if (saveInFlight) {
       saveQueuedAfterSuccess = true;
       state.ui.saveState = "保存中";
-      notifySoon();
+      notifySoon({ renderScope: "save-status" });
       return;
     }
     clearTimeout(saveTimer);
@@ -172,7 +166,7 @@ export function createStore(projectId = "") {
     if (lastRuntimeSavedSnapshot && savingSnapshotKey === lastRuntimeSavedSnapshot) {
       state.ui.saveState = "已保存";
       state.ui.saveMessage = "";
-      notifySoon();
+      notifySoon({ renderScope: "save-status" });
       return;
     }
     saveInFlight = true;
@@ -180,7 +174,7 @@ export function createStore(projectId = "") {
     let flushQueued = false;
     try {
       state.ui.saveState = "保存中";
-      notifySoon();
+      notifySoon({ renderScope: "save-status" });
       const payload = await runtimeClient.saveStudioState(snapshot, runtimeStateVersion);
       runtimeStateVersion = String(payload?.state_version || runtimeStateVersion || "");
       lastRuntimeSavedSnapshot = savingSnapshotKey;
@@ -203,16 +197,19 @@ export function createStore(projectId = "") {
         saveQueuedAfterSuccess = false;
         scheduleRuntimeSave();
       }
-      notifySoon();
+      notifySoon({ renderScope: "save-status" });
     }
   }
 
-  function notifySoon() {
+  function notifySoon(meta = {}) {
+    pendingNotifyMeta = mergeNotifyMeta(pendingNotifyMeta, meta);
     if (scheduled) return;
     scheduled = true;
     queueMicrotask(() => {
       scheduled = false;
-      listeners.forEach((fn) => fn(state));
+      const meta = pendingNotifyMeta;
+      pendingNotifyMeta = emptyNotifyMeta();
+      listeners.forEach((fn) => fn(state, meta));
     });
   }
 

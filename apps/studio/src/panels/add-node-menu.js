@@ -1,5 +1,5 @@
 import { NODE_TYPES, NODE_MENU_ORDER, createNode, connect, downstreamTypesFor, effectiveHeight } from "../nodes.js";
-import { screenToWorld, rectsIntersect } from "../geometry.js";
+import { clientToCanvasPoint, screenToWorld, rectsIntersect } from "../geometry.js";
 import { showPopover, el } from "../overlay.js";
 import { icon } from "../icons.js";
 import { ACTION_GROUPS, createActionNode } from "../action-registry.js";
@@ -9,7 +9,8 @@ const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_directo
 export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   let closeRef = () => {};
   const pop = buildMenu((action) => {
-    const world = screenToWorld(store.get().viewport, screenPoint.x, screenPoint.y);
+    const point = canvasPointFromMenuPoint(screenPoint);
+    const world = screenToWorld(store.get().viewport, point.x, point.y);
     const position = openPositionNear(store, action, world.x - 140, world.y - 40);
     spawn(store, action, position.x, position.y);
   }, () => closeRef());
@@ -18,11 +19,26 @@ export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
     closeRef = showPopover(anchorEl, pop, { place: "top" });
     return closeRef;
   }
+  const anchorPoint = clientPointFromMenuPoint(screenPoint);
   const anchor = el("div");
-  anchor.style.cssText = `position:fixed;left:${screenPoint.x}px;top:${screenPoint.y}px;width:1px;height:1px;pointer-events:none;`;
+  anchor.style.cssText = `position:fixed;left:${anchorPoint.x}px;top:${anchorPoint.y}px;width:1px;height:1px;pointer-events:none;`;
   document.body.appendChild(anchor);
   closeRef = showPopover(anchor, pop, { place: "bottom", onClose: () => anchor.remove() });
   return closeRef;
+}
+
+function canvasPointFromMenuPoint(point) {
+  if (point?.coordinateSpace === "canvas") return { x: point.x, y: point.y };
+  return clientToCanvasPoint(point?.x || 0, point?.y || 0);
+}
+
+function clientPointFromMenuPoint(point) {
+  if (point?.coordinateSpace !== "canvas") return { x: point?.x || 0, y: point?.y || 0 };
+  const rect = document.getElementById("canvas-root")?.getBoundingClientRect?.();
+  return {
+    x: (rect?.left || 0) + Number(point.x || 0),
+    y: (rect?.top || 0) + Number(point.y || 0),
+  };
 }
 
 export function openReferenceMenu(store, runtime, fromNode, anchorEl, options = {}) {

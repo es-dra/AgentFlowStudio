@@ -672,9 +672,23 @@ export function createProductShell(options = {}) {
     render();
   }
 
-  function updateStudioState(studioState) {
+  function updateStudioState(studioState, options = {}) {
     snapshot = { ...snapshot, studioState };
-    if (document.getElementById("app")?.classList.contains("product-mode")) render();
+    if (!document.getElementById("app")?.classList.contains("product-mode")) return;
+    if (options.render === false || options.deferRender === true) {
+      syncSaveStatusElement();
+      return;
+    }
+    render();
+  }
+
+  function syncSaveStatusElement() {
+    const status = document.querySelector(".studio-save-status");
+    if (!status) return;
+    const saveState = String(snapshot.studioState?.ui?.saveState || "本地暂存");
+    status.textContent = saveState;
+    status.className = `studio-save-status ${saveTone(saveState)}`;
+    status.title = snapshot.studioState?.ui?.saveMessage || saveState;
   }
 
   function showStoryboard() {

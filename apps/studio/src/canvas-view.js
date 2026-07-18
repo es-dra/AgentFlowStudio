@@ -6,6 +6,8 @@ import { icon } from "./icons.js";
 import { canRunNodeGeneration } from "./node-actions.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
+let pendingEdgeLayoutRaf = 0;
+
 export function renderCanvas(state, store) {
   const world = document.getElementById("world");
   const viewport = state.order.length ? state.viewport : { x: 0, y: 0, scale: 1 };
@@ -13,9 +15,19 @@ export function renderCanvas(state, store) {
   const relations = relationSets(state);
   renderNodes(state, relations, store);
   renderEdges(state, relations, store);
+  scheduleEdgeLayoutPass(store);
   renderEmptyState(state);
   const zoomLabel = document.querySelector("#corner-controls .zoom-label");
   if (zoomLabel) zoomLabel.textContent = `${Math.round(viewport.scale * 100)}%`;
+}
+
+function scheduleEdgeLayoutPass(store) {
+  if (typeof requestAnimationFrame !== "function" || pendingEdgeLayoutRaf) return;
+  pendingEdgeLayoutRaf = requestAnimationFrame(() => {
+    pendingEdgeLayoutRaf = 0;
+    const state = store.get();
+    renderEdges(state, relationSets(state), store);
+  });
 }
 
 function renderEmptyState(state) {

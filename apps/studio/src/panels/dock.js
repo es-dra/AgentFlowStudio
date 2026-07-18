@@ -21,7 +21,8 @@ export function renderDock(store, runtime) {
 
   const fitBtn = dockBtn("fit", "适应画布");
   fitBtn.addEventListener("click", () => store.set((s) => {
-    s.viewport = fitVisibleCanvasViewport(s.nodes);
+    const viewport = fitVisibleCanvasViewport(s.nodes);
+    if (viewport) s.viewport = viewport;
   }, { history: false, persist: false }));
   dock.appendChild(fitBtn);
 
@@ -57,7 +58,8 @@ function renderCorner(store, runtime) {
   fit.title = "适应画布";
   fit.setAttribute("aria-label", "适应画布");
   fit.addEventListener("click", () => store.set((s) => {
-    s.viewport = fitVisibleCanvasViewport(s.nodes);
+    const viewport = fitVisibleCanvasViewport(s.nodes);
+    if (viewport) s.viewport = viewport;
   }));
   corner.appendChild(fit);
 

@@ -33,7 +33,8 @@ export function arrangeCanvas(store) {
         node.y = rowIndex * gapY - 180 - Math.floor(ids.length / 2) * 40;
       });
     });
-    s.viewport = fitVisibleCanvasViewport(s.nodes);
+    const viewport = fitVisibleCanvasViewport(s.nodes);
+    if (viewport) s.viewport = viewport;
   });
 }
 
@@ -105,7 +106,8 @@ function handleViewportCommands(e, store) {
   if ((e.ctrlKey || e.metaKey) && e.key === "0") {
     e.preventDefault();
     store.set((s) => {
-      s.viewport = fitVisibleCanvasViewport(s.nodes);
+      const viewport = fitVisibleCanvasViewport(s.nodes);
+      if (viewport) s.viewport = viewport;
     }, { history: false, persist: false });
     return true;
   }

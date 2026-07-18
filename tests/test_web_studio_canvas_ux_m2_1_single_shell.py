@@ -59,10 +59,11 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "/optimize-selected-default" in prompt_bar
     assert "默认优化文本" in prompt_bar
     assert "优化提示词" in prompt_bar
+    assert "自动拆分分镜" in prompt_bar
+    assert "/plan-selected-script-shots" in prompt_bar
     assert "expandTextIdeaToScript" not in prompt_bar
     assert "splitTextNodeToStoryboardNodes" not in prompt_bar
     assert "扩写剧本" not in prompt_bar
-    assert "拆分分镜" not in prompt_bar
     assert "扩写当前文本" not in node_menu
     assert "拆分为分镜" not in node_menu
     assert 'data-role="run-action"' in canvas

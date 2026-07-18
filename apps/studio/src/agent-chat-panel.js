@@ -9,6 +9,7 @@ import {
   undoAgentReceipt,
   undoAgentReceiptWithRuntime,
 } from "./agent-chat-lifecycle.js";
+import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 
 export function buildAgentChatPanel({
   session,
@@ -193,6 +194,14 @@ function composer({ session, context, onOpen, onRender }) {
     ? "描述你想怎么调整当前节点或镜头"
     : "输入想法、剧本要求或下一步计划";
   input.setAttribute("aria-label", "向 Agent Chat 发送消息或命令");
+  bindStableTextInputLifecycle(input, () => {}, {
+    onKeyDown: (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    },
+  });
   const send = el("button", "studio-icon-button");
   send.type = "submit";
   send.setAttribute("aria-label", "发送到 Agent Chat");

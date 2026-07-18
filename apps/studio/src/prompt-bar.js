@@ -25,6 +25,7 @@ import {
   canUseAssetReferenceMode,
   buildUserAssetCardRevisionState,
 } from "./asset-revision-references.js";
+import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
@@ -87,7 +88,7 @@ function buildBar(store, runtime, node) {
   const textarea = document.createElement("textarea");
   textarea.placeholder = promptTextPlaceholder(node);
   textarea.value = promptTextValue(node);
-  textarea.addEventListener("input", () => {
+  bindStableTextInputLifecycle(textarea, () => {
     store.set((s) => {
       s.ui.promptBarNodeId = node.id;
       const n = s.nodes[node.id];
@@ -117,17 +118,18 @@ function buildBar(store, runtime, node) {
         }
       }
       delete n.params.lastOptimizedPromptPlain;
-    }, { history: false });
-  });
-  textarea.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
-        flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
-        return;
+    }, { history: false, renderScope: "canvas-local-edit" });
+  }, {
+    onKeyDown: (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
+          flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
+          return;
+        }
+        runPromptBarGeneration(store, runtime, node);
       }
-      runPromptBarGeneration(store, runtime, node);
-    }
+    },
   });
   bindAssetMentionSuggestions(textarea, store, node.id);
   bar.appendChild(textarea);
@@ -237,6 +239,20 @@ function buildBottomRow(store, runtime, node, textarea) {
   });
   row.appendChild(optimizeBtn);
 
+  if (isTextContentNode(node)) {
+    const splitBtn = textAction("frames", "自动拆分分镜", () => {
+      if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
+        flashTooltip(splitBtn, "先输入剧本文本");
+        return;
+      }
+      syncTextAreaToNode(store, node.id, textarea);
+      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/plan-selected-script-shots" } }));
+    });
+    splitBtn.dataset.action = "plan-storyboard";
+    splitBtn.title = "从当前剧本版本规划专业分镜";
+    row.appendChild(splitBtn);
+  }
+
   const send = el("button", "send-btn");
   const canVideo = node.type === "video" && isRemoteVideoModel(node.params?.model);
   const shouldPollVideo = canVideo && node.status === "generating" && Boolean(node.params?.lastVideoJobId);
@@ -288,7 +304,7 @@ function syncTextAreaToNode(store, nodeId, textarea) {
     node.content = textarea.value;
     node.prompt = textarea.value;
     if (node.status === "empty" && textarea.value.trim()) node.status = "complete";
-  }, { history: false });
+  }, { history: false, renderScope: "canvas-local-edit" });
 }
 
 export function syncPromptBarState(bar, node) {

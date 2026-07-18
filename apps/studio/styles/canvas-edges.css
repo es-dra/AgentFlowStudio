@@ -35,13 +35,8 @@
   transition: opacity 0.15s ease;
 }
 
-#edge-layer path.edge-spark.active {
-  opacity: 0.95;
-}
-
-#edge-layer path.edge-spark.reverse {
-  animation-name: edge-spark-reverse;
-}
+#edge-layer path.edge-spark.active { opacity: 0.95; }
+#edge-layer path.edge-spark.reverse { animation-name: edge-spark-reverse; }
 
 #edge-layer path.director-edge {
   stroke: var(--energy);
@@ -64,21 +59,13 @@
   pointer-events: none;
 }
 
-.edge-label.visible {
-  display: block;
-}
+.edge-label.visible { display: block; }
 
-@keyframes edge-flow {
-  to { stroke-dashoffset: -16; }
-}
+@keyframes edge-flow { to { stroke-dashoffset: -16; } }
 
-@keyframes edge-spark-forward {
-  to { stroke-dashoffset: -262; }
-}
+@keyframes edge-spark-forward { to { stroke-dashoffset: -262; } }
 
-@keyframes edge-spark-reverse {
-  to { stroke-dashoffset: 262; }
-}
+@keyframes edge-spark-reverse { to { stroke-dashoffset: 262; } }
 
 #edge-layer path.pending {
   stroke: var(--accent);
@@ -104,10 +91,16 @@
   animation: edge-success 1s ease;
 }
 
-@keyframes edge-success {
-  0% { stroke-width: 3.5; }
-  100% { stroke-width: 1.8; }
-}
+#edge-layer path.edge-pending,
+#edge-layer path.edge-running { stroke: var(--port-out); stroke-width: 1.65; }
+
+#edge-layer path.edge-recovery { stroke: var(--energy); stroke-width: 1.65; stroke-dasharray: 7 6; }
+
+#edge-layer path.edge-failed { stroke: var(--danger); stroke-width: 1.55; stroke-dasharray: 3 6; }
+
+#edge-layer path.edge-paused { stroke: var(--product-warning, #d99a2b); stroke-width: 1.45; stroke-dasharray: 8 8; }
+
+@keyframes edge-success { 0% { stroke-width: 3.5; } 100% { stroke-width: 1.8; } }
 
 #edge-layer path.rel-up-edge {
   stroke: var(--port-in);
@@ -119,6 +112,10 @@
   stroke-width: 1.45;
 }
 
-#edge-layer path.rel-dim-edge {
-  opacity: 0.18;
+#edge-layer path.rel-dim-edge { opacity: 0.18; }
+
+@media (prefers-reduced-motion: reduce) {
+  #edge-layer path.edge-spark,
+  #edge-layer path.pending,
+  #edge-layer path.just-connected { animation: none !important; }
 }

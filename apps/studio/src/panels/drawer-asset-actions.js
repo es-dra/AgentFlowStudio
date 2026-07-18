@@ -387,7 +387,8 @@ function focusAssetSource(store, asset) {
     const node = s.nodes[asset.source_node_id];
     if (!node) return;
     s.selection = { nodeIds: [node.id], edgeId: null };
-    s.viewport = fitVisibleCanvasViewport({ [node.id]: node }, 220);
+    const viewport = fitVisibleCanvasViewport({ [node.id]: node }, 220);
+    if (viewport) s.viewport = viewport;
   }, { history: false, persist: false });
 }
 

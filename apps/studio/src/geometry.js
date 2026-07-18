@@ -9,6 +9,21 @@ export function screenToWorld(viewport, sx, sy) {
   };
 }
 
+export function clientToCanvasPoint(clientX, clientY, root = null) {
+  const canvasRoot = root || (typeof document !== "undefined" ? document.getElementById("canvas-root") : null);
+  const rect = canvasRoot?.getBoundingClientRect?.();
+  if (!rect) return { x: clientX, y: clientY };
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top,
+  };
+}
+
+export function clientToWorld(viewport, clientX, clientY, root = null) {
+  const point = clientToCanvasPoint(clientX, clientY, root);
+  return screenToWorld(viewport, point.x, point.y);
+}
+
 export function worldToScreen(viewport, wx, wy) {
   return {
     x: wx * viewport.scale + viewport.x,
