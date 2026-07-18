@@ -68,6 +68,7 @@ function contextStrip(context) {
   }
   const counts = context?.counts || {};
   strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
+  strip.append(el("dt", "", "计划"), el("dd", "", context?.production_plan_state || "planning_required"));
   return strip;
 }
 
@@ -167,10 +168,10 @@ function composer({ session, context, onOpen, onRender }) {
   const form = el("form", "agent-chat-composer");
   const input = document.createElement("textarea");
   input.rows = 3;
-  input.maxLength = 900;
+  input.maxLength = 12000;
   input.placeholder = context?.selected_node_id
-    ? "发送上下文，或输入 /rename-selected 新名称"
-    : "发送上下文，或先在画布选择节点再发命令";
+    ? "发送上下文，或输入 /edit-shot-duration 6.5"
+    : "发送上下文，或输入 /submit-story-plan {json}";
   input.setAttribute("aria-label", "向 Agent Chat 发送消息或命令");
   const send = el("button", "studio-icon-button");
   send.type = "submit";

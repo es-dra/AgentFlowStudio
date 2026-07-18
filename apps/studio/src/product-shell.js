@@ -637,6 +637,23 @@ export function createProductShell(options = {}) {
 
   function shotModel() {
     const state = snapshot.studioState || {};
+    const planShots = state.production?.dynamic_production_plan_projection?.storyboard_shots || [];
+    if (Array.isArray(planShots) && planShots.length) {
+      return planShots
+        .slice()
+        .sort((left, right) => Number(left.order || 0) - Number(right.order || 0))
+        .map((shot, index) => ({
+          nodeId: `production_plan_shot_${String(shot.shot_id || "").replace(/[^A-Za-z0-9_.:-]/g, "")}`,
+          title: cleanTitle(shot.title || shot.shot_id || shotTitle(index)),
+          description: cleanDescription([
+            shot.intent || "",
+            shot.strategy ? `${String(shot.strategy).toUpperCase()} · ${shot.strategy_reason || ""}` : "",
+          ].filter(Boolean).join("\n")),
+          duration: `${Number(shot.duration_seconds || 0).toFixed(1)}s`,
+          preview: "",
+          state: shot.status === "failed" || shot.media_input_state === "pending_input" ? "blocked" : shot.status === "planned" ? "ready" : "draft",
+        }));
+    }
     const nodes = Object.values(state.nodes || {});
     const candidates = nodes.filter((item) => item && (
       item.previewUrl

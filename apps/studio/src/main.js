@@ -36,6 +36,7 @@ import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+import { applyProductionPlanProjection } from "./production-plan-projection.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -98,7 +99,7 @@ async function bootstrap() {
   await projectController.ensureAccessibleStartupProject();
   if (hasActiveProject()) {
     await store.hydrateRuntime(runtime); await syncRuntimeAssets(store, runtime);
-    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime); await refreshScriptCoreTruth(runtime);
+    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime); await refreshScriptCoreTruth(runtime); await refreshProductionPlanTruth(runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
 }
@@ -147,6 +148,7 @@ function initializeStudio(authUser) {
         await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
         await refreshPendingKeyframeGenerations(store, runtimeClient);
         await refreshScriptCoreTruth(runtimeClient);
+        await refreshProductionPlanTruth(runtimeClient);
       }
       await refreshProductOverview();
     },
@@ -167,6 +169,26 @@ async function refreshScriptCoreTruth(runtimeClient = runtime) {
       event_type: "script_core_truth_refresh_failed",
       severity: "warning",
       action: "refresh_script_core_truth",
+      message: safeError(error),
+      error,
+      getRuntime: () => runtime,
+      getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
+    });
+  }
+}
+async function refreshProductionPlanTruth(runtimeClient = runtime) {
+  if (!runtimeClient?.loadProductionPlanTruth || !store) return;
+  try {
+    const payload = await runtimeClient.loadProductionPlanTruth();
+    if (runtimeClient !== runtime) return;
+    store.set((state) => {
+      applyProductionPlanProjection(state, payload?.projection || {});
+    }, { history: false, persist: false });
+  } catch (error) {
+    reportClientError({
+      event_type: "production_plan_truth_refresh_failed",
+      severity: "warning",
+      action: "refresh_production_plan_truth",
       message: safeError(error),
       error,
       getRuntime: () => runtime,

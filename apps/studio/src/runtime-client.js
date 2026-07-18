@@ -362,6 +362,12 @@ function inferUserAction(route, method) {
   if (/\/core-assets\/commands\/preview$/.test(route) && method === "POST") return "preview_core_asset_command";
   if (/\/core-assets\/commands\/confirm$/.test(route) && method === "POST") return "confirm_core_asset_command";
   if (/\/core-assets\/commands\/undo$/.test(route) && method === "POST") return "undo_core_asset_command";
+  if (/\/production-plan-truth$/.test(route) && method === "GET") return "load_production_plan_truth";
+  if (/\/story-plan-candidates$/.test(route) && method === "POST") return "submit_story_plan_candidate";
+  if (/\/story-plan-candidates\/[^/]+\/confirm$/.test(route) && method === "POST") return "confirm_story_plan_candidate";
+  if (/\/production-plan-commands\/preview$/.test(route) && method === "POST") return "preview_production_plan_command";
+  if (/\/production-plan-commands\/confirm$/.test(route) && method === "POST") return "confirm_production_plan_command";
+  if (/\/production-plan-commands\/undo$/.test(route) && method === "POST") return "undo_production_plan_command";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -611,6 +617,27 @@ export function createRuntimeClient(projectId = "") {
     },
     undoCoreAssetCommand(payload) {
       return requestJson(`/projects/${encoded}/core-assets/commands/undo`, { method: "POST", payload });
+    },
+    loadProductionPlanTruth() {
+      return requestJson(`/projects/${encoded}/production-plan-truth`);
+    },
+    submitStoryPlanCandidate(payload) {
+      return requestJson(`/projects/${encoded}/story-plan-candidates`, { method: "POST", payload });
+    },
+    confirmStoryPlanCandidate(candidateDigest, payload) {
+      return requestJson(`/projects/${encoded}/story-plan-candidates/${encodeURIComponent(candidateDigest)}/confirm`, {
+        method: "POST",
+        payload,
+      });
+    },
+    previewProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/preview`, { method: "POST", payload });
+    },
+    confirmProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/confirm`, { method: "POST", payload });
+    },
+    undoProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/undo`, { method: "POST", payload });
     },
     createProductionRun(payload) {
       return requestJson(`/projects/${encoded}/production-runs`, { method: "POST", payload });
