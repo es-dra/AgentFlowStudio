@@ -65,7 +65,7 @@ const SAFE_PUBLIC_PROVIDER_KEYS = new Set([
   "tracesummary",
 ]);
 
-export function initialState(projectId = "studio-local-001") {
+export function initialState(projectId = "") {
   return {
     meta: {
       projectId,

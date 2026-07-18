@@ -1296,14 +1296,22 @@ def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:
     assert "识别视频资产卡" in node_menu
 
 
-def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:
+def test_runtime_client_uses_same_origin_or_explicit_runtime_base_without_fixed_port() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
-    assert 'const FALLBACK_BASE_URL = "http://127.0.0.1:8790"' in runtime_client
     assert 'const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url"' in runtime_client
-    assert 'const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"])' in runtime_client
-    assert "LOCAL_STATIC_FALLBACK_PORTS.has(current.port)" in runtime_client
-    assert "return FALLBACK_BASE_URL;" in runtime_client
+    assert "new URL(window.location.href).origin" in runtime_client
     assert "explicitRuntimeBaseUrl" in runtime_client
     assert "normalizeRuntimeBaseUrl" in runtime_client
     assert "isLocalHost(url.hostname)" in runtime_client
+    assert "FALLBACK_BASE_URL" not in runtime_client
+    assert "LOCAL_STATIC_FALLBACK_PORTS" not in runtime_client
+    assert "127.0.0.1:8790" not in runtime_client
+
+
+def test_studio_source_does_not_reintroduce_fixed_local_project_or_demo_prompt_defaults() -> None:
+    source = "\n".join(path.read_text(encoding="utf-8") for path in (STUDIO_ROOT / "src").glob("*.js"))
+
+    assert "studio-local-001" not in source
+    assert "AI 漫剧路演演示" not in source
+    assert "三幕式 AI 漫剧" not in source

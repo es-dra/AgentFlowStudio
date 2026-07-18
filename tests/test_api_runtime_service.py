@@ -17,7 +17,6 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "AFS_ALLOW_REMOTE_LLM",
         "AFS_ALLOW_REMOTE_IMAGE",
         "AFS_ALLOW_REMOTE_VIDEO",
-        "AFS_ALLOW_REMOTE_AUDIO",
         "AFS_ALLOW_REMOTE_VISION",
         "AFS_ALLOW_REMOTE_ASR",
         "AFS_ALLOW_EXTERNAL_DOWNLOAD",
@@ -51,7 +50,6 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "llm": False,
         "image": False,
         "video": False,
-        "audio": False,
         "vision": False,
         "asr": False,
         "external_download": False,
@@ -93,8 +91,8 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "visual_asset_register",
         "video_asset_register",
         "keyframe_generation",
-        "audio_generation",
         "video_generation",
+        "external_video_generation",
         "generation_comparison",
         "studio_state",
         "export_openapi_schema",
@@ -173,7 +171,6 @@ def test_runtime_health_provider_gate_projection_is_isolated_and_secret_free(tmp
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "true")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", r"D:\private\providers.local.json")
     monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
@@ -186,7 +183,6 @@ def test_runtime_health_provider_gate_projection_is_isolated_and_secret_free(tmp
         "llm": True,
         "image": True,
         "video": True,
-        "audio": True,
         "vision": True,
         "asr": False,
         "external_download": False,
@@ -570,7 +566,6 @@ def test_frontend_runtime_service_request_examples_match_current_api_contract(tm
         "AFS_ALLOW_REMOTE_LLM",
         "AFS_ALLOW_REMOTE_IMAGE",
         "AFS_ALLOW_REMOTE_VIDEO",
-        "AFS_ALLOW_REMOTE_AUDIO",
         "AFS_ALLOW_REMOTE_VISION",
         "AFS_ALLOW_REMOTE_ASR",
         "AFS_PROVIDER_CONFIG",

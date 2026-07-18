@@ -15,6 +15,7 @@ export function renderTopbar(options) {
     onToggleProjectFilter,
     onSwitchProject,
     onCreateProject,
+    onOpenExternalVideoDemo,
     onOpenHome,
     onBeforeSiteHome,
     authUser,
@@ -44,11 +45,12 @@ export function renderTopbar(options) {
   topbar.replaceChildren();
 
   if (!state.ui.drawerOpen) {
-    renderCompactTopbar(topbar, { state, store, runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject, onOpenHome, onBeforeSiteHome });
+    renderCompactTopbar(topbar, { state, store, runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject, onOpenExternalVideoDemo, onOpenHome, onBeforeSiteHome });
   } else {
     topbar.appendChild(siteHomeLink(onBeforeSiteHome));
     topbar.appendChild(studioHomeButton(onOpenHome));
     appendProjectControls(topbar, { runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject });
+    topbar.appendChild(externalVideoButton(onOpenExternalVideoDemo));
   }
 
   topbar.appendChild(el("div", "topbar-spacer"));
@@ -78,6 +80,7 @@ function renderCompactTopbar(topbar, options) {
   topbar.appendChild(title);
 
   appendProjectControls(topbar, { ...options, projectOptions });
+  topbar.appendChild(externalVideoButton(options.onOpenExternalVideoDemo));
 }
 
 function siteHomeLink(onBeforeSiteHome) {
@@ -101,6 +104,15 @@ function studioHomeButton(onOpenHome) {
   home.setAttribute("aria-label", "返回故事板");
   home.addEventListener("click", onOpenHome);
   return home;
+}
+
+function externalVideoButton(onOpenExternalVideoDemo) {
+  const button = el("button", "icon-btn external-video-demo-btn");
+  button.innerHTML = `${icon("video", 14)}<span>AI 漫剧</span>`;
+  button.title = "AI 漫剧任务";
+  button.setAttribute("aria-label", "AI 漫剧任务");
+  button.addEventListener("click", () => onOpenExternalVideoDemo?.());
+  return button;
 }
 
 function accountButton(user, onSignOut) {

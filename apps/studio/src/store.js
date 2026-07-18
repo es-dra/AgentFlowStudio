@@ -13,7 +13,7 @@ import {
 
 const SAVE_DEBOUNCE_MS = 700;
 
-export function createStore(projectId = "studio-local-001") {
+export function createStore(projectId = "") {
   migrateLegacyCanvasStorage(projectId);
   let state = loadPersisted(projectId) || initialState(projectId);
   const listeners = new Set();

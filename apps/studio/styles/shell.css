@@ -178,10 +178,17 @@
   padding-inline: 10px;
 }
 .account-btn span,
-.site-home-btn span {
+.site-home-btn span,
+.external-video-demo-btn span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.external-video-demo-btn {
+  flex: 0 0 auto;
+  gap: 6px;
+  padding-inline: 10px;
 }
 
 @media (max-width: 860px) {

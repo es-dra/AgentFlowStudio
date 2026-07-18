@@ -42,15 +42,19 @@ export function clearIdentityScopedStudioState() {
 
 export function persist(state) {
   try {
-    localStorage.setItem(storageKey(state.meta.projectId), JSON.stringify(snapshotStudioState(state)));
+    const key = storageKey(state.meta.projectId);
+    if (!key) return;
+    localStorage.setItem(key, JSON.stringify(snapshotStudioState(state)));
   } catch {
     /* Local persistence is best-effort; the in-memory canvas remains usable. */
   }
 }
 
-export function loadPersisted(projectId = "studio-local-001") {
+export function loadPersisted(projectId = "") {
   try {
-    const raw = localStorage.getItem(storageKey(projectId));
+    const key = storageKey(projectId);
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const snap = normalizeSnapshot(JSON.parse(raw));
     if (!hasStudioContent(snap)) return null;
@@ -63,8 +67,9 @@ export function loadPersisted(projectId = "studio-local-001") {
   }
 }
 
-export function migrateLegacyCanvasStorage(projectId = "studio-local-001") {
+export function migrateLegacyCanvasStorage(projectId = "") {
   try {
+    if (!storageKey(projectId)) return;
     if (localStorage.getItem(LEGACY_MIGRATION_MARKER)) return;
     const targetKey = storageKey(projectId);
     let raw = localStorage.getItem(STORAGE_KEY);
@@ -85,5 +90,6 @@ export function migrateLegacyCanvasStorage(projectId = "studio-local-001") {
 }
 
 function storageKey(projectId) {
-  return `${STORAGE_KEY_PREFIX}${projectId || "studio-local-001"}`;
+  const safe = String(projectId || "").trim();
+  return safe ? `${STORAGE_KEY_PREFIX}${safe}` : "";
 }

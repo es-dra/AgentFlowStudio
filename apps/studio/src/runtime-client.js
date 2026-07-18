@@ -1,23 +1,17 @@
 // Minimal Studio API client. It sends only project ids, safe node context,
 // safe generation summaries, Studio state JSON, and explicit user-selected image uploads.
 
-const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
 const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
-const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"]);
 export const AUTH_TOKEN_STORAGE_KEY = "afs_auth_session_token";
 
 export function runtimeBaseUrl() {
   if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) {
     const override = explicitRuntimeBaseUrl();
     if (override) return override;
-    const current = new URL(window.location.href);
-    if (isLocalHost(current.hostname) && LOCAL_STATIC_FALLBACK_PORTS.has(current.port)) {
-      return FALLBACK_BASE_URL;
-    }
-    return current.origin;
+    return new URL(window.location.href).origin;
   }
-  return FALLBACK_BASE_URL;
+  return explicitRuntimeBaseUrl();
 }
 
 export function runtimeMediaUrl(value) {
@@ -51,7 +45,7 @@ function explicitRuntimeBaseUrl() {
   } catch {
     // Ignore inaccessible storage and use the local Runtime default.
   }
-  values.push(window.__AFS_RUNTIME_BASE_URL__);
+  if (typeof window !== "undefined") values.push(window.__AFS_RUNTIME_BASE_URL__);
   for (const value of values) {
     const normalized = normalizeRuntimeBaseUrl(value);
     if (normalized) return normalized;
@@ -338,6 +332,7 @@ function inferRequestMeta(route, method, payload) {
     has_first_frame: Boolean(payload?.first_frame_image_asset_id),
     first_frame_image_asset_id: String(payload?.first_frame_image_asset_id || "").slice(0, 120),
     video_input_source_mode: String(payload?.input_source?.source_mode || "").slice(0, 80),
+    external_video_engine: String(payload?.engine || "").slice(0, 80),
     duration_sec: payload?.duration_sec,
     resolution: payload?.resolution,
     aspect_ratio: payload?.aspect_ratio,
@@ -347,6 +342,8 @@ function inferRequestMeta(route, method, payload) {
 
 function inferUserAction(route, method) {
   if (/\/video-generations\/preflight$/.test(route)) return "preflight_video_generation";
+  if (/\/external-video-jobs\/[^/]+\/poll$/.test(route)) return "poll_external_video_generation";
+  if (/\/external-video-jobs$/.test(route) && method === "POST") return "create_external_video_generation";
   if (/\/video-generations\/[^/]+\/poll$/.test(route)) return "poll_video_generation";
   if (/\/video-generations$/.test(route) && method === "POST") return "click_generate_video";
   if (/^\/projects\/[^/]+$/.test(route) && method === "DELETE") return "delete_project";
@@ -359,9 +356,6 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
-  if (/\/manga-first-l4b\/production-truth$/.test(route) && method === "POST") return "create_manga_first_l4b_production_truth";
-  if (/\/manga-first-l4b\/workspace$/.test(route) && method === "GET") return "load_manga_first_l4b_workspace";
-  if (/\/manga-first-l4b\/reference-set-approvals$/.test(route) && method === "POST") return "approve_manga_first_l4b_reference_set";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -384,6 +378,7 @@ function inferUserAction(route, method) {
 
 function inferGenerationKind(route) {
   if (route.includes("/keyframe-local-edits")) return "keyframe_local_edit";
+  if (route.includes("/external-video-jobs")) return "external_video";
   if (route.includes("/video-generations")) return "video";
   if (route.includes("/video-revisions")) return "video_revision";
   if (route.includes("/keyframe-generations")) return "keyframe";
@@ -451,7 +446,7 @@ function persistSession(payload) {
   return payload;
 }
 
-export function createRuntimeClient(projectId = "studio-local-001") {
+export function createRuntimeClient(projectId = "") {
   const encoded = encodeURIComponent(projectId);
   return {
     projectId,
@@ -560,6 +555,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     cancelVideo(jobId) {
       return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
     },
+    generateExternalVideo(payload) {
+      return requestJson(`/projects/${encoded}/external-video-jobs`, { method: "POST", payload });
+    },
+    pollExternalVideo(jobId) {
+      return requestJson(`/projects/${encoded}/external-video-jobs/${encodeURIComponent(jobId)}/poll`, { method: "POST" });
+    },
     recordFeedback(feedback) {
       return requestJson("/feedback", {
         method: "POST",
@@ -656,31 +657,6 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     loadCreatorWorkspace() {
       return requestJson(`/projects/${encoded}/creator-workspace`);
-    },
-    createMangaFirstProductionTruth(brief, options = {}) {
-      return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
-        method: "POST",
-        payload: {
-          brief,
-          idempotency_key: String(options.idempotencyKey || `manga-first-l4b-${projectId}-v1`),
-          include_manifest: options.includeManifest === true,
-        },
-      });
-    },
-    loadMangaFirstWorkspace() {
-      return requestJson(`/projects/${encoded}/manga-first-l4b/workspace`);
-    },
-    approveMangaFirstReferenceSet(payload, idempotencyKey = "") {
-      const decisionId = String(payload?.decision_id || "").trim();
-      return requestJson(`/projects/${encoded}/manga-first-l4b/reference-set-approvals`, {
-        method: "POST",
-        payload: {
-          decision_id: decisionId,
-          expected_aggregate_version: Number(payload?.expected_aggregate_version || 0),
-          reference_set_digest: String(payload?.reference_set_digest || "").trim(),
-          idempotency_key: String(idempotencyKey || payload?.idempotency_key || `${decisionId || "reference-approval"}-v1`),
-        },
-      });
     },
     previewShotImpact(payload) {
       return requestJson(`/projects/${encoded}/episode-production-aggregate/shot-impact-preview`, {

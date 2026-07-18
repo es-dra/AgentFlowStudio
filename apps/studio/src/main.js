@@ -31,15 +31,12 @@ import { createStudioProductShell, mountStudioDom } from "./studio-product-boots
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
-import { restoreCandidateSelectionsAfterLoad, submitDedicatedReviewDecision } from "./candidate-selection-controller.js";
-import { submitDedicatedProductionExport, submitDedicatedQualityApproval } from "./production-delivery-controller.js";
-import { selectedDeliverySubmission } from "./review-delivery-state.js";
+import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
-import { approveMangaFirstL4BReferenceSet, loadMangaFirstL4BWorkspace } from "./manga-first-l4b-workspace.js";
+import { openExternalVideoDemoPanel } from "./external-video-demo.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
-const MANGA_FIRST_REFERENCE_APPROVAL_EVENT = "afs:manga-first-reference-approval-requested";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -85,7 +82,6 @@ async function bootstrap() {
   bindQualityFeedback();
   bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
-  bindMangaFirstReferenceApproval();
   bindStudioWorkflowEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
@@ -104,10 +100,6 @@ async function bootstrap() {
     await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
-  const startupSection = initialStudioSection();
-  if (startupSection === "review") productShell?.setSection("review");
-  else if (startupSection === "canvas") productShell?.setSection("canvas");
-  else if (startupSection === "manga_first") productShell?.setSection("manga_first");
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
@@ -128,10 +120,8 @@ function initializeStudio(authUser) {
       await refreshProductOverview();
     },
     onRetry: refreshProductOverview,
-    onRefreshReview: refreshProductOverview,
-    onRefreshMangaFirst: () => refreshMangaFirstWorkspace({ open: true }),
-    onReviewAction: handleUnifiedReviewAction,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
+    onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
     formatError: safeError,
@@ -173,11 +163,6 @@ function bindHumanGateDecisionEvents() {
 function bindVideoAssetCardDraft() {
   window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => handleVideoAssetCardDraft(event));
 }
-function bindMangaFirstReferenceApproval() {
-  window.addEventListener(MANGA_FIRST_REFERENCE_APPROVAL_EVENT, (event) => {
-    void handleMangaFirstReferenceApproval(event.detail || {});
-  });
-}
 function bindStudioWorkflowEvents() {
   window.addEventListener("afs:studio-open-generation-panel", (event) => {
     openGenerationForNode(event.detail?.node);
@@ -196,7 +181,6 @@ function bindStudioWorkflowEvents() {
     store.set((s) => {
       s.selection = { nodeIds: [node.id], edgeId: null };
     }, { history: false, persist: false });
-    productShell?.syncSelectionFromCanvasNode?.(node.id);
   });
 }
 function bindSaveAuthRecovery() {
@@ -329,31 +313,30 @@ function renderAll(state) {
   syncDomainCrewContext();
   productShell?.updateStudioState(state);
   if (!editorMounted) return;
-  if (document.getElementById("topbar")) {
-    renderTopbar({
-      state,
-      store,
-      runtime,
-      projectSummaries: projectController.summaries,
-      projectOptions: projectController.projectOptions(state),
-      hiddenProjectCount: projectController.hiddenProjectCount(state),
-      showAllProjects: projectController.showAllProjects,
-      onToggleProjectFilter: () => projectController.toggleProjectFilter(),
-      onSwitchProject: projectController.switchProject,
-      onCreateProject: projectController.createNewProject,
-      onOpenHome: openProductOverview,
-      onBeforeSiteHome: () => store.flushRuntimeSave(),
-      authUser: projectController.authUser,
-      onRetrySave: () => store.flushRuntimeSave(),
-      runtimeSurfaceStatus,
-      onSignOut: handleSignOut,
-    });
-  }
+  renderTopbar({
+    state,
+    store,
+    runtime,
+    projectSummaries: projectController.summaries,
+    projectOptions: projectController.projectOptions(state),
+    hiddenProjectCount: projectController.hiddenProjectCount(state),
+    showAllProjects: projectController.showAllProjects,
+    onToggleProjectFilter: () => projectController.toggleProjectFilter(),
+    onSwitchProject: projectController.switchProject,
+    onCreateProject: projectController.createNewProject,
+    onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
+    onOpenHome: openProductOverview,
+    onBeforeSiteHome: () => store.flushRuntimeSave(),
+    authUser: projectController.authUser,
+    onRetrySave: () => store.flushRuntimeSave(),
+    runtimeSurfaceStatus,
+    onSignOut: handleSignOut,
+  });
   renderCanvas(state, store);
-  if (document.getElementById("drawer")) renderDrawer(state, store, runtimeRef);
-  if (document.getElementById("inspector")) renderInspectorPanel(state, store, runtimeRef);
+  renderDrawer(state, store, runtimeRef);
+  renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
-  if (document.getElementById("sprite-root")) renderSpriteWidget(state, runtimeRef);
+  renderSpriteWidget(state, runtimeRef);
 }
 function syncDomainCrewContext() {
   if (!domainCrewController || !projectController) return;
@@ -394,7 +377,6 @@ function openCanvasWorkspace() {
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
-  if (!row) return;
   row.replaceChildren();
   for (const starter of WORKFLOW_STARTERS) {
     const card = el("button", "starter-card workflow-starter-card");
@@ -467,85 +449,7 @@ function safeError(error) {
 }
 
 async function refreshProductOverview() {
-  if (runtime?.workspaceOverview && productShell) {
-    await productShell.refresh(runtime, projectController?.authUser || null);
-    await refreshMangaFirstWorkspace({ silent: true });
-  }
-}
-
-async function refreshMangaFirstWorkspace({ open = false, silent = false } = {}) {
-  if (!runtime?.loadMangaFirstWorkspace || !productShell || !runtime.projectId || runtime.projectId === "studio-empty") return null;
-  try {
-    const view = await loadMangaFirstL4BWorkspace({ projectId: runtime.projectId, runtimeClient: runtime });
-    productShell.setMangaFirstWorkspace?.(view);
-    if (open) productShell.setSection?.("manga_first");
-    return view;
-  } catch (error) {
-    if (Number(error?.status || 0) === 404) {
-      productShell.setMangaFirstWorkspace?.(null);
-      if (open && !silent) productShell.setSection?.("manga_first");
-      return null;
-    }
-    if (!silent) {
-      reportClientError({
-        event_type: "manga_first_workspace_load_failed",
-        action: "load_manga_first_l4b_workspace",
-        message: safeError(error),
-        error,
-        getRuntime: () => runtime,
-        getProjectId: () => runtime?.projectId || "",
-      });
-    }
-    throw error;
-  }
-}
-
-async function handleMangaFirstReferenceApproval(detail) {
-  const gate = detail?.reference_approval_gate || {};
-  if (!gate.reference_set_digest || !gate.aggregate_version || gate.status === "confirmed") return;
-  const decisionId = `manga-reference-approval-${runtime.projectId}-${gate.aggregate_version}`;
-  try {
-    const view = await approveMangaFirstL4BReferenceSet({
-      projectId: runtime.projectId,
-      referenceApprovalGate: gate,
-      runtimeClient: runtime,
-      decisionId,
-    });
-    productShell?.setMangaFirstWorkspace?.(view);
-    productShell?.setSection?.("manga_first");
-  } catch (error) {
-    reportClientError({
-      event_type: "manga_first_reference_approval_failed",
-      action: "approve_manga_first_reference_set",
-      message: safeError(error),
-      error,
-      getRuntime: () => runtime,
-      getProjectId: () => runtime?.projectId || "",
-    });
-  }
-}
-
-async function handleUnifiedReviewAction(action, { state, note, checklist } = {}) {
-  if (["select", "revise", "reject"].includes(action)) {
-    const intent = action === "select" ? "将当前方案设为制作基准。" : String(note || "").trim();
-    return submitDedicatedReviewDecision(runtime, state?.reviewSnapshot, action, intent);
-  }
-  const selectedDelivery = selectedDeliverySubmission(state);
-  if (action === "approve") return submitDedicatedQualityApproval(runtime, selectedDelivery?.snapshot, checklist || {});
-  if (action === "export") return submitDedicatedProductionExport(runtime, selectedDelivery?.snapshot);
-  return { ok: false, code: "unsupported_review_action", message: "当前操作暂不可用。" };
-}
-
-function initialStudioSection() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("stage") === "review" || params.get("mode") === "review") return "review";
-    if (params.get("stage") === "canvas" || params.get("mode") === "canvas") return "canvas";
-    if (params.get("stage") === "manga-first" || params.get("mode") === "manga-first") return "manga_first";
-    return "storyboard";
-  } catch {
-    return "storyboard";
-  }
+  if (runtime?.workspaceOverview && productShell) await productShell.refresh(runtime, projectController?.authUser || null);
 }
 
 async function handleSignOut() {
