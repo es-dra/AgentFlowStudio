@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -201,6 +203,9 @@ class ProviderDispatchRequest:
     prompt: str
     output_dir: Path
     task_type: str | None = None
+    structured_output_contract_id: str | None = None
+    structured_output_schema: dict[str, Any] | None = None
+    structured_output_schema_digest: str | None = None
     image_operation: Literal["generate", "edit"] = "generate"
     aspect_ratio: str = "9:16"
     candidate_count: int = 1
@@ -221,6 +226,11 @@ class ProviderDispatchRequest:
     voice: str | None = None
     response_format: Literal["wav", "mp3", "opus", "aac", "flac", "pcm"] | None = None
     instructions: str | None = None
+
+
+def structured_output_schema_digest(schema: dict[str, Any]) -> str:
+    canonical = json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class ProviderAdapter(Protocol):

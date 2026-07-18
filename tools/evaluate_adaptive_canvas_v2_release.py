@@ -15,12 +15,15 @@ if str(REPO_ROOT) not in sys.path:
 from fastapi.testclient import TestClient  # noqa: E402
 
 from agentflow_studio.model_gateway.company_secrets import SERVER_CODEX_SERVICE_ID  # noqa: E402
+from agentflow_studio.model_gateway.provider_adapter import structured_output_schema_digest  # noqa: E402
 from agentflow_studio.production.adaptive_canvas_v2 import (  # noqa: E402
     AdaptiveRunOptions,
     ChargeLedger,
     IMAGE_PROVIDER_SERVICE_ID,
+    SCRIPT_V3_CONTRACT_ID,
     VIDEO_PROVIDER_SERVICE_ID,
     build_script_truth_from_profile,
+    build_script_v3_output_schema,
     compile_duration_chunks,
     run_adaptive_canvas_production,
 )
@@ -110,8 +113,13 @@ def _check_paid_profile(
 ) -> None:
     if profile.llm_service_id != SERVER_CODEX_SERVICE_ID:
         findings.append({"severity": "P0", "scope": "route", "issue": "paid LLM route is not server_codex"})
-    if profile.script_candidate_id != "script-v2":
-        findings.append({"severity": "P1", "scope": "ledger", "issue": "paid script candidate is not script-v2"})
+    if profile.script_candidate_id != "script-v3":
+        findings.append({"severity": "P1", "scope": "ledger", "issue": "paid script candidate is not script-v3"})
+    if profile.script_contract_id != SCRIPT_V3_CONTRACT_ID:
+        findings.append({"severity": "P0", "scope": "route", "issue": "paid script contract is not adaptive_canvas_script_v3"})
+    schema_digest = structured_output_schema_digest(build_script_v3_output_schema(profile))
+    if len(schema_digest) != 64:
+        findings.append({"severity": "P1", "scope": "contract", "issue": "script-v3 schema digest is invalid"})
     if IMAGE_PROVIDER_SERVICE_ID != "image_relay":
         findings.append({"severity": "P0", "scope": "route", "issue": "image route is not relay"})
     if VIDEO_PROVIDER_SERVICE_ID != "seedance_i2v":

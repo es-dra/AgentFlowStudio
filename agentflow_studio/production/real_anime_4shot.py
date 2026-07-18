@@ -19,7 +19,8 @@ def real_anime_4shot_paid_profile() -> AdaptiveProductionProfile:
     return AdaptiveProductionProfile(
         project_type=PROJECT_TYPE,
         llm_service_id="server_codex",
-        script_candidate_id="script-v2",
+        script_candidate_id="script-v3",
+        script_contract_id="adaptive_canvas_script_v3",
         title="Neon Courier Pact",
         logline=(
             "Two young couriers carry a glowing city charter across a vertical neon skyline before "

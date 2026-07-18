@@ -6,6 +6,7 @@ from pathlib import Path
 import agentflow_studio.production.adaptive_canvas_v2 as adaptive_canvas
 import pytest
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.production.adaptive_canvas_v2 import (
     AdaptiveCanvasError,
     AdaptiveRunOptions,
@@ -26,7 +27,8 @@ from fastapi.testclient import TestClient
 def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     profile = real_anime_4shot_paid_profile()
     assert profile.llm_service_id == "server_codex"
-    assert profile.script_candidate_id == "script-v2"
+    assert profile.script_candidate_id == "script-v3"
+    assert profile.script_contract_id == "adaptive_canvas_script_v3"
     result = run_adaptive_canvas_production(
         AdaptiveRunOptions(
             runtime_root=tmp_path / "runtime",
@@ -83,26 +85,48 @@ def test_failed_script_v1_is_preserved_and_script_v2_has_a_new_fingerprint(tmp_p
     assert old["charge_fingerprint"] != new["charge_fingerprint"]
 
 
-def test_paid_script_route_dispatches_only_to_server_codex(tmp_path: Path) -> None:
+def _script_v3_payload() -> dict[str, object]:
+    truth = build_script_truth_from_profile(real_anime_4shot_paid_profile())
+    shot_fields = (
+        "shot_id",
+        "summary",
+        "location",
+        "characters",
+        "action",
+        "camera",
+        "target_duration_sec",
+        "generation_strategy",
+        "strategy_reason",
+        "continuity_in",
+        "continuity_out",
+    )
+    return {
+        "title": truth["title"],
+        "logline": truth["logline"],
+        "style_bible": truth["style_bible"],
+        "characters": truth["characters"],
+        "scenes": truth["scenes"],
+        "shots": [{key: shot[key] for key in shot_fields} for shot in truth["shots"]],
+    }
+
+
+def test_paid_script_v3_route_dispatches_only_to_server_codex_with_schema_digest(tmp_path: Path) -> None:
     class RecordingRegistry:
         def __init__(self) -> None:
             self.calls: list[tuple[str, str]] = []
+            self.request: object | None = None
 
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
             self.calls.append((capability, service_id))
+            self.request = request
             return {
-                "text": json.dumps(build_script_truth_from_profile(real_anime_4shot_paid_profile())),
+                "text": json.dumps(_script_v3_payload()),
+                "structured_output": _script_v3_payload(),
                 "provider_calls_started": True,
             }
 
     profile = real_anime_4shot_paid_profile()
-    options = AdaptiveRunOptions(
-        runtime_root=tmp_path / "runtime",
-        project_id="project",
-        run_id="run",
-        profile=profile,
-        mode="real",
-    )
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
     ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
@@ -110,60 +134,134 @@ def test_paid_script_route_dispatches_only_to_server_codex(tmp_path: Path) -> No
     adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
 
     assert registry.calls == [("llm", "server_codex")]
+    assert registry.request.task_type == "adaptive_canvas_script_v3"
+    assert registry.request.structured_output_contract_id == "adaptive_canvas_script_v3"
+    assert registry.request.structured_output_schema["type"] == "object"
+    assert len(registry.request.structured_output_schema_digest) == 64
     assert ledger.paid_attempt_count == 1
     assert ledger.attempts[0]["service_id"] == "server_codex"
-    assert ledger.attempts[0]["candidate_id"] == "script-v2"
+    assert ledger.attempts[0]["candidate_id"] == "script-v3"
+    assert ledger.attempts[0]["contract_id"] == "adaptive_canvas_script_v3"
+    assert ledger.attempts[0]["contract_schema_digest"] == registry.request.structured_output_schema_digest
 
 
 @pytest.mark.parametrize(
-    ("response_text", "message"),
+    "reason",
     [
-        ("not json", "LLM did not return a JSON object"),
-        (json.dumps({"title": "robot"}), "forbidden fixed template leaked into script"),
+        "markdown fence final rejected",
+        "preface or suffix final rejected",
+        "empty final rejected",
+        "Codex CLI nonzero exit",
     ],
 )
-def test_script_post_dispatch_contract_failure_marks_attempt_failed(
-    tmp_path: Path,
-    response_text: str,
-    message: str,
-) -> None:
+def test_script_v3_provider_failure_paths_mark_attempt_failed(tmp_path: Path, reason: str) -> None:
     class InvalidRegistry:
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
-            return {"text": response_text, "provider_calls_started": True}
+            raise ModelGatewayError(reason)
 
     profile = real_anime_4shot_paid_profile()
-    options = AdaptiveRunOptions(
-        runtime_root=tmp_path / "runtime",
-        project_id="project",
-        run_id="run",
-        profile=profile,
-        mode="real",
-    )
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
     run_root.mkdir()
     ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
 
-    with pytest.raises(AdaptiveCanvasError, match=message):
+    with pytest.raises(ModelGatewayError, match=reason):
         adaptive_canvas._ensure_script(run_root, options, ledger, InvalidRegistry(), None)
 
     assert ledger.paid_attempt_count == 1
     assert ledger.attempts[0]["status"] == "failed"
     assert ledger.attempts[0]["provider_calls_started"] is True
     assert ledger.attempts[0]["service_id"] == "server_codex"
-    assert ledger.attempts[0]["candidate_id"] == "script-v2"
+    assert ledger.attempts[0]["candidate_id"] == "script-v3"
     assert ledger.attempts[0]["attempt_index"] == 1
+    assert ledger.attempts[0]["safe_error"]["type"] == "ModelGatewayError"
+
+
+def test_script_v3_schema_invalid_final_marks_attempt_failed(tmp_path: Path) -> None:
+    class InvalidRegistry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            payload = _script_v3_payload()
+            payload["title"] = "robot"
+            return {
+                "text": json.dumps(payload),
+                "structured_output": payload,
+                "provider_calls_started": True,
+            }
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(AdaptiveCanvasError, match="forbidden fixed template leaked into script"):
+        adaptive_canvas._ensure_script(run_root, options, ledger, InvalidRegistry(), None)
+
+    assert ledger.attempts[0]["status"] == "failed"
     assert ledger.attempts[0]["safe_error"]["type"] == "AdaptiveCanvasError"
 
 
-def test_script_parser_exception_marks_attempt_failed(tmp_path: Path, monkeypatch) -> None:
+def test_script_v3_profile_contract_mismatch_marks_attempt_failed(tmp_path: Path) -> None:
+    class InvalidRegistry:
+        def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            payload = _script_v3_payload()
+            payload["shots"][0]["target_duration_sec"] = 99.0
+            return {
+                "text": json.dumps(payload),
+                "structured_output": payload,
+                "provider_calls_started": True,
+            }
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+
+    with pytest.raises(AdaptiveCanvasError, match="structured script duration must match profile"):
+        adaptive_canvas._ensure_script(run_root, options, ledger, InvalidRegistry(), None)
+
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["safe_error"]["type"] == "AdaptiveCanvasError"
+
+
+def test_script_v3_schema_digest_changes_charge_fingerprint(tmp_path: Path) -> None:
+    ledger = ChargeLedger(tmp_path / "ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    first = ledger.fingerprint(
+        stage="script",
+        shot_id=None,
+        chunk_id=None,
+        candidate_id="script-v3",
+        prompt="prompt",
+        contract_id="adaptive_canvas_script_v3",
+        contract_schema_digest="a" * 64,
+    )
+    second = ledger.fingerprint(
+        stage="script",
+        shot_id=None,
+        chunk_id=None,
+        candidate_id="script-v3",
+        prompt="prompt",
+        contract_id="adaptive_canvas_script_v3",
+        contract_schema_digest="b" * 64,
+    )
+
+    assert first != second
+
+
+def test_script_v3_parser_exception_marks_attempt_failed(tmp_path: Path, monkeypatch) -> None:
     class Registry:
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
-            return {"text": "{}", "provider_calls_started": True}
+            return {
+                "text": json.dumps(_script_v3_payload()),
+                "structured_output": _script_v3_payload(),
+                "provider_calls_started": True,
+            }
 
-    def parser_failure(text: str, profile: object) -> dict[str, object]:
+    def parser_failure(payload: dict[str, object], profile: object) -> dict[str, object]:
         raise RuntimeError("parser failed")
 
-    monkeypatch.setattr(adaptive_canvas, "_parse_script_json", parser_failure)
+    monkeypatch.setattr(adaptive_canvas, "_parse_script_payload", parser_failure)
     profile = real_anime_4shot_paid_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
     run_root = tmp_path / "run"
@@ -177,14 +275,14 @@ def test_script_parser_exception_marks_attempt_failed(tmp_path: Path, monkeypatc
     assert ledger.attempts[0]["safe_error"]["type"] == "RuntimeError"
 
 
-def test_script_recovery_after_two_contract_failures_does_not_buy_or_overwrite(tmp_path: Path) -> None:
+def test_script_v3_recovery_after_one_failure_does_not_dispatch_again(tmp_path: Path) -> None:
     class InvalidRegistry:
         def __init__(self) -> None:
             self.calls = 0
 
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
             self.calls += 1
-            return {"text": "not json", "provider_calls_started": True}
+            raise ModelGatewayError("invalid structured final")
 
     profile = real_anime_4shot_paid_profile()
     options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
@@ -192,19 +290,18 @@ def test_script_recovery_after_two_contract_failures_does_not_buy_or_overwrite(t
     run_root.mkdir()
     ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
     registry = InvalidRegistry()
-    for _ in range(2):
-        with pytest.raises(AdaptiveCanvasError, match="LLM did not return a JSON object"):
-            adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
 
+    with pytest.raises(ModelGatewayError, match="invalid structured final"):
+        adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
     before = json.loads(json.dumps(ledger.attempts))
     with pytest.raises(ProviderArtifactRetryExceeded):
         adaptive_canvas._ensure_script(run_root, options, ledger, registry, None)
 
-    assert registry.calls == 2
-    assert ledger.paid_attempt_count == 2
+    assert registry.calls == 1
+    assert ledger.paid_attempt_count == 1
     assert ledger.attempts == before
-    assert [attempt["status"] for attempt in ledger.attempts] == ["failed", "failed"]
-    assert [attempt["attempt_index"] for attempt in ledger.attempts] == [1, 2]
+    assert ledger.attempts[0]["status"] == "failed"
+    assert ledger.attempts[0]["attempt_index"] == 1
 
 
 def test_reference_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> None:

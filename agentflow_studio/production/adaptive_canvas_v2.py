@@ -17,6 +17,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     ProviderRegistry,
     load_provider_registry,
+    structured_output_schema_digest,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 
@@ -28,6 +29,7 @@ LEDGER_SCHEMA_VERSION = "afs.adaptive_canvas_v2.charge_ledger.v0.1"
 DEFAULT_PROVIDER_ATTEMPT_CAP = 20
 IMAGE_PROVIDER_SERVICE_ID = "image_relay"
 VIDEO_PROVIDER_SERVICE_ID = "seedance_i2v"
+SCRIPT_V3_CONTRACT_ID = "adaptive_canvas_script_v3"
 
 
 class AdaptiveCanvasError(RuntimeError):
@@ -68,6 +70,7 @@ class AdaptiveProductionProfile:
     shots: tuple[AdaptiveShotSpec, ...]
     llm_service_id: str = "prompt_optimizer"
     script_candidate_id: str = "script-v1"
+    script_contract_id: str | None = None
     provider_supported_video_durations_sec: tuple[int, ...] = (10, 5)
     reference_sheet_required: bool = True
     max_paid_attempts: int = DEFAULT_PROVIDER_ATTEMPT_CAP
@@ -85,6 +88,10 @@ class AdaptiveProductionProfile:
             raise AdaptiveCanvasError("llm_service_id must be non-empty")
         if not self.script_candidate_id.strip():
             raise AdaptiveCanvasError("script_candidate_id must be non-empty")
+        if self.script_contract_id is not None and not self.script_contract_id.strip():
+            raise AdaptiveCanvasError("script_contract_id must be non-empty when provided")
+        if self.script_candidate_id == "script-v3" and self.script_contract_id != SCRIPT_V3_CONTRACT_ID:
+            raise AdaptiveCanvasError("script-v3 requires the adaptive_canvas_script_v3 contract")
         if not self.shots:
             raise AdaptiveCanvasError("profile requires at least one shot")
         if self.max_paid_attempts > DEFAULT_PROVIDER_ATTEMPT_CAP:
@@ -155,6 +162,8 @@ class ChargeLedger:
         chunk_id: str | None,
         candidate_id: str,
         prompt: str,
+        contract_id: str | None = None,
+        contract_schema_digest: str | None = None,
     ) -> str:
         material = {
             "project_id": self.project_id,
@@ -165,6 +174,10 @@ class ChargeLedger:
             "candidate_id": candidate_id,
             "prompt_sha256": sha256_text(prompt),
         }
+        if contract_id:
+            material["contract_id"] = contract_id
+        if contract_schema_digest:
+            material["contract_schema_digest"] = contract_schema_digest
         return sha256_text(json.dumps(material, sort_keys=True, separators=(",", ":")))
 
     def successful_attempt(self, fingerprint: str) -> dict[str, Any] | None:
@@ -183,6 +196,9 @@ class ChargeLedger:
         capability: str,
         service_id: str,
         prompt: str,
+        contract_id: str | None = None,
+        contract_schema_digest: str | None = None,
+        max_provider_starts: int = 2,
     ) -> dict[str, Any]:
         fingerprint = self.fingerprint(
             stage=stage,
@@ -190,13 +206,17 @@ class ChargeLedger:
             chunk_id=chunk_id,
             candidate_id=candidate_id,
             prompt=prompt,
+            contract_id=contract_id,
+            contract_schema_digest=contract_schema_digest,
         )
         started = [
             attempt
             for attempt in self.attempts
             if attempt.get("charge_fingerprint") == fingerprint and attempt.get("provider_calls_started") is True
         ]
-        if len(started) >= 2:
+        if max_provider_starts <= 0:
+            raise ValueError("max_provider_starts must be positive")
+        if len(started) >= max_provider_starts:
             raise ProviderArtifactRetryExceeded(f"artifact retry limit exceeded for {stage}:{shot_id}:{chunk_id}")
         if self.paid_attempt_count >= self.max_paid_attempts:
             raise PaidAttemptLimitExceeded(f"paid provider attempt cap reached: {self.max_paid_attempts}")
@@ -217,6 +237,8 @@ class ChargeLedger:
             "service_id": service_id,
             "prompt_sha256": sha256_text(prompt),
             "charge_fingerprint": fingerprint,
+            "contract_id": contract_id,
+            "contract_schema_digest": contract_schema_digest,
             "status": "reserved",
             "provider_calls_started": False,
             "created_at": utc_now(),
@@ -388,6 +410,82 @@ def build_script_truth_from_profile(profile: AdaptiveProductionProfile) -> dict[
     }
 
 
+def build_script_v3_output_schema(profile: AdaptiveProductionProfile) -> dict[str, Any]:
+    profile.validate()
+    string_field = {"type": "string", "minLength": 1}
+    character_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["name", "continuity", "role"],
+        "properties": {"name": string_field, "continuity": string_field, "role": string_field},
+    }
+    scene_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["name", "visual_mood", "story_function"],
+        "properties": {"name": string_field, "visual_mood": string_field, "story_function": string_field},
+    }
+    shot_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "shot_id",
+            "summary",
+            "location",
+            "characters",
+            "action",
+            "camera",
+            "target_duration_sec",
+            "generation_strategy",
+            "strategy_reason",
+            "continuity_in",
+            "continuity_out",
+        ],
+        "properties": {
+            "shot_id": {"type": "string", "enum": [shot.shot_id for shot in profile.shots]},
+            "summary": string_field,
+            "location": string_field,
+            "characters": {"type": "array", "items": string_field, "minItems": 1},
+            "action": string_field,
+            "camera": string_field,
+            "target_duration_sec": {"type": "number"},
+            "generation_strategy": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "strategy_reason": string_field,
+            "continuity_in": string_field,
+            "continuity_out": string_field,
+        },
+    }
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["title", "logline", "style_bible", "characters", "scenes", "shots"],
+        "properties": {
+            "title": string_field,
+            "logline": string_field,
+            "style_bible": string_field,
+            "characters": {
+                "type": "array",
+                "items": character_schema,
+                "minItems": len(profile.characters),
+                "maxItems": len(profile.characters),
+            },
+            "scenes": {
+                "type": "array",
+                "items": scene_schema,
+                "minItems": len(profile.scenes),
+                "maxItems": len(profile.scenes),
+            },
+            "shots": {
+                "type": "array",
+                "items": shot_schema,
+                "minItems": profile.shot_count,
+                "maxItems": profile.shot_count,
+            },
+        },
+    }
+
+
 def run_adaptive_canvas_production(options: AdaptiveRunOptions, *, callback: Callback | None = None) -> dict[str, Any]:
     if options.mode not in {"real", "fake"}:
         raise ValueError("mode must be real or fake")
@@ -525,6 +623,9 @@ def _ensure_script(
         return script
     if registry is None:
         raise AdaptiveCanvasError("provider registry is required in real mode")
+    contract_id = options.profile.script_contract_id
+    output_schema = build_script_v3_output_schema(options.profile) if contract_id == SCRIPT_V3_CONTRACT_ID else None
+    schema_digest = structured_output_schema_digest(output_schema) if output_schema is not None else None
     result = _real_provider_attempt(
         ledger,
         registry,
@@ -535,10 +636,28 @@ def _ensure_script(
         chunk_id=None,
         candidate_id=options.profile.script_candidate_id,
         prompt=prompt,
-        request=ProviderDispatchRequest(prompt=prompt, output_dir=run_root / "provider_outputs" / "script", timeout_sec=240.0),
+        contract_id=contract_id,
+        contract_schema_digest=schema_digest,
+        max_provider_starts=1 if contract_id == SCRIPT_V3_CONTRACT_ID else 2,
+        request=ProviderDispatchRequest(
+            prompt=prompt,
+            output_dir=run_root / "provider_outputs" / "script",
+            task_type=contract_id,
+            structured_output_contract_id=contract_id,
+            structured_output_schema=output_schema,
+            structured_output_schema_digest=schema_digest,
+            timeout_sec=240.0,
+        ),
     )
     try:
-        script = _parse_script_json(str(result.get("text") or ""), options.profile)
+        if contract_id == SCRIPT_V3_CONTRACT_ID:
+            structured = result.get("structured_output")
+            if not isinstance(structured, dict):
+                raise AdaptiveCanvasError("structured script final response is missing")
+            _validate_script_v3_payload(structured, options.profile)
+            script = _parse_script_payload(structured, options.profile)
+        else:
+            script = _parse_script_json(str(result.get("text") or ""), options.profile)
         _validate_script(script, options.profile)
         write_json(path, script)
         ledger.mark_succeeded(
@@ -1070,9 +1189,20 @@ def _real_provider_attempt(
     candidate_id: str,
     prompt: str,
     request: ProviderDispatchRequest,
+    contract_id: str | None = None,
+    contract_schema_digest: str | None = None,
+    max_provider_starts: int = 2,
 ) -> dict[str, Any]:
     if ledger.successful_attempt(
-        ledger.fingerprint(stage=stage, shot_id=shot_id, chunk_id=chunk_id, candidate_id=candidate_id, prompt=prompt)
+        ledger.fingerprint(
+            stage=stage,
+            shot_id=shot_id,
+            chunk_id=chunk_id,
+            candidate_id=candidate_id,
+            prompt=prompt,
+            contract_id=contract_id,
+            contract_schema_digest=contract_schema_digest,
+        )
     ):
         raise AdaptiveCanvasError("provider artifact is marked successful but output is missing from run root")
     attempt = ledger.reserve(
@@ -1083,6 +1213,9 @@ def _real_provider_attempt(
         capability=capability,
         service_id=service_id,
         prompt=prompt,
+        contract_id=contract_id,
+        contract_schema_digest=contract_schema_digest,
+        max_provider_starts=max_provider_starts,
     )
     try:
         ledger.mark_started(str(attempt["attempt_id"]))
@@ -1155,7 +1288,7 @@ def _script_prompt(profile: AdaptiveProductionProfile) -> str:
         "shots": [
             {
                 "shot_id": shot.shot_id,
-                "duration_sec": shot.duration_sec,
+                "target_duration_sec": shot.duration_sec,
                 "generation_strategy": shot.generation_strategy,
                 "story_intent": shot.summary,
             }
@@ -1181,6 +1314,23 @@ def _parse_script_json(text: str, profile: AdaptiveProductionProfile) -> dict[st
     payload = json.loads(match.group(0))
     if not isinstance(payload, dict):
         raise AdaptiveCanvasError("LLM script JSON must be an object")
+    return _parse_script_payload(payload, profile)
+
+
+def _validate_script_v3_payload(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> None:
+    shots = payload.get("shots")
+    if not isinstance(shots, list) or len(shots) != profile.shot_count:
+        raise AdaptiveCanvasError("structured script shot count must match profile")
+    for supplied, expected in zip(shots, profile.shots, strict=True):
+        if not isinstance(supplied, dict) or str(supplied.get("shot_id") or "") != expected.shot_id:
+            raise AdaptiveCanvasError("structured script shot order must match profile")
+        if float(supplied.get("target_duration_sec") or 0.0) != float(expected.duration_sec):
+            raise AdaptiveCanvasError("structured script duration must match profile")
+        if str(supplied.get("generation_strategy") or "") != expected.generation_strategy:
+            raise AdaptiveCanvasError("structured script strategy must match profile")
+
+
+def _parse_script_payload(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> dict[str, Any]:
     fallback = build_script_truth_from_profile(profile)
     merged = {**fallback, **payload}
     shot_by_id = {str(shot.get("shot_id")): shot for shot in payload.get("shots", []) if isinstance(shot, dict)}
@@ -1493,6 +1643,7 @@ def _safe_message(value: str) -> str:
 __all__ = [
     "AdaptiveCanvasError",
     "IMAGE_PROVIDER_SERVICE_ID",
+    "SCRIPT_V3_CONTRACT_ID",
     "VIDEO_PROVIDER_SERVICE_ID",
     "AdaptiveProductionProfile",
     "AdaptiveRunOptions",
@@ -1502,6 +1653,7 @@ __all__ = [
     "PaidAttemptLimitExceeded",
     "compile_duration_chunks",
     "build_script_truth_from_profile",
+    "build_script_v3_output_schema",
     "load_adaptive_workspace",
     "run_adaptive_canvas_production",
     "sha256_file",
