@@ -368,6 +368,10 @@ function inferUserAction(route, method) {
   if (/\/production-plan-commands\/preview$/.test(route) && method === "POST") return "preview_production_plan_command";
   if (/\/production-plan-commands\/confirm$/.test(route) && method === "POST") return "confirm_production_plan_command";
   if (/\/production-plan-commands\/undo$/.test(route) && method === "POST") return "undo_production_plan_command";
+  if (/\/m3-zero-cost\/context-packs\/preview$/.test(route) && method === "POST") return "preview_m3_context_pack";
+  if (/\/m3-zero-cost\/context-packs\/confirm$/.test(route) && method === "POST") return "confirm_m3_context_pack";
+  if (/\/m3-zero-cost\/context-packs\/undo$/.test(route) && method === "POST") return "undo_m3_context_pack";
+  if (/\/m3-zero-cost\/audit-truth$/.test(route) && method === "GET") return "load_m3_zero_cost_audit_truth";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -638,6 +642,30 @@ export function createRuntimeClient(projectId = "") {
     },
     undoProductionPlanCommand(payload) {
       return requestJson(`/projects/${encoded}/production-plan-commands/undo`, { method: "POST", payload });
+    },
+    loadM3ZeroCostAuditTruth() {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/audit-truth`);
+    },
+    loadM3KnowledgePack() {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/knowledge-pack`);
+    },
+    previewM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/preview`, { method: "POST", payload });
+    },
+    confirmM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/confirm`, { method: "POST", payload });
+    },
+    undoM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/undo`, { method: "POST", payload });
+    },
+    recordM3FeedbackCandidate(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/feedback-candidates`, { method: "POST", payload });
+    },
+    recordM3PromotionDecision(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/promotion-decisions`, { method: "POST", payload });
+    },
+    recordM3EvaluationReport(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/evaluation-reports`, { method: "POST", payload });
     },
     createProductionRun(payload) {
       return requestJson(`/projects/${encoded}/production-runs`, { method: "POST", payload });

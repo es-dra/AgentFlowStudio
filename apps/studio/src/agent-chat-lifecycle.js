@@ -6,6 +6,7 @@ const SCHEMA_VERSION = "afs_agent_chat_lifecycle.v0.1";
 const CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1";
 const STORY_PLAN_CANDIDATE_SCHEMA_VERSION = "afs.story_plan_candidate.v0.1";
 const PRODUCTION_PLAN_COMMAND_SCHEMA_VERSION = "afs.production_plan_command.v0.1";
+const M3_CONTEXT_COMMAND_SCHEMA_VERSION = "afs.m3_context_command.v0.1";
 const MESSAGE_LIMIT = 28;
 const RECEIPT_LIMIT = 12;
 
@@ -101,6 +102,9 @@ export function agentChatContextSnapshot({
       "media_strategy_preview_confirm",
       "chunk_continuity_plan_contract",
       "production_plan_undo",
+      "m3_zero_cost_context_pack",
+      "feedback_not_memory_contract",
+      "knowledge_pack_scoped_retrieval",
     ],
     storyboard_mode: "read_only_deferred",
     remote_dispatch_count: 0,
@@ -207,6 +211,12 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
     response = await runtime.confirmProductionPlanCommand(payload);
     runtimeReceipt = response?.receipt || null;
     projectionDomain = "production_plan";
+  } else if (command.command_type === "build_m3_context_pack") {
+    const payload = runtimeM3ContextPackPayload(command);
+    await runtime.previewM3ContextPack(payload);
+    response = await runtime.confirmM3ContextPack(payload);
+    runtimeReceipt = response?.receipt || null;
+    projectionDomain = "m3_context";
   } else {
     const payload = runtimeCoreAssetCommandPayload(command);
     await runtime.previewCoreAssetCommand(payload);
@@ -225,7 +235,9 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   }
   const receipt = projectionDomain === "production_plan"
     ? productionPlanAgentReceipt(command, response, runtimeReceipt, projectionSummary)
-    : runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary);
+    : projectionDomain === "m3_context"
+      ? m3ContextAgentReceipt(command, response, runtimeReceipt)
+      : runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary);
   session.pendingCommand = null;
   recordReceipt(session, receipt);
   appendMessage(session, { role: "assistant", text: receipt.summary });
@@ -243,6 +255,7 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
   if (!receipt?.undo_available) throw new Error("agent receipt is not undoable");
   const isProductionPlan = receipt.runtime_domain === "production_plan";
   const isScriptRevision = receipt.runtime_domain === "script_revision";
+  const isM3Context = receipt.runtime_domain === "m3_context";
   if (isScriptRevision) {
     if (!receipt.previous_revision_id || !runtime?.selectScriptRevision) throw new Error("script revision undo is unavailable");
     const response = await runtime.selectScriptRevision(receipt.previous_revision_id);
@@ -271,6 +284,42 @@ export async function undoAgentReceiptWithRuntime(session, receipt, store, runti
       execution_mode: "runtime",
       runtime_domain: "script_revision",
       projection_summary: projectionSummary,
+      remote_dispatch_count: 0,
+      provider_dispatch_count: 0,
+    };
+    receipt.undo_available = false;
+    recordReceipt(session, undoReceipt);
+    appendMessage(session, { role: "assistant", text: undoReceipt.summary });
+    return undoReceipt;
+  }
+  if (isM3Context) {
+    if (!runtime?.undoM3ContextPack || !receipt.context_pack_id || !receipt.runtime_receipt_id) throw new Error("上下文包撤销不可用");
+    const response = await runtime.undoM3ContextPack({
+      project_id: receipt.project_id,
+      context_pack_id: receipt.context_pack_id,
+      receipt_id: receipt.runtime_receipt_id,
+      script_revision_id: receipt.script_revision_id || receipt.revision_id,
+      source_digest: receipt.source_digest,
+      schema_version: M3_CONTEXT_COMMAND_SCHEMA_VERSION,
+    });
+    const undoReceipt = {
+      schema_version: SCHEMA_VERSION,
+      receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      command_id: receipt.command_id,
+      command_type: `${receipt.command_type}.undo`,
+      status: "undone",
+      executed_at: new Date().toISOString(),
+      context_key: receipt.context_key,
+      project_id: receipt.project_id,
+      revision_id: receipt.revision_id,
+      script_revision_id: receipt.script_revision_id || receipt.revision_id,
+      source_digest: receipt.source_digest,
+      context_pack_id: receipt.context_pack_id,
+      summary: response?.receipt?.summary || "已撤销上下文包选择；剧本、分镜、资产事实未改变。",
+      undo_available: false,
+      storyboard_write: false,
+      execution_mode: "runtime",
+      runtime_domain: "m3_context",
       remote_dispatch_count: 0,
       provider_dispatch_count: 0,
     };
@@ -431,6 +480,15 @@ function previewAgentCommand(message, context = {}) {
 
   if (/^\/plan-selected-script-shots$/i.test(message) || /^自动拆分分镜$/i.test(message) || /^自动分镜$/i.test(message)) {
     return storyPlanRequestCommand(context);
+  }
+
+  const m3Instruction = matchCommand(message, [
+    /^\/m3-context-pack(?:\s+(.+))?$/i,
+    /^构建精准上下文包(?:[:：]\s*(.+))?$/i,
+    /^零付费审计上下文(?:[:：]\s*(.+))?$/i,
+  ]);
+  if (/^\/m3-context-pack$/i.test(message) || /^构建精准上下文包$/i.test(message) || /^零付费审计上下文$/i.test(message) || m3Instruction) {
+    return m3ContextPackCommand(context, m3Instruction || "零付费审计当前剧本、动态计划、资产 Bible 和上下文边界。");
   }
 
   const storyPlanCandidate = jsonPayloadCommand(message, [
@@ -876,6 +934,58 @@ function storyPlanRequestCommand(context) {
   };
 }
 
+function m3ContextPackCommand(context, instruction) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("build_m3_context_pack", "构建精准上下文包", "故事板是只读投影。请切回画布后再构建执行上下文。", context);
+  }
+  if (!context.script_revision_id || !context.script_source_digest) {
+    return blockedCommand("build_m3_context_pack", "构建精准上下文包", "请先创建或刷新剧本版本；上下文包必须绑定可追溯的 ScriptRevision。", context);
+  }
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "build_m3_context_pack",
+    execution_mode: "runtime",
+    status: "preview",
+    title: "构建精准上下文包",
+    summary: "按当前剧本版本、选中节点、制作计划摘要和任务域检索少量相关知识；确认后只锁定上下文包，不改剧本或分镜事实。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    revision_id: cleanToken(context.script_revision_id, 140),
+    script_revision_id: cleanToken(context.script_revision_id, 140),
+    source_digest: cleanToken(context.script_source_digest, 80),
+    plan_id: cleanToken(context.production_plan_id, 140) || null,
+    plan_digest: cleanToken(context.production_plan_digest, 80) || null,
+    selected_node_id: cleanToken(context.selected_node_id, 120),
+    selected_node_type: cleanToken(context.selected_node_type, 40),
+    instruction: cleanText(instruction, 900),
+    requested_domains: ["story_plan", "asset_bible", "context", "safety", "evaluation"],
+    upstream_refs: [
+      cleanToken(context.script_revision_id, 140),
+      cleanToken(context.production_plan_id, 140),
+    ].filter(Boolean),
+    downstream_refs: ["professional_script_candidate", "script_understanding", "story_plan_candidate", "asset_bible_candidate", "evaluation_report"],
+    constraints: {
+      storyboard_mode: "read_only_deferred",
+      draft_is_not_truth: true,
+      feedback_is_not_memory: true,
+      provider_disabled: true,
+    },
+    preferences: {},
+    exclusions: ["private_user_data", "prompt_injection", "full_chat_history"],
+    token_budget: 760,
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: "m3_zero_cost_context_pack_only",
+      storyboard_write: false,
+      canonical_truth_write: false,
+    },
+    requires_confirmation: true,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
 function productionPlanRefreshCommand(context) {
   if (context?.section === "storyboard_read_only") {
     return blockedCommand("refresh_production_plan", "刷新制作计划事实", "故事板是只读投影。请切回画布后再刷新计划投影。", context);
@@ -1101,6 +1211,44 @@ function runtimeProductionPlanCommandPayload(command) {
   };
 }
 
+function runtimeM3ContextPackPayload(command) {
+  return {
+    project_id: command.project_id,
+    script_revision_id: command.script_revision_id || command.revision_id,
+    source_digest: command.source_digest,
+    schema_version: M3_CONTEXT_COMMAND_SCHEMA_VERSION,
+    instruction: command.instruction || "",
+    selected_node_id: command.selected_node_id || null,
+    selected_node_type: command.selected_node_type || null,
+    plan_id: command.plan_id || null,
+    plan_digest: command.plan_digest || null,
+    requested_domains: command.requested_domains || [],
+    constraints: command.constraints || {},
+    preferences: command.preferences || {},
+    upstream_refs: command.upstream_refs || [],
+    downstream_refs: command.downstream_refs || [],
+    exclusions: command.exclusions || [],
+    token_budget: command.token_budget || 760,
+    provider_gates: {
+      llm: false,
+      image: false,
+      video: false,
+      audio: false,
+      asr: false,
+      vision: false,
+      external_download: false,
+    },
+    tool_gates: {
+      model_call: false,
+      external_download: false,
+      media_generation: false,
+    },
+    trace_id: command.command_id,
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+  };
+}
+
 function productionPlanAgentReceipt(command, response, runtimeReceipt, projectionSummary) {
   const projection = response?.projection || {};
   const plan = projection.current_plan || {};
@@ -1163,6 +1311,33 @@ function runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummar
     provider_dispatch_count: 0,
   };
   return receipt;
+}
+
+function m3ContextAgentReceipt(command, response, runtimeReceipt) {
+  const contextPack = response?.context_pack || {};
+  return {
+    schema_version: SCHEMA_VERSION,
+    receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_id: command.command_id,
+    command_type: command.command_type,
+    status: "executed",
+    executed_at: new Date().toISOString(),
+    context_key: command.context_key,
+    project_id: command.project_id || response?.project_id || contextPack.project_id || "",
+    revision_id: contextPack.script_revision_id || command.revision_id || "",
+    script_revision_id: contextPack.script_revision_id || command.script_revision_id || command.revision_id || "",
+    source_digest: contextPack.source_digest || command.source_digest || "",
+    context_pack_id: contextPack.context_pack_id || runtimeReceipt?.context_pack_id || "",
+    canonical_truth_digest: contextPack.canonical_truth_digest || "",
+    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，Provider 保持关闭，草案不会写入事实。`,
+    undo_available: Boolean(runtimeReceipt?.undo_available),
+    runtime_receipt_id: runtimeReceipt?.receipt_id || "",
+    storyboard_write: false,
+    execution_mode: "runtime",
+    runtime_domain: "m3_context",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
 }
 
 function productionPlanReceiptSummary(command, response) {
@@ -1248,6 +1423,7 @@ function userCommandDisplayText(command, fallbackText) {
   }
   if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
   if (type === "request_story_plan_candidate") return "自动拆分分镜";
+  if (type === "build_m3_context_pack") return "构建精准上下文包";
   if (type === "refresh_script_truth") return "刷新剧本与资产事实";
   if (type === "refresh_production_plan") return "刷新制作计划事实";
   if (isProductionPlanRuntimeCommand(type)) return productionPlanCommandLabel(type);

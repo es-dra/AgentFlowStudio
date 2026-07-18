@@ -47,6 +47,7 @@ from apps.api.runtime_social_square import register_runtime_social_square_routes
 from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_routes
 from apps.api.runtime_dynamic_production_plan import register_runtime_dynamic_production_plan_routes
 from apps.api.runtime_script_core_truth import register_runtime_script_core_truth_routes
+from apps.api.runtime_m3_zero_cost_kernel import register_runtime_m3_zero_cost_kernel_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
@@ -389,6 +390,7 @@ def create_runtime_app(
     register_runtime_adaptive_canvas_v2_routes(app, store, auth)
     register_runtime_script_core_truth_routes(app, store, auth)
     register_runtime_dynamic_production_plan_routes(app, store, auth)
+    register_runtime_m3_zero_cost_kernel_routes(app, store, auth)
     register_runtime_provider_script_routes(app, store)
     register_runtime_storyboard_routes(app, store)
     register_runtime_shot_asset_plan_routes(app, store)

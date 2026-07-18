@@ -440,6 +440,11 @@ def public_projection(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def production_plan_projection_for_project(store: RuntimeStore, project_id: str) -> dict[str, Any]:
+    store.ensure_project_manifest(project_id)
+    return public_projection(_load_state(store, project_id))
+
+
 def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     return {
         "candidate_digest": str(candidate.get("candidate_digest") or ""),
@@ -1281,6 +1286,7 @@ __all__ = (
     "PRODUCTION_PLAN_SCHEMA_VERSION",
     "PROVIDER_CAPABILITY_SCHEMA_VERSION",
     "STORY_PLAN_CANDIDATE_SCHEMA_VERSION",
+    "production_plan_projection_for_project",
     "public_projection",
     "register_runtime_dynamic_production_plan_routes",
     "story_plan_candidate_digest",
