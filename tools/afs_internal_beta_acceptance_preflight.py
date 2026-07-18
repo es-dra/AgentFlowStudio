@@ -213,5 +213,5 @@ def _safe_studio_static(value: Any) -> dict[str, bool | str]:
 def _safe_provider_gates(value: Any) -> dict[str, bool]:
     if not isinstance(value, dict):
         return {}
-    allowed = {"llm", "image", "video", "vision", "asr", "external_download"}
+    allowed = {"llm", "image", "video", "audio", "vision", "asr", "external_download"}
     return {str(key): bool(val) for key, val in value.items() if str(key) in allowed}

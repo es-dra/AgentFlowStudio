@@ -62,6 +62,34 @@ def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
     assert workspace["final_demo"]["duration_sec"] >= 59.0
 
 
+def test_run_state_clears_current_error_after_recovery_and_preserves_audit_history(tmp_path: Path) -> None:
+    path = tmp_path / "run_state.json"
+    state = {
+        "schema_version": "afs.adaptive_canvas_v2.v0.1",
+        "project_id": "project",
+        "run_id": "run",
+    }
+    error = {"type": "RuntimeError", "message": "temporary contract failure"}
+
+    adaptive_canvas._write_state(path, state, status="failed", safe_error=error)
+    failed = read_json(path)
+    assert failed["status"] == "failed"
+    assert failed["safe_error"] == error
+    assert failed["error_history"][-1]["safe_error"] == error
+
+    adaptive_canvas._write_state(path, state, status="running")
+    running = read_json(path)
+    assert running["status"] == "running"
+    assert "safe_error" not in running
+    assert running["error_history"][-1]["safe_error"] == error
+
+    adaptive_canvas._write_state(path, state, status="succeeded")
+    succeeded = read_json(path)
+    assert succeeded["status"] == "succeeded"
+    assert "safe_error" not in succeeded
+    assert [item["safe_error"] for item in succeeded["error_history"]] == [error]
+
+
 def test_failed_script_v1_is_preserved_and_script_v2_has_a_new_fingerprint(tmp_path: Path) -> None:
     ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
     old = ledger.reserve(

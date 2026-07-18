@@ -767,10 +767,32 @@ def _load_or_init_state(path: Path, options: AdaptiveRunOptions) -> dict[str, An
 
 
 def _write_state(path: Path, state: dict[str, Any], *, status: str, **updates: Any) -> None:
+    now = utc_now()
+    previous_safe_error = state.get("safe_error")
+    if status in {"running", "succeeded"} and isinstance(previous_safe_error, dict):
+        _append_safe_error_history(state, previous_safe_error, recorded_at=str(state.get("updated_at") or now))
+        state.pop("safe_error", None)
     state.update(updates)
+    if status == "failed" and isinstance(state.get("safe_error"), dict):
+        _append_safe_error_history(state, state["safe_error"], recorded_at=now)
     state["status"] = status
-    state["updated_at"] = utc_now()
+    state["updated_at"] = now
     write_json(path, state)
+
+
+def _append_safe_error_history(state: dict[str, Any], error: dict[str, Any], *, recorded_at: str) -> None:
+    history = [item for item in state.get("error_history") or [] if isinstance(item, dict)]
+    if history and history[-1].get("safe_error") == error:
+        state["error_history"] = history[-20:]
+        return
+    history.append(
+        {
+            "status": "failed",
+            "recorded_at": recorded_at,
+            "safe_error": dict(error),
+        }
+    )
+    state["error_history"] = history[-20:]
 
 
 def _ensure_script(

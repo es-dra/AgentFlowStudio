@@ -116,6 +116,7 @@ def test_http_acceptance_reuses_contract_with_safe_report(tmp_path: Path, monkey
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "false")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "false")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "false")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "false")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "false")
     monkeypatch.setenv("AFS_ALLOW_EXTERNAL_DOWNLOAD", "false")
 
@@ -157,6 +158,7 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "false")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_AUDIO", "false")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "false")
     monkeypatch.setenv("AFS_ALLOW_EXTERNAL_DOWNLOAD", "false")
 
@@ -202,6 +204,7 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
         "llm": True,
         "image": True,
         "video": False,
+        "audio": False,
         "vision": True,
         "asr": False,
         "external_download": False,
