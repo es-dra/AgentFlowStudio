@@ -1,0 +1,82 @@
+{
+  "schema_version": "company_provider_secrets.local.v2",
+  "accounts": {
+    "crazyrouter_m3_1": {
+      "auth_type": "bearer_env",
+      "base_url": "https://api.crazyrouter.com/v1",
+      "api_key_env": "CRAZYROUTER_API_KEY",
+      "default_models": {
+        "llm": "qwen-plus"
+      }
+    }
+  },
+  "account_pools": {
+    "creative_script_planner_pool": {
+      "accounts": [
+        {
+          "account_id": "crazyrouter_m3_1",
+          "service_id": "creative_script_planner",
+          "credential_env": "CRAZYROUTER_API_KEY",
+          "enabled_capabilities": [
+            "llm"
+          ],
+          "enabled": true,
+          "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    }
+  },
+  "services": {
+    "creative_script_planner": {
+      "provider": "openai_compatible",
+      "account_ref": "crazyrouter_m3_1",
+      "capability": "llm",
+      "required_gate": "AFS_ALLOW_REMOTE_LLM",
+      "model": "qwen-plus",
+      "temperature": 0.2,
+      "max_completion_tokens": 6000,
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "llm",
+        "execution_mode": "sync",
+        "capabilities": [
+          "llm"
+        ],
+        "account_pool_id": "creative_script_planner_pool",
+        "reference_image_slots": 0,
+        "supported_aspect_ratios": [
+          "1:1"
+        ],
+        "prompt_char_limit": 20000,
+        "seed_supported": false,
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "cost_hint": "M3.1 bounded text-only gate; harness enforces max 8 requests and estimated USD 20 before each call.",
+        "rate_limit_hint": "One bounded oneshot runner, concurrency 1."
+      },
+      "m3_1_contract": {
+        "purpose": "bounded_creative_script_planning_text_gate",
+        "structured_output_json": true,
+        "schema_version": "afs.m3_1_bounded_provider_text_gate.v0.1",
+        "input_token_budget": 8000,
+        "max_completion_tokens": 6000,
+        "context_limit_basis": "conservative token_budget descriptor pending live provider metadata preflight; fail closed on provider context error",
+        "hard_gates": {
+          "llm": true,
+          "image": false,
+          "video": false,
+          "audio": false,
+          "asr": false,
+          "vision": false,
+          "external_download": false
+        },
+        "draft_output_only": true,
+        "writes_canonical_truth": false,
+        "writes_memory": false,
+        "writes_knowledge": false
+      }
+    }
+  }
+}

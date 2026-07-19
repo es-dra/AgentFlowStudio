@@ -83,6 +83,29 @@ def test_openai_compatible_provider_returns_chat_completion(monkeypatch) -> None
     assert captured["timeout"] == 12.5
 
 
+def test_openai_compatible_provider_exposes_raw_chat_completion_for_usage(monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        return FakeResponse(
+            {
+                "choices": [{"message": {"content": "model text"}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17},
+            }
+        )
+
+    monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    provider = OpenAICompatibleProvider(
+        base_url="https://example.test/v1",
+        api_key="fake-key",
+        model="fake-model",
+    )
+
+    raw = provider.request_chat_completion("hello")
+
+    assert raw["choices"][0]["message"]["content"] == "model text"
+    assert raw["usage"]["total_tokens"] == 17
+
+
 def test_openai_compatible_provider_adds_formatter_system_message_for_prompt_enhancement(monkeypatch) -> None:
     captured = {}
 
