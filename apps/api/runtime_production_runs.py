@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 from copy import deepcopy
@@ -51,6 +52,12 @@ from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID, VIDEO_SUFFIX_TYP
 
 SAFE_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 SAFE_PREVIEW_JOB_STATUSES = frozenset({"succeeded", "partially_complete", "complete"})
+REAL_STORY_RECOVERY_GATE_ENV = "AFS_ENABLE_REAL_STORY_RECOVERY_ROUTE"
+
+
+def real_story_recovery_route_enabled() -> bool:
+    """The fixed legacy route is recovery/test-only and closed by default."""
+    return os.environ.get(REAL_STORY_RECOVERY_GATE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -321,6 +328,8 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         body: RealStoryProductionRequest,
         request: Request,
     ) -> dict[str, Any]:
+        if not real_story_recovery_route_enabled():
+            raise HTTPException(status_code=404, detail="route not found")
         owner_user_id = _require_project_owner(store, auth, request, project_id)
         request_digest = canonical_json_digest(body.model_dump(mode="json"))
         production_root = _real_story_production_root(store, project_id, run_id)
@@ -374,6 +383,8 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
         run_id: str,
         request: Request,
     ) -> FileResponse:
+        if not real_story_recovery_route_enabled():
+            raise HTTPException(status_code=404, detail="route not found")
         owner_user_id = _require_project_owner(store, auth, request, project_id)
         run = _load_owned_run(store, project_id, run_id, owner_user_id)
         production = run.get("real_story_production")

@@ -221,6 +221,7 @@ def test_run_keyframe_registers_canonical_candidate_image_path(tmp_path: Path, m
 
 
 def test_real_story_production_route_persists_safe_manifest_and_preview(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_REAL_STORY_RECOVERY_ROUTE", "true")
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
     monkeypatch.setenv("AFS_AUTH_ALLOW_OPEN_SIGNUP", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
