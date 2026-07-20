@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,12 @@ def read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def safe_id(value: str) -> str:
+def safe_id(value: str, *, max_length: int = 120) -> str:
     cleaned = SAFE_ID_PATTERN.sub("-", str(value).strip()).strip("-._")
-    return cleaned or "item"
+    if not cleaned:
+        cleaned = "item"
+    if len(cleaned) <= max_length:
+        return cleaned
+    digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:12]
+    prefix = cleaned[: max(1, max_length - len(digest) - 1)].rstrip("-._") or "item"
+    return f"{prefix}-{digest}"

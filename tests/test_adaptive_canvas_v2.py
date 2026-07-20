@@ -28,7 +28,86 @@ from apps.api.runtime_store import RuntimeStore, read_json
 from fastapi.testclient import TestClient
 
 
-def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path) -> None:
+@pytest.fixture
+def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[str, object]]:
+    metadata: dict[Path, dict[str, object]] = {}
+
+    def key(path: Path) -> Path:
+        return Path(path).resolve()
+
+    def record(path: Path, payload: bytes, probe: dict[str, object]) -> None:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        metadata[key(target)] = probe
+
+    def fake_png(path: Path, color: str) -> None:
+        record(
+            path,
+            f"offline-png:{color}".encode("utf-8"),
+            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": "1.000"}},
+        )
+
+    def fake_video(path: Path, *, duration_sec: int, color: str) -> None:
+        record(
+            path,
+            f"offline-mp4:{duration_sec}:{color}".encode("utf-8"),
+            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": f"{float(duration_sec):.3f}"}},
+        )
+
+    def concat_videos(inputs: list[Path], output: Path, *, duration_sec: float) -> None:
+        assert inputs
+        for source in inputs:
+            assert Path(source).exists()
+        record(
+            output,
+            f"offline-concat:{duration_sec:.3f}".encode("utf-8"),
+            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": f"{float(duration_sec):.3f}"}},
+        )
+
+    def extract_tail_frame(video: Path, output: Path) -> None:
+        if not Path(video).exists():
+            raise FileNotFoundError(str(video))
+        fake_png(output, "tail-frame")
+
+    def contact_sheet(video: Path, output: Path) -> None:
+        if not Path(video).exists():
+            raise FileNotFoundError(str(video))
+        record(
+            output,
+            b"offline-contact-sheet",
+            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": "1.000"}},
+        )
+
+    def probe(path: Path) -> dict[str, object]:
+        value = metadata.get(key(path))
+        if value is None:
+            raise AdaptiveCanvasError(f"offline media fixture has no probe metadata: {Path(path).name}")
+        return value
+
+    def decode_check(path: Path) -> dict[str, str]:
+        return {"status": "pass" if Path(path).exists() else "failed", "stderr_tail": ""}
+
+    monkeypatch.setattr(adaptive_canvas, "_fake_png", fake_png)
+    monkeypatch.setattr(adaptive_canvas, "_fake_video", fake_video)
+    monkeypatch.setattr(adaptive_canvas, "_concat_videos", concat_videos)
+    monkeypatch.setattr(adaptive_canvas, "_extract_tail_frame", extract_tail_frame)
+    monkeypatch.setattr(adaptive_canvas, "_contact_sheet", contact_sheet)
+    monkeypatch.setattr(adaptive_canvas, "_probe", probe)
+    monkeypatch.setattr(adaptive_canvas, "_decode_check", decode_check)
+    return metadata
+
+
+def test_missing_ffmpeg_media_tool_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def missing_executable(cmd: list[str], *args: object, **kwargs: object) -> object:
+        raise FileNotFoundError(cmd[0])
+
+    monkeypatch.setattr(adaptive_canvas.subprocess, "run", missing_executable)
+    with pytest.raises(AdaptiveCanvasError, match="command executable not found: ffmpeg"):
+        adaptive_canvas._fake_video(tmp_path / "missing-tool.mp4", duration_sec=5, color="0x000000")
+
+
+def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path, offline_adaptive_media: dict[Path, dict[str, object]]) -> None:
     profile = real_anime_4shot_paid_profile()
     assert profile.llm_service_id == "disabled_agent_authored"
     assert profile.script_candidate_id == "agent-authored-script-v1"
@@ -588,7 +667,10 @@ def test_video_output_contract_failure_marks_attempt_failed(tmp_path: Path) -> N
     assert ledger.attempts[0]["provider_calls_started"] is True
 
 
-def test_zero_provider_counterexample_has_dynamic_shots_durations_and_strategy(tmp_path: Path) -> None:
+def test_zero_provider_counterexample_has_dynamic_shots_durations_and_strategy(
+    tmp_path: Path,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
     profile = alternate_no_provider_profile()
     result = run_adaptive_canvas_production(
         AdaptiveRunOptions(
@@ -714,7 +796,10 @@ def test_charge_ledger_separates_stage_chunk_candidate_and_attempt(tmp_path: Pat
         raise AssertionError("third paid attempt must be blocked")
 
 
-def test_runtime_workspace_api_exposes_safe_projection(tmp_path: Path) -> None:
+def test_runtime_workspace_api_exposes_safe_projection(
+    tmp_path: Path,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
     profile = alternate_no_provider_profile()
     run_adaptive_canvas_production(
         AdaptiveRunOptions(
@@ -741,7 +826,11 @@ def test_runtime_workspace_api_exposes_safe_projection(tmp_path: Path) -> None:
     assert ".mp4" not in raw
 
 
-def test_runtime_workspace_api_requires_authenticated_project_owner(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_workspace_api_requires_authenticated_project_owner(
+    tmp_path: Path,
+    monkeypatch,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
     monkeypatch.setenv("AFS_INVITE_CODES", "adaptive-owner,adaptive-other")
     runtime_root = tmp_path / "runtime"

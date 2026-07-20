@@ -294,10 +294,10 @@ def _fact(
     lifecycle_state: str = "draft",
     review_state: str = "not_requested",
 ) -> dict[str, Any]:
-    version_id = f"{safe_id(entity_id)}-v1"
+    safe_entity_id = safe_id(entity_id, max_length=160)
     return {
-        "entity_id": safe_id(entity_id),
-        "version_id": version_id,
+        "entity_id": safe_entity_id,
+        "version_id": safe_id(f"{safe_entity_id}-v1", max_length=160),
         "revision": 1,
         "parent_version_id": None,
         "lifecycle_state": lifecycle_state,
@@ -309,4 +309,4 @@ def _fact(
 
 
 def _id(project_id: str, suffix: str) -> str:
-    return safe_id(f"{project_id}-{suffix}")
+    return safe_id(f"{project_id}-{suffix}", max_length=160)

@@ -21,6 +21,7 @@ from agentflow_studio.production.manga_first_l4a import (
     persist_manga_first_project,
     validate_manga_first_manifest,
 )
+from agentflow_studio.production.runtime_safe_io import safe_id as production_safe_id
 from apps.api.runtime_episode_domain_contract import TenantScope
 from apps.api.runtime_episode_domain_store import EpisodeDomainAggregateStore
 from apps.api.runtime_service import create_runtime_app
@@ -30,6 +31,23 @@ from apps.api.runtime_store import RuntimeStore
 REPO_ROOT = Path(__file__).resolve().parents[1]
 L1_ROOT = Path("/opt/afs/recovery-evidence/real-story-20260717T143658Z-6ea4fbee/recovery-bound-v1")
 L3_ROOT = Path("/opt/afs/recovery-evidence/real-story-20260717T143658Z-6ea4fbee/visual-creative-evaluation-v1")
+
+
+def _run_node_script(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]:
+    script_path = tmp_path / "node_probe.mjs"
+    script_path.write_text(script, encoding="utf-8")
+    return subprocess.run(
+        ["node", str(script_path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _write_json_fixture(path: Path, value: object) -> Path:
+    path.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    return path
 
 
 def _brief(project_id: str = "manga-a") -> dict:
@@ -308,6 +326,38 @@ def test_episode_aggregate_and_runtime_persistence_are_the_unique_fact_authority
     assert persisted.manifest_artifact["artifact_id"]
 
 
+def test_l4b_runtime_uses_bounded_storage_ids_for_long_project_ids(tmp_path: Path) -> None:
+    project_id = "manga-" + ("p" * 154)
+    manifest = compile_manga_first_manifest(_brief(project_id))
+    scope = TenantScope(org_id="org-1", project_id=project_id, actor_id="creator-1")
+    runtime_store = RuntimeStore(tmp_path)
+    runtime_store.create_project_manifest(
+        project_id=project_id,
+        project_type="manga_first_episode",
+        goal="Manga first L4B long project id",
+        status="in_progress",
+    )
+
+    persisted = persist_manga_first_project(
+        runtime_store,
+        manifest,
+        scope=scope,
+        idempotency_key="manga-first-long-project-create-v1",
+    )
+    storage_id = production_safe_id(project_id)
+    project_root = tmp_path / "projects" / storage_id
+
+    assert storage_id != project_id
+    assert len(storage_id) <= 120
+    assert (project_root / "manga_first_l4b" / "production_truth_manifest.json").is_file()
+    assert persisted.manifest.project_id == project_id
+    assert persisted.studio_workspace["project_id"] == project_id
+    assert len(persisted.manifest.manifest_sha256) == 64
+    assert persisted.manifest_artifact["artifact_id"]
+    assert persisted.manifest_artifact["artifact_id"] != project_id
+    assert max(len(part) for path in tmp_path.rglob("*") for part in path.relative_to(tmp_path).parts) <= 120
+
+
 @pytest.mark.skipif(not L1_ROOT.exists() or not L3_ROOT.exists(), reason="server recovery fixture is not mounted")
 def test_existing_13x13_assets_compose_provider_free_silent_regression_and_preserve_l3_p1(tmp_path: Path) -> None:
     result = compose_legacy_fixture_silent_assembly(
@@ -362,21 +412,17 @@ def test_runtime_api_and_studio_projection_are_safe_and_provider_free(tmp_path: 
     assert payload["manifest"]["fact_chain"]["studio_fabricated_state_allowed"] is False
 
     js = REPO_ROOT / "apps" / "studio" / "src" / "manga-first-l4a-projection.js"
+    payload_path = _write_json_fixture(tmp_path / "l4a_projection_payload.json", payload)
     script = f"""
+      import {{ readFileSync }} from "node:fs";
       import {{ normalizeMangaFirstL4AProjection, mangaFirstL4AStatusCounts }} from {json.dumps(js.as_uri())};
-      const payload = {json.dumps(payload)};
+      const payload = JSON.parse(readFileSync({json.dumps(str(payload_path))}, "utf8"));
       const view = normalizeMangaFirstL4AProjection(payload);
       if (!view || view.provider_dispatch_count !== 0 || view.fabricated_state_allowed !== false) process.exit(2);
       const counts = mangaFirstL4AStatusCounts(view);
       if (counts.awaiting_provider_authorization !== 12) process.exit(3);
     """
-    completed = subprocess.run(
-        ["node", "--input-type=module", "-e", script],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_node_script(tmp_path, script)
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
@@ -405,24 +451,22 @@ def test_l4b_runtime_route_persists_truth_and_studio_workspace_uses_runtime_data
     assert _runtime_tree_fingerprint(tmp_path) == before_get
 
     js = REPO_ROOT / "apps" / "studio" / "src" / "manga-first-l4b-workspace.js"
+    payload_path = _write_json_fixture(tmp_path / "l4b_workspace_payload.json", payload)
+    brief_path = _write_json_fixture(tmp_path / "l4b_workspace_brief.json", _brief())
     script = f"""
+      import {{ readFileSync }} from "node:fs";
       import {{ normalizeMangaFirstL4BWorkspace, createMangaFirstL4BWorkspace }} from {json.dumps(js.as_uri())};
-      const payload = {json.dumps(payload)};
+      const payload = JSON.parse(readFileSync({json.dumps(str(payload_path))}, "utf8"));
+      const brief = JSON.parse(readFileSync({json.dumps(str(brief_path))}, "utf8"));
       const view = normalizeMangaFirstL4BWorkspace(payload);
       if (!view || view.provider_dispatch_count !== 0 || view.fabricated_state_allowed !== false) process.exit(2);
       if (view.truth_authority.second_fact_source_allowed !== false) process.exit(3);
       if (!view.reference_approval_gate || view.reference_approval_gate.status !== "pending_human") process.exit(4);
       const runtimeClient = {{ createMangaFirstProductionTruth: async () => payload }};
-      const created = await createMangaFirstL4BWorkspace({{ projectId: "manga-a", brief: {json.dumps(_brief())}, runtimeClient }});
+      const created = await createMangaFirstL4BWorkspace({{ projectId: "manga-a", brief, runtimeClient }});
       if (!created || created.shot_status.length !== 12) process.exit(5);
     """
-    completed = subprocess.run(
-        ["node", "--input-type=module", "-e", script],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_node_script(tmp_path, script)
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
@@ -522,11 +566,14 @@ def test_l4b_two_distinct_briefs_run_full_no_provider_e2e(tmp_path: Path, monkey
         assert forbidden not in combined
 
 
-def test_studio_runtime_client_reaches_manga_first_workspace_contract() -> None:
+def test_studio_runtime_client_reaches_manga_first_workspace_contract(tmp_path: Path) -> None:
     client_js = REPO_ROOT / "apps" / "studio" / "src" / "runtime-client.js"
+    brief_path = _write_json_fixture(tmp_path / "runtime_client_brief.json", _brief())
     digest = "a" * 64
     script = f"""
+      import {{ readFileSync }} from "node:fs";
       import {{ createRuntimeClient }} from {json.dumps(client_js.as_uri())};
+      const brief = JSON.parse(readFileSync({json.dumps(str(brief_path))}, "utf8"));
       const calls = [];
       globalThis.fetch = async (url, options = {{}}) => {{
         calls.push({{
@@ -543,7 +590,7 @@ def test_studio_runtime_client_reaches_manga_first_workspace_contract() -> None:
         }};
       }};
       const client = createRuntimeClient("manga-a");
-      await client.createMangaFirstProductionTruth({json.dumps(_brief())}, {{
+      await client.createMangaFirstProductionTruth(brief, {{
         idempotencyKey: "manga-first-create-v1",
         includeManifest: true,
       }});
@@ -562,13 +609,7 @@ def test_studio_runtime_client_reaches_manga_first_workspace_contract() -> None:
       if (calls[0].payload.idempotency_key !== "manga-first-create-v1" || calls[0].payload.include_manifest !== true) process.exit(3);
       if (calls[2].payload.reference_set_digest !== {json.dumps(digest)}) process.exit(4);
     """
-    completed = subprocess.run(
-        ["node", "--input-type=module", "-e", script],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_node_script(tmp_path, script)
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 

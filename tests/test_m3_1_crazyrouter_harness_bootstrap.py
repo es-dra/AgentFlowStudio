@@ -371,7 +371,7 @@ def test_harness_runs_six_mocked_requests_without_secret_or_canonical_writes(tmp
 
 
 def test_bootstrap_content_is_exact_unit_not_wildcard() -> None:
-    candidate = Path("/home/afs-ops/.codex/worktrees/afs-m3-0-zero-cost-knowledge-context-audit-20260718")
+    candidate = Path(__file__).resolve().parents[1]
     unit = bundle_builder._unit_file(candidate)
     runner = bundle_builder._runner_script(candidate, "a" * 40, "b" * 64)
     sudoers = bundle_builder._sudoers()
@@ -386,6 +386,9 @@ def test_bootstrap_content_is_exact_unit_not_wildcard() -> None:
     assert "EXPECTED_HEAD=" in runner
     assert "EXPECTED_HARNESS_SHA256=" in runner
     assert "EXPECTED_PROVIDER_CONFIG_SHA256=" in runner
+    assert f'CANDIDATE_DIR="{candidate}"' in runner
+    assert "/home/afs-ops/.codex/worktrees/afs-m3-0-zero-cost-knowledge-context-audit-20260718" not in runner
+    assert "\\home\\afs-ops" not in runner
     assert 'PROVIDER_CONFIG="/etc/afs/m3-1-crazyrouter.providers.json"' in runner
     assert '--service-id "creative_script_planner"' in runner
     assert "--max-requests 8" in runner
