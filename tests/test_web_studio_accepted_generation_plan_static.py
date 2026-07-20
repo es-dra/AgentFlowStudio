@@ -34,8 +34,8 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
     assert "AFS_ALLOW_REMOTE" not in panel
     assert "provider_service_id" not in panel
 
-    assert "openAcceptedGenerationPlanPanel" in dock
-    assert "计划预览（已阻断）" in dock
+    assert "openAcceptedGenerationPlanPanel" not in dock
+    assert "计划预览（已阻断）" not in dock
     assert "Generation plan review" not in dock
     assert "previewAcceptedGenerationPlanPacket(payload = {})" in runtime_client
     assert 'payload: { fixture_mode: "default_unconfirmed", ...payload }' in runtime_client

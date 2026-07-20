@@ -139,7 +139,8 @@ def test_default_canvas_edges_use_solid_frame_connection() -> None:
     assert "animation:" not in edge_rule
     assert "edge-spark" in canvas_edges
     assert "syncEdgeSpark" in canvas_edges
-    assert "selected.has(edge.from) || selected.has(edge.to)" in canvas_edges
+    assert "syncEdgeStateClass(path, item, edge, state)" in canvas_edges
+    assert "state.selection.edgeId === edge.id" in canvas_edges
     assert "#edge-layer path.edge-spark" in styles
     assert "animation: edge-spark-forward 3.9s linear infinite" in styles
     assert "@keyframes edge-spark-forward" in styles
@@ -316,6 +317,13 @@ def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
     assert '"advanced-create-list"' in source
     assert '"advanced-create-content"' in source
     assert "bindDynamicMenuPosition" in source
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    assert "let lastBlankClick = null" in canvas_input
+    assert "let lastBlankPointerUp = null" in canvas_input
+    assert "function maybeOpenBlankPointerMenu" in canvas_input
+    assert "session?.kind !== \"marquee\" || session.rect" in canvas_input
+    assert "now - previous.at <= 460" in canvas_input
+    assert "openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY })" in canvas_input
     assert ".compact-create-menu" in styles
     assert "max-height: min(560px, calc(100vh - 32px))" in styles
     assert "window.innerHeight - height - 8" in overlay

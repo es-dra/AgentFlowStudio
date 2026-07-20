@@ -42,6 +42,16 @@ class OpenAICompatibleProvider:
         self.extra_body = dict(extra_body or {})
 
     def generate(self, prompt: str, *, task_type: str | None = None) -> str:
+        response = self.request_chat_completion(prompt, task_type=task_type)
+        try:
+            content = response["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ModelProviderError("OpenAI-compatible response missing choices[0].message.content") from exc
+        if not isinstance(content, str):
+            raise ModelProviderError("OpenAI-compatible response content is not a string")
+        return content
+
+    def request_chat_completion(self, prompt: str, *, task_type: str | None = None) -> dict[str, Any]:
         api_key = self._resolve_api_key()
         self._ensure_remote_calls_allowed()
         payload = {
@@ -52,14 +62,7 @@ class OpenAICompatibleProvider:
         if self.max_completion_tokens is not None:
             payload["max_completion_tokens"] = self.max_completion_tokens
         payload.update(self.extra_body)
-        response = self._send_request(payload, api_key)
-        try:
-            content = response["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise ModelProviderError("OpenAI-compatible response missing choices[0].message.content") from exc
-        if not isinstance(content, str):
-            raise ModelProviderError("OpenAI-compatible response content is not a string")
-        return content
+        return self._send_request(payload, api_key)
 
     def _resolve_api_key(self) -> str:
         if self.api_key:
@@ -115,6 +118,18 @@ def _messages_for_task(prompt: str, task_type: str | None) -> list[dict[str, str
                 "content": (
                     "You are AFS Studio's strict prompt formatter. Return only the requested Chinese section lines. "
                     "Do not explain, do not use Markdown, do not add tables, do not write tutorials, and do not include code blocks."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ]
+    if task_type == "m3_1_structured_json":
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are an AFS professional content-production planning agent. "
+                    "Return only one valid JSON object matching the requested schema. "
+                    "Do not include Markdown, code fences, secrets, provider credentials, or memory-promotion claims."
                 ),
             },
             {"role": "user", "content": prompt},

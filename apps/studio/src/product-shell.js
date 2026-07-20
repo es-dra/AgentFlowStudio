@@ -1,25 +1,24 @@
 import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
-import { createDirectorContextStore, findNextProductionTarget, productContextKey } from "./product-shell-context.js";
-
-const FALLBACK_SCENES = ["巷口", "雨巷", "老宅", "天台", "尾声"];
-const DIRECTOR_TABS = [
-  ["suggestion", "建议"],
-  ["reference", "引用"],
-  ["version", "版本"],
-];
+import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
+import { buildAgentChatPanel } from "./agent-chat-panel.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
+import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
-  let section = "storyboard";
+  let section = "canvas";
   let selection = { sceneIndex: 0, shotIndex: 0 };
-  let directorTab = "suggestion";
-  let directorCollapsed = false;
-  let cockpitOpen = false;
+  let agentCollapsed = false;
+  let projectDrawerOpen = false;
   let contextOpen = false;
-  let mobileDirectorOpen = false;
+  let mobileAgentOpen = false;
   let notice = "";
-  const directorContexts = createDirectorContextStore();
+  let pendingGraphImpact = null;
+  let m6SourceText = "";
+  let graphRefreshPending = false;
+  let agentChatWidth = readAgentChatWidth();
+  const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
     workspace: null,
@@ -28,6 +27,7 @@ export function createProductShell(options = {}) {
     error: "",
     authUser: null,
   };
+  bindShellEvents();
 
   function render(next = {}) {
     snapshot = { ...snapshot, ...next };
@@ -35,11 +35,11 @@ export function createProductShell(options = {}) {
     const root = document.getElementById("product-shell-root");
     if (!root) return;
     options.parkCanvas?.();
-    root.className = `unified-studio-shell ${cockpitOpen ? "cockpit-open" : ""}`;
+    root.className = `unified-studio-shell ${projectDrawerOpen ? "project-drawer-open" : ""}`;
     root.dataset.view = section;
     root.replaceChildren();
     root.appendChild(buildHeader());
-    if (cockpitOpen && snapshot.project) root.appendChild(buildCockpit());
+    if (projectDrawerOpen && snapshot.project) root.appendChild(buildProjectDrawer());
     if (snapshot.loading) root.appendChild(statePanel("loading"));
     else if (snapshot.error) root.appendChild(statePanel("error"));
     else if (!snapshot.project) root.appendChild(statePanel("empty"));
@@ -64,21 +64,24 @@ export function createProductShell(options = {}) {
     project.appendChild(projectLabel);
     if (contextOpen) project.appendChild(buildProjectMenu());
 
-    const stage = node("button", `studio-stage-button ${cockpitOpen ? "active" : ""}`);
-    stage.type = "button";
-    stage.setAttribute("aria-expanded", String(cockpitOpen));
-    stage.innerHTML = `<span>${escapeHtml(snapshot.project?.current_stage || "分镜制作")}</span>${icon("chevronDown", 13)}`;
-    stage.addEventListener("click", () => {
-      cockpitOpen = !cockpitOpen;
+    const navigator = node("button", `studio-stage-button ${projectDrawerOpen ? "active" : ""}`);
+    navigator.type = "button";
+    navigator.setAttribute("aria-label", "打开项目导航");
+    navigator.setAttribute("aria-controls", "studio-context-drawer");
+    navigator.setAttribute("aria-expanded", String(projectDrawerOpen));
+    navigator.innerHTML = `<span>项目导航</span>${icon("chevronDown", 13)}`;
+    navigator.addEventListener("click", () => {
+      projectDrawerOpen = !projectDrawerOpen;
       render();
+      requestCanvasSafeAreaUpdate();
     });
 
     const viewSwitch = node("div", "studio-view-switch");
     viewSwitch.setAttribute("role", "tablist");
     viewSwitch.setAttribute("aria-label", "工作区视图");
     viewSwitch.append(
-      viewButton("storyboard", "故事板"),
       viewButton("canvas", "画布"),
+      viewButton("storyboard", "故事板"),
     );
 
     const summary = node("div", "studio-header-summary");
@@ -89,6 +92,13 @@ export function createProductShell(options = {}) {
     );
 
     const actions = node("div", "studio-header-actions");
+    if (options.onOpenExternalVideoDemo) {
+      const externalVideo = node("button", "studio-secondary-button studio-external-video-button");
+      externalVideo.type = "button";
+      externalVideo.innerHTML = icon("video", 13) + "<span>AI 漫剧</span>";
+      externalVideo.addEventListener("click", () => options.onOpenExternalVideoDemo?.());
+      actions.appendChild(externalVideo);
+    }
     actions.appendChild(buildSaveStatus());
     const language = node("button", "studio-icon-button", locale === "zh-CN" ? "中" : "EN");
     language.type = "button";
@@ -106,7 +116,7 @@ export function createProductShell(options = {}) {
       actions.appendChild(account);
     }
 
-    header.append(brand, project, stage, viewSwitch, summary, actions);
+    header.append(brand, project, navigator, viewSwitch, summary, actions);
     return header;
   }
 
@@ -152,13 +162,22 @@ export function createProductShell(options = {}) {
     return cluster;
   }
 
-  function buildCockpit() {
+  function buildProjectDrawer() {
     const project = snapshot.project;
-    const panel = node("section", "studio-cockpit");
-    panel.setAttribute("aria-label", "项目状态与下一步");
+    const panel = node("section", "studio-context-drawer");
+    panel.id = "studio-context-drawer";
+    panel.setAttribute("aria-label", "项目导航");
+    const close = node("button", "studio-icon-button context-drawer-close");
+    close.type = "button";
+    close.setAttribute("aria-label", "关闭项目导航");
+    close.innerHTML = icon("x", 15);
+    close.addEventListener("click", () => {
+      projectDrawerOpen = false;
+      render();
+    });
     const copy = node("div", "cockpit-copy");
     copy.append(
-      node("span", "eyebrow", "当前阶段"),
+      node("span", "eyebrow", "项目"),
       node("strong", "", project.current_stage || "分镜制作"),
       node("p", "", project.next_action || "复核当前场景并继续制作"),
     );
@@ -171,17 +190,257 @@ export function createProductShell(options = {}) {
     const next = node("button", "cockpit-next", project.next_action || "继续制作");
     next.type = "button";
     next.addEventListener("click", activateNextAction);
-    panel.append(copy, stages, next);
+    const scenes = node("div", "context-drawer-scenes");
+    scenes.appendChild(node("strong", "", "场景 / 镜头"));
+    const model = sceneModel();
+    if (!model.length) {
+      scenes.appendChild(node("p", "", "还没有确认的场景或镜头。"));
+    } else {
+      model.forEach((scene, index) => {
+        const item = node("button", index === selection.sceneIndex ? "active" : "");
+        item.type = "button";
+        item.innerHTML = `<span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(scene.name)}</strong><small>${scene.shots.length} 镜头 · ${scene.duration}</small>`;
+        item.addEventListener("click", () => {
+          projectDrawerOpen = false;
+          selectContext(index, 0);
+        });
+        scenes.appendChild(item);
+      });
+    }
+    panel.append(close, copy, stages, scenes);
+    if (graphWorkspaceReady()) panel.appendChild(buildGraphProductionSummary());
+    panel.appendChild(next);
     return panel;
   }
 
+  function buildGraphProductionSummary() {
+    const view = graphView();
+    const sectionEl = node("section", "graph-production-summary");
+    sectionEl.appendChild(node("strong", "", `制作序列 · 版本 ${view.graphVersion}`));
+    const counts = node("dl", "graph-production-counts");
+    for (const [label, value] of [["剧本", view.summary.scriptRevisions], ["序列", view.summary.sequences], ["角色", view.summary.characters], ["场景", view.summary.locations],
+      ["镜头", view.shots.length], ["道具", view.summary.props], ["参考集", view.summary.referenceSets],
+      ["任务", view.summary.tasks], ["候选", view.summary.candidates]]) {
+      counts.append(node("dt", "", label), node("dd", "", String(value)));
+    }
+    sectionEl.appendChild(counts);
+    const lifecycle = node("div", "graph-lifecycle-actions");
+    const latestCandidate = view.lifecycle.candidates.at(-1);
+    if (latestCandidate && !view.summary.selections) {
+      lifecycle.appendChild(graphActionButton("选择最新候选", "select_candidate", "选择候选版本",
+        "确认后记录候选选择，不覆盖原候选。", { artifact_id: latestCandidate.artifact_id, selection_key: "sequence_delivery" }));
+    }
+    const pendingReview = view.lifecycle.reviews.find((item) => item.state === "pending");
+    const rejectedReview = view.lifecycle.reviews.find((item) => item.state === "rejected");
+    if (pendingReview) {
+      lifecycle.append(
+        graphActionButton("通过审核", "review_decision", "通过专业审核", "确认后把审核结论写入同一制作图版本。", { review_id: pendingReview.review_id, state: "approved" }),
+        graphActionButton("退回修改", "review_decision", "退回当前审核", "确认后保留候选与证据，并等待明确返工。", { review_id: pendingReview.review_id, state: "rejected" }),
+      );
+    }
+    if (rejectedReview) {
+      lifecycle.appendChild(graphActionButton("安排返工", "redo_rejected", "安排受控返工", "确认后新增返工任务，不覆盖原候选。", { review_id: rejectedReview.review_id }));
+    }
+    const delivery = view.lifecycle.deliveries.at(-1);
+    if (delivery && delivery.state !== "review_ready") {
+      lifecycle.appendChild(graphActionButton("提交交付核验", "delivery_state", "提交交付清单核验",
+        "确认后仅更新交付清单状态；不执行导出或媒体生成。", { delivery_id: delivery.delivery_id, state: "review_ready" }));
+    }
+    if (lifecycle.children.length) sectionEl.appendChild(lifecycle);
+    sectionEl.appendChild(graphLifecycleList("制作任务", view.lifecycle.tasks, (item, index) => `任务 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("候选版本", view.lifecycle.candidates, (item, index) => `候选 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("审核记录", view.lifecycle.reviews, (item, index) => `审核 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("交付清单", view.lifecycle.deliveries, (item) => `${graphStateLabel(item.state)} · 时间线 ${item.timeline_refs?.length || 0} · 权利 ${item.rights_refs?.length || 0} · 来源 ${item.provenance_refs?.length || 0}`));
+    const history = view.summary.versionHistory.slice(0, 4).map((item) => `版本 ${Number(item.version)}`).join(" · ");
+    sectionEl.appendChild(node("p", "graph-version-history", history ? `最近记录：${history}` : "尚无版本变更记录"));
+    return sectionEl;
+  }
+
+  function graphLifecycleList(title, items, describe) {
+    const sectionEl = node("section", "graph-lifecycle-list");
+    sectionEl.appendChild(node("strong", "", title));
+    const list = node("ul", "");
+    if (!items.length) list.appendChild(node("li", "", "尚无记录"));
+    else items.slice(0, 5).forEach((item, index) => list.appendChild(node("li", "", describe(item, index))));
+    sectionEl.appendChild(list);
+    return sectionEl;
+  }
+
+  function graphActionButton(label, action, title, summary, payload) {
+    const button = node("button", "studio-secondary-button", label);
+    button.type = "button";
+    button.addEventListener("click", () => stageGraphCommand({ action, title, summary, payload }));
+    return button;
+  }
+
+  function buildGraphCanvasStatus() {
+    const view = graphView();
+    const status = node("aside", `graph-canvas-status ${view.status}`);
+    status.setAttribute("aria-live", "polite");
+    if (view.planningRequired) {
+      status.append(node("strong", "", "需要确认制作方案"), node("span", "", "先输入或导入剧本；已有结构化制作方案时，可在 Agent Chat 中预览后确认。"));
+      const planner = node("div", "m6-script-plan-entry");
+      const textarea = document.createElement("textarea");
+      textarea.rows = 5;
+      textarea.value = m6SourceText;
+      textarea.placeholder = "角色、场景、目标、冲突、道具和剧本段落";
+      textarea.setAttribute("aria-label", "输入想法或已有剧本");
+      textarea.addEventListener("input", () => {
+        m6SourceText = textarea.value;
+      });
+      const preview = node("button", "studio-primary-button", "生成剧本制作方案");
+      preview.type = "button";
+      preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
+      planner.append(textarea, preview);
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json,.json";
+      input.hidden = true;
+      input.setAttribute("aria-label", "选择结构化制作方案文件");
+      const importButton = node("button", "studio-secondary-button", "导入结构化制作方案");
+      importButton.type = "button";
+      importButton.addEventListener("click", () => input.click());
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const candidate = JSON.parse(await file.text());
+          stageGraphCandidate(candidate);
+        } catch {
+          notice = "制作方案无法读取；请检查文件格式后重试，现有项目未改变。";
+          render();
+        } finally {
+          input.value = "";
+        }
+      });
+      status.append(planner, importButton, input);
+      return status;
+    }
+    if (view.status !== "ready") {
+      status.hidden = true;
+      return status;
+    }
+    status.append(
+      node("strong", "", `制作序列 v${view.graphVersion}`),
+      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.summary.tasks} 任务`),
+    );
+    const details = node("button", "studio-text-button", "制作详情");
+    details.type = "button";
+    details.addEventListener("click", () => { projectDrawerOpen = true; render(); });
+    status.appendChild(details);
+    const selected = selectedGraphTarget();
+    if (selected) {
+      const impact = node("button", "studio-secondary-button", "预览所选对象影响");
+      impact.type = "button";
+      impact.addEventListener("click", () => previewGraphMutation(selected.nodeId, { review_state: "needs_revision" }, `确认修订${selected.title}`));
+      status.appendChild(impact);
+    }
+    return status;
+  }
+
+  function stageGraphCommand(details) {
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    stageProductionGraphCommand(session, context, details);
+    projectDrawerOpen = false;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "命令已送入 Agent Chat；确认前不会改变制作事实。";
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  function stageGraphCandidate(candidate) {
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    try {
+      stageProductionGraphCandidateCommand(session, context, candidate);
+    } catch (error) {
+      notice = error?.message || "制作方案缺少必要结构，项目未改变。";
+      render();
+      return;
+    }
+    projectDrawerOpen = false;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "制作方案已送入 Agent Chat；确认前不会建立制作图。";
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  async function previewM6ScriptPlan(sourceText) {
+    try {
+      const preview = await options.getRuntime?.().previewM6ScriptPlanAssetBible({
+        source_kind: "idea",
+        source_text: sourceText,
+      });
+      const context = currentAgentChatContext();
+      context.context_key = agentChatContextKey(context);
+      const session = agentChatContexts.get(context.context_key);
+      stageM6ScriptPlanCandidateCommand(session, context, preview);
+      projectDrawerOpen = false;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = "M6方案已送入 Agent Chat；确认前不会建立制作图。";
+    } catch (error) {
+      notice = error?.message || "M6方案生成失败，项目未改变。";
+    }
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  function applyGraphWorkspace(workspace) {
+    const store = options.getStore?.();
+    const ready = productionGraphWorkspaceProjection(workspace).status === "ready";
+    store?.setRuntimePersistenceMode?.(ready ? "production_graph_read_only" : "studio_state");
+    store?.set?.((state) => applyProductionGraphCanvasProjection(state, workspace), { history: false, persist: false });
+  }
+
+  async function previewGraphMutation(nodeId, patch, title) {
+    try {
+      pendingGraphImpact = await options.getRuntime?.().previewSequenceImpact({ changed_node_ids: [nodeId] });
+      notice = `将重新处理 ${pendingGraphImpact.impact.invalidated_node_ids.length} 个下游对象，保留 ${pendingGraphImpact.impact.preserved_node_ids.length} 个无关对象。`;
+      stageGraphCommand({ action: "mutate", title, summary: notice, targetNodeId: nodeId, changedNodeIds: [nodeId], patch, impact: pendingGraphImpact.impact });
+    } catch {
+      notice = "影响预览失败，未修改制作事实。";
+      render();
+    }
+  }
+
+  function syncGraphWorkspaceAfterAgentReceipt(session) {
+    const receipt = session?.receipts?.at(-1);
+    if (receipt?.runtime_domain !== "production_graph" || Number(receipt.graph_version || 0) <= Number(snapshot.sequenceWorkspace?.graph_version || 0)) {
+      render();
+      return;
+    }
+    if (graphRefreshPending) return;
+    graphRefreshPending = true;
+    options.getRuntime?.().sequenceWorkspace?.().then((workspace) => {
+      snapshot.sequenceWorkspace = workspace;
+      applyGraphWorkspace(workspace);
+      snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+      pendingGraphImpact = null;
+      notice = `制作图已更新到版本 ${Number(workspace.graph_version || 0)}。`;
+    }).catch(() => {
+      notice = "制作图已变更但刷新失败，请重新载入后继续；不会重复执行命令。";
+    }).finally(() => {
+      graphRefreshPending = false;
+      render();
+    });
+  }
+
   function buildWorkspace() {
-    const shell = node("div", `studio-unified-workspace ${directorCollapsed ? "director-collapsed" : ""}`);
+    const emptyCanvas = section === "canvas" && !hasStoryFacts();
+    const canvasActive = section === "canvas";
+    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
-    shell.appendChild(buildSceneRail());
+    shell.style.setProperty("--agent-chat-width", `${agentChatWidth}px`);
+    if (section === "storyboard" && !emptyCanvas) shell.appendChild(buildSceneRail());
     const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
     shell.appendChild(main);
-    shell.appendChild(buildDirector());
+    shell.appendChild(buildAgentChat());
     return shell;
   }
 
@@ -197,19 +456,19 @@ export function createProductShell(options = {}) {
     const main = node("main", "studio-workspace-main studio-canvas-workspace");
     main.id = "product-main";
     main.tabIndex = -1;
-    main.appendChild(buildContextBar());
     const stage = node("section", "canvas-workspace-stage");
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
-    stage.dataset.canvasTarget = currentShot().nodeId || "empty-shot";
+    stage.dataset.canvasTarget = currentShot().nodeId || "empty-project";
     const editor = options.getCanvasShell?.();
     if (editor) stage.appendChild(editor);
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
+    stage.appendChild(buildGraphCanvasStatus());
     if (notice) {
       const live = node("p", "studio-live-notice", notice);
       live.setAttribute("aria-live", "polite");
       stage.appendChild(live);
     }
-    main.append(stage, buildVersionBar());
+    main.appendChild(stage);
     return main;
   }
 
@@ -221,6 +480,15 @@ export function createProductShell(options = {}) {
     aside.appendChild(head);
     const list = node("nav", "scene-list");
     list.setAttribute("aria-label", "场景列表");
+    if (!scenes.length) {
+      list.classList.add("scene-list-empty");
+      list.appendChild(node("p", "", "尚未创建场景"));
+      aside.appendChild(list);
+      const progress = node("div", "scene-progress");
+      progress.innerHTML = '<span>本集进度</span><strong>0 / 0 镜头</strong><div><i style="width:0%"></i></div>';
+      aside.appendChild(progress);
+      return aside;
+    }
     scenes.forEach((scene, index) => {
       const button = node("button", index === selection.sceneIndex ? "active" : "");
       button.type = "button";
@@ -241,31 +509,26 @@ export function createProductShell(options = {}) {
   function buildContextBar() {
     const scene = currentScene();
     const shot = currentShot();
+    const empty = !hasStoryFacts();
     const bar = node("header", "storyboard-context-bar");
     const selectionContext = node("div", "selection-context");
-    selectionContext.innerHTML = `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
+    selectionContext.innerHTML = empty
+      ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>0 场景 · 0 镜头 · 尚未创建故事事实</span>`
+      : `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
-    const review = node("button", "studio-secondary-button", "进入审核");
-    review.type = "button";
-    review.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
-      notice = "审核范围已锁定为当前镜头。";
-      render();
-    });
     const canvas = node("button", "studio-text-button");
     canvas.type = "button";
     canvas.innerHTML = section === "canvas"
       ? `${icon("grid", 13)}在故事板查看`
       : `查看画布${icon("expand", 13)}`;
-    canvas.addEventListener("click", () => section === "canvas" ? showOverview() : openCanvas());
-    actions.append(review, canvas);
+    canvas.addEventListener("click", () => section === "canvas" ? showStoryboard() : openCanvas());
+    actions.append(canvas);
     bar.append(selectionContext, actions);
     return bar;
   }
 
   function buildStoryboardContent() {
+    if (!hasStoryFacts()) return buildEmptyStoryboardContent();
     const scene = currentScene();
     const sectionEl = node("section", "storyboard-content");
     const sparse = scene.shots.length <= 2;
@@ -286,6 +549,32 @@ export function createProductShell(options = {}) {
       live.setAttribute("aria-live", "polite");
       sectionEl.appendChild(live);
     }
+    return sectionEl;
+  }
+
+  function buildEmptyStoryboardContent() {
+    const sectionEl = node("section", "storyboard-content storyboard-empty-state");
+    const heading = node("div", "storyboard-heading");
+    heading.append(
+      node("div", "", '<span class="eyebrow">故事板</span><h1>等待创作简报</h1>'),
+      node("span", "storyboard-duration", "0 场景 · 0 镜头"),
+    );
+    heading.firstElementChild.innerHTML = '<span class="eyebrow">故事板</span><h1>等待创作简报</h1>';
+    const body = node("div", "storyboard-empty-body");
+    body.append(
+      node("p", "", "这个项目还没有场景、镜头、进度、决策、参考或示例素材。"),
+      node("p", "", "故事板当前只读取画布确认后的事实；空项目不会自动创建示例分镜。"),
+    );
+    const actions = node("div", "storyboard-empty-actions");
+    const canvas = node("button", "studio-secondary-button", "打开空白画布");
+    canvas.type = "button";
+    canvas.addEventListener("click", openCanvas);
+    actions.append(canvas);
+    const counts = node("dl", "empty-canonical-counts");
+    for (const [label, value] of [["场景", 0], ["镜头", 0], ["参考", 0], ["决策", 0]]) {
+      counts.append(node("dt", "", label), node("dd", "", String(value)));
+    }
+    sectionEl.append(heading, body, actions, counts);
     return sectionEl;
   }
 
@@ -329,169 +618,71 @@ export function createProductShell(options = {}) {
       notice = "脚本上下文已绑定当前场景；详细内容保持折叠。";
       render();
     });
-    const versions = node("button", "studio-text-button", "查看版本与恢复");
+    const versions = node("button", "studio-text-button", "查看版本记录");
     versions.type = "button";
     versions.addEventListener("click", () => {
-      directorTab = "version";
-      directorCollapsed = false;
-      mobileDirectorOpen = true;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = "版本记录只随画布事实读取；恢复命令需要在 Agent Chat 中预览和确认。";
       render();
     });
     bar.append(script, node("p", "", currentShot().description), versions);
+    if (graphWorkspaceReady()) {
+      const impact = node("button", "studio-secondary-button", pendingGraphImpact ? "已预览影响" : "预览修改影响");
+      impact.type = "button";
+      impact.addEventListener("click", () => previewGraphMutation(currentShot().graphNodeId, { review_state: "needs_revision" }, "确认镜头局部修改"));
+      bar.appendChild(impact);
+    }
     return bar;
   }
 
-  function buildDirector() {
-    const aside = node("aside", `studio-director ${mobileDirectorOpen ? "mobile-open" : ""}`);
-    aside.dataset.contextKey = currentContextKey();
-    const head = node("header", "director-head");
-    const title = node("div");
-    title.innerHTML = `<span class="director-mark">AI</span><span><strong>导演 · 当前镜头</strong><small>${escapeHtml(currentShot().title)}</small></span>`;
-    const collapse = node("button", "studio-icon-button");
-    collapse.type = "button";
-    collapse.setAttribute("aria-label", directorCollapsed ? "展开 AI 导演" : "收起 AI 导演");
-    collapse.setAttribute("aria-expanded", String(!directorCollapsed));
-    collapse.innerHTML = icon(directorCollapsed ? "panel" : "chevronDown", 15);
-    collapse.addEventListener("click", () => {
-      directorCollapsed = !directorCollapsed;
-      mobileDirectorOpen = !directorCollapsed;
-      render();
-    });
-    head.append(title, collapse);
-    aside.appendChild(head);
-    if (directorCollapsed) return aside;
-
-    const tabs = node("div", "director-tabs");
-    tabs.setAttribute("role", "tablist");
-    for (const [key, label] of DIRECTOR_TABS) {
-      const tab = node("button", directorTab === key ? "active" : "", label);
-      tab.type = "button";
-      tab.setAttribute("role", "tab");
-      tab.setAttribute("aria-selected", String(directorTab === key));
-      tab.addEventListener("click", () => {
-        directorTab = key;
+  function buildAgentChat() {
+    const context = currentAgentChatContext();
+    const session = agentChatContexts.get(agentChatContextKey(context));
+    return buildAgentChatPanel({
+      session,
+      context: { ...context, context_key: agentChatContextKey(context) },
+      store: options.getStore?.(),
+      runtime: options.getRuntime?.(),
+      collapsed: agentCollapsed,
+      mobileOpen: mobileAgentOpen,
+      onToggleCollapse: () => {
+        agentCollapsed = !agentCollapsed;
+        mobileAgentOpen = !agentCollapsed;
         render();
-      });
-      tabs.appendChild(tab);
-    }
-    aside.appendChild(tabs);
-    if (directorTab === "reference") aside.appendChild(buildDirectorReferences());
-    else if (directorTab === "version") aside.appendChild(buildDirectorVersions());
-    else aside.appendChild(buildDirectorSuggestion());
-    return aside;
-  }
-
-  function buildDirectorSuggestion() {
-    const body = node("div", "director-body");
-    const chat = node("div", "director-chat");
-    const shot = currentShot();
-    const context = directorContext();
-    chat.appendChild(chatBubble("assistant", `建议先检查“${shot.title}”的主体方向与环境关系，再决定是否进入审核。`));
-    for (const item of context.conversations.slice(-4)) chat.appendChild(chatBubble(item.role, item.text));
-    body.appendChild(chat);
-
-    const references = node("button", "director-reference-summary");
-    references.type = "button";
-    references.innerHTML = `${icon("link", 14)}<span><strong>参考已绑定</strong><small>脚本场景 · 相邻镜头 · 当前候选</small></span>${icon("chevronDown", 13)}`;
-    references.addEventListener("click", () => {
-      directorTab = "reference";
-      render();
+        requestCanvasSafeAreaUpdate();
+      },
+      onOpen: () => {
+        agentCollapsed = false;
+        mobileAgentOpen = true;
+      },
+      onResizeStart: bindAgentResize,
+      onRender: () => syncGraphWorkspaceAfterAgentReceipt(session),
     });
-    body.appendChild(references);
-
-    const proposal = node("section", `director-proposal ${context.proposalApplied ? "applied" : ""}`);
-    proposal.innerHTML = `<span class="eyebrow">${context.actionLabel ? "当前下一步 · 已定位" : "建议调整 · 不自动执行"}</span><strong>${context.proposalApplied ? "调整已加入当前镜头草稿" : escapeHtml(context.proposalText)}</strong><p>只影响当前镜头；相邻镜头、已确认事实和版本仍保持不变。</p>`;
-    const apply = node("button", "studio-primary-button", context.proposalApplied ? "已加入草稿" : "应用到草稿");
-    apply.type = "button";
-    apply.disabled = context.proposalApplied;
-    apply.addEventListener("click", () => {
-      const applied = options.onApplyDirectorDraft?.(shot.nodeId, context.proposalText);
-      if (applied === false) {
-        notice = "当前镜头还没有可写入的画布节点，建议已保留在本次讨论中。";
-        render();
-        return;
-      }
-      context.proposalApplied = true;
-      notice = "导演建议已加入当前镜头草稿，正在保存；尚未提交审核。";
-      render();
-    });
-    proposal.appendChild(apply);
-    body.appendChild(proposal);
-
-    const form = node("form", "director-composer");
-    const input = document.createElement("textarea");
-    input.rows = 2;
-    input.placeholder = "围绕当前镜头继续讨论…";
-    input.setAttribute("aria-label", "向 AI 导演提问");
-    const send = node("button", "studio-icon-button");
-    send.type = "submit";
-    send.setAttribute("aria-label", "发送");
-    send.innerHTML = icon("arrowUp", 16);
-    form.append(input, send);
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
-      context.conversations.push(
-        { role: "user", text },
-        { role: "assistant", text: "我会把建议限制在当前镜头，并先列出影响范围再等待你确认。" },
-      );
-      render();
-    });
-    body.appendChild(form);
-    return body;
-  }
-
-  function buildDirectorReferences() {
-    const body = node("div", "director-body director-reference-list");
-    const refs = [
-      ["脚本场景", currentScene().name, "当前"],
-      ["相邻镜头", selection.shotIndex > 0 ? currentScene().shots[selection.shotIndex - 1].title : "场景开场", "上下文"],
-      ["当前候选", currentShot().title, "v3"],
-    ];
-    for (const [type, title, meta] of refs) {
-      const item = node("article", "director-reference-item");
-      item.append(node("span", "", icon("image", 15)), node("div", "", `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`), node("span", "", meta));
-      item.children[1].innerHTML = `<small>${escapeHtml(type)}</small><strong>${escapeHtml(title)}</strong>`;
-      body.appendChild(item);
-    }
-    body.appendChild(node("p", "director-note", "引用只用于当前建议，不会自动改变已确认事实。"));
-    return body;
-  }
-
-  function buildDirectorVersions() {
-    const body = node("div", "director-body director-version-panel");
-    body.append(
-      node("p", "director-note", "版本与恢复按需展开；当前仅显示与所选镜头有关的记录。"),
-      versionRow("当前候选", "v3", "待审核"),
-      versionRow("已确认版本", "v2", "可恢复"),
-    );
-    const recovery = node("button", "studio-secondary-button", "恢复上一确认版本");
-    recovery.type = "button";
-    recovery.addEventListener("click", () => {
-      notice = "已进入恢复预览；确认前不会覆盖当前草稿。";
-      render();
-    });
-    body.appendChild(recovery);
-    return body;
   }
 
   function buildMobileNav() {
     const nav = node("nav", "product-mobile-nav");
-    nav.setAttribute("aria-label", "移动端项目与审核导航");
-    for (const [key, label] of [["storyboard", "故事板"], ["context", "项目"], ["review", "审核"], ["director", "导演"]]) {
-      const button = node("button", section === key ? "active" : "", label);
+    nav.setAttribute("aria-label", "移动端 Studio 导航");
+    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["agent", "Agent"]]) {
+      const active = key === "agent" ? mobileAgentOpen : section === key;
+      const button = node("button", active ? "active" : "", label);
       button.type = "button";
-      button.setAttribute("aria-current", section === key ? "page" : "false");
+      button.setAttribute("aria-current", active ? "page" : "false");
       button.addEventListener("click", () => {
-        section = key;
-        if (key === "context") cockpitOpen = true;
-        if (key === "review") directorTab = "version";
-        if (key === "review" || key === "director") {
-          directorCollapsed = false;
-          mobileDirectorOpen = true;
+        if (key === "canvas") {
+          openCanvas();
+        } else if (key === "storyboard") {
+          showStoryboard();
+        } else if (key === "context") {
+          projectDrawerOpen = true;
+          mobileAgentOpen = false;
+        } else {
+          agentCollapsed = false;
+          mobileAgentOpen = true;
         }
         render();
+        requestCanvasSafeAreaUpdate();
         requestAnimationFrame(() => document.getElementById("product-main")?.focus());
       });
       nav.appendChild(button);
@@ -505,44 +696,124 @@ export function createProductShell(options = {}) {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(active));
-    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showOverview());
+    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showStoryboard());
     return button;
   }
 
   function activateNextAction() {
     const target = findNextProductionTarget(sceneModel(), selection);
-    if (!target) return;
+    if (!target) {
+      focusAgentComposer();
+      return;
+    }
     const actionLabel = snapshot.project?.next_action || "继续当前镜头制作";
-    cockpitOpen = false;
-    directorTab = "suggestion";
-    directorCollapsed = false;
-    mobileDirectorOpen = true;
+    projectDrawerOpen = false;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
     selectContext(target.sceneIndex, target.shotIndex, {
       actionLabel,
-      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，导演建议已按当前下一步准备。`,
+      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，Agent Chat 已绑定当前上下文。`,
     });
   }
 
   function selectContext(sceneIndex, shotIndex, { actionLabel = "", noticeText = "" } = {}) {
     const scenes = sceneModel();
+    if (!scenes.length) {
+      selection = { sceneIndex: 0, shotIndex: 0 };
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = noticeText || "先完成创作简报，确认后再创建故事事实。";
+      syncCanvasSelection();
+      render();
+      requestCanvasSafeAreaUpdate();
+      requestAnimationFrame(() => document.getElementById("product-main")?.focus());
+      return;
+    }
     const nextSceneIndex = Math.max(0, Math.min(Number(sceneIndex || 0), scenes.length - 1));
     const nextShotIndex = Math.max(0, Math.min(Number(shotIndex || 0), scenes[nextSceneIndex].shots.length - 1));
     selection = { sceneIndex: nextSceneIndex, shotIndex: nextShotIndex };
-    directorTab = "suggestion";
     notice = noticeText;
-    const context = directorContext();
     if (actionLabel) {
-      context.actionLabel = actionLabel;
-      context.proposalText = `${actionLabel}：先复核“${currentShot().title}”的画面目标与阻塞项`;
-      context.proposalApplied = false;
+      const context = currentAgentChatContext();
+      const session = agentChatContexts.get(agentChatContextKey(context));
+      session.messages.push({
+        role: "assistant",
+        text: `${actionLabel} 已绑定当前镜头。请发送命令获取预览，确认前不会写入画布。`,
+        created_at: new Date().toISOString(),
+      });
     }
     syncCanvasSelection();
     render();
+    requestCanvasSafeAreaUpdate();
     requestAnimationFrame(focusCurrentContext);
   }
 
   function syncCanvasSelection() {
     options.onSelectCanvasNode?.(currentShot().nodeId || "");
+  }
+
+  function focusAgentComposer() {
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "Agent Chat 已绑定当前画布上下文；确认前不会创建场景或镜头。";
+    render();
+    requestCanvasSafeAreaUpdate();
+    requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
+  }
+
+  function submitToAgentChat(messageText) {
+    const context = currentAgentChatContext();
+    const session = agentChatContexts.get(agentChatContextKey(context));
+    const result = submitAgentChatMessage(session, messageText, context);
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    if (result.status === "empty") focusAgentComposer();
+    else render();
+    requestCanvasSafeAreaUpdate();
+    requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
+    return result;
+  }
+
+  function bindShellEvents() {
+    window.addEventListener("afs:agent-chat-submit", (event) => {
+      submitToAgentChat(event.detail?.message || "");
+    });
+    window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (projectDrawerOpen || contextOpen || mobileAgentOpen) {
+        projectDrawerOpen = false;
+        contextOpen = false;
+        mobileAgentOpen = false;
+        render();
+        requestCanvasSafeAreaUpdate();
+      }
+    });
+  }
+
+  function bindAgentResize(event) {
+    if (!event?.pointerId || agentCollapsed) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = agentChatWidth;
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("is-resizing-agent-chat");
+    const onMove = (moveEvent) => {
+      agentChatWidth = clampAgentChatWidth(startWidth + (startX - moveEvent.clientX));
+      document.querySelector(".studio-unified-workspace")?.style?.setProperty("--agent-chat-width", `${agentChatWidth}px`);
+    };
+    const onEnd = () => {
+      document.body.classList.remove("is-resizing-agent-chat");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      storeAgentChatWidth(agentChatWidth);
+      render();
+      requestCanvasSafeAreaUpdate();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd, { once: true });
+    window.addEventListener("pointercancel", onEnd, { once: true });
   }
 
   function focusCurrentContext() {
@@ -561,15 +832,35 @@ export function createProductShell(options = {}) {
     });
   }
 
-  function directorContext() {
-    return directorContexts.get(currentContextKey());
+  function currentAgentChatContext() {
+    const studioState = productionGraphAgentContext(snapshot.studioState, snapshot.sequenceWorkspace);
+    return agentChatContextSnapshot({
+      project: snapshot.project,
+      studioState,
+      section,
+      selectedNode: selectedCanvasNode(),
+      currentShot: currentShot(),
+    });
+  }
+
+  function selectedCanvasNode() {
+    const state = snapshot.studioState || {};
+    const selectedId = state.selection?.nodeIds?.[0] || currentShot().nodeId || "";
+    return selectedId ? state.nodes?.[selectedId] || null : null;
+  }
+
+  function selectedGraphTarget() {
+    const selected = selectedCanvasNode();
+    const truth = selected?.params?.productionGraphTruth;
+    if (!truth?.graph_node_id) return null;
+    return { nodeId: truth.graph_node_id, title: cleanTitle(selected.title || "所选制作对象") };
   }
 
   function openCanvas() {
     const opened = options.onOpenCanvas?.();
     if (opened === false) {
       section = "storyboard";
-      mobileDirectorOpen = false;
+      mobileAgentOpen = false;
       notice = "移动端保留项目上下文与审核；画布编辑请在桌面打开。";
       render();
     }
@@ -612,7 +903,14 @@ export function createProductShell(options = {}) {
         if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
         project = payload?.project || null;
       }
-      snapshot = { loading: false, workspace, project, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      let sequenceWorkspace = null;
+      if (activeProjectId) {
+        try { sequenceWorkspace = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.sequenceWorkspace?.(); } catch { sequenceWorkspace = null; }
+      }
+      if (sequenceWorkspace) {
+        applyGraphWorkspace(sequenceWorkspace);
+      }
+      snapshot = { loading: false, workspace, project, sequenceWorkspace, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -620,15 +918,33 @@ export function createProductShell(options = {}) {
     render();
   }
 
-  function updateStudioState(studioState) {
+  function updateStudioState(studioState, options = {}) {
     snapshot = { ...snapshot, studioState };
-    if (document.getElementById("app")?.classList.contains("product-mode")) render();
+    if (!document.getElementById("app")?.classList.contains("product-mode")) return;
+    if (options.render === false || options.deferRender === true) {
+      syncSaveStatusElement();
+      return;
+    }
+    render();
+  }
+
+  function syncSaveStatusElement() {
+    const status = document.querySelector(".studio-save-status");
+    if (!status) return;
+    const saveState = String(snapshot.studioState?.ui?.saveState || "本地暂存");
+    status.textContent = saveState;
+    status.className = `studio-save-status ${saveTone(saveState)}`;
+    status.title = snapshot.studioState?.ui?.saveMessage || saveState;
+  }
+
+  function showStoryboard() {
+    section = "storyboard";
+    mobileAgentOpen = false;
+    render();
   }
 
   function showOverview() {
-    section = "storyboard";
-    mobileDirectorOpen = false;
-    render();
+    showStoryboard();
   }
 
   function showCanvas() {
@@ -640,17 +956,21 @@ export function createProductShell(options = {}) {
   }
 
   function sceneModel() {
+    if (graphWorkspaceReady()) return graphSceneModel();
     const shots = shotModel();
-    const sceneCount = Math.max(3, Math.min(5, Math.ceil(shots.length / 7)));
+    if (!shots.length) {
+      selection = { sceneIndex: 0, shotIndex: 0 };
+      return [];
+    }
+    const sceneCount = Math.max(1, Math.min(5, Math.ceil(shots.length / 7)));
     const scenes = Array.from({ length: sceneCount }, (_, index) => ({
-      name: FALLBACK_SCENES[index] || `场景 ${index + 1}`,
+      name: `场景 ${index + 1}`,
       shots: [],
       duration: "00:00",
       blocked: false,
     }));
     shots.forEach((shot, index) => scenes[Math.min(sceneCount - 1, Math.floor(index / 7))].shots.push(shot));
     for (const scene of scenes) {
-      if (!scene.shots.length) scene.shots.push(emptyShot(scene.name));
       scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0));
       scene.blocked = scene.shots.some((shot) => shot.state === "blocked");
     }
@@ -663,7 +983,25 @@ export function createProductShell(options = {}) {
   }
 
   function shotModel() {
+    if (graphWorkspaceReady()) return graphShotModel();
     const state = snapshot.studioState || {};
+    const planShots = state.production?.dynamic_production_plan_projection?.storyboard_shots || [];
+    if (Array.isArray(planShots) && planShots.length) {
+      return planShots
+        .slice()
+        .sort((left, right) => Number(left.order || 0) - Number(right.order || 0))
+        .map((shot, index) => ({
+          nodeId: `production_plan_shot_${String(shot.shot_id || "").replace(/[^A-Za-z0-9_.:-]/g, "")}`,
+          title: cleanTitle(shot.title || shot.shot_id || shotTitle(index)),
+          description: cleanDescription([
+            shot.intent || "",
+            shot.strategy ? `${String(shot.strategy).toUpperCase()} · ${shot.strategy_reason || ""}` : "",
+          ].filter(Boolean).join("\n")),
+          duration: `${Number(shot.duration_seconds || 0).toFixed(1)}s`,
+          preview: "",
+          state: shot.status === "failed" || shot.media_input_state === "pending_input" ? "blocked" : shot.status === "planned" ? "ready" : "draft",
+        }));
+    }
     const nodes = Object.values(state.nodes || {});
     const candidates = nodes.filter((item) => item && (
       item.previewUrl
@@ -685,23 +1023,40 @@ export function createProductShell(options = {}) {
       };
     });
     if (mapped.length) return mapped;
-    return Array.from({ length: 15 }, (_, index) => ({
-      nodeId: "",
-      title: shotTitle(index),
-      description: ["建立空间与天气", "人物进入画面", "视线转向雨巷", "细节切入", "继续前行"][index % 5],
-      duration: `${(3 + (index % 3) * 0.5).toFixed(1)}s`,
-      preview: "",
-      state: index < 2 ? "ready" : index === 2 ? "blocked" : "draft",
-    }));
+    return [];
   }
 
-  function currentScene() { return sceneModel()[selection.sceneIndex]; }
-  function currentShot() { return currentScene().shots[selection.shotIndex]; }
+  function graphView() { return productionGraphWorkspaceProjection(snapshot.sequenceWorkspace); }
+
+  function graphWorkspaceReady() { return graphView().status === "ready"; }
+
+  function graphShotModel() {
+    return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
+      title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
+      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: "", state: shot.state, sceneId: shot.sceneNodeId }));
+  }
+
+  function graphSceneModel() {
+    const shots = graphShotModel();
+    const scenes = graphView().scenes.map((scene) => ({ name: cleanTitle(scene.name || "场景"),
+      shots: shots.filter((shot) => shot.sceneId === scene.graphNodeId), duration: "00:00", blocked: false }));
+    for (const scene of scenes) { scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0)); scene.blocked = scene.shots.some((shot) => shot.state === "blocked"); }
+    return scenes;
+  }
+
+  function currentScene() { return sceneModel()[selection.sceneIndex] || emptyScene(); }
+  function currentShot() { return currentScene().shots[selection.shotIndex] || emptyShot(); }
+  function hasStoryFacts() { return shotModel().length > 0; }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function totalReadyShots() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => shot.state === "ready").length; }
-  function completionPercent() { return Math.round((totalReadyShots() / Math.max(1, totalShots())) * 100); }
+  function completionPercent() { return totalShots() ? Math.round((totalReadyShots() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
+  function graphStateLabel(state) {
+    return ({ planned: "待制作", reserved: "已预留", dispatched: "处理中", succeeded: "已完成", candidate: "待选择",
+      pending: "待审核", approved: "已通过", rejected: "已退回", redo_planned: "已安排返工",
+      review_ready: "待交付核验", blocked: "已阻断" })[String(state || "")] || "待确认";
+  }
 
   function saveTone(state) {
     if (state === "已保存") return "success";
@@ -715,8 +1070,20 @@ export function createProductShell(options = {}) {
     refresh,
     updateStudioState,
     showOverview,
+    showStoryboard,
     showCanvas,
-    setSection(next) { section = next; render(); },
+    setSection(next) {
+      if (next === "agent") {
+        agentCollapsed = false;
+        mobileAgentOpen = true;
+      } else if (next === "storyboard") {
+        section = "storyboard";
+      } else {
+        section = "canvas";
+      }
+      render();
+      requestCanvasSafeAreaUpdate();
+    },
     get section() { return section; },
   };
 }
@@ -746,25 +1113,23 @@ function candidateDeliveryProgress(project) {
   return project?.delivery?.candidate_selected ? 40 : 0;
 }
 
-function chatBubble(role, text) {
-  const bubble = node("div", `director-bubble ${role}`);
-  bubble.append(node("span", "director-avatar", role === "user" ? "我" : "AI"), node("p", "", text));
-  return bubble;
+function emptyScene() {
+  return { name: "尚未创建场景", shots: [], duration: "00:00", blocked: false };
 }
 
-function versionRow(label, version, state) {
-  const row = node("article", "director-version-row");
-  row.append(node("div", "", `<strong>${escapeHtml(label)}</strong><small>${escapeHtml(version)}</small>`), node("span", "", state));
-  row.firstElementChild.innerHTML = `<strong>${escapeHtml(label)}</strong><small>${escapeHtml(version)}</small>`;
-  return row;
-}
-
-function emptyShot(scene) {
-  return { title: `${scene}开场`, description: "等待补充镜头内容", duration: "3.0s", preview: "", state: "draft" };
+function emptyShot() {
+  return {
+    nodeId: "",
+    title: "等待创作简报",
+    description: "确认创作简报前不会创建场景或镜头。",
+    duration: "0.0s",
+    preview: "",
+    state: "draft",
+  };
 }
 
 function shotTitle(index) {
-  return ["建立空间", "脚步特写", "人物回望", "眼神细节", "继续前行", "环境过渡"][index % 6];
+  return `镜头 ${Number(index || 0) + 1}`;
 }
 
 function cleanTitle(value) {
@@ -802,4 +1167,30 @@ function node(tag, className = "", text = "") {
   if (className) element.className = className;
   if (text !== "") element.textContent = String(text);
   return element;
+}
+
+function readAgentChatWidth() {
+  let stored = 392;
+  try {
+    stored = Number(window.localStorage?.getItem("afs_agent_chat_width") || stored);
+  } catch {
+    stored = 392;
+  }
+  return clampAgentChatWidth(stored);
+}
+
+function storeAgentChatWidth(width) {
+  try {
+    window.localStorage?.setItem("afs_agent_chat_width", String(clampAgentChatWidth(width)));
+  } catch {
+    // Storage can be unavailable; the current session width is already applied.
+  }
+}
+
+function clampAgentChatWidth(value) {
+  return Math.max(360, Math.min(420, Math.round(Number(value) || 392)));
+}
+
+function requestCanvasSafeAreaUpdate() {
+  requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("afs:canvas-safe-area-changed")));
 }

@@ -49,7 +49,16 @@ const handlers = {
   canonicalPreviewSession,
 };
 
-bootstrap().catch((error) => showSecureEntry(readError(error), { error: true }));
+if (!redirectLegacyReviewEntry()) bootstrap().catch((error) => showSecureEntry(readError(error), { error: true }));
+
+function redirectLegacyReviewEntry() {
+  const projectId = requestedProjectId();
+  const target = new URL("/studio/", window.location.origin);
+  if (projectId) target.searchParams.set("project", projectId);
+  target.searchParams.set("stage", "review");
+  window.location.replace(target.toString());
+  return true;
+}
 
 async function bootstrap() {
   showSecureEntry("正在确认账户状态…");

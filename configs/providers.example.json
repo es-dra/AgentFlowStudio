@@ -34,6 +34,14 @@
       "default_models": {
         "video": "doubao-seedance-2-0-fast"
       }
+    },
+    "audio_relay": {
+      "auth_type": "api_key",
+      "base_url_env": "AFS_AUDIO_RELAY_BASE_URL",
+      "api_key_env": "AFS_AUDIO_RELAY_API_KEY",
+      "default_models": {
+        "audio": "gpt-4o-mini-tts"
+      }
     }
   },
   "account_pools": {
@@ -113,6 +121,21 @@
           "enabled_capabilities": ["video"],
           "enabled": true,
           "priority": 15,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "audio_relay_pool": {
+      "accounts": [
+        {
+          "account_id": "audio_relay",
+          "service_id": "tts_relay",
+          "credential_env": "AFS_AUDIO_RELAY_API_KEY",
+          "enabled_capabilities": ["audio"],
+          "enabled": true,
+          "priority": 10,
           "weight": 1,
           "concurrency_limit": 1,
           "health_state": "unknown"
@@ -266,6 +289,35 @@
         "prompt_profile": "video_i2v_v1",
         "cost_estimate": {
           "unit": "task",
+          "disclaimer": "Example only; use local provider terms for actual cost."
+        }
+      }
+    },
+    "tts_relay": {
+      "provider": "openai_compatible_tts",
+      "account_ref": "audio_relay",
+      "capability": "audio",
+      "endpoint": "/audio/speech",
+      "model": "gpt-4o-mini-tts",
+      "voice": "coral",
+      "response_format": "wav",
+      "required_gate": "AFS_ALLOW_REMOTE_AUDIO",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "audio",
+        "execution_mode": "sync",
+        "capabilities": ["audio"],
+        "account_pool_id": "audio_relay_pool",
+        "reference_image_slots": 0,
+        "supported_aspect_ratios": ["1:1"],
+        "prompt_char_limit": 4000,
+        "seed_supported": false,
+        "cost_hint": "OpenAI-compatible TTS relay. Usage and billing are controlled by the configured relay account.",
+        "rate_limit_hint": "Keep one live speech synthesis request at a time during alpha validation.",
+        "required_gate": "AFS_ALLOW_REMOTE_AUDIO",
+        "cost_estimate": {
+          "unit": "character",
+          "currency": "CNY",
           "disclaimer": "Example only; use local provider terms for actual cost."
         }
       }

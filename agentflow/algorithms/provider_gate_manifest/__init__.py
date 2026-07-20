@@ -35,6 +35,7 @@ CAPABILITY_GATES = {
     "llm": "AFS_ALLOW_REMOTE_LLM",
     "image": "AFS_ALLOW_REMOTE_IMAGE",
     "video": "AFS_ALLOW_REMOTE_VIDEO",
+    "audio": "AFS_ALLOW_REMOTE_AUDIO",
     "vision": "AFS_ALLOW_REMOTE_VISION",
     "asr": "AFS_ALLOW_REMOTE_ASR",
 }

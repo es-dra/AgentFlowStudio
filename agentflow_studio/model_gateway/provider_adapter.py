@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -17,7 +19,7 @@ from agentflow_studio.model_gateway.provider_account_pool import (
 )
 
 
-ProviderCapability = Literal["image", "video", "llm", "asr", "vision"]
+ProviderCapability = Literal["image", "video", "audio", "llm", "asr", "vision"]
 ProviderModality = ProviderCapability
 ProviderExecutionMode = Literal["sync", "async"]
 FrameSlotRequirement = Literal["required", "optional", "unsupported"]
@@ -201,6 +203,9 @@ class ProviderDispatchRequest:
     prompt: str
     output_dir: Path
     task_type: str | None = None
+    structured_output_contract_id: str | None = None
+    structured_output_schema: dict[str, Any] | None = None
+    structured_output_schema_digest: str | None = None
     image_operation: Literal["generate", "edit"] = "generate"
     aspect_ratio: str = "9:16"
     candidate_count: int = 1
@@ -218,6 +223,14 @@ class ProviderDispatchRequest:
     input_mode: str | None = None
     input_source: dict[str, Any] | None = None
     duration_contract: dict[str, Any] | None = None
+    voice: str | None = None
+    response_format: Literal["wav", "mp3", "opus", "aac", "flac", "pcm"] | None = None
+    instructions: str | None = None
+
+
+def structured_output_schema_digest(schema: dict[str, Any]) -> str:
+    canonical = json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class ProviderAdapter(Protocol):
@@ -243,6 +256,7 @@ class ProviderAdapter(Protocol):
 from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     FakeAsyncVideoAdapter,
     OpenAICompatibleLLMAdapter,
+    OpenAICompatibleTTSAdapter,
 )
 from agentflow_studio.model_gateway.provider_api_relay import ApiRelayAdapter  # noqa: E402
 from agentflow_studio.model_gateway.provider_codex_handoff import CodexImageHandoffAdapter  # noqa: E402
@@ -286,6 +300,9 @@ class ProviderRegistry:
                 continue
             if capability == "llm" and provider in {"openai_compatible", "deepseek"}:
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
+                continue
+            if capability == "audio" and provider in {"openai_tts", "openai_compatible_tts"}:
+                adapters[service_id] = OpenAICompatibleTTSAdapter(store, service_id, descriptor)
                 continue
             if capability == "video" and provider == "fake":
                 adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
@@ -378,6 +395,8 @@ def _is_adapter_service(provider: str, capability: str) -> bool:
         "deepseek",
         "fake",
         "openai_compatible",
+        "openai_compatible_tts",
+        "openai_tts",
         "seedance",
         "volc_seedance",
     }
@@ -432,6 +451,7 @@ def _required_gate_or_default(capability: str, configured: str) -> str:
     defaults = {
         "image": "AFS_ALLOW_REMOTE_IMAGE",
         "video": "AFS_ALLOW_REMOTE_VIDEO",
+        "audio": "AFS_ALLOW_REMOTE_AUDIO",
         "llm": "AFS_ALLOW_REMOTE_LLM",
         "asr": "AFS_ALLOW_REMOTE_ASR",
         "vision": "AFS_ALLOW_REMOTE_VISION",
@@ -441,6 +461,7 @@ def _required_gate_or_default(capability: str, configured: str) -> str:
 
 __all__ = (
     "OpenAICompatibleLLMAdapter",
+    "OpenAICompatibleTTSAdapter",
     "FakeAsyncVideoAdapter",
     "FakeVisionAdapter",
     "CodexImageHandoffAdapter",

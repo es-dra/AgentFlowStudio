@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 from copy import deepcopy
@@ -39,12 +40,24 @@ from apps.api.runtime_production_models import (
     canonical_json_digest,
     checkpoint_digest,
 )
+from apps.api.runtime_real_story_production import (
+    REAL_STORY_SCHEMA_VERSION,
+    RealStoryProductionError,
+    RealStoryProductionRequest,
+    execute_real_story_production,
+)
 from apps.api.runtime_store import RuntimeStore, safe_id
 from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID, VIDEO_SUFFIX_TYPES
 
 
 SAFE_SHA256 = re.compile(r"^[a-f0-9]{64}$")
 SAFE_PREVIEW_JOB_STATUSES = frozenset({"succeeded", "partially_complete", "complete"})
+REAL_STORY_RECOVERY_GATE_ENV = "AFS_ENABLE_REAL_STORY_RECOVERY_ROUTE"
+
+
+def real_story_recovery_route_enabled() -> bool:
+    """The fixed legacy route is recovery/test-only and closed by default."""
+    return os.environ.get(REAL_STORY_RECOVERY_GATE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -93,6 +106,7 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
                 "exports": [],
                 "representative_episode_binding": None,
                 "representative_episode_media": None,
+                "real_story_production": None,
                 "lineage": [
                     {
                         "source_ref": candidate.parent_job_id,
@@ -303,6 +317,89 @@ def register_runtime_production_run_routes(app: FastAPI, store: RuntimeStore, au
             path,
             media_type="video/mp4",
             filename="episode-preview.mp4",
+            content_disposition_type="inline",
+            headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+        )
+
+    @app.post("/projects/{project_id}/production-runs/{run_id}/real-story-production")
+    def run_real_story_production(
+        project_id: str,
+        run_id: str,
+        body: RealStoryProductionRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        if not real_story_recovery_route_enabled():
+            raise HTTPException(status_code=404, detail="route not found")
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        request_digest = canonical_json_digest(body.model_dump(mode="json"))
+        production_root = _real_story_production_root(store, project_id, run_id)
+        with exclusive_file_lock(store.production_run_lock_path(project_id)):
+            run = _load_owned_run(store, project_id, run_id, owner_user_id)
+            if _mutation_is_replay(run, "real_story_production", body.idempotency_key, request_digest):
+                return _run_response(run, idempotent_replay=True)
+            _require_checkpoint_version(run, body.expected_checkpoint_version)
+            if isinstance(run.get("real_story_production"), dict):
+                raise HTTPException(status_code=409, detail="real story production already exists")
+            try:
+                production = execute_real_story_production(
+                    store,
+                    project_id,
+                    run_id,
+                    body,
+                    production_root,
+                    request_id=str(request.headers.get("X-Request-ID") or ""),
+                    client_request_id=str(request.headers.get("X-Client-Request-ID") or ""),
+                )
+            except RealStoryProductionError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "real_story_production_failed",
+                        "reason": str(exc),
+                        "provider_calls_may_have_started": True,
+                    },
+                ) from exc
+            run["real_story_production"] = production
+            run.setdefault("lineage", []).append(
+                {
+                    "source_ref": production["story_canon_digest"],
+                    "target_ref": production["production_sha256"],
+                    "relation": "canonical_story_generated_media_assembled_with_creative_qa",
+                }
+            )
+            _record_mutation_idempotency(
+                run,
+                "real_story_production",
+                body.idempotency_key,
+                request_digest,
+            )
+            _advance_checkpoint(run)
+            store.write_production_run(project_id, run)
+            return _run_response(run, idempotent_replay=False)
+
+    @app.get("/projects/{project_id}/production-runs/{run_id}/real-story-production/delivery/preview")
+    def real_story_delivery_preview(
+        project_id: str,
+        run_id: str,
+        request: Request,
+    ) -> FileResponse:
+        if not real_story_recovery_route_enabled():
+            raise HTTPException(status_code=404, detail="route not found")
+        owner_user_id = _require_project_owner(store, auth, request, project_id)
+        run = _load_owned_run(store, project_id, run_id, owner_user_id)
+        production = run.get("real_story_production")
+        if not isinstance(production, dict) or production.get("schema_version") != REAL_STORY_SCHEMA_VERSION:
+            raise HTTPException(status_code=404, detail="real story production delivery not found")
+        delivery = production.get("delivery") if isinstance(production.get("delivery"), dict) else {}
+        if not delivery:
+            raise HTTPException(status_code=404, detail="real story production delivery not found")
+        path = _real_story_production_root(store, project_id, run_id) / "delivery" / "episode.mp4"
+        if not path.is_file() or _file_sha256(path) != delivery.get("episode_sha256"):
+            raise HTTPException(status_code=409, detail="real story production delivery integrity mismatch")
+        return FileResponse(
+            path,
+            media_type="video/mp4",
+            filename="real-story-preview.mp4",
             content_disposition_type="inline",
             headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
         )
@@ -1158,6 +1255,18 @@ def _representative_episode_media_root(
     media_root = (root / "representative_episode_media").resolve()
     if root not in media_root.parents:
         raise HTTPException(status_code=409, detail="representative episode media root is unsafe")
+    return media_root
+
+
+def _real_story_production_root(
+    store: RuntimeStore,
+    project_id: str,
+    run_id: str,
+) -> Path:
+    root = store.production_run_path(project_id, run_id).parent.resolve()
+    media_root = (root / "real_story_production").resolve()
+    if root not in media_root.parents:
+        raise HTTPException(status_code=409, detail="real story production root is unsafe")
     return media_root
 
 

@@ -574,19 +574,21 @@ process.stdout.write(JSON.stringify({ textRendered, imageRendered }));
         assert "provider_raw_response" not in rendered
 
 
-def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
+def test_text_node_uses_agent_chat_optimization_instead_of_fixed_script_tools() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     script_file_import = (STUDIO_ROOT / "src" / "script-file-import.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
 
-    assert "importScriptFileIntoTextNode" in prompt_bar
-    assert "expandTextIdeaToScript" in prompt_bar
-    assert "splitTextNodeToStoryboardNodes" in prompt_bar
-    assert "导入剧本" in prompt_bar
-    assert "扩写剧本" in prompt_bar
-    assert "拆分分镜" in prompt_bar
+    assert "/optimize-selected-default" in prompt_bar
+    assert "syncTextAreaToNode(store, node.id, textarea)" in prompt_bar
+    assert "expandTextIdeaToScript" not in prompt_bar
+    assert "splitTextNodeToStoryboardNodes" not in prompt_bar
+    assert "导入剧本" not in prompt_bar
+    assert "扩写剧本" not in prompt_bar
+    assert "/plan-selected-script-shots" in prompt_bar
+    assert "text-script-tool" in prompt_bar
     assert "export function splitScriptIntoShots" in script_breakdown
     assert "formal_script_before_storyboard_breakdown" in script_breakdown
     assert "storyboard_placeholder_outline" in script_breakdown
@@ -599,7 +601,8 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
         assert marker in script_file_import
     assert 'createNode(store, "script"' in script_breakdown
     assert "connect(store, fresh.id, shotNode.id)" in script_breakdown
-    assert "剧本拆分分镜" in nodes
+    assert "剧本拆分分镜" not in nodes
+    assert "想法扩写剧本" not in nodes
 
 
 def test_idea_expansion_fallback_outputs_formal_script_not_storyboard_template() -> None:
@@ -1087,8 +1090,8 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "生成关键帧层" in nodes
     assert "identifyScriptAssets" in node_actions
     assert "createStoryboardKeyframeLayer" in node_actions
-    assert "识别资产" in node_menu
-    assert "生成关键帧层" in node_menu
+    assert "识别资产" not in node_menu
+    assert "生成关键帧层" not in node_menu
     assert "createKeyframeNodesForStoryboard" in keyframes
     assert "ensureShotAssetPrepNodesForScriptNode(store, fresh)" not in storyboard_actions
     assert "existingShotAssetCardNodeIds" not in storyboard_actions
@@ -1124,14 +1127,15 @@ def test_script_node_menu_hides_generic_retry_generation() -> None:
     assert "return canStartGenerationForNode(node);" in node_actions
     assert "return [\"image\", \"video\"].includes(node?.type);" in generation_actions
     assert "if (!canRunNodeGeneration(node))" in canvas_view
-    assert 'runBtn.dataset.action = "run-disabled";' in canvas_view
+    assert 'data-role="run-action"' in canvas_view
+    assert "runBtn.hidden = true;" in canvas_view
     assert "if (node && canRunNodeGeneration(node)) startNodeGeneration" in keyboard
     assert "if (!canRunNodeGeneration(fresh)) return;" in prompt_bar
     assert "当前节点不支持直接生成，请使用该节点的专用操作" in prompt_bar
     assert "处理失败，请检查该节点的专用操作或错误详情" in canvas_body
-    assert 'if (node.type === "script")' in node_menu
-    assert "identifyScriptAssets(store, runtime, fresh)" in node_menu
-    assert "createStoryboardKeyframeLayer(store, fresh)" in node_menu
+    assert 'if (node.type === "script")' not in node_menu
+    assert "identifyScriptAssets(store, runtime, fresh)" not in node_menu
+    assert "createStoryboardKeyframeLayer(store, fresh)" not in node_menu
 
 
 def test_script_asset_recognition_replaces_stale_structured_shot_cards() -> None:
@@ -1301,7 +1305,6 @@ def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_ass
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
-    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     add_asset_modal = (STUDIO_ROOT / "src" / "panels" / "add-asset-modal.js").read_text(encoding="utf-8")
 
     assert "planShotAssets(payload)" in runtime_client
@@ -1309,11 +1312,6 @@ def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_ass
     assert "identifyScriptAssets(store, runtime, node)" in storyboard_actions
     assert "runtime?.planShotAssets" in storyboard_actions
     assert "createManualShotAssetNode" in asset_nodes
-    assert "openAddAssetModal" in node_menu
-    assert "新增资产" in node_menu
-    assert "添加角色资产" not in node_menu
-    assert "添加场景资产" not in node_menu
-    assert "添加道具资产" not in node_menu
     assert "inferManualAssetType" in add_asset_modal
     assert "createManualShotAssetNode(store, fresh, assetType, label)" in add_asset_modal
     assert "金刚狼" in add_asset_modal

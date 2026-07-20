@@ -1,21 +1,37 @@
 import { fitViewport } from "./geometry.js";
 
-const SAFE_OVERLAYS = ["#drawer", "#inspector", "#topbar", "#dock"];
+const SAFE_OVERLAYS = [
+  "#drawer",
+  "#inspector",
+  "#topbar",
+  "#dock",
+  ".studio-agent-chat",
+  ".studio-context-drawer",
+  ".product-mobile-nav",
+];
 
 export function fitVisibleCanvasViewport(nodes, padding = 90) {
   const frame = visibleCanvasFrame();
+  if (!isVisibleCanvasFrameUsable(frame)) return null;
   return fitViewport(nodes, frame.width, frame.height, padding, frame.safeArea);
 }
 
 export function visibleCanvasFrame() {
   const root = document.getElementById("canvas-root");
   const rect = root?.getBoundingClientRect();
-  if (!rect) return { width: 0, height: 0, safeArea: {} };
+  if (!rect) return { width: 0, height: 0, safeArea: {}, visible: false };
+  const style = window.getComputedStyle(root);
+  const visible = root.isConnected
+    && !root.hidden
+    && style.display !== "none"
+    && style.visibility !== "hidden"
+    && rect.width > 0
+    && rect.height > 0;
   const safeArea = { left: 0, right: 0, top: 0, bottom: 0 };
   for (const selector of SAFE_OVERLAYS) {
     applyOverlayInset(safeArea, rect, document.querySelector(selector));
   }
-  return { width: rect.width, height: rect.height, safeArea };
+  return { width: rect.width, height: rect.height, safeArea, visible };
 }
 
 export function visibleCanvasCenter() {
@@ -27,7 +43,12 @@ export function visibleCanvasCenter() {
   return {
     x: left + (frame.width - left - right) / 2,
     y: top + (frame.height - top - bottom) / 2,
+    coordinateSpace: "canvas",
   };
+}
+
+export function isVisibleCanvasFrameUsable(frame = visibleCanvasFrame()) {
+  return Boolean(frame.visible && frame.width >= 160 && frame.height >= 160);
 }
 
 function applyOverlayInset(safeArea, rootRect, overlay) {

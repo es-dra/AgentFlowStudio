@@ -8,11 +8,18 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
+from agentflow_studio.model_gateway.company_secrets import (
+    SERVER_CODEX_SERVICE_ID,
+    CompanyProviderSecrets,
+)
 from agentflow_studio.model_gateway.codex_runtime_env import codex_subprocess_env, prune_codex_home
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
-from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
+from agentflow_studio.model_gateway.provider_adapter import (
+    ProviderDescriptor,
+    ProviderDispatchRequest,
+    structured_output_schema_digest,
+)
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -37,6 +44,28 @@ class CodexLocalAdapter:
             raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
         if self.descriptor.modality not in {"llm", "vision"}:
             raise ModelConfigError(f"Codex local adapter does not support capability: {self.descriptor.modality}")
+        structured_requested = (
+            request.structured_output_contract_id is not None
+            or request.structured_output_schema is not None
+            or request.structured_output_schema_digest is not None
+        )
+        if structured_requested:
+            if self.service_id != SERVER_CODEX_SERVICE_ID or self.descriptor.modality != "llm":
+                raise ModelConfigError("structured output is only supported by server_codex llm")
+            if (
+                not request.structured_output_contract_id
+                or not isinstance(request.structured_output_schema, dict)
+                or not request.structured_output_schema_digest
+            ):
+                raise ModelConfigError("structured output contract id, schema, and schema digest are required")
+            if (
+                request.structured_output_schema.get("type") != "object"
+                or request.structured_output_schema.get("additionalProperties") is not False
+            ):
+                raise ModelConfigError("structured output root schema must be a closed object")
+            actual_digest = structured_output_schema_digest(request.structured_output_schema)
+            if actual_digest != request.structured_output_schema_digest:
+                raise ModelConfigError("structured output schema digest mismatch")
 
     def translate(
         self,
@@ -50,8 +79,14 @@ class CodexLocalAdapter:
             "capability": self.descriptor.modality,
             "prompt": request.prompt,
             "task_type": request.task_type,
+            "structured_output_contract_id": request.structured_output_contract_id,
+            "structured_output_schema": request.structured_output_schema,
+            "structured_output_schema_digest": request.structured_output_schema_digest,
             "reference_image_paths": tuple(request.reference_image_paths),
-            "cli_command": str(service.get("cli_command") or account.get("cli_command") or "codex"),
+            "cli_command": _codex_cli_command(
+                self.service_id,
+                str(service.get("cli_command") or account.get("cli_command") or "codex"),
+            ),
             "timeout_sec": float(service.get("timeout_sec") or account.get("timeout_sec") or request.timeout_sec),
             "account": account_selection.public_summary(),
         }
@@ -65,7 +100,10 @@ class CodexLocalAdapter:
 
     def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         if self.descriptor.modality == "llm":
-            return {"text": _extract_text(raw), "provider_calls_started": True}
+            normalized = {"text": _extract_text(raw), "provider_calls_started": True}
+            if isinstance(raw.get("structured_output"), dict):
+                normalized["structured_output"] = raw["structured_output"]
+            return normalized
         if self.descriptor.modality == "vision":
             return _normalize_vision(raw)
         return raw
@@ -74,15 +112,39 @@ class CodexLocalAdapter:
         return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
 
 
+def _codex_cli_command(service_id: str, configured: str) -> str:
+    command = configured.strip() or "codex"
+    if service_id != SERVER_CODEX_SERVICE_ID:
+        return command
+    candidates = [
+        os.environ.get("AFS_CODEX_CLI", "").strip(),
+        str(Path.home() / ".codex" / "packages" / "standalone" / "current" / "bin" / "codex"),
+        str(Path.home() / ".local" / "bin" / "codex"),
+        shutil.which(command) or "",
+    ]
+    for raw in candidates:
+        if not raw:
+            continue
+        candidate = Path(raw).expanduser()
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return command
+
+
 def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="afs_codex_local_") as tmp:
         work_dir = Path(tmp)
         references = _copy_reference_images(work_dir, plan.get("reference_image_paths") or [])
+        contract_id = str(plan.get("structured_output_contract_id") or "")
+        schema = plan.get("structured_output_schema")
+        schema_digest = str(plan.get("structured_output_schema_digest") or "")
         request_payload = {
-            "schema_version": "afs_codex_local_request.v0.1",
+            "schema_version": "afs_codex_local_request.v0.2",
             "service_id": str(plan["service_id"]),
             "capability": str(plan["capability"]),
             "task_type": plan.get("task_type"),
+            "structured_output_contract_id": contract_id or None,
+            "structured_output_schema_digest": schema_digest or None,
             "prompt": str(plan["prompt"]),
             "reference_images": references,
             "provider_raw_response_stored": False,
@@ -91,21 +153,40 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
         }
         (work_dir / "request.json").write_text(json.dumps(request_payload, ensure_ascii=False, indent=2), encoding="utf-8")
         (work_dir / "prompt.md").write_text(_codex_prompt(request_payload), encoding="utf-8")
+        schema_path = work_dir / "output.schema.json"
+        final_message_path = work_dir / "final-message.json"
+        if isinstance(schema, dict):
+            schema_path.write_text(json.dumps(schema, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        command = [
+            str(plan.get("cli_command") or "codex"),
+            "exec",
+            "-c",
+            'approval_policy="never"',
+            "--sandbox",
+            "workspace-write",
+            "--skip-git-repo-check",
+        ]
+        if isinstance(schema, dict):
+            command.extend(
+                [
+                    "--ephemeral",
+                    "--output-schema",
+                    str(schema_path),
+                    "--output-last-message",
+                    str(final_message_path),
+                ]
+            )
+        command.extend(
+            [
+                "--cd",
+                str(work_dir),
+                "Read request.json and prompt.md in the current directory, then return only the requested answer.",
+            ]
+        )
         codex_env = codex_subprocess_env()
         try:
             completed = subprocess.run(
-                [
-                    str(plan.get("cli_command") or "codex"),
-                    "exec",
-                    "-c",
-                    'approval_policy="never"',
-                    "--sandbox",
-                    "workspace-write",
-                    "--skip-git-repo-check",
-                    "--cd",
-                    str(work_dir),
-                    "Read request.json and prompt.md in the current directory, then return only the requested answer.",
-                ],
+                command,
                 cwd=str(work_dir),
                 capture_output=True,
                 text=True,
@@ -116,13 +197,25 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
                 check=False,
             )
         except OSError as exc:
-            # Keep missing local CLI setup inside the provider contract
-            # instead of leaking raw OS errors.
             raise ModelGatewayError("Codex local provider command is not available") from exc
         finally:
             prune_codex_home(codex_env)
         if completed.returncode != 0:
             raise ModelGatewayError(_safe_error(completed.stderr or completed.stdout))
+        if isinstance(schema, dict):
+            payload, output = _read_structured_final(final_message_path, schema)
+            return {
+                "text": output,
+                "structured_output": payload,
+                "provider_calls_started": True,
+                "provider_raw_response_stored": False,
+                "safe_evidence": {
+                    "reference_image_count": len(references),
+                    "structured_output_contract_id": contract_id,
+                    "structured_output_schema_digest": schema_digest,
+                    "stdout_ignored": True,
+                },
+            }
         output = (completed.stdout or "").strip()
         if not output:
             raise ModelGatewayError("Codex local provider returned empty output")
@@ -136,7 +229,77 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+def _read_structured_final(path: Path, schema: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    if not path.is_file():
+        raise ModelGatewayError("Codex structured final response is missing")
+    output = path.read_text(encoding="utf-8").strip()
+    if not output:
+        raise ModelGatewayError("Codex structured final response is empty")
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise ModelGatewayError("Codex structured final response is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise ModelGatewayError("Codex structured final response must be an object")
+    try:
+        _validate_controlled_schema(payload, schema)
+    except (TypeError, ValueError) as exc:
+        raise ModelGatewayError("Codex structured final response does not match schema") from exc
+    return payload, json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _validate_controlled_schema(value: Any, schema: dict[str, Any]) -> None:
+    expected = schema.get("type")
+    if expected == "object":
+        if not isinstance(value, dict):
+            raise TypeError("object required")
+        properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+        required = schema.get("required") if isinstance(schema.get("required"), list) else []
+        if any(key not in value for key in required):
+            raise ValueError("required property missing")
+        if schema.get("additionalProperties") is False and any(key not in properties for key in value):
+            raise ValueError("additional property is not allowed")
+        for key, item in value.items():
+            child = properties.get(key)
+            if isinstance(child, dict):
+                _validate_controlled_schema(item, child)
+        return
+    if expected == "array":
+        if not isinstance(value, list):
+            raise TypeError("array required")
+        if "minItems" in schema and len(value) < int(schema["minItems"]):
+            raise ValueError("array is too short")
+        if "maxItems" in schema and len(value) > int(schema["maxItems"]):
+            raise ValueError("array is too long")
+        child = schema.get("items")
+        if isinstance(child, dict):
+            for item in value:
+                _validate_controlled_schema(item, child)
+        return
+    if expected == "string":
+        if not isinstance(value, str):
+            raise TypeError("string required")
+        if "minLength" in schema and len(value) < int(schema["minLength"]):
+            raise ValueError("string is too short")
+        allowed = schema.get("enum")
+        if isinstance(allowed, list) and value not in allowed:
+            raise ValueError("string is not in enum")
+        return
+    if expected == "integer" and (not isinstance(value, int) or isinstance(value, bool)):
+        raise TypeError("integer required")
+    if expected == "number" and (not isinstance(value, (int, float)) or isinstance(value, bool)):
+        raise TypeError("number required")
+    if expected == "boolean" and not isinstance(value, bool):
+        raise TypeError("boolean required")
+
 def _codex_prompt(request: dict[str, Any]) -> str:
+    if request.get("structured_output_contract_id"):
+        return (
+            "You are the local Codex structured script worker for AFS.\n"
+            "Read request.json and return exactly one final JSON object that conforms to output.schema.json.\n"
+            "Do not include markdown fences, prefaces, suffixes, explanations, credentials, paths, or raw metadata.\n"
+        )
+
     if request["capability"] == "vision":
         refs = "\n".join(f"- {item['path']}" for item in request.get("reference_images") or [])
         return (

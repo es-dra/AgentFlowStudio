@@ -7,7 +7,7 @@ export function createDirectorContextStore() {
         contexts.set(safeKey, {
           conversations: [],
           proposalApplied: false,
-          proposalText: "强化主体轮廓，保留雨夜层次",
+          proposalText: "先核对主体目标、连续性影响和确认边界",
           actionLabel: "",
         });
       }

@@ -10,11 +10,6 @@ export const NODE_TYPES = {
     intents: [
       { icon: "pencil", label: "自己编写内容" },
       { icon: "upload", label: "上传完整剧本" },
-      { icon: "sparkles", label: "想法扩写剧本" },
-      { icon: "frames", label: "剧本拆分分镜" },
-      { icon: "video", label: "文生视频" },
-      { icon: "image", label: "图片反推提示词" },
-      { icon: "music", label: "文字生音乐" },
     ],
     downstream: ["text", "image", "video", "director", "script", "ref"],
     size: { w: 280, h: 280 },
@@ -72,9 +67,6 @@ export const NODE_TYPES = {
     tag: "Beta",
     icon: "script",
     intents: [
-      { icon: "text", label: "剧本生成分镜脚本" },
-      { icon: "video", label: "视频参考生成分镜脚本" },
-      { icon: "user", label: "角色生成分镜脚本" },
       { icon: "sparkles", label: "识别资产" },
       { icon: "image", label: "生成关键帧层" },
     ],

@@ -143,6 +143,67 @@ def test_product_overview_has_chinese_empty_and_recovery_models(tmp_path, monkey
     assert payload["blocked_count"] == 0
 
 
+def test_creator_authoring_empty_projects_do_not_report_implicit_episode_or_shots(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "alpha-empty,beta-empty")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _, alpha_headers = _register(client, "alpha-empty@example.com", "alpha-empty")
+    _, beta_headers = _register(client, "beta-empty@example.com", "beta-empty")
+
+    for project_id, name in (
+        ("alpha-blank-a", "空白项目 A"),
+        ("alpha-blank-b", "空白项目 B"),
+        ("alpha-example", "示例：雨灯演示"),
+    ):
+        created = client.post(
+            "/projects",
+            headers=alpha_headers,
+            json={
+                "project_id": project_id,
+                "project_type": "studio_creator_authoring",
+                "goal": name,
+            },
+        )
+        assert created.status_code == 200, created.text
+        assert created.json()["episode_bootstrap"]["workspace_entry"] == {
+            "href": f"/studio/?project={project_id}",
+        }
+
+    workspace = client.get("/product/workspace-overview", headers=alpha_headers)
+    assert workspace.status_code == 200, workspace.text
+    projects = {item["project_id"]: item for item in workspace.json()["projects"]}
+    assert set(projects) == {"alpha-blank-a", "alpha-blank-b", "alpha-example"}
+
+    for project_id in projects:
+        overview = client.get(f"/projects/{project_id}/product-overview", headers=alpha_headers)
+        assert overview.status_code == 200, overview.text
+        project = overview.json()["project"]
+        assert project["episode"] == "未创建分集"
+        assert project["progress_percent"] == 0
+        assert project["current_stage"] == "创作简报"
+        assert project["next_action"] == "继续创作简报"
+        assert project["decision_inbox"]["pending_count"] == 0
+        assert project["canonical_state"]["status_label"] == "0/0"
+        assert project["canonical_state"]["scenes"] == 0
+        assert project["canonical_state"]["shots"] == 0
+        assert project["canonical_state"]["timeline"] == []
+        assert project["canonical_state"]["audio"]["total_shot_count"] == 0
+        assert project["canonical_state"]["pending_media_count"] == 0
+        encoded = json.dumps(project, ensure_ascii=False)
+        assert "巷口" not in encoded
+        assert "雨巷" not in encoded
+        assert "老宅" not in encoded
+        assert "shot-001" not in encoded
+
+    assert client.get("/projects/alpha-blank-a/product-overview", headers=beta_headers).status_code == 403
+    beta_workspace = client.get("/product/workspace-overview", headers=beta_headers)
+    assert beta_workspace.status_code == 200, beta_workspace.text
+    assert beta_workspace.json()["projects"] == []
+
+
 def test_product_overview_projects_authoritative_rainlight_canon_and_reload(tmp_path, monkeypatch) -> None:
     seed = prepare_provider_free_delivery_qa(tmp_path)
     monkeypatch.setenv("AFS_AUTH_ENABLED", "true")

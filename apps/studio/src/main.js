@@ -7,11 +7,8 @@ import { bindCanvasContextMenu } from "./canvas-context-menu.js";
 import { renderPromptBar } from "./prompt-bar.js";
 import { renderDrawer } from "./panels/drawer.js";
 import { renderInspectorPanel } from "./panels/inspector-panel.js";
-import { openGenerationPanel } from "./panels/generation-panel.js";
-import { openCreationProcessPanel } from "./panels/creation-process-panel.js";
 import { renderDock } from "./panels/dock.js";
 import { el, showModal } from "./overlay.js";
-import { fixNodeVisualAsset, startNodeGeneration } from "./node-actions.js";
 import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { WORKFLOW_STARTERS, createWorkflowStarter } from "./workflow-starters.js";
 import { openProjectHub } from "./project-hub.js";
@@ -20,7 +17,6 @@ import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT } from "./quality-feedback.js";
 import { handleQualityFeedbackRuntime } from "./quality-feedback-runtime-flow.js";
-import { HUMAN_GATE_DECISION_EVENT, HUMAN_GATE_DECISION_RESULT_EVENT } from "./human-gate.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { clearProjectSession, initialProjectId } from "./studio-project-session.js";
@@ -34,8 +30,13 @@ import { installClientErrorReporter, reportClientError } from "./client-error-re
 import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
-
-const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
+import { openExternalVideoDemoPanel } from "./external-video-demo.js";
+import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+import { applyProductionPlanProjection } from "./production-plan-projection.js";
+import { fitVisibleCanvasViewport, visibleCanvasCenter } from "./canvas-safe-area.js";
+import { createNode } from "./nodes.js";
+import { importScriptFileIntoTextNode } from "./script-breakdown.js";
+import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCardDraft } from "./studio-runtime-events.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -72,16 +73,17 @@ async function bootstrap() {
   initializeStudio(authState?.user || null);
   projectController.rememberStartupProject(runtime.projectId);
   if (editorMounted) {
-    renderStarters();
     renderDock(store, runtimeRef);
+    bindCanvasEmptyOnboarding();
     bindCanvasInput(store, runtimeRef);
     bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
     bindStudioKeyboard({ store, runtime: runtimeRef });
   }
   bindQualityFeedback();
-  bindHumanGateDecisionEvents();
-  bindVideoAssetCardDraft();
-  bindStudioWorkflowEvents();
+  bindHumanGateDecisionEvents({ getRuntime: () => runtime, store, safeError });
+  bindVideoAssetCardDraft({ getRuntime: () => runtime, store, safeError });
+  bindStudioWorkflowEvents({ store, runtimeRef });
+  bindCanvasSafeAreaEvents();
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
   bindProjectAccessRecovery();
@@ -96,7 +98,7 @@ async function bootstrap() {
   await projectController.ensureAccessibleStartupProject();
   if (hasActiveProject()) {
     await store.hydrateRuntime(runtime); await syncRuntimeAssets(store, runtime);
-    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime);
+    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime); await refreshScriptCoreTruth(runtime); await refreshProductionPlanTruth(runtime);
   }
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
 }
@@ -113,6 +115,7 @@ function initializeStudio(authUser) {
     getStore: () => store,
     getCanvasShell: () => editorShell,
     getCanvasParking: () => editorParking,
+    getRuntime: () => runtime,
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
@@ -120,6 +123,7 @@ function initializeStudio(authUser) {
     },
     onRetry: refreshProductOverview,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
+    onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
     formatError: safeError,
@@ -142,6 +146,8 @@ function initializeStudio(authUser) {
       if (editorMounted) {
         await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
         await refreshPendingKeyframeGenerations(store, runtimeClient);
+        await refreshScriptCoreTruth(runtimeClient);
+        await refreshProductionPlanTruth(runtimeClient);
       }
       await refreshProductOverview();
     },
@@ -149,37 +155,53 @@ function initializeStudio(authUser) {
   });
   projectController.setAuthUser(authUser);
 }
+async function refreshScriptCoreTruth(runtimeClient = runtime) {
+  if (!runtimeClient?.loadScriptTruth || !store) return;
+  try {
+    const payload = await runtimeClient.loadScriptTruth();
+    if (runtimeClient !== runtime) return;
+    store.set((state) => {
+      applyScriptCoreTruthProjection(state, payload?.projection || {});
+      fitCanvasProjection(state);
+    }, { history: false, persist: false });
+  } catch (error) {
+    reportClientError({
+      event_type: "script_core_truth_refresh_failed",
+      severity: "warning",
+      action: "refresh_script_core_truth",
+      message: safeError(error),
+      error,
+      getRuntime: () => runtime,
+      getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
+    });
+  }
+}
+async function refreshProductionPlanTruth(runtimeClient = runtime) {
+  if (!runtimeClient?.loadProductionPlanTruth || !store) return;
+  try {
+    const payload = await runtimeClient.loadProductionPlanTruth();
+    if (runtimeClient !== runtime) return;
+    store.set((state) => {
+      applyProductionPlanProjection(state, payload?.projection || {});
+      fitCanvasProjection(state);
+    }, { history: false, persist: false });
+  } catch (error) {
+    reportClientError({
+      event_type: "production_plan_truth_refresh_failed",
+      severity: "warning",
+      action: "refresh_production_plan_truth",
+      message: safeError(error),
+      error,
+      getRuntime: () => runtime,
+      getProjectId: () => runtime?.projectId || store?.get?.().meta?.projectId || "",
+    });
+  }
+}
 function bindDomainCrewEvents() {
   window.addEventListener("afs:studio-open-domain-crew", () => { syncDomainCrewContext(); openDomainCrewPanel(domainCrewController); });
 }
 function bindQualityFeedback() {
   window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => handleQualityFeedbackRuntime({ event, runtime, store }));
-}
-function bindHumanGateDecisionEvents() {
-  window.addEventListener(HUMAN_GATE_DECISION_EVENT, (event) => handleHumanGateDecision(event));
-}
-function bindVideoAssetCardDraft() {
-  window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => handleVideoAssetCardDraft(event));
-}
-function bindStudioWorkflowEvents() {
-  window.addEventListener("afs:studio-open-generation-panel", (event) => {
-    openGenerationForNode(event.detail?.node);
-  });
-  window.addEventListener("afs:studio-open-creation-process", (event) => {
-    const node = resolveEventNode(event);
-    if (node) openCreationProcessPanel(store.get(), node);
-  });
-  window.addEventListener("afs:studio-fix-visual-asset", (event) => {
-    const node = resolveEventNode(event);
-    if (node) fixNodeVisualAsset(store, runtimeRef, node);
-  });
-  window.addEventListener("afs:studio-select-node", (event) => {
-    const node = resolveEventNode(event);
-    if (!node) return;
-    store.set((s) => {
-      s.selection = { nodeIds: [node.id], edgeId: null };
-    }, { history: false, persist: false });
-  });
 }
 function bindSaveAuthRecovery() {
   let recoveryInFlight = false;
@@ -204,136 +226,52 @@ function bindProjectAccessRecovery() {
 function bindSessionExpiryBoundary() {
   window.addEventListener("afs:auth-session-expired", () => void recoverExpiredSession());
 }
-function openGenerationForNode(inputNode) {
-  const node = inputNode?.id ? store.get().nodes[inputNode.id] : selectedNode();
-  if (!node) return null;
-  return openGenerationPanel({
-    store,
-    node,
-    onRun: (fresh) => startNodeGeneration(store, runtimeRef, fresh),
-  });
-}
-function resolveEventNode(event) {
-  const nodeId = String(event.detail?.node_id || event.detail?.node?.id || "");
-  if (!nodeId) return selectedNode();
-  return store.get().nodes[nodeId] || null;
-}
-function selectedNode() {
-  const id = store.get().selection.nodeIds[0];
-  return id ? store.get().nodes[id] || null : null;
-}
-async function handleVideoAssetCardDraft(event) {
-  const node = resolveEventNode(event) || event.detail?.node;
-  const nodeId = String(node?.id || event.detail?.node_id || "");
-  if (!nodeId || !runtime?.draftAssetCard) return;
-  const sourceVideoArtifactId = String(
-    node?.params?.lastVideoArtifactId || node?.params?.lastVideoJobId || "",
-  ).trim();
-  if (!sourceVideoArtifactId) {
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.result = `${current.result || ""}\n请先生成视频，再识别视频资产卡。`.trim();
-    });
-    return;
-  }
-  store.set((s) => {
-    const current = s.nodes[nodeId];
-    if (!current) return;
-    current.params.lastVideoAssetCardDraftStatus = "running";
-    current.result = `${current.result || ""}\n正在识别视频资产卡...`.trim();
-  }, { history: false, persist: false });
-  try {
-    const response = await runtime.draftAssetCard({
-      asset_type: "video",
-      source_video_artifact_id: sourceVideoArtifactId,
-      sampled_image_asset_refs: [],
-      node_id: nodeId,
-      prompt_text: node.prompt || node.result || node.title || "",
-      provider_service_id: "vision_video",
-      generated_at: new Date().toISOString(),
-    });
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.params.lastVideoAssetCardDraft = response?.draft || null;
-      current.params.lastVideoAssetCardDraftStatus = response?.job?.status || "unknown";
-      current.result = `${current.result || ""}\n视频资产卡草稿：${response?.job?.status || "unknown"}`.trim();
-    });
-  } catch (error) {
-    store.set((s) => {
-      const current = s.nodes[nodeId];
-      if (!current) return;
-      current.params.lastVideoAssetCardDraftStatus = "failed";
-      current.result = `${current.result || ""}\n视频资产卡识别失败：${safeError(error)}`.trim();
-    });
-  }
-}
-async function handleHumanGateDecision(event) {
-  const requestId = String(event.detail?.request_id || "");
-  const payload = event.detail?.payload;
-  try {
-    if (!payload || typeof payload !== "object") throw new Error("human gate payload is empty");
-    const response = await runtime.recordHumanGateDecision(payload);
-    const humanGateId = response?.human_gate_decision?.human_gate_id || response?.artifact?.artifact_id || "";
-    recordHumanGateDecisionOnNode(payload, humanGateId, response?.job?.status || "succeeded");
-    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
-      detail: { request_id: requestId, ok: true, human_gate_id: humanGateId },
-    }));
-  } catch (error) {
-    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
-      detail: { request_id: requestId, ok: false, error: safeError(error) },
-    }));
-  }
-}
-function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
-  const nodeId = String(payload?.node_id || "");
-  if (!nodeId) return;
-  store.set((s) => {
-    const node = s.nodes[nodeId];
-    if (!node) return;
-    const decisions = Array.isArray(node.params.humanGateDecisions) ? node.params.humanGateDecisions : [];
-    node.params.humanGateDecisions = [
-      ...decisions,
-      {
-        human_gate_id: String(humanGateId || ""),
-        target_type: String(payload.target_type || ""),
-        target_id: String(payload.target_id || ""),
-        decision: String(payload.decision || ""),
-        status: String(status || ""),
-        recorded_at: new Date().toISOString(),
-        writes_long_term_memory: false,
-      },
-    ].slice(-12);
-  }, { history: false });
-}
-function renderAll(state) {
+function renderAll(state, meta = {}) {
   syncDomainCrewContext();
-  productShell?.updateStudioState(state);
+  productShell?.updateStudioState(state, { render: shouldRenderProductShell(meta) });
   if (!editorMounted) return;
-  renderTopbar({
-    state,
-    store,
-    runtime,
-    projectSummaries: projectController.summaries,
-    projectOptions: projectController.projectOptions(state),
-    hiddenProjectCount: projectController.hiddenProjectCount(state),
-    showAllProjects: projectController.showAllProjects,
-    onToggleProjectFilter: () => projectController.toggleProjectFilter(),
-    onSwitchProject: projectController.switchProject,
-    onCreateProject: projectController.createNewProject,
-    onOpenHome: openProductOverview,
-    onBeforeSiteHome: () => store.flushRuntimeSave(),
-    authUser: projectController.authUser,
-    onRetrySave: () => store.flushRuntimeSave(),
-    runtimeSurfaceStatus,
-    onSignOut: handleSignOut,
-  });
+  bindCanvasEmptyOnboarding();
+  if (document.getElementById("topbar")) {
+    renderTopbar({
+      state,
+      store,
+      runtime,
+      projectSummaries: projectController.summaries,
+      projectOptions: projectController.projectOptions(state),
+      hiddenProjectCount: projectController.hiddenProjectCount(state),
+      showAllProjects: projectController.showAllProjects,
+      onToggleProjectFilter: () => projectController.toggleProjectFilter(),
+      onSwitchProject: projectController.switchProject,
+      onCreateProject: projectController.createNewProject,
+      onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
+      onOpenHome: openProductOverview,
+      onBeforeSiteHome: () => store.flushRuntimeSave(),
+      authUser: projectController.authUser,
+      onRetrySave: () => store.flushRuntimeSave(),
+      runtimeSurfaceStatus,
+      onSignOut: handleSignOut,
+    });
+  }
   renderCanvas(state, store);
-  renderDrawer(state, store, runtimeRef);
-  renderInspectorPanel(state, store, runtimeRef);
+  if (document.getElementById("drawer")) renderDrawer(state, store, runtimeRef);
+  if (document.getElementById("inspector")) renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
   renderSpriteWidget(state, runtimeRef);
+}
+
+function shouldRenderProductShell(meta = {}) {
+  if (isCanvasTextEditingActive()) return false;
+  if (meta.full) return true;
+  const scopes = Array.isArray(meta.renderScopes) ? meta.renderScopes : [];
+  if (!scopes.length) return true;
+  const shellSafeScopes = new Set(["canvas-local-edit", "save-status"]);
+  return !scopes.every((scope) => shellSafeScopes.has(scope));
+}
+
+function isCanvasTextEditingActive() {
+  const active = document.activeElement;
+  if (!active || !["TEXTAREA", "INPUT"].includes(active.tagName)) return false;
+  return Boolean(active.closest?.(".node-content-editor, .prompt-bar, .canvas-empty-onboarding"));
 }
 function syncDomainCrewContext() {
   if (!domainCrewController || !projectController) return;
@@ -360,7 +298,7 @@ function openStudioHome(state = store.get()) {
   });
 }
 function openProductOverview() {
-  productShell?.showOverview();
+  productShell?.showCanvas();
   void refreshProductOverview();
 }
 function openCanvasWorkspace() {
@@ -374,6 +312,7 @@ function openCanvasWorkspace() {
 }
 function renderStarters() {
   const row = document.getElementById("starter-row");
+  if (!row) return;
   row.replaceChildren();
   for (const starter of WORKFLOW_STARTERS) {
     const card = el("button", "starter-card workflow-starter-card");
@@ -386,6 +325,54 @@ function renderStarters() {
     card.addEventListener("click", () => launchStarter(starter.id));
     row.appendChild(card);
   }
+}
+
+function bindCanvasEmptyOnboarding() {
+  const form = document.querySelector(".canvas-empty-onboarding");
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = "1";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = form.querySelector('[data-empty-action="idea-text"]');
+    const text = String(input?.value || "").trim();
+    if (!text) {
+      input?.focus();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: `/idea ${text}` } }));
+  });
+  form.querySelector('[data-empty-action="import-script"]')?.addEventListener("click", () => {
+    const node = createEmptyTextNode("剧本文本");
+    importScriptFileIntoTextNode(store, node);
+  });
+  form.querySelector('[data-empty-action="blank-node"]')?.addEventListener("click", () => {
+    createEmptyTextNode("故事文本");
+  });
+}
+
+function createEmptyTextNode(title) {
+  const point = canvasCenterWorldPoint();
+  const node = createNode(store, "text", point.x - 150, point.y - 120);
+  store.set((state) => {
+    const target = state.nodes[node.id];
+    if (!target) return;
+    target.title = title;
+    target.status = "empty";
+    target.content = "";
+    target.prompt = "";
+    state.selection = { nodeIds: [node.id], edgeId: null };
+  });
+  return store.get().nodes[node.id] || node;
+}
+
+function canvasCenterWorldPoint() {
+  const viewport = store.get().viewport || { x: 0, y: 0, scale: 1 };
+  const center = visibleCanvasCenter();
+  const scale = Number(viewport.scale || 1) || 1;
+  return {
+    x: Math.round(((center.x || 450) - Number(viewport.x || 0)) / scale),
+    y: Math.round(((center.y || 310) - Number(viewport.y || 0)) / scale),
+  };
 }
 async function launchStarter(id) {
   if (!hasActiveProject()) {
@@ -443,6 +430,24 @@ function promptCreateProjectBeforeStarter() {
 
 function safeError(error) {
   return formatRuntimeError(error, "暂时无法读取制作状态，请稍后重试。");
+}
+
+function fitCanvasProjection(state) {
+  const nodes = state?.nodes || {};
+  if (!document.getElementById("canvas-root") || !Object.keys(nodes).length) return;
+  const viewport = fitVisibleCanvasViewport(nodes);
+  if (viewport) state.viewport = viewport;
+}
+
+function bindCanvasSafeAreaEvents() {
+  let raf = 0;
+  window.addEventListener("afs:canvas-safe-area-changed", () => {
+    window.cancelAnimationFrame(raf);
+    raf = window.requestAnimationFrame(() => {
+      if (!store || !document.getElementById("canvas-root")) return;
+      store.set((state) => fitCanvasProjection(state), { history: false, persist: false });
+    });
+  });
 }
 
 async function refreshProductOverview() {

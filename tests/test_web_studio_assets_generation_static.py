@@ -250,6 +250,7 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    runtime_events = (STUDIO_ROOT / "src" / "studio-runtime-events.js").read_text(encoding="utf-8")
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
 
     assert "提示词优化" in source
@@ -263,7 +264,7 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     assert 'llmProvider: "prompt_optimizer"' in source
     assert 'llm_provider: "prompt_optimizer"' in optimizer_contract
     assert 'provider_service_id: "vision_image"' in visual_asset_panel
-    assert 'provider_service_id: "vision_video"' in main
+    assert 'provider_service_id: "vision_video"' in runtime_events
     assert "Seedance 2.0 Fast" in source
     assert 'VIDEO_RELAY_SERVICE_ID = "seedance_i2v"' in source
     assert "providerServiceId: VIDEO_RELAY_SERVICE_ID" in source
@@ -1034,9 +1035,10 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "handleQualityFeedbackRuntime" in main
     assert "runtime.recordFeedback" in feedback_runtime_flow
     assert 'action === "content-card" || action === "video-asset-card-draft"' in action_handler
-    assert "resolveEventNode(event) || event.detail?.node" in main
-    assert "正在识别视频资产卡" in main
-    assert "视频资产卡草稿" in main
+    runtime_events = (STUDIO_ROOT / "src" / "studio-runtime-events.js").read_text(encoding="utf-8")
+    assert "resolveEventNode(event, store) || event.detail?.node" in runtime_events
+    assert "正在识别视频资产卡" in runtime_events
+    assert "视频资产卡草稿" in runtime_events
     assert "videoTimingLine" in generation_results
     assert "耗时：" in generation_results
     assert "cancelNodeVideoGeneration" in node_actions
@@ -1296,14 +1298,22 @@ def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:
     assert "识别视频资产卡" in node_menu
 
 
-def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:
+def test_runtime_client_uses_same_origin_or_explicit_runtime_base_without_fixed_port() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
-    assert 'const FALLBACK_BASE_URL = "http://127.0.0.1:8790"' in runtime_client
     assert 'const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url"' in runtime_client
-    assert 'const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"])' in runtime_client
-    assert "LOCAL_STATIC_FALLBACK_PORTS.has(current.port)" in runtime_client
-    assert "return FALLBACK_BASE_URL;" in runtime_client
+    assert "new URL(window.location.href).origin" in runtime_client
     assert "explicitRuntimeBaseUrl" in runtime_client
     assert "normalizeRuntimeBaseUrl" in runtime_client
     assert "isLocalHost(url.hostname)" in runtime_client
+    assert "FALLBACK_BASE_URL" not in runtime_client
+    assert "LOCAL_STATIC_FALLBACK_PORTS" not in runtime_client
+    assert "127.0.0.1:8790" not in runtime_client
+
+
+def test_studio_source_does_not_reintroduce_fixed_local_project_or_demo_prompt_defaults() -> None:
+    source = "\n".join(path.read_text(encoding="utf-8") for path in (STUDIO_ROOT / "src").glob("*.js"))
+
+    assert "studio-local-001" not in source
+    assert "AI 漫剧路演演示" not in source
+    assert "三幕式 AI 漫剧" not in source

@@ -6,21 +6,36 @@ import { icon } from "./icons.js";
 import { canRunNodeGeneration } from "./node-actions.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
+let pendingEdgeLayoutRaf = 0;
+
 export function renderCanvas(state, store) {
   const world = document.getElementById("world");
-  world.style.transform = `translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${state.viewport.scale})`;
+  const viewport = state.order.length ? state.viewport : { x: 0, y: 0, scale: 1 };
+  world.style.transform = `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`;
   const relations = relationSets(state);
   renderNodes(state, relations, store);
   renderEdges(state, relations, store);
+  scheduleEdgeLayoutPass(store);
   renderEmptyState(state);
   const zoomLabel = document.querySelector("#corner-controls .zoom-label");
-  if (zoomLabel) zoomLabel.textContent = `${Math.round(state.viewport.scale * 100)}%`;
+  if (zoomLabel) zoomLabel.textContent = `${Math.round(viewport.scale * 100)}%`;
+}
+
+function scheduleEdgeLayoutPass(store) {
+  if (typeof requestAnimationFrame !== "function" || pendingEdgeLayoutRaf) return;
+  pendingEdgeLayoutRaf = requestAnimationFrame(() => {
+    pendingEdgeLayoutRaf = 0;
+    const state = store.get();
+    renderEdges(state, relationSets(state), store);
+  });
 }
 
 function renderEmptyState(state) {
   const rail = starterRailState(state);
   const starterRow = document.getElementById("starter-row");
-  document.getElementById("canvas-empty-hint").hidden = !rail.empty;
+  const emptyHint = document.getElementById("canvas-empty-hint");
+  if (emptyHint) emptyHint.hidden = !rail.empty;
+  if (!starterRow) return;
   starterRow.hidden = !rail.show;
   starterRow.dataset.mode = rail.mode;
 }
@@ -77,11 +92,11 @@ function nodeActions() {
   actions.className = "node-actions";
   actions.dataset.role = "actions";
   actions.innerHTML = [
-    `<button class="na-btn" data-action="fix-visual-asset" title="保存为素材">${icon("bookmark", 13)}</button>`,
-    `<button class="na-btn" data-action="run" title="生成">${icon("play", 13)}</button>`,
-    `<button class="na-btn" data-action="duplicate" title="复制节点">${icon("copy", 13)}</button>`,
-    `<button class="na-btn" data-action="toggle-collapse" title="折叠/展开">${icon("chevronUp", 13)}</button>`,
-    `<button class="na-btn" data-action="node-menu" title="更多">${icon("more", 13)}</button>`,
+    `<button class="na-btn" data-role="asset-action" data-action="fix-visual-asset" title="保存为素材" aria-label="保存为素材">${icon("bookmark", 13)}</button>`,
+    `<button class="na-btn" data-role="run-action" data-action="run" title="生成" aria-label="生成">${icon("play", 13)}</button>`,
+    `<button class="na-btn" data-role="duplicate-action" data-action="duplicate" title="复制节点" aria-label="复制节点">${icon("copy", 13)}</button>`,
+    `<button class="na-btn" data-role="collapse-action" data-action="toggle-collapse" title="折叠/展开" aria-label="折叠或展开节点">${icon("chevronUp", 13)}</button>`,
+    `<button class="na-btn" data-role="menu-action" data-action="node-menu" title="更多" aria-label="更多节点操作">${icon("more", 13)}</button>`,
   ].join("");
   return actions;
 }
@@ -115,6 +130,7 @@ function syncNodeElement(elNode, node, state, relations, store) {
   syncNodeRelations(elNode, node, relations);
   syncNodeTitle(elNode, node, def);
   syncNodeStateStrip(elNode, node, def);
+  syncNodeActions(elNode, node, def);
   syncRunAction(elNode, node);
   syncNodeBody(elNode, node, def, store);
 }
@@ -179,7 +195,7 @@ function syncNodeBody(elNode, node, def, store) {
 }
 
 function syncRunAction(elNode, node) {
-  const runBtn = elNode.querySelector('[data-action="run"], [data-action="video-poll"]');
+  const runBtn = elNode.querySelector('[data-role="run-action"]');
   if (!runBtn) return;
   runBtn.disabled = false;
   if (node.type === "video" && node.status === "generating") {
@@ -198,7 +214,7 @@ function syncRunAction(elNode, node) {
   if (!canRunNodeGeneration(node)) {
     runBtn.hidden = true;
     runBtn.disabled = true;
-    runBtn.dataset.action = "run-disabled";
+    runBtn.dataset.action = "run";
     return;
   }
   runBtn.hidden = false;
@@ -210,4 +226,19 @@ function syncRunAction(elNode, node) {
   }
   runBtn.title = "生成";
   runBtn.innerHTML = icon("play", 13);
+}
+
+function syncNodeActions(elNode, node, def) {
+  const assetBtn = elNode.querySelector('[data-role="asset-action"]');
+  if (assetBtn) {
+    const canSaveAsset = ["image", "video"].includes(node.type) || assetsFromNode(node).length > 0;
+    assetBtn.hidden = !canSaveAsset;
+    assetBtn.disabled = !canSaveAsset;
+  }
+  const upload = elNode.querySelector(".node-float-action");
+  if (upload) {
+    const canUpload = Boolean(def.upload);
+    upload.hidden = !canUpload;
+    upload.disabled = !canUpload;
+  }
 }

@@ -25,11 +25,7 @@ import {
   canUseAssetReferenceMode,
   buildUserAssetCardRevisionState,
 } from "./asset-revision-references.js";
-import {
-  expandTextIdeaToScript,
-  importScriptFileIntoTextNode,
-  splitTextNodeToStoryboardNodes,
-} from "./script-breakdown.js";
+import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
@@ -37,7 +33,8 @@ export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && (node.type === "script" || !node.content || state.ui?.promptBarNodeId === node.id);
+  const graphReadOnly = node?.params?.productionGraphProjection || node?.params?.productionGraphLegacyProjection;
+  const show = node && !graphReadOnly && PROMPT_NODE_TYPES.has(node.type) && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {
@@ -92,7 +89,7 @@ function buildBar(store, runtime, node) {
   const textarea = document.createElement("textarea");
   textarea.placeholder = promptTextPlaceholder(node);
   textarea.value = promptTextValue(node);
-  textarea.addEventListener("input", () => {
+  bindStableTextInputLifecycle(textarea, () => {
     store.set((s) => {
       s.ui.promptBarNodeId = node.id;
       const n = s.nodes[node.id];
@@ -122,17 +119,18 @@ function buildBar(store, runtime, node) {
         }
       }
       delete n.params.lastOptimizedPromptPlain;
-    }, { history: false });
-  });
-  textarea.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
-        flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
-        return;
+    }, { history: false, renderScope: "canvas-local-edit" });
+  }, {
+    onKeyDown: (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
+          flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
+          return;
+        }
+        runPromptBarGeneration(store, runtime, node);
       }
-      runPromptBarGeneration(store, runtime, node);
-    }
+    },
   });
   bindAssetMentionSuggestions(textarea, store, node.id);
   bar.appendChild(textarea);
@@ -203,10 +201,12 @@ function buildBottomRow(store, runtime, node, textarea) {
   const p = node.params;
   const model = findModel(node.type, p.model);
 
-  const modelBtn = el("button", "bar-select");
-  modelBtn.innerHTML = `<span class="sel-icon">${icon("sparkle1", 13)}</span><span>${model.name}</span><span class="caret">▾</span>`;
-  modelBtn.addEventListener("click", () => openModelPopover(store, node, modelBtn));
-  row.appendChild(modelBtn);
+  if (!isTextContentNode(node)) {
+    const modelBtn = el("button", "bar-select");
+    modelBtn.innerHTML = `<span class="sel-icon">${icon("sparkle1", 13)}</span><span>${model.name}</span><span class="caret">▾</span>`;
+    modelBtn.addEventListener("click", () => openModelPopover(store, node, modelBtn));
+    row.appendChild(modelBtn);
+  }
 
   if (node.type === "video" || node.type === "video_merge") {
     const specBtn = el("button", "bar-select");
@@ -220,30 +220,39 @@ function buildBottomRow(store, runtime, node, textarea) {
     row.appendChild(motionBtn);
   }
 
-  if (node.type === "text") {
-    row.appendChild(textAction("upload", "导入剧本", () => importScriptFileIntoTextNode(store, node, textarea)));
-    row.appendChild(textAction("sparkles", "扩写剧本", () => expandTextIdeaToScript(store, runtime, node, textarea)));
-    row.appendChild(textAction("frames", "拆分分镜", () => {
-      splitTextNodeToStoryboardNodes(store, node, runtime).then((created) => {
-        if (!created.length) flashTooltip(textarea, "先输入或导入剧本");
-      });
-    }));
-  }
-
   row.appendChild(el("span", "row-spacer"));
 
   const optimizeBtn = el("button", "bar-tool optimize-btn");
   optimizeBtn.dataset.action = "optimize-prompt";
   optimizeBtn.innerHTML = `${icon("sparkles", 14)}<span>优化</span>`;
-  optimizeBtn.title = "优化提示词";
+  optimizeBtn.title = isTextContentNode(node) ? "默认优化文本" : "优化提示词";
   optimizeBtn.addEventListener("click", () => {
     if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
-      flashTooltip(optimizeBtn, "先输入提示词");
+      flashTooltip(optimizeBtn, isTextContentNode(node) ? "先输入文本" : "先输入提示词");
+      return;
+    }
+    if (isTextContentNode(node)) {
+      syncTextAreaToNode(store, node.id, textarea);
+      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/optimize-selected-default" } }));
       return;
     }
     openOptimizer(store, runtime, node.id, optimizeBtn, textarea);
   });
   row.appendChild(optimizeBtn);
+
+  if (isTextContentNode(node)) {
+    const splitBtn = textAction("frames", "自动拆分分镜", () => {
+      if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
+        flashTooltip(splitBtn, "先输入剧本文本");
+        return;
+      }
+      syncTextAreaToNode(store, node.id, textarea);
+      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/plan-selected-script-shots" } }));
+    });
+    splitBtn.dataset.action = "plan-storyboard";
+    splitBtn.title = "从当前剧本版本规划专业分镜";
+    row.appendChild(splitBtn);
+  }
 
   const send = el("button", "send-btn");
   const canVideo = node.type === "video" && isRemoteVideoModel(node.params?.model);
@@ -280,6 +289,23 @@ function optimizableNodeText(node, textarea = null) {
 
 function isTextContentNode(node) {
   return node.type === "text" || node.type === "script";
+}
+
+function isEditableTextPromptNode(node) {
+  if (!isTextContentNode(node)) return false;
+  if (node.params?.scriptCoreProjection || node.params?.productionPlanProjection) return false;
+  return true;
+}
+
+function syncTextAreaToNode(store, nodeId, textarea) {
+  if (!textarea) return;
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.content = textarea.value;
+    node.prompt = textarea.value;
+    if (node.status === "empty" && textarea.value.trim()) node.status = "complete";
+  }, { history: false, renderScope: "canvas-local-edit" });
 }
 
 export function syncPromptBarState(bar, node) {
@@ -320,7 +346,7 @@ function syncAssetReferenceModeTabs(root, activeMode) {
 function activePromptTaskProgress(node) {
   const tasks = [
     { label: "优化", state: node.params?.promptOptimizationState },
-    { label: "扩写", state: node.params?.scriptExpansionState },
+    { label: "文本处理", state: node.params?.scriptExpansionState },
     { label: "拆分", state: node.params?.storyboardBreakdownState },
   ];
   return tasks.find((item) => item.state?.status === "running") || null;

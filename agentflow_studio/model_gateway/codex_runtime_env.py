@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -53,10 +54,15 @@ def bootstrap_codex_home(codex_home: Path, *, source_home: Path) -> None:
         if not source.is_file():
             continue
         target = codex_home / name
-        if target.exists():
-            continue
-        shutil.copy2(source, target)
-        target.chmod(0o600)
+        fd, raw_tmp = tempfile.mkstemp(prefix=f".{name}.", dir=codex_home)
+        os.close(fd)
+        tmp = Path(raw_tmp)
+        try:
+            shutil.copy2(source, tmp)
+            tmp.chmod(0o600)
+            os.replace(tmp, target)
+        finally:
+            tmp.unlink(missing_ok=True)
 
 
 def prune_codex_home(env: dict[str, str] | None = None) -> None:

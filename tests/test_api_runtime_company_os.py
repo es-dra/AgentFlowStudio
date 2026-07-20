@@ -22,6 +22,7 @@ def test_company_os_gfr_projection_payload_is_safe_and_explicit() -> None:
         "llm": "closed",
         "image": "closed",
         "video": "closed",
+        "audio": "closed",
         "vision": "closed",
         "asr": "closed",
         "external_download": "closed",

@@ -1,23 +1,17 @@
 // Minimal Studio API client. It sends only project ids, safe node context,
 // safe generation summaries, Studio state JSON, and explicit user-selected image uploads.
 
-const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
 const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
-const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"]);
 export const AUTH_TOKEN_STORAGE_KEY = "afs_auth_session_token";
 
 export function runtimeBaseUrl() {
   if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) {
     const override = explicitRuntimeBaseUrl();
     if (override) return override;
-    const current = new URL(window.location.href);
-    if (isLocalHost(current.hostname) && LOCAL_STATIC_FALLBACK_PORTS.has(current.port)) {
-      return FALLBACK_BASE_URL;
-    }
-    return current.origin;
+    return new URL(window.location.href).origin;
   }
-  return FALLBACK_BASE_URL;
+  return explicitRuntimeBaseUrl();
 }
 
 export function runtimeMediaUrl(value) {
@@ -51,7 +45,7 @@ function explicitRuntimeBaseUrl() {
   } catch {
     // Ignore inaccessible storage and use the local Runtime default.
   }
-  values.push(window.__AFS_RUNTIME_BASE_URL__);
+  if (typeof window !== "undefined") values.push(window.__AFS_RUNTIME_BASE_URL__);
   for (const value of values) {
     const normalized = normalizeRuntimeBaseUrl(value);
     if (normalized) return normalized;
@@ -338,6 +332,7 @@ function inferRequestMeta(route, method, payload) {
     has_first_frame: Boolean(payload?.first_frame_image_asset_id),
     first_frame_image_asset_id: String(payload?.first_frame_image_asset_id || "").slice(0, 120),
     video_input_source_mode: String(payload?.input_source?.source_mode || "").slice(0, 80),
+    external_video_engine: String(payload?.engine || "").slice(0, 80),
     duration_sec: payload?.duration_sec,
     resolution: payload?.resolution,
     aspect_ratio: payload?.aspect_ratio,
@@ -347,6 +342,8 @@ function inferRequestMeta(route, method, payload) {
 
 function inferUserAction(route, method) {
   if (/\/video-generations\/preflight$/.test(route)) return "preflight_video_generation";
+  if (/\/external-video-jobs\/[^/]+\/poll$/.test(route)) return "poll_external_video_generation";
+  if (/\/external-video-jobs$/.test(route) && method === "POST") return "create_external_video_generation";
   if (/\/video-generations\/[^/]+\/poll$/.test(route)) return "poll_video_generation";
   if (/\/video-generations$/.test(route) && method === "POST") return "click_generate_video";
   if (/^\/projects\/[^/]+$/.test(route) && method === "DELETE") return "delete_project";
@@ -359,6 +356,27 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
+  if (/\/script-revisions$/.test(route) && method === "POST") return "create_script_revision";
+  if (/\/script-revisions\/[^/]+\/select$/.test(route) && method === "POST") return "select_script_revision";
+  if (/\/analysis-candidates$/.test(route) && method === "POST") return "submit_structured_analysis_candidate";
+  if (/\/core-assets\/commands\/preview$/.test(route) && method === "POST") return "preview_core_asset_command";
+  if (/\/core-assets\/commands\/confirm$/.test(route) && method === "POST") return "confirm_core_asset_command";
+  if (/\/core-assets\/commands\/undo$/.test(route) && method === "POST") return "undo_core_asset_command";
+  if (/\/production-plan-truth$/.test(route) && method === "GET") return "load_production_plan_truth";
+  if (/\/story-plan-candidates$/.test(route) && method === "POST") return "submit_story_plan_candidate";
+  if (/\/story-plan-candidates\/[^/]+\/confirm$/.test(route) && method === "POST") return "confirm_story_plan_candidate";
+  if (/\/production-plan-commands\/preview$/.test(route) && method === "POST") return "preview_production_plan_command";
+  if (/\/production-plan-commands\/confirm$/.test(route) && method === "POST") return "confirm_production_plan_command";
+  if (/\/production-plan-commands\/undo$/.test(route) && method === "POST") return "undo_production_plan_command";
+  if (/\/m3-zero-cost\/context-packs\/preview$/.test(route) && method === "POST") return "preview_m3_context_pack";
+  if (/\/m3-zero-cost\/context-packs\/confirm$/.test(route) && method === "POST") return "confirm_m3_context_pack";
+  if (/\/m3-zero-cost\/context-packs\/undo$/.test(route) && method === "POST") return "undo_m3_context_pack";
+  if (/\/m3-zero-cost\/audit-truth$/.test(route) && method === "GET") return "load_m3_zero_cost_audit_truth";
+  if (/\/m6\/script-plan-asset-bible\/preview$/.test(route) && method === "POST") return "preview_m6_script_plan_asset_bible";
+  if (/\/m6\/script-plan-asset-bible\/confirm$/.test(route) && method === "POST") return "confirm_m6_script_plan_asset_bible";
+  if (/\/manga-first-l4b\/production-truth$/.test(route) && method === "POST") return "create_manga_first_production_truth";
+  if (/\/manga-first-l4b\/workspace$/.test(route) && method === "GET") return "load_manga_first_workspace";
+  if (/\/manga-first-l4b\/reference-set-approvals$/.test(route) && method === "POST") return "approve_manga_first_reference_set";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -381,6 +399,7 @@ function inferUserAction(route, method) {
 
 function inferGenerationKind(route) {
   if (route.includes("/keyframe-local-edits")) return "keyframe_local_edit";
+  if (route.includes("/external-video-jobs")) return "external_video";
   if (route.includes("/video-generations")) return "video";
   if (route.includes("/video-revisions")) return "video_revision";
   if (route.includes("/keyframe-generations")) return "keyframe";
@@ -448,7 +467,7 @@ function persistSession(payload) {
   return payload;
 }
 
-export function createRuntimeClient(projectId = "studio-local-001") {
+export function createRuntimeClient(projectId = "") {
   const encoded = encodeURIComponent(projectId);
   return {
     projectId,
@@ -478,6 +497,43 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     projectOverview() {
       return requestJson(`/projects/${encoded}/product-overview`);
+    },
+    sequenceWorkspace() {
+      return requestJson(`/projects/${encoded}/m5/sequence-workspace`);
+    },
+    confirmFilmCandidate(payload) {
+      return requestJson(`/projects/${encoded}/m4/film-candidates/confirm`, { method: "POST", payload });
+    },
+    previewSequenceImpact(payload) {
+      return requestJson(`/projects/${encoded}/m5/impact-preview`, { method: "POST", payload });
+    },
+    confirmSequenceMutation(payload) {
+      return requestJson(`/projects/${encoded}/m5/mutations/confirm`, { method: "POST", payload });
+    },
+    confirmSequenceAction(payload) {
+      return requestJson(`/projects/${encoded}/m5/actions/confirm`, { method: "POST", payload });
+    },
+    previewM6ScriptPlanAssetBible(payload) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview`, { method: "POST", payload });
+    },
+    confirmM6ScriptPlanAssetBible(payload) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/confirm`, { method: "POST", payload });
+    },
+    createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
+        method: "POST",
+        payload: {
+          brief,
+          idempotency_key: idempotencyKey || `manga-first-l4b-${projectId}-v1`,
+          include_manifest: includeManifest === true,
+        },
+      });
+    },
+    loadMangaFirstWorkspace() {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/workspace`);
+    },
+    approveMangaFirstReferenceSet(payload) {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/reference-set-approvals`, { method: "POST", payload });
     },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });
@@ -557,6 +613,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     cancelVideo(jobId) {
       return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
     },
+    generateExternalVideo(payload) {
+      return requestJson(`/projects/${encoded}/external-video-jobs`, { method: "POST", payload });
+    },
+    pollExternalVideo(jobId) {
+      return requestJson(`/projects/${encoded}/external-video-jobs/${encodeURIComponent(jobId)}/poll`, { method: "POST" });
+    },
     recordFeedback(feedback) {
       return requestJson("/feedback", {
         method: "POST",
@@ -577,6 +639,75 @@ export function createRuntimeClient(projectId = "studio-local-001") {
         method: "POST",
         payload: { fixture_mode: "default_unconfirmed", ...payload },
       });
+    },
+    createScriptRevision(payload) {
+      return requestJson(`/projects/${encoded}/script-revisions`, { method: "POST", payload });
+    },
+    selectScriptRevision(revisionId) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/select`, { method: "POST" });
+    },
+    loadScriptTruth() {
+      return requestJson(`/projects/${encoded}/script-truth`);
+    },
+    submitStructuredAnalysisCandidate(revisionId, payload) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates`, {
+        method: "POST",
+        payload,
+      });
+    },
+    previewCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/preview`, { method: "POST", payload });
+    },
+    confirmCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/confirm`, { method: "POST", payload });
+    },
+    undoCoreAssetCommand(payload) {
+      return requestJson(`/projects/${encoded}/core-assets/commands/undo`, { method: "POST", payload });
+    },
+    loadProductionPlanTruth() {
+      return requestJson(`/projects/${encoded}/production-plan-truth`);
+    },
+    submitStoryPlanCandidate(payload) {
+      return requestJson(`/projects/${encoded}/story-plan-candidates`, { method: "POST", payload });
+    },
+    confirmStoryPlanCandidate(candidateDigest, payload) {
+      return requestJson(`/projects/${encoded}/story-plan-candidates/${encodeURIComponent(candidateDigest)}/confirm`, {
+        method: "POST",
+        payload,
+      });
+    },
+    previewProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/preview`, { method: "POST", payload });
+    },
+    confirmProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/confirm`, { method: "POST", payload });
+    },
+    undoProductionPlanCommand(payload) {
+      return requestJson(`/projects/${encoded}/production-plan-commands/undo`, { method: "POST", payload });
+    },
+    loadM3ZeroCostAuditTruth() {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/audit-truth`);
+    },
+    loadM3KnowledgePack() {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/knowledge-pack`);
+    },
+    previewM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/preview`, { method: "POST", payload });
+    },
+    confirmM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/confirm`, { method: "POST", payload });
+    },
+    undoM3ContextPack(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/context-packs/undo`, { method: "POST", payload });
+    },
+    recordM3FeedbackCandidate(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/feedback-candidates`, { method: "POST", payload });
+    },
+    recordM3PromotionDecision(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/promotion-decisions`, { method: "POST", payload });
+    },
+    recordM3EvaluationReport(payload) {
+      return requestJson(`/projects/${encoded}/m3-zero-cost/evaluation-reports`, { method: "POST", payload });
     },
     createProductionRun(payload) {
       return requestJson(`/projects/${encoded}/production-runs`, { method: "POST", payload });

@@ -16,6 +16,9 @@ IMAGE_RELAY_SERVICE_ID = "image_relay"
 IMAGE_RELAY_POOL_ID = "image_relay_pool"
 LEGACY_CODEX_IMAGE_SERVICE_ID = "codex_image"
 LEGACY_CODEX_IMAGE_POOL_ID = "codex_image_pool"
+SERVER_CODEX_SERVICE_ID = "server_codex"
+SERVER_CODEX_ACCOUNT_ID = "server_codex_login"
+SERVER_CODEX_POOL_ID = "server_codex_pool"
 
 
 class CompanyProviderSecrets(BaseModel):
@@ -55,7 +58,7 @@ def load_company_provider_secrets(
         raise ModelConfigError(f"Company provider secret JSON is invalid: {config_path}") from exc
     if not isinstance(payload, dict):
         raise ModelConfigError(f"Company provider secret JSON must be an object: {config_path}")
-    payload = _with_image_relay_service(payload)
+    payload = _with_server_codex_service(_with_image_relay_service(payload))
     try:
         return CompanyProviderSecrets.model_validate(payload)
     except ValidationError as exc:
@@ -83,6 +86,60 @@ def resolve_ref(root: dict[str, Any], ref: str) -> Any:
             raise ModelConfigError(f"Provider config reference not found: {ref}")
         current = current[part]
     return current
+
+
+def _with_server_codex_service(payload: dict[str, Any]) -> dict[str, Any]:
+    services = payload.get("services")
+    if not isinstance(services, dict):
+        return payload
+    if SERVER_CODEX_SERVICE_ID in services:
+        existing = services.get(SERVER_CODEX_SERVICE_ID)
+        if not isinstance(existing, dict) or existing.get("provider") != "codex_local" or existing.get("capability") != "llm":
+            raise ModelConfigError("server_codex must remain a codex_local llm service")
+        return payload
+    next_payload = dict(payload)
+    accounts = dict(payload.get("accounts") or {})
+    accounts[SERVER_CODEX_ACCOUNT_ID] = {
+        "auth_type": "none",
+        "execution_backend": "codex_exec",
+        "default_models": {"llm": "server-codex-login"},
+    }
+    next_payload["accounts"] = accounts
+    account_pools = dict(payload.get("account_pools") or {})
+    account_pools[SERVER_CODEX_POOL_ID] = {
+        "accounts": [{
+            "account_id": SERVER_CODEX_ACCOUNT_ID,
+            "service_id": SERVER_CODEX_SERVICE_ID,
+            "enabled_capabilities": ["llm"],
+            "enabled": True,
+            "priority": 1,
+            "weight": 1,
+            "concurrency_limit": 1,
+            "health_state": "unknown",
+        }]
+    }
+    next_payload["account_pools"] = account_pools
+    next_services = dict(services)
+    next_services[SERVER_CODEX_SERVICE_ID] = {
+        "provider": "codex_local",
+        "account_ref": SERVER_CODEX_ACCOUNT_ID,
+        "capability": "llm",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "llm",
+            "execution_mode": "sync",
+            "capabilities": ["llm"],
+            "account_pool_id": SERVER_CODEX_POOL_ID,
+            "reference_image_slots": 0,
+            "supported_aspect_ratios": ["1:1"],
+            "prompt_char_limit": 12000,
+            "seed_supported": False,
+            "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        },
+    }
+    next_payload["services"] = next_services
+    return next_payload
 
 
 def _with_image_relay_service(payload: dict[str, Any]) -> dict[str, Any]:

@@ -66,6 +66,47 @@ def test_creator_pending_command_round_trips_through_server_state(tmp_path) -> N
     assert recovered.json()["state"]["creator_authoring"]["pending_command"] == pending
 
 
+def test_director_draft_round_trips_through_studio_state_sanitizer(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "creator-state-director-draft"
+    _project(client, project_id)
+
+    response = client.put(
+        f"/projects/{project_id}/studio-state",
+        json={
+            "state": {
+                "nodes": {
+                    "shot-alpha": {
+                        "id": "shot-alpha",
+                        "type": "script",
+                        "title": "镜头 Alpha",
+                        "params": {
+                            "nodeRole": "storyboard_shot",
+                            "directorDraft": {
+                                "text": "先复核主体方向，再进入审核。",
+                                "scope": "current_shot",
+                                "updated_at": "2026-07-17T00:00:00+00:00",
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    )
+    assert response.status_code == 200, response.text
+    saved = response.json()["state"]["nodes"]["shot-alpha"]["params"]["directorDraft"]
+    assert saved == {
+        "text": "先复核主体方向，再进入审核。",
+        "scope": "current_shot",
+        "updated_at": "2026-07-17T00:00:00+00:00",
+    }
+
+    restarted = TestClient(create_runtime_app(runtime_root=tmp_path))
+    recovered = restarted.get(f"/projects/{project_id}/studio-state")
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["state"]["nodes"]["shot-alpha"]["params"]["directorDraft"] == saved
+
+
 def test_pending_command_accepts_canonical_episode_ref_union_and_rejects_aliases(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "creator-state-canonical-union"

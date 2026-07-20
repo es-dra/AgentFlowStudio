@@ -17,11 +17,11 @@ export function dragSession(store, nodeIds, e, meta = {}) {
   };
 }
 
-export function selectInRect(store, rectScreen) {
+export function selectInRect(store, rectCanvas) {
   const state = store.get();
   const vp = state.viewport;
-  const topLeft = screenToWorld(vp, rectScreen.x, rectScreen.y);
-  const bottomRight = screenToWorld(vp, rectScreen.x + rectScreen.w, rectScreen.y + rectScreen.h);
+  const topLeft = screenToWorld(vp, rectCanvas.x, rectCanvas.y);
+  const bottomRight = screenToWorld(vp, rectCanvas.x + rectCanvas.w, rectCanvas.y + rectCanvas.h);
   const worldRect = { x: topLeft.x, y: topLeft.y, w: bottomRight.x - topLeft.x, h: bottomRight.y - topLeft.y };
   const hit = Object.values(state.nodes)
     .filter((n) => rectsIntersect(worldRect, { x: n.x, y: n.y, w: n.w, h: effectiveHeight(n) }))

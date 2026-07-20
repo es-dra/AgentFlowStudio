@@ -62,7 +62,8 @@ function openCanvasMenu(store, runtime, point, callbacks) {
 
 function fitCurrentCanvas(store) {
   store.set((s) => {
-    s.viewport = fitVisibleCanvasViewport(s.nodes);
+    const viewport = fitVisibleCanvasViewport(s.nodes);
+    if (viewport) s.viewport = viewport;
   }, { history: false, persist: false });
 }
 

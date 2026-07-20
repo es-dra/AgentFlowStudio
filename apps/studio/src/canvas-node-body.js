@@ -7,6 +7,7 @@ import { generationStatusCard } from "./generation-status-view.js";
 import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
+import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -24,6 +25,10 @@ export function buildNodeBody(node, def, store = null) {
   if (node.status === "error") return withCreativeRuntimeContract(node, errorBody(node));
   if (node.content) {
     out.push(contentBlock(node, store));
+    return withCreativeRuntimeContract(node, out);
+  }
+  if (isEditableContentNode(node) && store) {
+    out.push(editableContentBlock(node, store, false));
     return withCreativeRuntimeContract(node, out);
   }
   return withCreativeRuntimeContract(node, emptyBody(node, def));
@@ -86,6 +91,8 @@ export function nodeBodySignature(node) {
     directorSig,
     node.params?.appliedDownstreamCount || 0,
     node.params?.scriptExpansionState?.status || "",
+    node.params?.productionGraphProjection || "",
+    node.params?.productionGraphLegacyProjection || "",
   ].join("|");
 }
 
@@ -217,29 +224,33 @@ function editableContentBlock(node, store, expanding) {
   const assetCardEditor = node.params?.assetCardDraft ? " asset-card-content-editor" : "";
   textarea.className = `text-content-view node-content-editor${assetCardEditor}${expanding ? " content-shimmer" : ""}`;
   textarea.value = node.content || "";
+  textarea.placeholder = node.type === "script" ? "输入剧本、分镜或制作说明" : "输入想法、剧本文字或参考说明";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
-  textarea.addEventListener("input", () => {
-    store.set((s) => {
-      const target = s.nodes[node.id];
-      if (!target) return;
-      target.content = textarea.value;
-      target.prompt = textarea.value;
-      target.status = target.status === "empty" ? "complete" : target.status;
-      if (target.params?.assetCardDraft) {
-        target.params.assetCardDraft.user_edited_text = textarea.value;
-        target.params.assetCardDraft.updated_by_user = true;
-      }
-    }, { history: false });
-  });
+  bindStableTextInputLifecycle(textarea, () => persistEditorValue(textarea, node, store));
   bindAssetMentionSuggestions(textarea, store, node.id);
-  textarea.addEventListener("pointerdown", (event) => event.stopPropagation());
-  textarea.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
   return textarea;
 }
 
 function isEditableContentNode(node) {
+  if (node.params?.scriptCoreProjection) return false;
+  if (node.params?.productionPlanProjection) return false;
+  if (node.params?.productionGraphProjection || node.params?.productionGraphLegacyProjection) return false;
   return node.type === "text" || node.type === "script" || Boolean(node.params?.assetCardDraft);
+}
+
+function persistEditorValue(textarea, node, store) {
+  store.set((s) => {
+    const target = s.nodes[node.id];
+    if (!target) return;
+    target.content = textarea.value;
+    target.prompt = textarea.value;
+    target.status = target.status === "empty" ? "complete" : target.status;
+    if (target.params?.assetCardDraft) {
+      target.params.assetCardDraft.user_edited_text = textarea.value;
+      target.params.assetCardDraft.updated_by_user = true;
+    }
+  }, { history: false, renderScope: "canvas-local-edit" });
 }
 
 function errorBody(node) {
@@ -259,20 +270,8 @@ function errorBody(node) {
 
 function emptyBody(node, def) {
   const out = [iconBlock(def.icon)];
-  if (def.intents.length && !["image", "video"].includes(node.type)) {
-    out.push(textBlock("node-empty-label", "尝试:"));
-    const list = document.createElement("div");
-    list.className = "node-intents";
-    for (const intent of def.intents) {
-      const btn = document.createElement("button");
-      btn.className = "node-intent";
-      btn.dataset.action = "intent";
-      btn.dataset.intent = intent.label;
-      btn.innerHTML = `<span class="intent-icon">${icon(intent.icon, 13)}</span><span>${intent.label}</span>`;
-      list.appendChild(btn);
-    }
-    out.push(list);
-  }
+  if (node.type === "text" || node.type === "script") out.push(textBlock("node-empty-label", "输入故事、剧本或制作说明后，可从节点工具条默认优化。"));
+  else out.push(textBlock("node-empty-label", def.upload ? "上传或连接参考后继续。" : "选择该节点后查看可用动作。"));
   return out;
 }
 

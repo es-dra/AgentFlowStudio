@@ -27,7 +27,11 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   let projectAccessRecovery = null;
 
   async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true, recoverOnDenied = true } = {}) {
-    const safe = safeProjectId(projectId) || "studio-local-001";
+    const safe = safeProjectId(projectId);
+    if (!safe) {
+      await showEmptyProjectState();
+      return;
+    }
     persistActiveProject(safe);
     rememberProject(safe);
     syncProjectUrl(safe);
@@ -106,7 +110,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   }
 
   async function switchProject(projectId) {
-    const safe = safeProjectId(projectId) || "studio-local-001";
+    const safe = safeProjectId(projectId);
     if (!safe || safe === getRuntime().projectId) {
       return;
     }
@@ -120,18 +124,14 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       if (name === null) return false;
       const suffix = Math.random().toString(36).slice(2, 8);
       const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
-      const projectName = name.trim() || "AFS Studio project";
+      const projectName = name.trim() || "未命名项目";
       const nextRuntime = createRuntimeClient(projectId);
-      const created = await createProjectWithRetry(nextRuntime, {
+      await createProjectWithRetry(nextRuntime, {
         project_id: projectId,
         project_type: "studio_creator_authoring",
         goal: projectName,
       });
       await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
-      const creatorEntry = created?.episode_bootstrap?.workspace_entry?.href;
-      if (creatorEntry) {
-        window.location.assign(creatorEntry);
-      }
       return true;
     } catch (error) {
       reportProjectCreateClientError(getRuntime(), error, safeError);
@@ -288,7 +288,7 @@ function requestProjectName(existingProjects = []) {
     field.appendChild(el("span", "", "项目名称"));
     const input = document.createElement("input");
     input.type = "text";
-    input.value = uniqueProjectName("AFS 内测项目", existingProjects);
+    input.value = uniqueProjectName("未命名项目", existingProjects);
     input.maxLength = 80;
     field.appendChild(input);
     const error = el("div", "modal-error");
@@ -362,7 +362,7 @@ function isDuplicateProjectName(name, projects) {
 }
 
 function uniqueProjectName(baseName, projects) {
-  const base = String(baseName || "AFS 内测项目").trim() || "AFS 内测项目";
+  const base = String(baseName || "未命名项目").trim() || "未命名项目";
   if (!isDuplicateProjectName(base, projects)) return base;
   for (let index = 2; index < 1000; index += 1) {
     const candidate = `${base} ${index}`;

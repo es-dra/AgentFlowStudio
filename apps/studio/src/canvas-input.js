@@ -1,7 +1,7 @@
 import { findPortAtPoint, finishConnectSession, moveConnectSession, startConnectSession } from "./canvas-connection.js";
 import { handleCanvasNodeClick } from "./canvas-node-action-handler.js";
 import { dragSession, isEditable, selectInRect, updatePortHover } from "./canvas-selection.js";
-import { screenToWorld, zoomAt } from "./geometry.js";
+import { clientToCanvasPoint, clientToWorld, zoomAt } from "./geometry.js";
 import { applyEdgeAutoPan } from "./interaction/auto-pan.js";
 import { beginDragFeedback, finishDragFeedback, updateDragFeedback } from "./interaction/feedback-layer.js";
 import { clearPortMagnet, outputPortFromMagnet, updatePortMagnet } from "./interaction/port-magnet.js";
@@ -18,6 +18,7 @@ export function bindCanvasInput(store, runtime) {
   const rootEl = document.getElementById("canvas-root");
   let spaceHeld = false;
   let session = null;
+  let lastBlankPointerUp = null;
   let cancelPanMomentum = null;
   const stopPanMomentum = () => {
     if (cancelPanMomentum) cancelPanMomentum();
@@ -47,7 +48,9 @@ export function bindCanvasInput(store, runtime) {
   });
   rootEl.addEventListener("pointerup", (e) => {
     if (!session) return;
+    const finishedSession = session;
     cancelPanMomentum = handlePointerUp(e, { store, runtime, session, viewportEl, rootEl });
+    lastBlankPointerUp = maybeOpenBlankPointerMenu(e, { session: finishedSession, runtime, store, previous: lastBlankPointerUp });
     session = null;
   });
   rootEl.addEventListener("click", (e) => handleCanvasNodeClick(store, runtime, e));
@@ -83,7 +86,8 @@ function bindViewportWheel(rootEl, store, stopPanMomentum) {
     store.set((s) => {
       if (e.ctrlKey || e.metaKey) {
         const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-        s.viewport = zoomAt(s.viewport, e.clientX, e.clientY, factor);
+        const point = clientToCanvasPoint(e.clientX, e.clientY, rootEl);
+        s.viewport = zoomAt(s.viewport, point.x, point.y, factor);
       } else {
         s.viewport.x -= e.shiftKey ? e.deltaY : e.deltaX;
         s.viewport.y -= e.shiftKey ? 0 : e.deltaY;
@@ -93,7 +97,29 @@ function bindViewportWheel(rootEl, store, stopPanMomentum) {
 }
 
 function bindQuickMenus(rootEl, store, runtime) {
+  let lastBlankClick = null;
+  rootEl.addEventListener("click", (e) => {
+    if (hasOpenOverlay()) {
+      lastBlankClick = null;
+      return;
+    }
+    if (!isBlankCanvasDoubleClick(e)) {
+      lastBlankClick = null;
+      return;
+    }
+    const now = performance.now();
+    const previous = lastBlankClick;
+    lastBlankClick = { x: e.clientX, y: e.clientY, at: now };
+    if (!previous) return;
+    const closeInTime = now - previous.at <= 460;
+    const closeInSpace = Math.abs(e.clientX - previous.x) + Math.abs(e.clientY - previous.y) <= 10;
+    if (!closeInTime || !closeInSpace) return;
+    lastBlankClick = null;
+    e.preventDefault();
+    openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
+  });
   rootEl.addEventListener("dblclick", (e) => {
+    if (hasOpenOverlay()) return;
     const nodeEl = closestFromEvent(e, ".node");
     if (nodeEl) {
       if (!closestFromEvent(e, ".node-content-editor")) {
@@ -103,6 +129,7 @@ function bindQuickMenus(rootEl, store, runtime) {
       return;
     }
     if (!isBlankCanvasDoubleClick(e)) return;
+    lastBlankClick = null;
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
   rootEl.addEventListener("contextmenu", (e) => {
@@ -111,6 +138,21 @@ function bindQuickMenus(rootEl, store, runtime) {
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
+}
+
+function maybeOpenBlankPointerMenu(e, { session, runtime, store, previous }) {
+  if (hasOpenOverlay()) return null;
+  if (session?.kind !== "marquee" || session.rect) return null;
+  if (!isBlankCanvasDoubleClick(e)) return null;
+  const now = performance.now();
+  const current = { x: e.clientX, y: e.clientY, at: now };
+  if (!previous) return current;
+  const closeInTime = now - previous.at <= 460;
+  const closeInSpace = Math.abs(e.clientX - previous.x) + Math.abs(e.clientY - previous.y) <= 10;
+  if (!closeInTime || !closeInSpace) return current;
+  e.preventDefault();
+  openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
+  return null;
 }
 
 function isBlankCanvasDoubleClick(e) {
@@ -217,8 +259,8 @@ function handlePointerMove(e, { store, session, rootEl }) {
 function moveNodeSession(store, session, e, rootEl) {
   applyEdgeAutoPan(store, rootEl, e);
   const state = store.get();
-  session.startWorld = session.startWorld || screenToWorld(state.viewport, session.startX, session.startY);
-  const currentWorld = screenToWorld(state.viewport, e.clientX, e.clientY);
+  session.startWorld = session.startWorld || clientToWorld(state.viewport, session.startX, session.startY, rootEl);
+  const currentWorld = clientToWorld(state.viewport, e.clientX, e.clientY, rootEl);
   const dx = currentWorld.x - session.startWorld.x;
   const dy = currentWorld.y - session.startWorld.y;
   if (Math.abs(dx) + Math.abs(dy) <= 2 && !session.moved) return;
@@ -247,10 +289,12 @@ function moveMarquee(session, e) {
     session.el.id = "marquee";
     document.getElementById("canvas-root").appendChild(session.el);
   }
-  const x = Math.min(session.startX, e.clientX);
-  const y = Math.min(session.startY, e.clientY);
-  const w = Math.abs(e.clientX - session.startX);
-  const h = Math.abs(e.clientY - session.startY);
+  const start = clientToCanvasPoint(session.startX, session.startY);
+  const current = clientToCanvasPoint(e.clientX, e.clientY);
+  const x = Math.min(start.x, current.x);
+  const y = Math.min(start.y, current.y);
+  const w = Math.abs(current.x - start.x);
+  const h = Math.abs(current.y - start.y);
   Object.assign(session.el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
   session.rect = { x, y, w, h };
 }
@@ -278,6 +322,8 @@ function finishMarquee(store, session) {
 
 function isChromeTarget(e) {
   return e.target.closest(".prompt-bar")
+    || e.target.closest("#canvas-empty-hint")
+    || e.target.closest("button,input,textarea,select,a")
     || e.target.closest("#dock")
     || e.target.closest("#drawer")
     || e.target.closest("#topbar")
