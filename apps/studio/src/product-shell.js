@@ -2,7 +2,7 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 
 export function createProductShell(options = {}) {
@@ -15,6 +15,7 @@ export function createProductShell(options = {}) {
   let mobileAgentOpen = false;
   let notice = "";
   let pendingGraphImpact = null;
+  let m6SourceText = "";
   let graphRefreshPending = false;
   let agentChatWidth = readAgentChatWidth();
   const agentChatContexts = createAgentChatContextStore();
@@ -278,6 +279,19 @@ export function createProductShell(options = {}) {
     status.setAttribute("aria-live", "polite");
     if (view.planningRequired) {
       status.append(node("strong", "", "需要确认制作方案"), node("span", "", "先输入或导入剧本；已有结构化制作方案时，可在 Agent Chat 中预览后确认。"));
+      const planner = node("div", "m6-script-plan-entry");
+      const textarea = document.createElement("textarea");
+      textarea.rows = 5;
+      textarea.value = m6SourceText;
+      textarea.placeholder = "角色、场景、目标、冲突、道具和剧本段落";
+      textarea.setAttribute("aria-label", "输入想法或已有剧本");
+      textarea.addEventListener("input", () => {
+        m6SourceText = textarea.value;
+      });
+      const preview = node("button", "studio-primary-button", "生成剧本制作方案");
+      preview.type = "button";
+      preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
+      planner.append(textarea, preview);
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "application/json,.json";
@@ -299,7 +313,7 @@ export function createProductShell(options = {}) {
           input.value = "";
         }
       });
-      status.append(importButton, input);
+      status.append(planner, importButton, input);
       return status;
     }
     if (view.status !== "ready") {
@@ -352,6 +366,27 @@ export function createProductShell(options = {}) {
     agentCollapsed = false;
     mobileAgentOpen = true;
     notice = "制作方案已送入 Agent Chat；确认前不会建立制作图。";
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  async function previewM6ScriptPlan(sourceText) {
+    try {
+      const preview = await options.getRuntime?.().previewM6ScriptPlanAssetBible({
+        source_kind: "idea",
+        source_text: sourceText,
+      });
+      const context = currentAgentChatContext();
+      context.context_key = agentChatContextKey(context);
+      const session = agentChatContexts.get(context.context_key);
+      stageM6ScriptPlanCandidateCommand(session, context, preview);
+      projectDrawerOpen = false;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = "M6方案已送入 Agent Chat；确认前不会建立制作图。";
+    } catch (error) {
+      notice = error?.message || "M6方案生成失败，项目未改变。";
+    }
     render();
     requestCanvasSafeAreaUpdate();
   }

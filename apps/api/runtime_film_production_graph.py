@@ -75,18 +75,26 @@ def compile_film_candidate(project_id: str, candidate: Mapping[str, Any]) -> lis
                                                            "target_duration_seconds": float(sequence.get("target_duration_seconds") or 0)}),
                        _relation(revision_id, sequence_id, "derived_from")])
     for item in characters:
-        events.extend([_node(item["character_id"], "entity", {"display_name": item["display_name"], "aliases": list(item.get("aliases", []))}),
+        metadata = _film_metadata(item, exclude={"character_id"})
+        metadata.update({"display_name": item["display_name"], "aliases": list(item.get("aliases", []))})
+        events.extend([_node(item["character_id"], "entity", metadata),
                        _relation(revision_id, item["character_id"], "derived_from")])
     for item in scenes:
-        events.extend([_node(item["scene_id"], "location", {"name": item.get("name", ""), "lineage": list(item.get("lineage", []))}),
+        metadata = _film_metadata(item, exclude={"scene_id"})
+        metadata.update({"name": item.get("name", ""), "lineage": list(item.get("lineage", []))})
+        events.extend([_node(item["scene_id"], "location", metadata),
                        _relation(revision_id, item["scene_id"], "derived_from")])
         if sequence_id: events.append(_relation(sequence_id, item["scene_id"], "contains"))
     for item in assets:
-        events.extend([_node(item["asset_id"], "resource", {"name": item.get("name", ""), "kind": item.get("kind", "")}),
+        metadata = _film_metadata(item, exclude={"asset_id"})
+        metadata.update({"name": item.get("name", ""), "kind": item.get("kind", "")})
+        events.extend([_node(item["asset_id"], "resource", metadata),
                        _relation(revision_id, item["asset_id"], "derived_from")])
     for item in shots:
         shot_id = item["shot_id"]
-        events.append(_node(shot_id, "unit", {"duration_seconds": item["duration_seconds"], "intent": item.get("intent", "")}))
+        metadata = _film_metadata(item, exclude={"shot_id", "scene_id", "character_refs", "asset_refs"})
+        metadata.update({"duration_seconds": item["duration_seconds"], "intent": item.get("intent", "")})
+        events.append(_node(shot_id, "unit", metadata))
         events.append(_relation(item["scene_id"], shot_id, "contains"))
         for ref in [*item.get("character_refs", []), *item.get("asset_refs", [])]: events.append(_relation(ref, shot_id, "required_by"))
         events.append({"type": "work_created", "work_id": f"work-{shot_id}", "semantic_digest": canonical_digest(item),
@@ -224,6 +232,15 @@ def _node(node_id: str, category: str, metadata: Mapping[str, Any]) -> dict[str,
 
 def _relation(from_id: str, to_id: str, relation_type: str) -> dict[str, Any]:
     return {"type": "relation_upserted", "from_id": from_id, "to_id": to_id, "relation_type": relation_type}
+
+
+def _film_metadata(item: Mapping[str, Any], *, exclude: set[str]) -> dict[str, Any]:
+    metadata = {}
+    for key, value in item.items():
+        if key in exclude:
+            continue
+        metadata[key] = deepcopy(value)
+    return metadata
 
 
 def _mapping(value: Mapping[str, Any], name: str) -> dict[str, Any]:

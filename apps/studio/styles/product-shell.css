@@ -679,6 +679,30 @@ body,
 .graph-canvas-status strong { font-size: 12px; }
 .graph-canvas-status span { overflow: hidden; color: var(--product-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .graph-canvas-status.planning_required { grid-template-columns: auto minmax(0, 1fr); border-color: rgba(217, 154, 43, .5); }
+.m6-script-plan-entry {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: min(480px, calc(100vw - 48px));
+}
+.m6-script-plan-entry textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 86px;
+  max-height: 150px;
+  resize: vertical;
+  border: 1px solid var(--product-line);
+  border-radius: 5px;
+  padding: 9px 10px;
+  background: #0c1821;
+  color: var(--product-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.m6-script-plan-entry textarea::placeholder { color: var(--product-muted); }
 
 .canvas-workspace-stage #studio-editor-shell {
   position: absolute;
@@ -1033,6 +1057,9 @@ body,
     max-width: none;
     grid-template-columns: auto minmax(0, 1fr);
   }
+
+  .m6-script-plan-entry { grid-template-columns: 1fr; min-width: 0; }
+  .m6-script-plan-entry textarea { min-height: 74px; }
 
   .graph-canvas-status .studio-text-button { display: none; }
 }

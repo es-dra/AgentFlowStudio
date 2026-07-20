@@ -372,6 +372,8 @@ function inferUserAction(route, method) {
   if (/\/m3-zero-cost\/context-packs\/confirm$/.test(route) && method === "POST") return "confirm_m3_context_pack";
   if (/\/m3-zero-cost\/context-packs\/undo$/.test(route) && method === "POST") return "undo_m3_context_pack";
   if (/\/m3-zero-cost\/audit-truth$/.test(route) && method === "GET") return "load_m3_zero_cost_audit_truth";
+  if (/\/m6\/script-plan-asset-bible\/preview$/.test(route) && method === "POST") return "preview_m6_script_plan_asset_bible";
+  if (/\/m6\/script-plan-asset-bible\/confirm$/.test(route) && method === "POST") return "confirm_m6_script_plan_asset_bible";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -507,6 +509,12 @@ export function createRuntimeClient(projectId = "") {
     },
     confirmSequenceAction(payload) {
       return requestJson(`/projects/${encoded}/m5/actions/confirm`, { method: "POST", payload });
+    },
+    previewM6ScriptPlanAssetBible(payload) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview`, { method: "POST", payload });
+    },
+    confirmM6ScriptPlanAssetBible(payload) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/confirm`, { method: "POST", payload });
     },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });

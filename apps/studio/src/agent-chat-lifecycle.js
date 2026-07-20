@@ -110,6 +110,8 @@ export function agentChatContextSnapshot({
       "m3_zero_cost_context_pack",
       "feedback_not_memory_contract",
       "knowledge_pack_scoped_retrieval",
+      "m6_script_plan_asset_bible_contract",
+      "m6_professional_review_roles",
     ],
     storyboard_mode: "read_only_deferred",
     remote_dispatch_count: 0,
@@ -175,6 +177,40 @@ export function stageProductionGraphCandidateCommand(session, context, candidate
   return command;
 }
 
+export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
+  const candidate = preview?.candidate || {};
+  const validation = preview?.validation || {};
+  const characters = Array.isArray(candidate.characters) ? candidate.characters.length : 0;
+  const scenes = Array.isArray(candidate.scenes) ? candidate.scenes.length : 0;
+  const shots = Array.isArray(candidate.shots) ? candidate.shots.length : 0;
+  const roles = Array.isArray(validation.review_roles) ? validation.review_roles.length : 0;
+  if (!session || candidate.m6_schema_version !== "afs.m6.script_plan_asset_bible.v0.1" || !characters || !scenes || !shots || roles < 6) {
+    throw new Error("M6候选需要专业剧本、动态分镜、资产Bible和六视角审核合同");
+  }
+  const command = {
+    schema_version: SCHEMA_VERSION,
+    command_id: `command_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "m6_script_plan_asset_bible",
+    graph_action: "confirm_m6_script_plan_asset_bible",
+    title: "确认M6剧本制作方案",
+    summary: `确认后写入同一ProductionGraph：${characters} 个角色、${scenes} 个场景、${shots} 个动态镜头、${roles} 个审核视角。`,
+    status: "preview",
+    execution_mode: "runtime",
+    context_key: context?.context_key || agentChatContextKey(context),
+    project_id: context?.project_id || "",
+    graph_version: Number(context?.production_graph_version || 0),
+    graph_digest: context?.production_graph_digest || "",
+    candidate,
+    m6_validation: validation,
+    storyboard_write: false,
+    provider_dispatch_count: 0,
+  };
+  appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
+  session.pendingCommand = command;
+  appendMessage(session, { role: "assistant", text: "已生成M6方案预览；确认前不会写入制作图、调用Provider或改变画布事实。" });
+  return command;
+}
+
 export function submitAgentChatMessage(session, rawText, context) {
   const commandText = cleanSourceText(rawText, 12000);
   const displayText = cleanText(rawText, 900);
@@ -234,7 +270,16 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   let response = null;
   let runtimeReceipt = null;
   let projectionDomain = "script_core";
-  if (command.command_type === "m5_graph_candidate") {
+  if (command.command_type === "m6_script_plan_asset_bible") {
+    response = await runtime.confirmM6ScriptPlanAssetBible({
+      expected_graph_version: command.graph_version,
+      idempotency_key: command.command_id,
+      candidate: command.candidate,
+    });
+    const graph = response?.graph || {};
+    runtimeReceipt = { graph_version: graph.version, graph_digest: graph.graph_digest, recovery: "refresh_and_retry_on_version_conflict" };
+    projectionDomain = "production_graph";
+  } else if (command.command_type === "m5_graph_candidate") {
     response = await runtime.confirmFilmCandidate({
       expected_graph_version: command.graph_version,
       idempotency_key: command.command_id,
@@ -341,6 +386,7 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
 function productionGraphAgentReceipt(command, runtimeReceipt = {}) {
   const actionSummaries = {
     confirm_candidate: "可信制作方案已建立为唯一制作图版本；画布与故事板将同步刷新。",
+    confirm_m6_script_plan_asset_bible: "M6剧本、动态拆镜与资产Bible已写入同一制作图；画布、故事板与Agent Chat将同步消费。",
     mutate: "局部修改已确认；仅证据关联的下游对象进入待处理，未关联产物继续保留。",
     select_candidate: "候选版本已选定并写入制作图版本记录。",
     review_decision: command.payload?.state === "approved" ? "专业审核已通过并写入制作图。" : "专业审核已退回，原候选与证据仍保留。",
