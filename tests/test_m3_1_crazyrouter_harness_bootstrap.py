@@ -372,10 +372,13 @@ def test_harness_runs_six_mocked_requests_without_secret_or_canonical_writes(tmp
 
 def test_bootstrap_content_is_exact_unit_not_wildcard() -> None:
     candidate = Path(__file__).resolve().parents[1]
-    unit = bundle_builder._unit_file(candidate)
-    runner = bundle_builder._runner_script(candidate, "a" * 40, "b" * 64)
+    target_candidate = "/home/afs-ops/AgentFlowStudio"
+    unit = bundle_builder._unit_file(candidate, target_candidate_dir=target_candidate)
+    runner = bundle_builder._runner_script(candidate, "a" * 40, "b" * 64, target_candidate_dir=target_candidate)
     sudoers = bundle_builder._sudoers()
 
+    assert "Documentation=file:///home/afs-ops/AgentFlowStudio/tools/m3_1_crazyrouter_provider_harness.py" in unit
+    assert "WorkingDirectory=/home/afs-ops/AgentFlowStudio" in unit
     assert "EnvironmentFile=/etc/afs/afs-runtime.env" in unit
     assert "AFS_PROVIDER_CONFIG=/etc/afs/m3-1-crazyrouter.providers.json" in unit
     assert "AFS_PROVIDER_CONFIG=/etc/afs/providers.local.json" not in unit
@@ -386,7 +389,9 @@ def test_bootstrap_content_is_exact_unit_not_wildcard() -> None:
     assert "EXPECTED_HEAD=" in runner
     assert "EXPECTED_HARNESS_SHA256=" in runner
     assert "EXPECTED_PROVIDER_CONFIG_SHA256=" in runner
-    assert f'CANDIDATE_DIR="{candidate}"' in runner
+    assert f'CANDIDATE_DIR="{target_candidate}"' in runner
+    assert "D:" not in unit
+    assert "\\" not in unit
     assert "/home/afs-ops/.codex/worktrees/afs-m3-0-zero-cost-knowledge-context-audit-20260718" not in runner
     assert "\\home\\afs-ops" not in runner
     assert 'PROVIDER_CONFIG="/etc/afs/m3-1-crazyrouter.providers.json"' in runner

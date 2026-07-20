@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,15 +20,16 @@ if str(ROOT) not in sys.path:
 
 
 DEFAULT_CANDIDATE = Path(os.environ.get("AFS_M3_1_DEFAULT_CANDIDATE", str(ROOT)))
-PROVIDER_CONFIG = Path("/etc/afs/providers.local.json")
-M3_1_PROVIDER_CONFIG_TARGET = Path("/etc/afs/m3-1-crazyrouter.providers.json")
-ENV_FILE = Path("/etc/afs/afs-runtime.env")
-PYTHON = Path("/opt/afs/AgentFlowStudio/.venv/bin/python")
+DEFAULT_TARGET_CANDIDATE_DIR = os.environ.get("AFS_M3_1_TARGET_CANDIDATE_DIR", "/home/afs-ops/AgentFlowStudio")
+PROVIDER_CONFIG = "/etc/afs/providers.local.json"
+M3_1_PROVIDER_CONFIG_TARGET = "/etc/afs/m3-1-crazyrouter.providers.json"
+ENV_FILE = "/etc/afs/afs-runtime.env"
+PYTHON = "/opt/afs/AgentFlowStudio/.venv/bin/python"
 HARNESS_REL = Path("tools/m3_1_crazyrouter_provider_harness.py")
 PROVIDER_MANIFEST_REL = Path("configs/m3_1_crazyrouter_provider.manifest.json")
-RUNNER_TARGET = Path("/usr/local/sbin/afs-m3-1-crazyrouter-runner")
-UNIT_TARGET = Path("/etc/systemd/system/afs-m3-1-crazyrouter.service")
-SUDOERS_TARGET = Path("/etc/sudoers.d/afs-m3-1-crazyrouter")
+RUNNER_TARGET = "/usr/local/sbin/afs-m3-1-crazyrouter-runner"
+UNIT_TARGET = "/etc/systemd/system/afs-m3-1-crazyrouter.service"
+SUDOERS_TARGET = "/etc/sudoers.d/afs-m3-1-crazyrouter"
 STATE_DIR = "afs-m3-1-crazyrouter"
 SERVICE_NAME = "afs-m3-1-crazyrouter.service"
 EXPECTED_HOST = "api.crazyrouter.com"
@@ -37,7 +39,11 @@ EXPECTED_MODEL = "qwen-plus"
 
 def main() -> int:
     args = parse_args()
-    bundle = build_bundle(candidate=Path(args.candidate), output_root=Path(args.output_root))
+    bundle = build_bundle(
+        candidate=Path(args.candidate),
+        output_root=Path(args.output_root),
+        target_candidate_dir=args.target_candidate_dir,
+    )
     print(json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
@@ -46,11 +52,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the non-secret M3.1 CrazyRouter admin bootstrap bundle.")
     parser.add_argument("--candidate", type=Path, default=DEFAULT_CANDIDATE)
     parser.add_argument("--output-root", type=Path, default=Path(tempfile.gettempdir()))
+    parser.add_argument("--target-candidate-dir", default=None, help="Absolute Linux path used by generated systemd scripts.")
     return parser.parse_args()
 
 
-def build_bundle(*, candidate: Path, output_root: Path) -> dict[str, Any]:
+def build_bundle(*, candidate: Path, output_root: Path, target_candidate_dir: str | None = None) -> dict[str, Any]:
     candidate = candidate.resolve()
+    linux_candidate = _linux_target_candidate(candidate, target_candidate_dir)
     head = _git(candidate, "rev-parse", "HEAD")
     short = head[:12]
     status = _git(candidate, "status", "--porcelain")
@@ -65,14 +73,14 @@ def build_bundle(*, candidate: Path, output_root: Path) -> dict[str, Any]:
         shutil.rmtree(bundle_dir)
     bundle_dir.mkdir(parents=True, mode=0o755)
     files = {
-        "afs-m3-1-crazyrouter-runner": _runner_script(candidate, head, harness_hash),
-        "afs-m3-1-crazyrouter.service": _unit_file(candidate),
+        "afs-m3-1-crazyrouter-runner": _runner_script(candidate, head, harness_hash, target_candidate_dir=linux_candidate),
+        "afs-m3-1-crazyrouter.service": _unit_file(candidate, target_candidate_dir=linux_candidate),
         "afs-m3-1-crazyrouter.sudoers": _sudoers(),
         PROVIDER_MANIFEST_REL.name: provider_manifest_path.read_text(encoding="utf-8"),
-        "install.sh": _install_script(candidate, head, harness_hash, provider_manifest_hash),
+        "install.sh": _install_script(candidate, head, harness_hash, provider_manifest_hash, target_candidate_dir=linux_candidate),
         "uninstall.sh": _uninstall_script(),
-        "README.md": _readme(candidate, head, harness_hash, provider_manifest_hash),
-        "manifest.json": json.dumps(_manifest(candidate, head, harness_hash, provider_manifest_hash), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        "README.md": _readme(linux_candidate, head, harness_hash, provider_manifest_hash),
+        "manifest.json": json.dumps(_manifest(linux_candidate, head, harness_hash, provider_manifest_hash), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
     }
     for name, content in files.items():
         path = bundle_dir / name
@@ -85,6 +93,7 @@ def build_bundle(*, candidate: Path, output_root: Path) -> dict[str, Any]:
     return {
         "bundle_dir": str(bundle_dir),
         "candidate": str(candidate),
+        "target_candidate_dir": linux_candidate,
         "head": head,
         "harness_sha256": harness_hash,
         "provider_manifest_sha256": provider_manifest_hash,
@@ -95,13 +104,14 @@ def build_bundle(*, candidate: Path, output_root: Path) -> dict[str, Any]:
     }
 
 
-def _runner_script(candidate: Path, head: str, harness_hash: str) -> str:
+def _runner_script(candidate: Path, head: str, harness_hash: str, *, target_candidate_dir: str | None = None) -> str:
+    linux_candidate = _linux_target_candidate(candidate, target_candidate_dir)
     return dedent(
         f"""\
         #!/usr/bin/env bash
         set -euo pipefail
 
-        CANDIDATE_DIR="{candidate}"
+        CANDIDATE_DIR="{linux_candidate}"
         EXPECTED_HEAD="{head}"
         HARNESS_PATH="$CANDIDATE_DIR/{HARNESS_REL.as_posix()}"
         EXPECTED_HARNESS_SHA256="{harness_hash}"
@@ -146,12 +156,13 @@ def _runner_script(candidate: Path, head: str, harness_hash: str) -> str:
     ).replace("__PROVIDER_CONFIG_SHA256__", _sha256_file(candidate / PROVIDER_MANIFEST_REL))
 
 
-def _unit_file(candidate: Path) -> str:
+def _unit_file(candidate: Path, *, target_candidate_dir: str | None = None) -> str:
+    linux_candidate = _linux_target_candidate(candidate, target_candidate_dir)
     return dedent(
         f"""\
         [Unit]
         Description=AFS M3.1 bounded CrazyRouter text provider harness
-        Documentation=file://{candidate}/tools/m3_1_crazyrouter_provider_harness.py
+        Documentation=file://{linux_candidate}/tools/m3_1_crazyrouter_provider_harness.py
         After=network-online.target
         Wants=network-online.target
 
@@ -159,7 +170,7 @@ def _unit_file(candidate: Path) -> str:
         Type=oneshot
         User=afs-ops
         Group=afs-ops
-        WorkingDirectory={candidate}
+        WorkingDirectory={linux_candidate}
         EnvironmentFile={ENV_FILE}
         Environment=AFS_PROVIDER_CONFIG={M3_1_PROVIDER_CONFIG_TARGET}
         Environment=AFS_ALLOW_REMOTE_LLM=true
@@ -196,7 +207,15 @@ def _sudoers() -> str:
     )
 
 
-def _install_script(candidate: Path, head: str, harness_hash: str, provider_manifest_hash: str) -> str:
+def _install_script(
+    candidate: Path,
+    head: str,
+    harness_hash: str,
+    provider_manifest_hash: str,
+    *,
+    target_candidate_dir: str | None = None,
+) -> str:
+    linux_candidate = _linux_target_candidate(candidate, target_candidate_dir)
     return dedent(
         f"""\
         #!/usr/bin/env bash
@@ -206,7 +225,7 @@ def _install_script(candidate: Path, head: str, harness_hash: str, provider_mani
           exit 2
         fi
         BUNDLE_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-        CANDIDATE_DIR="{candidate}"
+        CANDIDATE_DIR="{linux_candidate}"
         EXPECTED_HEAD="{head}"
         HARNESS_PATH="$CANDIDATE_DIR/{HARNESS_REL.as_posix()}"
         EXPECTED_HARNESS_SHA256="{harness_hash}"
@@ -278,7 +297,7 @@ def _uninstall_script() -> str:
     )
 
 
-def _readme(candidate: Path, head: str, harness_hash: str, provider_manifest_hash: str) -> str:
+def _readme(candidate: str, head: str, harness_hash: str, provider_manifest_hash: str) -> str:
     return dedent(
         f"""\
         # AFS M3.1 CrazyRouter Admin Bootstrap Bundle
@@ -332,22 +351,22 @@ def _readme(candidate: Path, head: str, harness_hash: str, provider_manifest_has
     )
 
 
-def _manifest(candidate: Path, head: str, harness_hash: str, provider_manifest_hash: str) -> dict[str, Any]:
+def _manifest(candidate: str, head: str, harness_hash: str, provider_manifest_hash: str) -> dict[str, Any]:
     return {
         "artifact_type": "afs_m3_1_crazyrouter_admin_bootstrap_bundle",
         "schema_version": "afs.m3_1.bootstrap_bundle.v0.1",
-        "candidate": str(candidate),
+        "candidate": candidate,
         "head": head,
         "harness_sha256": harness_hash,
-        "provider_config": str(M3_1_PROVIDER_CONFIG_TARGET),
+        "provider_config": M3_1_PROVIDER_CONFIG_TARGET,
         "provider_manifest_source": PROVIDER_MANIFEST_REL.as_posix(),
         "provider_manifest_sha256": provider_manifest_hash,
         "provider_service_id": EXPECTED_SERVICE_ID,
-        "env_file": str(ENV_FILE),
+        "env_file": ENV_FILE,
         "service": SERVICE_NAME,
-        "runner_target": str(RUNNER_TARGET),
-        "unit_target": str(UNIT_TARGET),
-        "sudoers_target": str(SUDOERS_TARGET),
+        "runner_target": RUNNER_TARGET,
+        "unit_target": UNIT_TARGET,
+        "sudoers_target": SUDOERS_TARGET,
         "state_directory": f"/var/lib/{STATE_DIR}",
         "contains_secret": False,
         "provider_calls_started_by_bundle_generation": False,
@@ -368,6 +387,19 @@ def _write_sha256s(bundle_dir: Path) -> None:
 def _git(cwd: Path, *args: str) -> str:
     result = subprocess.run(["git", "-C", str(cwd), *args], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return result.stdout.strip()
+
+
+def _linux_target_candidate(candidate: Path | str, target_candidate_dir: str | None = None) -> str:
+    raw = str(target_candidate_dir or candidate).replace("\\", "/")
+    if _looks_like_windows_path(raw):
+        raw = DEFAULT_TARGET_CANDIDATE_DIR
+    if not raw.startswith("/"):
+        raise ValueError("target candidate dir must be an absolute Linux path")
+    return raw.rstrip("/")
+
+
+def _looks_like_windows_path(value: str) -> bool:
+    return bool(re.match(r"^[A-Za-z]:/", value))
 
 
 def _sha256_file(path: Path) -> str:
