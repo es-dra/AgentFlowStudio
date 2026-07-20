@@ -33,7 +33,8 @@ export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
+  const graphReadOnly = node?.params?.productionGraphProjection || node?.params?.productionGraphLegacyProjection;
+  const show = node && !graphReadOnly && PROMPT_NODE_TYPES.has(node.type) && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {

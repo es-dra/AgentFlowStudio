@@ -201,13 +201,29 @@ function hydrateNodePreviews(nodes) {
 function sanitizeSnapshotForPersistence(snapshot, { stripProductionAuthority = false } = {}) {
   const projectId = safeProjectId(snapshot?.meta?.projectId);
   const nodes = {};
+  const projectedNodeIds = new Set();
   for (const [id, node] of Object.entries(snapshot.nodes || {})) {
     if (!node || typeof node !== "object") continue;
+    if (stripProductionAuthority && (
+      node.params?.productionGraphProjection === "canonical_production_graph_projection"
+      || node.params?.productionGraphLegacyProjection === "read_only_legacy_projection"
+    )) {
+      projectedNodeIds.add(id);
+      continue;
+    }
     nodes[id] = sanitizeNodeForPersistence(node, projectId);
+  }
+  const edges = {};
+  for (const [id, edge] of Object.entries(snapshot.edges || {})) {
+    if (!edge || typeof edge !== "object") continue;
+    if (projectedNodeIds.has(edge.from) || projectedNodeIds.has(edge.to) || (stripProductionAuthority && String(edge.relation_type || "").startsWith("production_graph_"))) continue;
+    edges[id] = edge;
   }
   return {
     ...snapshot,
     nodes,
+    edges,
+    order: (Array.isArray(snapshot.order) ? snapshot.order : []).filter((id) => !projectedNodeIds.has(id)),
     assets: sanitizeAssetsForPersistence(snapshot.assets || [], projectId),
     production: stripProductionAuthority ? {} : sanitizeProductionBinding(snapshot.production),
   };

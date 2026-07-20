@@ -56,6 +56,15 @@ def graph_lock_path(store: RuntimeStore, project_id: str) -> Path:
     return graph_path(store, project_id).with_suffix(".lock")
 
 
+def graph_has_authority(store: RuntimeStore, project_id: str) -> bool:
+    """Return whether a sealed, non-empty graph owns product mutations."""
+    path = graph_path(store, project_id)
+    if not path.exists():
+        return False
+    graph = ProductionGraphStore(store).load(project_id)
+    return bool(graph.get("nodes"))
+
+
 class ProductionGraphStore:
     """Append-only graph envelope with optimistic version and semantic replay."""
 
@@ -154,7 +163,8 @@ class ProductionGraphStore:
         return self.append(project_id, expected_version=expected_version, idempotency_key=idempotency_key,
                            semantic_digest=canonical_digest({"changed": sorted(changed_node_ids), "descendants": sorted(descendants)}),
                            events=[{"type": "nodes_invalidated", "changed_node_ids": changed_node_ids,
-                                    "invalidated_node_ids": sorted(descendants), "dependency_evidence": _dependency_evidence(graph, descendants)}])
+                                    "invalidated_node_ids": sorted(descendants),
+                                    "dependency_evidence": _dependency_evidence(graph, set(changed_node_ids), descendants)}])
 
     def reconcile(self, project_id: str, *, expected_version: int, attempt_id: str) -> dict[str, Any]:
         """A crash after dispatch becomes durable reconciliation, never a blind redispatch."""
@@ -259,15 +269,33 @@ def _apply_event(graph: dict[str, Any], event: dict[str, Any]) -> None:
         if not review_id or event.get("target_id") not in graph["nodes"]: raise ProductionGraphError("review references unknown target")
         graph["reviews"][review_id] = {"review_id": review_id, "target_id": event["target_id"], "state": event.get("state", "pending"),
                                         "evidence_refs": list(event.get("evidence_refs", []))}
+    elif event_type == "review_updated":
+        review = graph["reviews"].get(event.get("review_id"))
+        if not review: raise ProductionGraphError("review update references unknown review")
+        if event.get("state") not in {"pending", "approved", "rejected", "redo_planned"}:
+            raise ProductionGraphError("unsupported review state")
+        review["state"] = event["state"]
+        review["evidence_refs"] = list(event.get("evidence_refs", review.get("evidence_refs", [])))
     elif event_type == "delivery_recorded":
         delivery_id = str(event.get("delivery_id") or "")
         if not delivery_id or event.get("target_id") not in graph["nodes"]: raise ProductionGraphError("delivery references unknown target")
         graph["deliveries"][delivery_id] = {"delivery_id": delivery_id, "target_id": event["target_id"], "state": event.get("state", "planned"),
                                               "timeline_refs": list(event.get("timeline_refs", [])), "rights_refs": list(event.get("rights_refs", [])),
                                               "cost_refs": list(event.get("cost_refs", [])), "provenance_refs": list(event.get("provenance_refs", []))}
+    elif event_type == "delivery_updated":
+        delivery = graph["deliveries"].get(event.get("delivery_id"))
+        if not delivery: raise ProductionGraphError("delivery update references unknown delivery")
+        if event.get("state") not in {"planned", "review_ready", "blocked"}:
+            raise ProductionGraphError("unsupported delivery state")
+        delivery["state"] = event["state"]
     elif event_type == "nodes_invalidated":
         for node_id in event.get("invalidated_node_ids", []):
             if node_id in graph["nodes"]: graph["nodes"][node_id]["state"] = "invalidated"
+    elif event_type == "node_metadata_updated":
+        node = graph["nodes"].get(event.get("node_id"))
+        if not node: raise ProductionGraphError("mutation references unknown node")
+        node.setdefault("metadata", {}).update(dict(event.get("patch") or {}))
+        node["state"] = "active"
     else:
         raise ProductionGraphError(f"unsupported graph event {event_type}")
     graph["events"].append(event)
@@ -287,8 +315,27 @@ def _descendants(graph: Mapping[str, Any], changed: set[str]) -> set[str]:
     return descendants - changed
 
 
-def _dependency_evidence(graph: Mapping[str, Any], descendants: set[str]) -> list[dict[str, str]]:
-    return [dict(relation) for relation in graph["relations"] if relation["to_id"] in descendants]
+def impacted_descendants(graph: Mapping[str, Any], changed_node_ids: list[str]) -> dict[str, Any]:
+    changed = set(changed_node_ids)
+    if not changed <= set(graph.get("nodes", {})): raise ProductionGraphError("impact preview references unknown node")
+    descendants = _descendants(graph, changed)
+    return {"changed_node_ids": sorted(changed), "invalidated_node_ids": sorted(descendants),
+            "preserved_node_ids": sorted(set(graph["nodes"]) - descendants - changed),
+            "dependency_evidence": _dependency_evidence(graph, changed, descendants)}
+
+
+def _dependency_evidence(graph: Mapping[str, Any], changed: set[str], descendants: set[str]) -> list[dict[str, str]]:
+    evidence: list[dict[str, str]] = []
+    frontier = set(changed)
+    reached = set(changed)
+    while frontier:
+        layer = [relation for relation in graph["relations"]
+                 if relation["from_id"] in frontier and relation["to_id"] in descendants]
+        evidence.extend(dict(relation) for relation in layer)
+        next_ids = {relation["to_id"] for relation in layer} - reached
+        reached.update(next_ids)
+        frontier = next_ids
+    return evidence
 
 
 def _seal(graph: dict[str, Any]) -> None:

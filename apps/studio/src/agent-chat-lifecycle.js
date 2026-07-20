@@ -44,6 +44,7 @@ export function agentChatContextSnapshot({
   const activeNode = selectedNode || null;
   const scriptTruth = state.production?.script_core_truth_projection || {};
   const productionPlan = state.production?.dynamic_production_plan_projection || {};
+  const productionGraph = state.production?.production_graph_projection || {};
   const selectedCoreAsset = activeNode?.params?.coreAssetTruth || null;
   const selectedPlanEntity = activeNode?.params?.productionPlanTruth || null;
   const scriptRevisionId = cleanToken(scriptTruth.current_revision_id, 140);
@@ -61,6 +62,8 @@ export function agentChatContextSnapshot({
     production_plan_digest: cleanToken(productionPlan.plan_digest, 80),
     production_plan_state: cleanToken(productionPlan.planning_state || "", 80),
     production_plan_version: Number(productionPlan.plan_version || 0),
+    production_graph_version: Number(productionGraph.graph_version || 0),
+    production_graph_digest: cleanToken(productionGraph.graph_digest, 80),
     canvas_name: cleanText(meta.canvasName || "画布", 40),
     project_name: cleanText(project?.name || meta.projectName || "未命名项目", 80),
     section: section === "storyboard" ? "storyboard_read_only" : "canvas",
@@ -81,9 +84,11 @@ export function agentChatContextSnapshot({
     current_shot_title: cleanText(currentShot?.title || "", 80),
     counts: {
       nodes: nodeValues.length,
-      scenes: inferSceneCount(shotNodes),
-      shots: planShotCount || shotNodes.length,
+      scenes: Number(productionGraph.scene_count || 0) || inferSceneCount(shotNodes),
+      shots: Number(productionGraph.shot_count || 0) || planShotCount || shotNodes.length,
       assets: Array.isArray(state.assets) ? state.assets.length : 0,
+      graph_tasks: Number(productionGraph.task_count || 0),
+      graph_pending_reviews: Number(productionGraph.pending_review_count || 0),
       production_plan_shots: planShotCount,
       production_plan_chunks: Number(productionPlan.chunk_count || 0),
     },
@@ -110,6 +115,64 @@ export function agentChatContextSnapshot({
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
+}
+
+export function stageProductionGraphCommand(session, context, { action, title, summary, targetNodeId = "", changedNodeIds = [], patch = {}, payload = {}, impact = null } = {}) {
+  if (!session || !action) throw new Error("production graph command requires a session and action");
+  const command = {
+    schema_version: SCHEMA_VERSION,
+    command_id: `command_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: action === "mutate" ? "m5_graph_mutation" : "m5_graph_action",
+    graph_action: action,
+    title: cleanText(title || "更新制作序列", 100),
+    summary: cleanText(summary || "确认后更新同一制作图版本。", 320),
+    status: "preview",
+    execution_mode: "runtime",
+    context_key: context?.context_key || agentChatContextKey(context),
+    project_id: context?.project_id || "",
+    graph_version: Number(context?.production_graph_version || 0),
+    graph_digest: context?.production_graph_digest || "",
+    target_node_id: cleanToken(targetNodeId, 160),
+    changed_node_ids: changedNodeIds.map((item) => cleanToken(item, 160)).filter(Boolean),
+    patch: { ...patch },
+    payload: { ...payload },
+    impact: impact ? { node_ids: [...(impact.invalidated_node_ids || [])], storyboard_write: false } : { node_ids: [], storyboard_write: false },
+    storyboard_write: false,
+    provider_dispatch_count: 0,
+  };
+  appendMessage(session, { role: "user", text: command.title });
+  session.pendingCommand = command;
+  appendMessage(session, { role: "assistant", text: "已生成制作图命令预览；确认前不会改变制作事实。" });
+  return command;
+}
+
+export function stageProductionGraphCandidateCommand(session, context, candidate) {
+  const characters = Array.isArray(candidate?.characters) ? candidate.characters.length : 0;
+  const scenes = Array.isArray(candidate?.scenes) ? candidate.scenes.length : 0;
+  const shots = Array.isArray(candidate?.shots) ? candidate.shots.length : 0;
+  if (!session || candidate?.trusted_candidate !== true || !characters || !scenes || !shots) {
+    throw new Error("可信制作方案需要明确的角色、场景和镜头结构");
+  }
+  const command = {
+    schema_version: SCHEMA_VERSION,
+    command_id: `command_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "m5_graph_candidate",
+    graph_action: "confirm_candidate",
+    title: "确认导入制作方案",
+    summary: `确认后建立 ${characters} 个角色、${scenes} 个场景和 ${shots} 个镜头，并生成同一制作图版本。`,
+    status: "preview",
+    execution_mode: "runtime",
+    context_key: context?.context_key || agentChatContextKey(context),
+    project_id: context?.project_id || "",
+    graph_version: Number(context?.production_graph_version || 0),
+    candidate,
+    storyboard_write: false,
+    provider_dispatch_count: 0,
+  };
+  appendMessage(session, { role: "user", text: "导入可信制作方案" });
+  session.pendingCommand = command;
+  appendMessage(session, { role: "assistant", text: "已核对结构范围；确认前不会建立制作图或改变画布事实。" });
+  return command;
 }
 
 export function submitAgentChatMessage(session, rawText, context) {
@@ -171,7 +234,36 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   let response = null;
   let runtimeReceipt = null;
   let projectionDomain = "script_core";
-  if (command.command_type === "create_script_revision" || command.command_type === "optimize_script_revision") {
+  if (command.command_type === "m5_graph_candidate") {
+    response = await runtime.confirmFilmCandidate({
+      expected_graph_version: command.graph_version,
+      idempotency_key: command.command_id,
+      candidate: command.candidate,
+    });
+    const graph = response?.graph || {};
+    runtimeReceipt = { graph_version: graph.version, graph_digest: graph.graph_digest, recovery: "refresh_and_retry_on_version_conflict" };
+    projectionDomain = "production_graph";
+  } else if (command.command_type === "m5_graph_mutation") {
+    await runtime.previewSequenceImpact({ changed_node_ids: command.changed_node_ids });
+    response = await runtime.confirmSequenceMutation({
+      expected_graph_version: command.graph_version,
+      idempotency_key: command.command_id,
+      node_id: command.target_node_id,
+      changed_node_ids: command.changed_node_ids,
+      patch: command.patch,
+    });
+    runtimeReceipt = response?.receipt || null;
+    projectionDomain = "production_graph";
+  } else if (command.command_type === "m5_graph_action") {
+    response = await runtime.confirmSequenceAction({
+      expected_graph_version: command.graph_version,
+      idempotency_key: command.command_id,
+      action: command.graph_action,
+      payload: command.payload,
+    });
+    runtimeReceipt = response?.receipt || null;
+    projectionDomain = "production_graph";
+  } else if (command.command_type === "create_script_revision" || command.command_type === "optimize_script_revision") {
     response = await runtime.createScriptRevision({
       source_kind: command.source_kind || "script",
       source_text: command.source_text || "",
@@ -225,7 +317,7 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   }
   const projection = response?.projection;
   let projectionSummary = null;
-  if (projection) {
+  if (projection && projectionDomain !== "production_graph") {
     store.set((state) => {
       projectionSummary = projectionDomain === "production_plan"
         ? applyProductionPlanProjection(state, projection)
@@ -233,7 +325,9 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
       fitCanvasProjection(state);
     });
   }
-  const receipt = projectionDomain === "production_plan"
+  const receipt = projectionDomain === "production_graph"
+    ? productionGraphAgentReceipt(command, runtimeReceipt)
+    : projectionDomain === "production_plan"
     ? productionPlanAgentReceipt(command, response, runtimeReceipt, projectionSummary)
     : projectionDomain === "m3_context"
       ? m3ContextAgentReceipt(command, response, runtimeReceipt)
@@ -242,6 +336,37 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   recordReceipt(session, receipt);
   appendMessage(session, { role: "assistant", text: receipt.summary });
   return receipt;
+}
+
+function productionGraphAgentReceipt(command, runtimeReceipt = {}) {
+  const actionSummaries = {
+    confirm_candidate: "可信制作方案已建立为唯一制作图版本；画布与故事板将同步刷新。",
+    mutate: "局部修改已确认；仅证据关联的下游对象进入待处理，未关联产物继续保留。",
+    select_candidate: "候选版本已选定并写入制作图版本记录。",
+    review_decision: command.payload?.state === "approved" ? "专业审核已通过并写入制作图。" : "专业审核已退回，原候选与证据仍保留。",
+    redo_rejected: "返工任务已创建；原候选、审核记录与版本历史均保留。",
+    delivery_state: "交付清单状态已更新，媒体、权利与来源仍需逐项核验。",
+  };
+  return {
+    schema_version: SCHEMA_VERSION,
+    receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_id: command.command_id,
+    command_type: command.command_type,
+    status: "confirmed",
+    executed_at: new Date().toISOString(),
+    context_key: command.context_key,
+    project_id: command.project_id,
+    graph_version: Number(runtimeReceipt.graph_version || 0),
+    graph_digest: runtimeReceipt.graph_digest || "",
+    summary: actionSummaries[command.graph_action] || "制作图动作已确认。",
+    undo_available: false,
+    recovery_available: true,
+    storyboard_write: false,
+    execution_mode: "runtime",
+    runtime_domain: "production_graph",
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+  };
 }
 
 export async function undoAgentReceiptWithRuntime(session, receipt, store, runtime) {

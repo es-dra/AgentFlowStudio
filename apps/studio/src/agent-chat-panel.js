@@ -71,13 +71,19 @@ function contextStrip(context) {
   }
   const counts = context?.counts || {};
   strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
-  strip.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
+  if (context?.production_graph_version) {
+    strip.append(el("dt", "", "制作序列"), el("dd", "", `版本 ${Number(context.production_graph_version)} · ${Number(counts.graph_tasks || 0)} 项任务 · ${Number(counts.graph_pending_reviews || 0)} 项待审`));
+  } else {
+    strip.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
+  }
   strip.appendChild(evidenceDetails("上下文证据", [
     ["project_id", context?.project_id],
     ["script_revision_id", context?.script_revision_id],
     ["source_digest", context?.script_source_digest],
     ["production_plan_id", context?.production_plan_id],
     ["production_plan_digest", context?.production_plan_digest],
+    ["production_graph_version", context?.production_graph_version],
+    ["production_graph_digest", context?.production_graph_digest],
     ["selected_node_id", context?.selected_node_id],
   ]));
   return strip;
@@ -119,6 +125,8 @@ function commandPreview({ session, store, runtime, onRender }) {
     ["revision_id", command.revision_id || command.script_revision_id],
     ["source_digest", command.source_digest],
     ["plan_digest", command.plan_digest],
+    ["graph_version", command.graph_version],
+    ["graph_digest", command.graph_digest],
   ]));
   const actions = el("div", "agent-command-actions");
   if (command.status !== "blocked") {
@@ -162,6 +170,9 @@ function receiptList({ session, store, runtime, onRender }) {
     const item = el("article", `agent-receipt ${receipt.status}`);
     item.append(el("strong", "", receipt.status === "undone" ? "已撤销" : "已执行"));
     item.append(el("p", "", receipt.summary));
+    if (receipt.recovery_available && !receipt.undo_available) {
+      item.appendChild(el("small", "agent-recovery-hint", "如遇版本冲突，刷新制作图后可安全重试；原记录不会被覆盖。"));
+    }
     if (receipt.undo_available) {
       const undo = el("button", "studio-text-button");
       undo.type = "button";

@@ -2,7 +2,8 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
+import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -13,6 +14,8 @@ export function createProductShell(options = {}) {
   let contextOpen = false;
   let mobileAgentOpen = false;
   let notice = "";
+  let pendingGraphImpact = null;
+  let graphRefreshPending = false;
   let agentChatWidth = readAgentChatWidth();
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
@@ -203,8 +206,194 @@ export function createProductShell(options = {}) {
         scenes.appendChild(item);
       });
     }
-    panel.append(close, copy, stages, scenes, next);
+    panel.append(close, copy, stages, scenes);
+    if (graphWorkspaceReady()) panel.appendChild(buildGraphProductionSummary());
+    panel.appendChild(next);
     return panel;
+  }
+
+  function buildGraphProductionSummary() {
+    const view = graphView();
+    const sectionEl = node("section", "graph-production-summary");
+    sectionEl.appendChild(node("strong", "", `制作序列 · 版本 ${view.graphVersion}`));
+    const counts = node("dl", "graph-production-counts");
+    for (const [label, value] of [["剧本", view.summary.scriptRevisions], ["序列", view.summary.sequences], ["角色", view.summary.characters], ["场景", view.summary.locations],
+      ["镜头", view.shots.length], ["道具", view.summary.props], ["参考集", view.summary.referenceSets],
+      ["任务", view.summary.tasks], ["候选", view.summary.candidates]]) {
+      counts.append(node("dt", "", label), node("dd", "", String(value)));
+    }
+    sectionEl.appendChild(counts);
+    const lifecycle = node("div", "graph-lifecycle-actions");
+    const latestCandidate = view.lifecycle.candidates.at(-1);
+    if (latestCandidate && !view.summary.selections) {
+      lifecycle.appendChild(graphActionButton("选择最新候选", "select_candidate", "选择候选版本",
+        "确认后记录候选选择，不覆盖原候选。", { artifact_id: latestCandidate.artifact_id, selection_key: "sequence_delivery" }));
+    }
+    const pendingReview = view.lifecycle.reviews.find((item) => item.state === "pending");
+    const rejectedReview = view.lifecycle.reviews.find((item) => item.state === "rejected");
+    if (pendingReview) {
+      lifecycle.append(
+        graphActionButton("通过审核", "review_decision", "通过专业审核", "确认后把审核结论写入同一制作图版本。", { review_id: pendingReview.review_id, state: "approved" }),
+        graphActionButton("退回修改", "review_decision", "退回当前审核", "确认后保留候选与证据，并等待明确返工。", { review_id: pendingReview.review_id, state: "rejected" }),
+      );
+    }
+    if (rejectedReview) {
+      lifecycle.appendChild(graphActionButton("安排返工", "redo_rejected", "安排受控返工", "确认后新增返工任务，不覆盖原候选。", { review_id: rejectedReview.review_id }));
+    }
+    const delivery = view.lifecycle.deliveries.at(-1);
+    if (delivery && delivery.state !== "review_ready") {
+      lifecycle.appendChild(graphActionButton("提交交付核验", "delivery_state", "提交交付清单核验",
+        "确认后仅更新交付清单状态；不执行导出或媒体生成。", { delivery_id: delivery.delivery_id, state: "review_ready" }));
+    }
+    if (lifecycle.children.length) sectionEl.appendChild(lifecycle);
+    sectionEl.appendChild(graphLifecycleList("制作任务", view.lifecycle.tasks, (item, index) => `任务 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("候选版本", view.lifecycle.candidates, (item, index) => `候选 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("审核记录", view.lifecycle.reviews, (item, index) => `审核 ${index + 1} · ${graphStateLabel(item.state)}`));
+    sectionEl.appendChild(graphLifecycleList("交付清单", view.lifecycle.deliveries, (item) => `${graphStateLabel(item.state)} · 时间线 ${item.timeline_refs?.length || 0} · 权利 ${item.rights_refs?.length || 0} · 来源 ${item.provenance_refs?.length || 0}`));
+    const history = view.summary.versionHistory.slice(0, 4).map((item) => `版本 ${Number(item.version)}`).join(" · ");
+    sectionEl.appendChild(node("p", "graph-version-history", history ? `最近记录：${history}` : "尚无版本变更记录"));
+    return sectionEl;
+  }
+
+  function graphLifecycleList(title, items, describe) {
+    const sectionEl = node("section", "graph-lifecycle-list");
+    sectionEl.appendChild(node("strong", "", title));
+    const list = node("ul", "");
+    if (!items.length) list.appendChild(node("li", "", "尚无记录"));
+    else items.slice(0, 5).forEach((item, index) => list.appendChild(node("li", "", describe(item, index))));
+    sectionEl.appendChild(list);
+    return sectionEl;
+  }
+
+  function graphActionButton(label, action, title, summary, payload) {
+    const button = node("button", "studio-secondary-button", label);
+    button.type = "button";
+    button.addEventListener("click", () => stageGraphCommand({ action, title, summary, payload }));
+    return button;
+  }
+
+  function buildGraphCanvasStatus() {
+    const view = graphView();
+    const status = node("aside", `graph-canvas-status ${view.status}`);
+    status.setAttribute("aria-live", "polite");
+    if (view.planningRequired) {
+      status.append(node("strong", "", "需要确认制作方案"), node("span", "", "先输入或导入剧本；已有结构化制作方案时，可在 Agent Chat 中预览后确认。"));
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json,.json";
+      input.hidden = true;
+      input.setAttribute("aria-label", "选择结构化制作方案文件");
+      const importButton = node("button", "studio-secondary-button", "导入结构化制作方案");
+      importButton.type = "button";
+      importButton.addEventListener("click", () => input.click());
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const candidate = JSON.parse(await file.text());
+          stageGraphCandidate(candidate);
+        } catch {
+          notice = "制作方案无法读取；请检查文件格式后重试，现有项目未改变。";
+          render();
+        } finally {
+          input.value = "";
+        }
+      });
+      status.append(importButton, input);
+      return status;
+    }
+    if (view.status !== "ready") {
+      status.hidden = true;
+      return status;
+    }
+    status.append(
+      node("strong", "", `制作序列 v${view.graphVersion}`),
+      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.summary.tasks} 任务`),
+    );
+    const details = node("button", "studio-text-button", "制作详情");
+    details.type = "button";
+    details.addEventListener("click", () => { projectDrawerOpen = true; render(); });
+    status.appendChild(details);
+    const selected = selectedGraphTarget();
+    if (selected) {
+      const impact = node("button", "studio-secondary-button", "预览所选对象影响");
+      impact.type = "button";
+      impact.addEventListener("click", () => previewGraphMutation(selected.nodeId, { review_state: "needs_revision" }, `确认修订${selected.title}`));
+      status.appendChild(impact);
+    }
+    return status;
+  }
+
+  function stageGraphCommand(details) {
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    stageProductionGraphCommand(session, context, details);
+    projectDrawerOpen = false;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "命令已送入 Agent Chat；确认前不会改变制作事实。";
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  function stageGraphCandidate(candidate) {
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    try {
+      stageProductionGraphCandidateCommand(session, context, candidate);
+    } catch (error) {
+      notice = error?.message || "制作方案缺少必要结构，项目未改变。";
+      render();
+      return;
+    }
+    projectDrawerOpen = false;
+    agentCollapsed = false;
+    mobileAgentOpen = true;
+    notice = "制作方案已送入 Agent Chat；确认前不会建立制作图。";
+    render();
+    requestCanvasSafeAreaUpdate();
+  }
+
+  function applyGraphWorkspace(workspace) {
+    const store = options.getStore?.();
+    const ready = productionGraphWorkspaceProjection(workspace).status === "ready";
+    store?.setRuntimePersistenceMode?.(ready ? "production_graph_read_only" : "studio_state");
+    store?.set?.((state) => applyProductionGraphCanvasProjection(state, workspace), { history: false, persist: false });
+  }
+
+  async function previewGraphMutation(nodeId, patch, title) {
+    try {
+      pendingGraphImpact = await options.getRuntime?.().previewSequenceImpact({ changed_node_ids: [nodeId] });
+      notice = `将重新处理 ${pendingGraphImpact.impact.invalidated_node_ids.length} 个下游对象，保留 ${pendingGraphImpact.impact.preserved_node_ids.length} 个无关对象。`;
+      stageGraphCommand({ action: "mutate", title, summary: notice, targetNodeId: nodeId, changedNodeIds: [nodeId], patch, impact: pendingGraphImpact.impact });
+    } catch {
+      notice = "影响预览失败，未修改制作事实。";
+      render();
+    }
+  }
+
+  function syncGraphWorkspaceAfterAgentReceipt(session) {
+    const receipt = session?.receipts?.at(-1);
+    if (receipt?.runtime_domain !== "production_graph" || Number(receipt.graph_version || 0) <= Number(snapshot.sequenceWorkspace?.graph_version || 0)) {
+      render();
+      return;
+    }
+    if (graphRefreshPending) return;
+    graphRefreshPending = true;
+    options.getRuntime?.().sequenceWorkspace?.().then((workspace) => {
+      snapshot.sequenceWorkspace = workspace;
+      applyGraphWorkspace(workspace);
+      snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+      pendingGraphImpact = null;
+      notice = `制作图已更新到版本 ${Number(workspace.graph_version || 0)}。`;
+    }).catch(() => {
+      notice = "制作图已变更但刷新失败，请重新载入后继续；不会重复执行命令。";
+    }).finally(() => {
+      graphRefreshPending = false;
+      render();
+    });
   }
 
   function buildWorkspace() {
@@ -238,6 +427,7 @@ export function createProductShell(options = {}) {
     const editor = options.getCanvasShell?.();
     if (editor) stage.appendChild(editor);
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
+    stage.appendChild(buildGraphCanvasStatus());
     if (notice) {
       const live = node("p", "studio-live-notice", notice);
       live.setAttribute("aria-live", "polite");
@@ -402,6 +592,12 @@ export function createProductShell(options = {}) {
       render();
     });
     bar.append(script, node("p", "", currentShot().description), versions);
+    if (graphWorkspaceReady()) {
+      const impact = node("button", "studio-secondary-button", pendingGraphImpact ? "已预览影响" : "预览修改影响");
+      impact.type = "button";
+      impact.addEventListener("click", () => previewGraphMutation(currentShot().graphNodeId, { review_state: "needs_revision" }, "确认镜头局部修改"));
+      bar.appendChild(impact);
+    }
     return bar;
   }
 
@@ -426,7 +622,7 @@ export function createProductShell(options = {}) {
         mobileAgentOpen = true;
       },
       onResizeStart: bindAgentResize,
-      onRender: () => render(),
+      onRender: () => syncGraphWorkspaceAfterAgentReceipt(session),
     });
   }
 
@@ -602,9 +798,10 @@ export function createProductShell(options = {}) {
   }
 
   function currentAgentChatContext() {
+    const studioState = productionGraphAgentContext(snapshot.studioState, snapshot.sequenceWorkspace);
     return agentChatContextSnapshot({
       project: snapshot.project,
-      studioState: snapshot.studioState,
+      studioState,
       section,
       selectedNode: selectedCanvasNode(),
       currentShot: currentShot(),
@@ -615,6 +812,13 @@ export function createProductShell(options = {}) {
     const state = snapshot.studioState || {};
     const selectedId = state.selection?.nodeIds?.[0] || currentShot().nodeId || "";
     return selectedId ? state.nodes?.[selectedId] || null : null;
+  }
+
+  function selectedGraphTarget() {
+    const selected = selectedCanvasNode();
+    const truth = selected?.params?.productionGraphTruth;
+    if (!truth?.graph_node_id) return null;
+    return { nodeId: truth.graph_node_id, title: cleanTitle(selected.title || "所选制作对象") };
   }
 
   function openCanvas() {
@@ -664,7 +868,14 @@ export function createProductShell(options = {}) {
         if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
         project = payload?.project || null;
       }
-      snapshot = { loading: false, workspace, project, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      let sequenceWorkspace = null;
+      if (activeProjectId) {
+        try { sequenceWorkspace = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.sequenceWorkspace?.(); } catch { sequenceWorkspace = null; }
+      }
+      if (sequenceWorkspace) {
+        applyGraphWorkspace(sequenceWorkspace);
+      }
+      snapshot = { loading: false, workspace, project, sequenceWorkspace, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -710,6 +921,7 @@ export function createProductShell(options = {}) {
   }
 
   function sceneModel() {
+    if (graphWorkspaceReady()) return graphSceneModel();
     const shots = shotModel();
     if (!shots.length) {
       selection = { sceneIndex: 0, shotIndex: 0 };
@@ -736,6 +948,7 @@ export function createProductShell(options = {}) {
   }
 
   function shotModel() {
+    if (graphWorkspaceReady()) return graphShotModel();
     const state = snapshot.studioState || {};
     const planShots = state.production?.dynamic_production_plan_projection?.storyboard_shots || [];
     if (Array.isArray(planShots) && planShots.length) {
@@ -778,6 +991,24 @@ export function createProductShell(options = {}) {
     return [];
   }
 
+  function graphView() { return productionGraphWorkspaceProjection(snapshot.sequenceWorkspace); }
+
+  function graphWorkspaceReady() { return graphView().status === "ready"; }
+
+  function graphShotModel() {
+    return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
+      title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
+      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: "", state: shot.state, sceneId: shot.sceneNodeId }));
+  }
+
+  function graphSceneModel() {
+    const shots = graphShotModel();
+    const scenes = graphView().scenes.map((scene) => ({ name: cleanTitle(scene.name || "场景"),
+      shots: shots.filter((shot) => shot.sceneId === scene.graphNodeId), duration: "00:00", blocked: false }));
+    for (const scene of scenes) { scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0)); scene.blocked = scene.shots.some((shot) => shot.state === "blocked"); }
+    return scenes;
+  }
+
   function currentScene() { return sceneModel()[selection.sceneIndex] || emptyScene(); }
   function currentShot() { return currentScene().shots[selection.shotIndex] || emptyShot(); }
   function hasStoryFacts() { return shotModel().length > 0; }
@@ -786,6 +1017,11 @@ export function createProductShell(options = {}) {
   function completionPercent() { return totalShots() ? Math.round((totalReadyShots() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
+  function graphStateLabel(state) {
+    return ({ planned: "待制作", reserved: "已预留", dispatched: "处理中", succeeded: "已完成", candidate: "待选择",
+      pending: "待审核", approved: "已通过", rejected: "已退回", redo_planned: "已安排返工",
+      review_ready: "待交付核验", blocked: "已阻断" })[String(state || "")] || "待确认";
+  }
 
   function saveTone(state) {
     if (state === "已保存") return "success";

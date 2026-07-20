@@ -493,6 +493,21 @@ export function createRuntimeClient(projectId = "") {
     projectOverview() {
       return requestJson(`/projects/${encoded}/product-overview`);
     },
+    sequenceWorkspace() {
+      return requestJson(`/projects/${encoded}/m5/sequence-workspace`);
+    },
+    confirmFilmCandidate(payload) {
+      return requestJson(`/projects/${encoded}/m4/film-candidates/confirm`, { method: "POST", payload });
+    },
+    previewSequenceImpact(payload) {
+      return requestJson(`/projects/${encoded}/m5/impact-preview`, { method: "POST", payload });
+    },
+    confirmSequenceMutation(payload) {
+      return requestJson(`/projects/${encoded}/m5/mutations/confirm`, { method: "POST", payload });
+    },
+    confirmSequenceAction(payload) {
+      return requestJson(`/projects/${encoded}/m5/actions/confirm`, { method: "POST", payload });
+    },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });
     },

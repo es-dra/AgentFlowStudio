@@ -254,12 +254,14 @@ def test_studio_topbar_surfaces_creator_safe_service_status() -> None:
 
 def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
     store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    persistence_source = (STUDIO_ROOT / "src" / "store-runtime-persistence-controller.js").read_text(encoding="utf-8")
     runtime_save_source = (STUDIO_ROOT / "src" / "store-runtime-save.js").read_text(encoding="utf-8")
 
-    assert "runtimeStateVersion" in store_source
-    assert "payload?.state_version" in store_source
-    assert "const snapshot = snapshotStudioState(state)" in store_source
-    assert "saveStudioState(snapshot, runtimeStateVersion)" in store_source
+    assert "createRuntimePersistenceController" in store_source
+    assert "stateVersion" in persistence_source
+    assert "payload?.state_version" in persistence_source
+    assert "const snapshot = snapshotStudioState(state)" in persistence_source
+    assert "saveStudioState(snapshot, stateVersion)" in persistence_source
     assert "error?.status === 409" in runtime_save_source
     assert "项目已在其他窗口更新" in runtime_save_source
     state_source = (STUDIO_ROOT / "src" / "store-state.js").read_text(encoding="utf-8")

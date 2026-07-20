@@ -10,6 +10,7 @@ from agentflow.harness.json_io import exclusive_file_lock, write_json
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_exception_detail
 from apps.api.runtime_production_runs import resolve_project_studio_binding
+from apps.api.runtime_production_graph import graph_has_authority
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state
 
@@ -55,6 +56,11 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth
     @app.put("/projects/{project_id}/studio-state")
     def put_studio_state(project_id: str, body: StudioStateRequest, request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        if graph_has_authority(store, project_id):
+            raise HTTPException(
+                status_code=409,
+                detail="production graph is authoritative; Studio is a read-only projection",
+            )
         try:
             state = sanitize_studio_state(body.state, project_id=project_id)
             state["production"] = _project_production_binding(store, auth, request, project_id)

@@ -355,6 +355,7 @@ def test_project_save_recovery_handles_auth_conflict_and_inflight_dirty_edges() 
 
 def test_project_save_failure_retry_is_visible_in_topbar_contract() -> None:
     store_source = _read("src/store.js")
+    persistence_source = _read("src/store-runtime-persistence-controller.js")
     topbar = _read("src/studio-topbar.js")
     styles = _read("styles/shell.css")
     main = _read("src/main.js")
@@ -364,10 +365,10 @@ def test_project_save_failure_retry_is_visible_in_topbar_contract() -> None:
         "保存冲突",
         "需要登录",
         "afs:studio-save-auth-required",
-        "lastRuntimeSavedSnapshot",
+        "lastSavedSnapshot",
         "savingSnapshotKey",
     ):
-        assert marker in store_source + _read("src/store-runtime-save.js")
+        assert marker in store_source + persistence_source + _read("src/store-runtime-save.js")
 
     assert "onRetrySave" in topbar
     assert "save-pill-button" in topbar

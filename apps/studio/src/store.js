@@ -1,6 +1,7 @@
 import { loadPersisted, migrateLegacyCanvasStorage, persist } from "./store-persistence.js";
 import { emptyNotifyMeta, mergeNotifyMeta } from "./store-notify-meta.js";
-import { runtimeSaveFailureState, shouldKeepLocalOverRemote, snapshotKey } from "./store-runtime-save.js";
+import { createRuntimePersistenceController } from "./store-runtime-persistence-controller.js";
+import { shouldKeepLocalOverRemote } from "./store-runtime-save.js";
 import {
   hasStudioContent,
   hasStudioMeta,
@@ -12,21 +13,19 @@ import {
   snapshotStudioState,
 } from "./store-state.js";
 
-const SAVE_DEBOUNCE_MS = 700;
-
 export function createStore(projectId = "") {
   migrateLegacyCanvasStorage(projectId);
   let state = loadPersisted(projectId) || initialState(projectId);
   const listeners = new Set();
   const history = { past: [], future: [] };
   let scheduled = false;
-  let saveTimer = null;
   let runtimeClient = null;
-  let runtimeStateVersion = "";
-  let lastRuntimeSavedSnapshot = "";
-  let saveInFlight = false;
-  let saveQueuedAfterSuccess = false;
   let pendingNotifyMeta = emptyNotifyMeta();
+  const runtimePersistence = createRuntimePersistenceController({
+    getRuntime: () => runtimeClient,
+    getState: () => state,
+    notify: notifySoon,
+  });
 
   function get() { return state; }
 
@@ -54,10 +53,7 @@ export function createStore(projectId = "") {
 
   function attachRuntime(runtime) {
     runtimeClient = runtime;
-    runtimeStateVersion = "";
-    lastRuntimeSavedSnapshot = "";
-    saveInFlight = false;
-    saveQueuedAfterSuccess = false;
+    runtimePersistence.reset();
     if (runtime?.projectId) state.meta.projectId = runtime.projectId;
     state.ui.saveState = "本地暂存";
     notifySoon();
@@ -78,7 +74,7 @@ export function createStore(projectId = "") {
         ...(remoteState && typeof remoteState === "object" ? remoteState : {}),
         meta: { ...(remoteState?.meta && typeof remoteState.meta === "object" ? remoteState.meta : {}), projectId: targetProjectId },
       } : remoteState);
-      runtimeStateVersion = String(payload?.state_version || "");
+      runtimePersistence.markHydrated(payload?.state_version, snapshotStudioState(remote));
       if (shouldKeepLocalOverRemote(state, remote, payload)) {
         await flushRuntimeSave();
         return { source: "local_newer" };
@@ -86,7 +82,6 @@ export function createStore(projectId = "") {
       if (payload?.source === "runtime" && (hasStudioContent(remote) || hasStudioMeta(remoteState))) {
         replaceSerializable(state, remote);
         persist(state);
-        lastRuntimeSavedSnapshot = snapshotKey(snapshotStudioState(state));
         state.ui.saveState = "已保存";
         state.ui.saveMessage = "";
         notifySoon();
@@ -125,11 +120,7 @@ export function createStore(projectId = "") {
 
   async function switchProject(projectId, runtime) {
     runtimeClient = runtime;
-    runtimeStateVersion = "";
-    lastRuntimeSavedSnapshot = "";
-    saveInFlight = false;
-    saveQueuedAfterSuccess = false;
-    clearTimeout(saveTimer);
+    runtimePersistence.reset();
     state = loadPersisted(projectId) || initialState(projectId);
     state.meta.projectId = projectId;
     history.past = [];
@@ -138,68 +129,24 @@ export function createStore(projectId = "") {
     return hydrateRuntime(runtime);
   }
 
-  function resetIdentityState() { clearTimeout(saveTimer); saveTimer = null; runtimeClient = null; runtimeStateVersion = ""; lastRuntimeSavedSnapshot = ""; saveInFlight = false; saveQueuedAfterSuccess = false; state = initialState("studio-empty"); state.meta.projectName = ""; state.meta.canvasName = ""; state.nodes = {}; state.edges = {}; state.order = []; state.assets = []; state.selection = { nodeIds: [], edgeId: null }; history.past = []; history.future = []; notifySoon(); }
-  function scheduleRuntimeSave() {
-    if (!runtimeClient?.saveStudioState) return;
-    if (saveInFlight) {
-      saveQueuedAfterSuccess = true;
-      state.ui.saveState = "保存中";
-      notifySoon({ renderScope: "save-status" });
-      return;
-    }
-    clearTimeout(saveTimer);
-    state.ui.saveState = "保存中";
-    saveTimer = setTimeout(async () => {
-      await flushRuntimeSave();
-    }, SAVE_DEBOUNCE_MS);
+  function resetIdentityState() {
+    runtimePersistence.reset();
+    runtimeClient = null;
+    state = initialState("studio-empty");
+    state.meta.projectName = "";
+    state.meta.canvasName = "";
+    state.nodes = {};
+    state.edges = {};
+    state.order = [];
+    state.assets = [];
+    state.selection = { nodeIds: [], edgeId: null };
+    history.past = [];
+    history.future = [];
+    notifySoon();
   }
-  async function flushRuntimeSave() {
-    if (!runtimeClient?.saveStudioState) return;
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    if (saveInFlight) {
-      saveQueuedAfterSuccess = true;
-      return;
-    }
-    const snapshot = snapshotStudioState(state);
-    const savingSnapshotKey = snapshotKey(snapshot);
-    if (lastRuntimeSavedSnapshot && savingSnapshotKey === lastRuntimeSavedSnapshot) {
-      state.ui.saveState = "已保存";
-      state.ui.saveMessage = "";
-      notifySoon({ renderScope: "save-status" });
-      return;
-    }
-    saveInFlight = true;
-    saveQueuedAfterSuccess = false;
-    let flushQueued = false;
-    try {
-      state.ui.saveState = "保存中";
-      notifySoon({ renderScope: "save-status" });
-      const payload = await runtimeClient.saveStudioState(snapshot, runtimeStateVersion);
-      runtimeStateVersion = String(payload?.state_version || runtimeStateVersion || "");
-      lastRuntimeSavedSnapshot = savingSnapshotKey;
-      if (snapshotKey(snapshotStudioState(state)) === savingSnapshotKey) {
-        state.ui.saveState = "已保存";
-        state.ui.saveMessage = "";
-      } else {
-        state.ui.saveState = "保存中";
-        state.ui.saveMessage = "新修改尚未完成保存，正在继续同步。";
-        flushQueued = true;
-      }
-    } catch (error) {
-      const failure = runtimeSaveFailureState(error);
-      state.ui.saveState = failure.saveState;
-      state.ui.saveMessage = failure.saveMessage;
-      saveQueuedAfterSuccess = false;
-    } finally {
-      saveInFlight = false;
-      if (flushQueued || saveQueuedAfterSuccess) {
-        saveQueuedAfterSuccess = false;
-        scheduleRuntimeSave();
-      }
-      notifySoon({ renderScope: "save-status" });
-    }
-  }
+  function scheduleRuntimeSave() { runtimePersistence.schedule(); }
+  async function flushRuntimeSave() { return runtimePersistence.flush(); }
+  function setRuntimePersistenceMode(mode = "studio_state") { runtimePersistence.setMode(mode); }
 
   function notifySoon(meta = {}) {
     pendingNotifyMeta = mergeNotifyMeta(pendingNotifyMeta, meta);
@@ -213,5 +160,5 @@ export function createStore(projectId = "") {
     });
   }
 
-  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, resetIdentityState, flushRuntimeSave, undo, redo };
+  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, resetIdentityState, flushRuntimeSave, setRuntimePersistenceMode, undo, redo };
 }

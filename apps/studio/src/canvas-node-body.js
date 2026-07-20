@@ -91,6 +91,8 @@ export function nodeBodySignature(node) {
     directorSig,
     node.params?.appliedDownstreamCount || 0,
     node.params?.scriptExpansionState?.status || "",
+    node.params?.productionGraphProjection || "",
+    node.params?.productionGraphLegacyProjection || "",
   ].join("|");
 }
 
@@ -233,6 +235,7 @@ function editableContentBlock(node, store, expanding) {
 function isEditableContentNode(node) {
   if (node.params?.scriptCoreProjection) return false;
   if (node.params?.productionPlanProjection) return false;
+  if (node.params?.productionGraphProjection || node.params?.productionGraphLegacyProjection) return false;
   return node.type === "text" || node.type === "script" || Boolean(node.params?.assetCardDraft);
 }
 
