@@ -1012,15 +1012,18 @@ def _perceptual_duplicate_pairs(root: Path, visual_assets: list[dict[str, Any]])
 
 
 def _average_frame_hash(path: Path) -> str:
-    result = subprocess.run(
-        [
-            "ffmpeg", "-v", "error", "-ss", "1", "-i", str(path), "-frames:v", "1",
-            "-vf", "scale=8:8,format=gray", "-f", "rawvideo", "-",
-        ],
-        capture_output=True,
-        timeout=30,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-v", "error", "-ss", "1", "-i", str(path), "-frames:v", "1",
+                "-vf", "scale=8:8,format=gray", "-f", "rawvideo", "-",
+            ],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except FileNotFoundError:
+        return ""
     data = result.stdout
     if result.returncode != 0 or len(data) != 64:
         return ""
@@ -1063,20 +1066,26 @@ def _safe_visual_asset_provenance(asset: dict[str, Any]) -> dict[str, Any]:
 
 
 def _media_duration(path: Path) -> float:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RealStoryProductionError("ffprobe executable not found") from exc
     if result.returncode != 0:
         raise RealStoryProductionError("cannot inspect media duration")
     return float(json.loads(result.stdout)["format"]["duration"])
 
 
 def _run_checked(command: list[str], *, timeout: int) -> None:
-    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except FileNotFoundError as exc:
+        raise RealStoryProductionError(f"command executable not found: {command[0]}") from exc
     if result.returncode != 0:
         raise RealStoryProductionError((result.stderr or result.stdout or "media command failed")[-500:])
 

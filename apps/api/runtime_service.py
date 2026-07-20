@@ -54,11 +54,13 @@ from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_ro
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
 from apps.api.runtime_adaptive_canvas_v2 import register_runtime_adaptive_canvas_v2_routes
+from apps.api.runtime_audio_routes import register_runtime_audio_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_creator_golden_trial import register_runtime_creator_golden_trial_routes
 from apps.api.runtime_commercial_production import register_runtime_commercial_production_routes
 from apps.api.runtime_feedback_candidate import register_runtime_feedback_candidate_routes
 from apps.api.runtime_human_gate import register_runtime_human_gate_routes
+from apps.api.runtime_manga_first_l4a import register_runtime_manga_first_l4a_routes
 from apps.api.runtime_external_video_routes import register_runtime_external_video_routes
 from apps.api.runtime_keyframe_local_edit import register_runtime_keyframe_local_edit_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
@@ -132,6 +134,7 @@ def create_runtime_app(
         title="AgentFlow Runtime Service",
         version="0.2.0",
         summary="Local AFS API adapter for AFS Studio canvas integration.",
+        separate_input_output_schemas=False,
     )
     configure_runtime_request_logging(app)
     configure_runtime_exception_handlers(app)
@@ -390,6 +393,7 @@ def create_runtime_app(
     register_runtime_creator_production_saga_routes(app, store, auth)
     register_runtime_product_read_model_routes(app, store, auth)
     register_runtime_adaptive_canvas_v2_routes(app, store, auth)
+    register_runtime_manga_first_l4a_routes(app, store, auth)
     register_runtime_script_core_truth_routes(app, store, auth)
     register_runtime_dynamic_production_plan_routes(app, store, auth)
     register_runtime_m3_zero_cost_kernel_routes(app, store, auth)
@@ -406,6 +410,7 @@ def create_runtime_app(
     register_runtime_external_video_routes(app, store)
     register_runtime_keyframe_routes(app, store)
     register_runtime_keyframe_local_edit_routes(app, store)
+    register_runtime_audio_routes(app, store)
     register_runtime_video_routes(app, store)
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)

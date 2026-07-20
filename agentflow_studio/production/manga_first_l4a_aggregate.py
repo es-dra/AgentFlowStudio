@@ -1,28 +1,30 @@
 from __future__ import annotations
 
+from importlib import import_module
 from typing import Any
 
 from agentflow_studio.production.manga_first_l4a_compiler import validate_manga_first_manifest
 from agentflow_studio.production.manga_first_l4a_schema import ProductionTruthManifest, json_digest
-from apps.api.runtime_episode_domain_contract import (
-    AssetCandidateVersion,
-    ContinuityStateVersion,
-    DeliveryVersion,
-    EpisodeVersion,
-    ProductionProjectAggregate,
-    ProjectDataPolicy,
-    ProjectVersion,
-    ReferenceAssetVersion,
-    ReferenceSetVersion,
-    ReviewDecision,
-    SceneVersion,
-    SelectedVersion,
-    SeriesVersion,
-    ShotVersion,
-    StoryBibleVersion,
-    TenantScope,
-)
-from apps.api.runtime_store import safe_id
+from agentflow_studio.production.runtime_safe_io import safe_id
+
+
+_CONTRACT = import_module("apps.api.runtime_episode_domain_contract")
+AssetCandidateVersion = _CONTRACT.AssetCandidateVersion
+ContinuityStateVersion = _CONTRACT.ContinuityStateVersion
+DeliveryVersion = _CONTRACT.DeliveryVersion
+EpisodeVersion = _CONTRACT.EpisodeVersion
+ProductionProjectAggregate = _CONTRACT.ProductionProjectAggregate
+ProjectDataPolicy = _CONTRACT.ProjectDataPolicy
+ProjectVersion = _CONTRACT.ProjectVersion
+ReferenceAssetVersion = _CONTRACT.ReferenceAssetVersion
+ReferenceSetVersion = _CONTRACT.ReferenceSetVersion
+ReviewDecision = _CONTRACT.ReviewDecision
+SceneVersion = _CONTRACT.SceneVersion
+SelectedVersion = _CONTRACT.SelectedVersion
+SeriesVersion = _CONTRACT.SeriesVersion
+ShotVersion = _CONTRACT.ShotVersion
+StoryBibleVersion = _CONTRACT.StoryBibleVersion
+TenantScope = _CONTRACT.TenantScope
 
 
 MANGA_FIRST_CREATED_AT = "2026-07-18T00:00:00+00:00"

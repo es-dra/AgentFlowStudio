@@ -99,13 +99,12 @@ def test_studio_retires_the_separate_production_control_frontend_but_keeps_inter
     assert not any(production_control.rglob("*"))
     assert "/studio/production-control/" not in topbar
     assert "productionControlLink" not in topbar
-    assert "项目状态与下一步" in product_shell
-    assert "project.next_action" in product_shell
     assert 'next.addEventListener("click", activateNextAction)' in product_shell
     assert "findNextProductionTarget(sceneModel(), selection)" in product_shell
     assert "selectContext(target.sceneIndex, target.shotIndex" in product_shell
-    assert "context.actionLabel = actionLabel" in product_shell
-    assert "导演 · 当前镜头" in product_shell
+    assert "${actionLabel} 已绑定当前镜头。请发送命令获取预览，确认前不会写入画布。" in product_shell
+    assert "buildGraphProductionSummary()" in product_shell
+    assert "buildAgentChatPanel" in product_shell
     assert "getProductionControl()" in runtime_client
     assert "getCommercialProduction()" in runtime_client
     assert "createCommercialProductionSample" in runtime_client
@@ -182,7 +181,7 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert "state.meta.projectId, state.meta.projectName, state.meta.canvasName" in drawer_source
     canvas_body_source = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
-    assert '!["image", "video"].includes(node.type)' in canvas_body_source
+    assert "if (isEditableContentNode(node) && store)" in canvas_body_source
     prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     assert "openExpandEditor(store, runtime, node)" in prompt_bar_source
     assert 'node.type === "video" || node.type === "script") {' not in prompt_bar_source
@@ -327,7 +326,9 @@ def test_prompt_optimizer_provider_errors_use_user_facing_message() -> None:
 def test_script_nodes_keep_prompt_bar_visible_with_content() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
 
-    assert 'node.type === "script" || !node.content' in prompt_bar
+    assert "isTextContentNode(node)" in prompt_bar
+    assert "/optimize-selected-default" in prompt_bar
+    assert "/plan-selected-script-shots" in prompt_bar
 
 
 def test_studio_asset_context_workflow_is_single_canvas() -> None:
@@ -386,7 +387,7 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert '["TEXTAREA", "INPUT"].includes' in prompt_bar
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
-    assert '!["image", "video"].includes(node.type)' in canvas_body
+    assert "if (isEditableContentNode(node) && store)" in canvas_body
     assert "bar-cost" not in prompt_bar
     assert "当前视频模型不支持直接生成" in prompt_bar
     assert "当前版本仅图片节点支持真实生成" not in prompt_bar

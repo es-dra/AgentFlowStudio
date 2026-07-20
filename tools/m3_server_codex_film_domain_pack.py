@@ -10,17 +10,21 @@ from typing import Any, Mapping
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agentflow_studio.m3_server_codex_quality import evaluate_artifact_root, evaluate_ledger, materialize_evidence
+from agentflow_studio.m3_server_codex_quality import (
+    evaluate_artifact_root,
+    evaluate_ledger,
+    materialize_evidence,
+    require_system_temp_root,
+)
 
 ROLES = {"story_editor", "director_cinematographer_editor", "asset_production_continuity", "agent_context_safety_product"}
 
 
 def load_external_corpus(*, corpus_root: Path | str | None = None, ledger: Mapping[str, Any] | None = None) -> Mapping[str, Any]:
-    """Accept an explicit ledger or a domain pack JSON below /tmp; do not author cases."""
+    """Accept an explicit ledger or a domain pack JSON below the system temp root; do not author cases."""
     if (corpus_root is None) == (ledger is None): raise ValueError("supply exactly one of corpus_root or ledger")
     if ledger is not None: return ledger
-    root = Path(corpus_root).resolve()
-    if root != Path("/tmp") and not str(root).startswith("/tmp/"): raise ValueError("external corpus root must be under /tmp")
+    root = require_system_temp_root(corpus_root, label="external corpus root")
     value = json.loads((root / "domain_pack.json").read_text(encoding="utf-8"))
     if not isinstance(value, dict): raise ValueError("domain_pack.json must contain an object")
     return value
@@ -72,9 +76,7 @@ def main() -> int:
     else:
         result = evaluate_ledger(controlled_attempt_ledger(), expected_roles=ROLES)
         if args.output_root:
-            output = Path(args.output_root).resolve()
-            if output != Path("/tmp") and not str(output).startswith("/tmp/"):
-                raise ValueError("ledger output root must be under /tmp")
+            output = require_system_temp_root(args.output_root, label="ledger output root")
             output.mkdir(parents=True, exist_ok=True)
             (output / "controlled_attempt_issue_ledger.json").write_text(
                 json.dumps(controlled_attempt_ledger(), ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")

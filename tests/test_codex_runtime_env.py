@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from agentflow_studio.model_gateway.codex_runtime_env import (
@@ -68,8 +69,9 @@ def test_bootstrap_codex_home_refreshes_existing_login_projection(tmp_path) -> N
 
     assert (target / "auth.json").read_text(encoding="utf-8") == "current-login"
     assert (target / "config.toml").read_text(encoding="utf-8") == "current-config"
-    assert (target / "auth.json").stat().st_mode & 0o777 == 0o600
-    assert (target / "config.toml").stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert (target / "auth.json").stat().st_mode & 0o777 == 0o600
+        assert (target / "config.toml").stat().st_mode & 0o777 == 0o600
 
 
 def test_prune_codex_home_removes_runtime_history_logs_and_state(tmp_path) -> None:

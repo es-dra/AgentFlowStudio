@@ -97,4 +97,4 @@ def test_generate_cli_returns_success_without_verdict(tmp_path, monkeypatch, cap
     assert film_pack.main() == 0
     output = json.loads(capsys.readouterr().out)
     assert output["status"] == "generated"
-    assert output["artifact_root"].startswith("/tmp/")
+    assert Path(output["artifact_root"]).resolve().is_relative_to(tmp_path.resolve())

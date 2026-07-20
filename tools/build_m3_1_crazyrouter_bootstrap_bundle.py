@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -17,7 +18,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-DEFAULT_CANDIDATE = Path("/home/afs-ops/.codex/worktrees/afs-m3-0-zero-cost-knowledge-context-audit-20260718")
+DEFAULT_CANDIDATE = Path(os.environ.get("AFS_M3_1_DEFAULT_CANDIDATE", str(ROOT)))
 PROVIDER_CONFIG = Path("/etc/afs/providers.local.json")
 M3_1_PROVIDER_CONFIG_TARGET = Path("/etc/afs/m3-1-crazyrouter.providers.json")
 ENV_FILE = Path("/etc/afs/afs-runtime.env")
@@ -44,7 +45,7 @@ def main() -> int:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the non-secret M3.1 CrazyRouter admin bootstrap bundle.")
     parser.add_argument("--candidate", type=Path, default=DEFAULT_CANDIDATE)
-    parser.add_argument("--output-root", type=Path, default=Path("/tmp"))
+    parser.add_argument("--output-root", type=Path, default=Path(tempfile.gettempdir()))
     return parser.parse_args()
 
 

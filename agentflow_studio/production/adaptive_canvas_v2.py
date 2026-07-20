@@ -9,6 +9,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from importlib import import_module
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -19,7 +20,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
     load_provider_registry,
     structured_output_schema_digest,
 )
-from apps.api.runtime_store import RuntimeStore, read_json, safe_id
+from agentflow_studio.production.runtime_safe_io import read_json, safe_id
 
 
 GenerationStrategy = Literal["text_to_video", "image_to_video"]
@@ -566,7 +567,7 @@ def seed_agent_authored_script_truth(
     profile: AdaptiveProductionProfile,
 ) -> dict[str, Any]:
     profile.validate()
-    store = RuntimeStore(runtime_root)
+    store = _runtime_store(runtime_root)
     _ensure_project(store, project_id, profile)
     run_root = _run_root(store, project_id, run_id)
     run_root.mkdir(parents=True, exist_ok=True)
@@ -671,7 +672,7 @@ def run_adaptive_canvas_production(options: AdaptiveRunOptions, *, callback: Cal
     if options.mode not in {"real", "fake"}:
         raise ValueError("mode must be real or fake")
     options.profile.validate()
-    store = RuntimeStore(options.runtime_root)
+    store = _runtime_store(options.runtime_root)
     _ensure_project(store, options.project_id, options.profile)
     run_root = _run_root(store, options.project_id, options.run_id)
     run_root.mkdir(parents=True, exist_ok=True)
@@ -1706,21 +1707,24 @@ def _video_artifact(
 
 
 def _probe(path: Path) -> dict[str, Any]:
-    proc = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration:stream=codec_type,width,height",
-            "-of",
-            "json",
-            str(path),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise AdaptiveCanvasError("ffprobe executable not found") from exc
     payload = json.loads(proc.stdout or "{}")
     if not isinstance(payload, dict):
         raise AdaptiveCanvasError("ffprobe returned non-object JSON")
@@ -1728,7 +1732,10 @@ def _probe(path: Path) -> dict[str, Any]:
 
 
 def _decode_check(path: Path) -> dict[str, Any]:
-    proc = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"], capture_output=True, text=True)
+    try:
+        proc = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"], capture_output=True, text=True)
+    except FileNotFoundError:
+        return {"status": "failed", "stderr_tail": "ffmpeg executable not found"}
     return {"status": "pass" if proc.returncode == 0 else "failed", "stderr_tail": proc.stderr[-1000:]}
 
 
@@ -1822,7 +1829,10 @@ def _copy_bytes(src: Path, dst: Path) -> None:
 
 
 def _run(cmd: list[str]) -> None:
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise AdaptiveCanvasError(f"command executable not found: {cmd[0]}") from exc
     if proc.returncode != 0:
         raise AdaptiveCanvasError(f"command failed: {' '.join(cmd[:2])}: {proc.stderr[-1000:]}")
 
@@ -1851,6 +1861,10 @@ def sha256_text(text: str) -> str:
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _runtime_store(runtime_root: Path) -> Any:
+    return import_module("apps.api.runtime_store").RuntimeStore(runtime_root)
 
 
 def safe_error(error: Exception) -> dict[str, str]:

@@ -30,7 +30,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     )
 
     assert '<div id="sprite-root"></div>' not in index
-    assert '<div id="sprite-root"></div>' in bootstrap
+    assert '<div id="sprite-root"></div>' not in bootstrap
     assert './styles/studio-sprite.css' in index
     assert 'from "./sprite-widget.js"' in main
     assert "renderSpriteWidget" in main

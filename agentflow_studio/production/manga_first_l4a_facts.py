@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -14,18 +15,21 @@ from agentflow_studio.production.manga_first_l4a_schema import (
     read_json_object,
     write_json_atomic,
 )
-from apps.api.runtime_episode_domain_contract import EntityVersionRef, ProductionProjectAggregate, TenantScope
-from apps.api.runtime_episode_domain_store import (
-    AggregateNotFoundError,
-    AggregateSaveResult,
-    AggregateVersionConflictError,
-    EpisodeDomainAggregateStore,
-)
-from apps.api.runtime_episode_workspace_projection import (
-    build_creator_authoring_projection,
-    build_episode_workspace_projection,
-)
-from apps.api.runtime_store import RuntimeStore, safe_id
+from agentflow_studio.production.runtime_safe_io import safe_id
+
+
+_CONTRACT = import_module("apps.api.runtime_episode_domain_contract")
+_DOMAIN_STORE = import_module("apps.api.runtime_episode_domain_store")
+_WORKSPACE_PROJECTION = import_module("apps.api.runtime_episode_workspace_projection")
+EntityVersionRef = _CONTRACT.EntityVersionRef
+ProductionProjectAggregate = _CONTRACT.ProductionProjectAggregate
+TenantScope = _CONTRACT.TenantScope
+AggregateNotFoundError = _DOMAIN_STORE.AggregateNotFoundError
+AggregateSaveResult = _DOMAIN_STORE.AggregateSaveResult
+AggregateVersionConflictError = _DOMAIN_STORE.AggregateVersionConflictError
+EpisodeDomainAggregateStore = _DOMAIN_STORE.EpisodeDomainAggregateStore
+build_creator_authoring_projection = _WORKSPACE_PROJECTION.build_creator_authoring_projection
+build_episode_workspace_projection = _WORKSPACE_PROJECTION.build_episode_workspace_projection
 
 
 MANGA_FIRST_RUNTIME_DIR = "manga_first_l4b"

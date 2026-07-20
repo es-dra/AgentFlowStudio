@@ -13,9 +13,21 @@ export function nodePortWorldPoint(node, port, viewport) {
 export function nodeFramePortWorldPoint(node, port, viewport) {
   if (!node) return null;
   const fallback = fallbackNodePortPoint(node, port);
-  const center = nodePortCanvasCenter(node.id, port);
-  if (!center || !viewport) return fallback;
-  return screenToWorld(viewport, center.x, center.y);
+  const screenCenter = nodePortScreenCenter(node.id, port);
+  if (!screenCenter || !viewport) return fallback;
+  const canvasRoot = typeof document !== "undefined" && typeof document.getElementById === "function"
+    ? document.getElementById("canvas-root")
+    : null;
+  const rootRect = canvasRoot?.getBoundingClientRect?.();
+  const canvasCenter = rootRect
+    ? clientToCanvasPoint(screenCenter.x, screenCenter.y, canvasRoot)
+    : null;
+  if (canvasCenter) return screenToWorld(viewport, canvasCenter.x, canvasCenter.y);
+  const visibleCenter = screenToWorld(viewport, screenCenter.x, screenCenter.y);
+  return {
+    x: port === "in" ? node.x : node.x + node.w,
+    y: visibleCenter.y,
+  };
 }
 
 export function fallbackNodePortPoint(node, port) {

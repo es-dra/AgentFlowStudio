@@ -139,7 +139,8 @@ def test_default_canvas_edges_use_solid_frame_connection() -> None:
     assert "animation:" not in edge_rule
     assert "edge-spark" in canvas_edges
     assert "syncEdgeSpark" in canvas_edges
-    assert "selected.has(edge.from) || selected.has(edge.to)" in canvas_edges
+    assert "syncEdgeStateClass(path, item, edge, state)" in canvas_edges
+    assert "state.selection.edgeId === edge.id" in canvas_edges
     assert "#edge-layer path.edge-spark" in styles
     assert "animation: edge-spark-forward 3.9s linear infinite" in styles
     assert "@keyframes edge-spark-forward" in styles

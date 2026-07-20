@@ -522,17 +522,54 @@ def test_l4b_two_distinct_briefs_run_full_no_provider_e2e(tmp_path: Path, monkey
         assert forbidden not in combined
 
 
-def test_studio_product_shell_references_manga_first_workspace_page() -> None:
-    main_js = (REPO_ROOT / "apps" / "studio" / "src" / "main.js").read_text(encoding="utf-8")
-    shell_js = (REPO_ROOT / "apps" / "studio" / "src" / "product-shell.js").read_text(encoding="utf-8")
-    client_js = (REPO_ROOT / "apps" / "studio" / "src" / "runtime-client.js").read_text(encoding="utf-8")
-
-    assert "loadMangaFirstL4BWorkspace" in main_js
-    assert "afs:manga-first-reference-approval-requested" in main_js
-    assert "buildMangaFirstWorkspace" in shell_js
-    assert "动漫制片" in shell_js
-    assert "参考设定待确认" in shell_js
-    assert "approveMangaFirstReferenceSet" in client_js
+def test_studio_runtime_client_reaches_manga_first_workspace_contract() -> None:
+    client_js = REPO_ROOT / "apps" / "studio" / "src" / "runtime-client.js"
+    digest = "a" * 64
+    script = f"""
+      import {{ createRuntimeClient }} from {json.dumps(client_js.as_uri())};
+      const calls = [];
+      globalThis.fetch = async (url, options = {{}}) => {{
+        calls.push({{
+          url,
+          method: options.method || "GET",
+          payload: options.body ? JSON.parse(options.body) : null,
+        }});
+        return {{
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: {{ get: () => "" }},
+          text: async () => "{{}}",
+        }};
+      }};
+      const client = createRuntimeClient("manga-a");
+      await client.createMangaFirstProductionTruth({json.dumps(_brief())}, {{
+        idempotencyKey: "manga-first-create-v1",
+        includeManifest: true,
+      }});
+      await client.loadMangaFirstWorkspace();
+      await client.approveMangaFirstReferenceSet({{
+        decision_id: "approve-manga-a-references",
+        expected_aggregate_version: 3,
+        reference_set_digest: {json.dumps(digest)},
+      }});
+      const expected = [
+        ["/projects/manga-a/manga-first-l4b/production-truth", "POST"],
+        ["/projects/manga-a/manga-first-l4b/workspace", "GET"],
+        ["/projects/manga-a/manga-first-l4b/reference-set-approvals", "POST"],
+      ];
+      if (JSON.stringify(calls.map((item) => [item.url, item.method])) !== JSON.stringify(expected)) process.exit(2);
+      if (calls[0].payload.idempotency_key !== "manga-first-create-v1" || calls[0].payload.include_manifest !== true) process.exit(3);
+      if (calls[2].payload.reference_set_digest !== {json.dumps(digest)}) process.exit(4);
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
 def test_provider_call_plan_is_read_only_and_marks_cost_as_owner_decision_needed() -> None:

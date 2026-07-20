@@ -587,7 +587,8 @@ def test_text_node_uses_agent_chat_optimization_instead_of_fixed_script_tools() 
     assert "splitTextNodeToStoryboardNodes" not in prompt_bar
     assert "导入剧本" not in prompt_bar
     assert "扩写剧本" not in prompt_bar
-    assert "拆分分镜" not in prompt_bar
+    assert "/plan-selected-script-shots" in prompt_bar
+    assert "text-script-tool" in prompt_bar
     assert "export function splitScriptIntoShots" in script_breakdown
     assert "formal_script_before_storyboard_breakdown" in script_breakdown
     assert "storyboard_placeholder_outline" in script_breakdown

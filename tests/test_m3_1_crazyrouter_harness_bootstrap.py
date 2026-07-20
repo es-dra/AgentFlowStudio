@@ -204,8 +204,12 @@ def test_artifact_writer_uses_0600_and_rejects_secret_like_content(tmp_path) -> 
     writer = harness.ArtifactWriter(tmp_path / "artifacts")
     path = writer.write_json("safe/report.json", {"status": "ok", "credential_recorded": False})
 
-    assert oct(path.stat().st_mode & 0o777) == "0o600"
-    assert oct(path.parent.stat().st_mode & 0o777) == "0o700"
+    if os.name != "nt":
+        assert oct(path.stat().st_mode & 0o777) == "0o600"
+        assert oct(path.parent.stat().st_mode & 0o777) == "0o700"
+    else:
+        assert path.is_file()
+        assert path.parent.is_dir()
     with pytest.raises(harness.HarnessBlocked, match="secret_like"):
         writer.write_json("bad/report.json", {"Authorization": "Bearer abcdefghijklmnopqrstuvwxyz"})
 
@@ -359,7 +363,8 @@ def test_harness_runs_six_mocked_requests_without_secret_or_canonical_writes(tmp
     assert final_status["writes_memory"] is False
     assert final_status["credential_recorded"] is False
     for path in Path(summary["artifact_root"]).rglob("*.json"):
-        assert oct(path.stat().st_mode & 0o777) == "0o600"
+        if os.name != "nt":
+            assert oct(path.stat().st_mode & 0o777) == "0o600"
         text = path.read_text(encoding="utf-8")
         assert "fake-secret-for-test" not in text
         assert "CRAZYROUTER_API_KEY" not in text

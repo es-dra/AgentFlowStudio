@@ -10,7 +10,11 @@ export function screenToWorld(viewport, sx, sy) {
 }
 
 export function clientToCanvasPoint(clientX, clientY, root = null) {
-  const canvasRoot = root || (typeof document !== "undefined" ? document.getElementById("canvas-root") : null);
+  const canvasRoot = root || (
+    typeof document !== "undefined" && typeof document.getElementById === "function"
+      ? document.getElementById("canvas-root")
+      : null
+  );
   const rect = canvasRoot?.getBoundingClientRect?.();
   if (!rect) return { x: clientX, y: clientY };
   return {

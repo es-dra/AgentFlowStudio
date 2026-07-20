@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -46,11 +47,19 @@ def evaluation_target_digest(manifests: list[Mapping[str, Any]]) -> str:
                          "generation_run_id": item.get("generation_run_id")} for item in manifests])
 
 
+def require_system_temp_root(path: Path | str, *, label: str) -> Path:
+    root = Path(path).resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    try:
+        root.relative_to(temp_root)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be under system temp root") from exc
+    return root
+
+
 def materialize_evidence(artifact_root: Path | str, corpus: Mapping[str, Any]) -> str:
-    """Write a supplied metadata corpus under /tmp for deterministic evaluation."""
-    base = Path(artifact_root).resolve()
-    if base != Path("/tmp") and not str(base).startswith("/tmp/"):
-        raise ValueError("artifact root must be under /tmp")
+    """Write a supplied metadata corpus under the platform temp root for deterministic evaluation."""
+    base = require_system_temp_root(artifact_root, label="artifact root")
     root = base / "m3_server_codex_evidence"
     root.mkdir(parents=True, exist_ok=False)
     _write(root / "run_summary.json", {"model_surface": corpus.get("model_surface", MODEL_SURFACE),

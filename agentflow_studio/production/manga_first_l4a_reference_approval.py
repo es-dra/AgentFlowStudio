@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Any
 
 from agentflow_studio.production.manga_first_l4a_schema import MangaFirstError, json_digest
-from apps.api.runtime_episode_domain_contract import (
-    AssetCandidateVersion,
-    DeliveryVersion,
-    EntityVersionRef,
-    ProductionProjectAggregate,
-    ReferenceAssetVersion,
-    ReferenceSetVersion,
-    ReviewDecision,
-    SelectedVersion,
-    ShotVersion,
-    TenantScope,
-)
-from apps.api.runtime_episode_domain_store import (
-    AggregateSaveResult,
-    AggregateVersionConflictError,
-    EpisodeDomainAggregateStore,
-)
-from apps.api.runtime_store import RuntimeStore, safe_id
+from agentflow_studio.production.runtime_safe_io import safe_id
+
+
+_CONTRACT = import_module("apps.api.runtime_episode_domain_contract")
+_DOMAIN_STORE = import_module("apps.api.runtime_episode_domain_store")
+AssetCandidateVersion = _CONTRACT.AssetCandidateVersion
+DeliveryVersion = _CONTRACT.DeliveryVersion
+EntityVersionRef = _CONTRACT.EntityVersionRef
+ProductionProjectAggregate = _CONTRACT.ProductionProjectAggregate
+ReferenceAssetVersion = _CONTRACT.ReferenceAssetVersion
+ReferenceSetVersion = _CONTRACT.ReferenceSetVersion
+ReviewDecision = _CONTRACT.ReviewDecision
+SelectedVersion = _CONTRACT.SelectedVersion
+ShotVersion = _CONTRACT.ShotVersion
+TenantScope = _CONTRACT.TenantScope
+AggregateSaveResult = _DOMAIN_STORE.AggregateSaveResult
+AggregateVersionConflictError = _DOMAIN_STORE.AggregateVersionConflictError
+EpisodeDomainAggregateStore = _DOMAIN_STORE.EpisodeDomainAggregateStore
 
 
 REFERENCE_APPROVED_AT = "2026-07-18T00:01:00+00:00"

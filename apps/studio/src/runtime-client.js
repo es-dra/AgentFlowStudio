@@ -374,6 +374,9 @@ function inferUserAction(route, method) {
   if (/\/m3-zero-cost\/audit-truth$/.test(route) && method === "GET") return "load_m3_zero_cost_audit_truth";
   if (/\/m6\/script-plan-asset-bible\/preview$/.test(route) && method === "POST") return "preview_m6_script_plan_asset_bible";
   if (/\/m6\/script-plan-asset-bible\/confirm$/.test(route) && method === "POST") return "confirm_m6_script_plan_asset_bible";
+  if (/\/manga-first-l4b\/production-truth$/.test(route) && method === "POST") return "create_manga_first_production_truth";
+  if (/\/manga-first-l4b\/workspace$/.test(route) && method === "GET") return "load_manga_first_workspace";
+  if (/\/manga-first-l4b\/reference-set-approvals$/.test(route) && method === "POST") return "approve_manga_first_reference_set";
   if (/\/production-runs$/.test(route) && method === "POST") return "create_production_run";
   if (/\/commercial-production\/sample$/.test(route) && method === "POST") return "create_commercial_production_sample";
   if (/\/commercial-production\/stage-gate\/lock$/.test(route) && method === "POST") return "lock_commercial_production_scope";
@@ -515,6 +518,22 @@ export function createRuntimeClient(projectId = "") {
     },
     confirmM6ScriptPlanAssetBible(payload) {
       return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/confirm`, { method: "POST", payload });
+    },
+    createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
+        method: "POST",
+        payload: {
+          brief,
+          idempotency_key: idempotencyKey || `manga-first-l4b-${projectId}-v1`,
+          include_manifest: includeManifest === true,
+        },
+      });
+    },
+    loadMangaFirstWorkspace() {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/workspace`);
+    },
+    approveMangaFirstReferenceSet(payload) {
+      return requestJson(`/projects/${encoded}/manga-first-l4b/reference-set-approvals`, { method: "POST", payload });
     },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });

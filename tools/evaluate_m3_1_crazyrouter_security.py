@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -95,7 +96,7 @@ def main() -> int:
     parser.add_argument("--report", type=Path, default=None)
     args = parser.parse_args()
     report = evaluate(root=args.root.resolve(), bundle=args.bundle.resolve() if args.bundle else None)
-    report_path = args.report or Path(f"/tmp/afs-m3-1-crazyrouter-security-{report['trace_id']}.json")
+    report_path = args.report or Path(tempfile.gettempdir()) / f"afs-m3-1-crazyrouter-security-{report['trace_id']}.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
     print(
         json.dumps(
