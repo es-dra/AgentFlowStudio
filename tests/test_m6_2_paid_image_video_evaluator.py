@@ -11,7 +11,25 @@ def test_m6_2_paid_evidence_evaluator_counts_two_clean_cases_and_recovery_case(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(evaluator, "_is_inside_git_worktree", lambda path: False)
-    monkeypatch.setattr(evaluator, "_ffprobe", lambda path: {"status": "PASS", "format": {"duration": "10.0"}})
+    monkeypatch.setattr(
+        evaluator,
+        "_ffprobe",
+        lambda path: {
+            "status": "PASS",
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "width": 864,
+                    "height": 496,
+                    "avg_frame_rate": "24/1",
+                    "r_frame_rate": "24/1",
+                    "nb_frames": "240",
+                }
+            ],
+            "format": {"duration": "10.0"},
+        },
+    )
+    monkeypatch.setattr(evaluator, "_video_event_scan", lambda path: {"status": "PASS", "black_segments": [], "freeze_events": []})
     run_root = tmp_path / "evidence"
     _write_smoke(run_root)
     _write_case(run_root, "dialogue_room", with_resolved_retry=True)
@@ -30,6 +48,10 @@ def test_m6_2_paid_evidence_evaluator_counts_two_clean_cases_and_recovery_case(
     }
     sci_fi = next(case for case in report["cases"] if case["case_id"] == "sci_fi_chamber")
     assert sci_fi["classification"] == "RECOVERY_EVIDENCE_NOT_COUNTED"
+    dialogue = next(case for case in report["cases"] if case["case_id"] == "dialogue_room")
+    assert dialogue["media_metrics"]["width"] == 864
+    assert dialogue["media_metrics"]["fps"] == 24.0
+    assert dialogue["technical_scores"]["black_freeze_repeat_anomaly"] == 5
     assert report["budget"]["within_budget"] is True
     assert any(issue["id"] == "m6_2_sci_fi_chamber_recovery_ledger" for issue in report["issue_ledger"]["resolved"])
 

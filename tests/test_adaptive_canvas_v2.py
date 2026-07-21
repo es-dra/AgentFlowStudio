@@ -41,18 +41,33 @@ def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[s
         target.write_bytes(payload)
         metadata[key(target)] = probe
 
+    def video_probe(duration_sec: float) -> dict[str, object]:
+        return {
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "width": 160,
+                    "height": 284,
+                    "avg_frame_rate": "12/1",
+                    "r_frame_rate": "12/1",
+                    "nb_frames": str(int(round(float(duration_sec) * 12))),
+                }
+            ],
+            "format": {"duration": f"{float(duration_sec):.3f}"},
+        }
+
     def fake_png(path: Path, color: str) -> None:
         record(
             path,
             f"offline-png:{color}".encode("utf-8"),
-            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": "1.000"}},
+            video_probe(1.0),
         )
 
     def fake_video(path: Path, *, duration_sec: int, color: str) -> None:
         record(
             path,
             f"offline-mp4:{duration_sec}:{color}".encode("utf-8"),
-            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": f"{float(duration_sec):.3f}"}},
+            video_probe(float(duration_sec)),
         )
 
     def concat_videos(inputs: list[Path], output: Path, *, duration_sec: float) -> None:
@@ -62,7 +77,7 @@ def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[s
         record(
             output,
             f"offline-concat:{duration_sec:.3f}".encode("utf-8"),
-            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": f"{float(duration_sec):.3f}"}},
+            video_probe(float(duration_sec)),
         )
 
     def extract_tail_frame(video: Path, output: Path) -> None:
@@ -76,7 +91,7 @@ def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[s
         record(
             output,
             b"offline-contact-sheet",
-            {"streams": [{"codec_type": "video", "width": 160, "height": 284}], "format": {"duration": "1.000"}},
+            video_probe(1.0),
         )
 
     def probe(path: Path) -> dict[str, object]:
@@ -88,6 +103,9 @@ def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[s
     def decode_check(path: Path) -> dict[str, str]:
         return {"status": "pass" if Path(path).exists() else "failed", "stderr_tail": ""}
 
+    def video_event_scan(path: Path) -> dict[str, object]:
+        return {"status": "pass", "black_segments": [], "freeze_events": []}
+
     monkeypatch.setattr(adaptive_canvas, "_fake_png", fake_png)
     monkeypatch.setattr(adaptive_canvas, "_fake_video", fake_video)
     monkeypatch.setattr(adaptive_canvas, "_concat_videos", concat_videos)
@@ -95,6 +113,7 @@ def offline_adaptive_media(monkeypatch: pytest.MonkeyPatch) -> dict[Path, dict[s
     monkeypatch.setattr(adaptive_canvas, "_contact_sheet", contact_sheet)
     monkeypatch.setattr(adaptive_canvas, "_probe", probe)
     monkeypatch.setattr(adaptive_canvas, "_decode_check", decode_check)
+    monkeypatch.setattr(adaptive_canvas, "_video_event_scan", video_event_scan)
     return metadata
 
 
@@ -139,6 +158,23 @@ def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path, offline_ada
     assert [shot["target_duration_sec"] for shot in workspace["shots"]] == [15.0, 15.0, 15.0, 15.0]
     assert {shot["generation_strategy"] for shot in workspace["shots"]} == {"image_to_video"}
     assert workspace["final_demo"]["duration_sec"] >= 59.0
+    qa = read_json(
+        tmp_path
+        / "runtime"
+        / "projects"
+        / "paid-profile-fake"
+        / "adaptive_canvas_v2"
+        / "run-001"
+        / "qa"
+        / "technical_qa.json"
+    )
+    assert qa["media_metrics"]["width"] == 160
+    assert qa["media_metrics"]["fps"] == 12.0
+    assert qa["media_metrics"]["frame_count"] == 720
+    assert qa["media_metrics"]["black_segment_count"] == 0
+    assert qa["media_metrics"]["freeze_event_count"] == 0
+    assert qa["technical_scores"]["resolution_fps_frame_count"] == 5
+    assert qa["technical_scores"]["black_freeze_repeat_anomaly"] == 5
 
 
 def test_cinematic_media_profile_keeps_adaptive_workspace_contract(
