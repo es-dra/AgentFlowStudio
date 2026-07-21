@@ -1063,3 +1063,28 @@ body,
 
   .graph-canvas-status .studio-text-button { display: none; }
 }
+
+.canvas-workspace-stage.graph-planning-mode {
+  --graph-planning-reserve: 224px;
+}
+
+.canvas-workspace-stage.graph-planning-mode #studio-editor-shell {
+  bottom: var(--graph-planning-reserve);
+  height: auto;
+}
+
+.canvas-workspace-stage.graph-planning-mode .graph-canvas-status.planning_required {
+  top: auto;
+  bottom: 14px;
+}
+
+@media (max-width: 760px) {
+  .canvas-workspace-stage.graph-planning-mode {
+    --graph-planning-reserve: 236px;
+  }
+
+  .canvas-workspace-stage.graph-planning-mode .graph-canvas-status.planning_required {
+    top: auto;
+    bottom: 8px;
+  }
+}
