@@ -8,7 +8,7 @@ from typing import Any
 
 
 EXPECTED_CASES = ("dialogue_room", "four_person_action", "sci_fi_chamber")
-EXPECTED_VIEWPORTS = ("1440x900", "1024x768", "800x900")
+EXPECTED_VIEWPORTS = ("1440x900", "1024x768", "800x900", "390x844")
 EXPECTED_ROLES = (
     "first_time_creator",
     "screenwriter",
@@ -24,6 +24,12 @@ EXPECTED_ROLES = (
 EXPECTED_MICRO_CHECKS = (
     "first_screen_10s",
     "primary_next_action_visible",
+    "project_title_discoverable",
+    "primary_review_not_clipped",
+    "review_shot_selection_available",
+    "agent_chat_compact_default",
+    "agent_chat_expand_collapse",
+    "phone_reviewer_flow",
     "paid_action_preview_not_execution",
     "safe_media_urls",
     "version_compare_available",
@@ -80,7 +86,20 @@ def _evaluate_browser_round(label: str, report: dict[str, Any], findings: list[d
                 continue
             if float(item.get("video_duration_sec") or 0) <= 0:
                 findings.append({"severity": "P0", "issue": f"{label} video metadata missing for {key}"})
-            for field in ("media_url_safe", "canvas_first_screen", "storyboard_operations", "redo_preview", "redo_version_compare", "recovery_and_cost_state"):
+            for field in (
+                "media_url_safe",
+                "canvas_first_screen",
+                "storyboard_operations",
+                "review_shot_selected",
+                "primary_review_unclipped",
+                "project_title_discoverable",
+                "agent_chat_compact_default",
+                "agent_chat_expand_collapse",
+                "phone_reviewer_flow",
+                "redo_preview",
+                "redo_version_compare",
+                "recovery_and_cost_state",
+            ):
                 if item.get(field) is not True:
                     findings.append({"severity": "P0", "issue": f"{label} {key} did not prove {field}"})
             if int(item.get("provider_dispatch_count") or 0) != 0:
@@ -97,7 +116,7 @@ def _evaluate_browser_round(label: str, report: dict[str, Any], findings: list[d
             findings.append({"severity": "P1", "issue": f"{label} micro UX check failed: {check}"})
 
     screenshots = report.get("screenshots") if isinstance(report.get("screenshots"), dict) else {}
-    if len(screenshots) < 54:
+    if len(screenshots) < 102:
         findings.append({"severity": "P1", "issue": f"{label} has insufficient screenshot evidence: {len(screenshots)}"})
     for key, value in screenshots.items():
         path = Path(str(value))
@@ -124,8 +143,8 @@ def _evaluate_issue_ledger(ledger: dict[str, Any], findings: list[dict[str, str]
         status = str(issue.get("status") or "").lower()
         if severity in {"P0", "P1"} and status != "resolved":
             findings.append({"severity": "P0", "issue": f"{severity} issue is not resolved: {issue.get('id')}"})
-        if severity == "P2" and issue.get("high_impact") is True and status != "resolved":
-            findings.append({"severity": "P1", "issue": f"high-impact P2 issue is not resolved: {issue.get('id')}"})
+        if severity == "P2" and status != "resolved":
+            findings.append({"severity": "P1", "issue": f"P2 issue is not resolved under owner-review hardening: {issue.get('id')}"})
 
 
 def _report(findings: list[dict[str, str]], round_a: dict[str, Any], round_b: dict[str, Any], ledger: dict[str, Any]) -> dict[str, Any]:
@@ -143,6 +162,7 @@ def _report(findings: list[dict[str, str]], round_a: dict[str, Any], round_b: di
         "verdict": "PASS" if not findings else "FAIL",
         "P0": p0,
         "P1": p1,
+        "P2": p2_open,
         "open_P2": p2_open,
         "findings": findings,
         "rounds": {

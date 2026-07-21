@@ -73,10 +73,18 @@ function renderCompactTopbar(topbar, options) {
   topbar.appendChild(siteHomeLink(onBeforeSiteHome));
   topbar.appendChild(studioHomeButton(onOpenHome));
 
+  const fullTitle = `${state.meta.projectName} · ${state.meta.canvasName}`;
   const title = el("div", "topbar-title compact-project");
-  title.appendChild(el("span", "proj-name", state.meta.projectName));
+  title.tabIndex = 0;
+  title.title = fullTitle;
+  title.setAttribute("aria-label", `当前项目：${fullTitle}`);
+  const projectName = el("span", "proj-name", state.meta.projectName);
+  projectName.title = state.meta.projectName;
   title.appendChild(el("span", "divider"));
-  title.appendChild(el("span", "canvas-name", `${state.meta.canvasName} ▾`));
+  const canvasName = el("span", "canvas-name", `${state.meta.canvasName} ▾`);
+  canvasName.title = state.meta.canvasName;
+  title.prepend(projectName);
+  title.appendChild(canvasName);
   topbar.appendChild(title);
 
   appendProjectControls(topbar, { ...options, projectOptions });
