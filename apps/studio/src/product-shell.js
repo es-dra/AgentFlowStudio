@@ -457,6 +457,7 @@ export function createProductShell(options = {}) {
     main.id = "product-main";
     main.tabIndex = -1;
     const stage = node("section", "canvas-workspace-stage");
+    if (graphView().planningRequired) stage.classList.add("graph-planning-mode");
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
     stage.dataset.canvasTarget = currentShot().nodeId || "empty-project";
     const editor = options.getCanvasShell?.();
