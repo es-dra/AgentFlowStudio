@@ -69,7 +69,12 @@ def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: Runt
         require_access(request, project_id)
         store.ensure_project_manifest(project_id)
         try:
-            preview = build_m6_script_plan_asset_bible(project_id, body.model_dump())
+            if _server_codex_m6_enabled():
+                from apps.api.runtime_m6_server_codex_planner import build_m6_server_codex_script_plan_asset_bible
+
+                preview = build_m6_server_codex_script_plan_asset_bible(project_id, body.model_dump())
+            else:
+                preview = build_m6_script_plan_asset_bible(project_id, body.model_dump())
         except M6PlanningError as exc:
             raise _contract_error("m6_planning_required", str(exc), project_id=project_id, stage="m6_preview", status_code=409) from exc
         return preview
@@ -94,13 +99,19 @@ def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: Runt
             "graph": graph,
             "projection": film_graph_projection(graph, "studio"),
             "m6_validation": validation,
-            "provider_dispatch_count": 0,
-            "cost_usd": 0,
+            "provider_dispatch_count": int(body.candidate.get("provider_dispatch_count") or 0),
+            "cost_usd": body.candidate.get("cost_usd", 0),
         }
 
 
 class M6PlanningError(ValueError):
     pass
+
+
+def _server_codex_m6_enabled() -> bool:
+    from apps.api.runtime_m6_server_codex_planner import server_codex_m6_enabled
+
+    return server_codex_m6_enabled()
 
 
 def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -232,8 +243,10 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
         findings.append(_finding("P0", "schema", "candidate must carry both film and M6 schema versions"))
     if candidate.get("trusted_candidate") is not True:
         findings.append(_finding("P0", "trusted_candidate", "candidate must be explicitly trusted after preview validation"))
-    if candidate.get("provider_dispatch_count", 0) != 0 or candidate.get("cost_usd", 0) != 0:
-        findings.append(_finding("P0", "provider", "M6 zero-cost candidate cannot carry provider dispatch or cost"))
+    provider_dispatch_count = int(candidate.get("provider_dispatch_count") or 0)
+    cost_usd = float(candidate.get("cost_usd") or 0)
+    if provider_dispatch_count < 0 or cost_usd != 0:
+        findings.append(_finding("P0", "provider", "M6 text planning candidate cannot carry negative dispatch or nonzero cost"))
     characters = _rows(candidate, "characters")
     scenes = _rows(candidate, "scenes")
     assets = _rows(candidate, "assets")
@@ -287,7 +300,7 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     p1 = sum(item["severity"] == "P1" for item in findings)
     if findings:
         raise M6PlanningError("; ".join(f"{item['severity']}:{item['surface']}:{item['issue']}" for item in findings[:6]))
-    return {"verdict": "PASS", "P0": p0, "P1": p1, "review_roles": sorted(roles), "provider_dispatch_count": 0, "cost_usd": 0}
+    return {"verdict": "PASS", "P0": p0, "P1": p1, "review_roles": sorted(roles), "provider_dispatch_count": provider_dispatch_count, "cost_usd": cost_usd}
 
 
 def _character_row(project_key: str, candidate_key: str, index: int, name: str, source_text: str) -> dict[str, Any]:

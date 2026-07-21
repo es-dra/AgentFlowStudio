@@ -30,7 +30,8 @@ def build_llm_script_draft_plan(
 ) -> dict[str, Any]:
     gate_open = _remote_llm_gate_open()
     gate_status = "ready_not_run" if gate_open else "blocked"
-    blockers = [] if gate_open else [_gate_closed_block()]
+    scaffold_status = "rehearsal" if gate_open else "blocked"
+    blockers = [_provider_not_dispatched_block()] if gate_open else [_gate_closed_block()]
     feedback_reuse = _feedback_reuse(
         request.review_feedback_artifact_id,
         previous_script_artifact_id=request.previous_script_artifact_id,
@@ -64,7 +65,7 @@ def build_llm_script_draft_plan(
         "artifact_type": "agentflow_script_storyboard_safe_artifact",
         "schema_version": "0.1.0",
         "project_id": request.project_id,
-        "status": gate_status,
+        "status": scaffold_status,
         "source": "local_pre_provider_scaffold",
         "provider_output": False,
         "remote_provider_calls_started": False,
@@ -84,7 +85,7 @@ def build_llm_script_draft_plan(
         "artifact_type": "agentflow_llm_script_safe_manifest",
         "schema_version": "0.1.0",
         "project_id": request.project_id,
-        "status": gate_status,
+        "status": scaffold_status,
         "provider_gate": provider_gate,
         "provider_calls_started": False,
         "raw_provider_response_stored": False,
@@ -108,7 +109,7 @@ def build_llm_script_draft_plan(
     write_json(output_dir / "script_storyboard_safe_artifact.json", script_artifact)
     write_json(output_dir / "script_provider_safe_manifest.json", safe_manifest)
     return {
-        "job_status": "blocked" if gate_status == "blocked" else "succeeded",
+        "job_status": "blocked",
         "provider_gate": provider_gate,
         "safe_manifest": safe_manifest,
         "tool_gate_state": {
@@ -129,6 +130,14 @@ def _gate_closed_block() -> dict[str, str]:
         "block_id": "remote_llm_gate_closed",
         "reason": f"Set {REMOTE_LLM_ENV}=true only for an explicit LLM provider smoke.",
         "required_gate": REMOTE_LLM_ENV,
+    }
+
+
+def _provider_not_dispatched_block() -> dict[str, str]:
+    return {
+        "block_id": "local_pre_provider_scaffold_rehearsal",
+        "reason": "The legacy script draft endpoint does not dispatch provider text; use the M6 server_codex route for real structured LLM planning.",
+        "required_route": "/projects/{project_id}/m6/script-plan-asset-bible/preview",
     }
 
 

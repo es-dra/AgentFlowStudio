@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -24,6 +25,17 @@ from agentflow_studio.model_gateway.provider_adapter import (
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 REFERENCE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+CODEX_CLI_ALLOWED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
+CODEX_CLI_KNOWN_MODEL_ALLOWLIST = {
+    "codex-auto-review",
+    "gpt-5.3-codex-spark",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.5",
+    "gpt-5.6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+}
 
 
 class CodexLocalAdapter:
@@ -87,6 +99,13 @@ class CodexLocalAdapter:
                 self.service_id,
                 str(service.get("cli_command") or account.get("cli_command") or "codex"),
             ),
+            "cli_model": _validated_cli_model(
+                request.model_name_override
+                or str(service.get("cli_model") or account.get("cli_model") or "").strip()
+            ),
+            "cli_reasoning_effort": _validated_cli_reasoning_effort(
+                str(service.get("cli_reasoning_effort") or account.get("cli_reasoning_effort") or "").strip()
+            ),
             "timeout_sec": float(service.get("timeout_sec") or account.get("timeout_sec") or request.timeout_sec),
             "account": account_selection.public_summary(),
         }
@@ -131,6 +150,52 @@ def _codex_cli_command(service_id: str, configured: str) -> str:
     return command
 
 
+def _validated_cli_model(value: str | None) -> str:
+    model = str(value or "").strip()
+    if not model:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,80}", model):
+        raise ModelConfigError("codex_local cli_model is not a safe model slug")
+    if model not in _codex_cli_allowed_models():
+        raise ModelConfigError("codex_local cli_model is not in the local Codex model allowlist")
+    return model
+
+
+def _validated_cli_reasoning_effort(value: str | None) -> str:
+    effort = str(value or "").strip().lower()
+    if not effort:
+        return ""
+    if effort not in CODEX_CLI_ALLOWED_REASONING_EFFORTS:
+        raise ModelConfigError("codex_local cli_reasoning_effort is not allowed")
+    return effort
+
+
+def _codex_cli_allowed_models() -> set[str]:
+    allowed = set(CODEX_CLI_KNOWN_MODEL_ALLOWLIST)
+    for path in _codex_model_cache_paths():
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        models = payload.get("models") if isinstance(payload, dict) else None
+        if isinstance(models, list):
+            for item in models:
+                if isinstance(item, dict) and isinstance(item.get("slug"), str):
+                    allowed.add(str(item["slug"]))
+    return allowed
+
+
+def _codex_model_cache_paths() -> tuple[Path, ...]:
+    configured_home = str(os.environ.get("CODEX_HOME") or os.environ.get("AFS_CODEX_HOME") or "").strip()
+    paths = []
+    if configured_home:
+        paths.append(Path(configured_home).expanduser() / "models_cache.json")
+    paths.append(Path.home() / ".codex" / "models_cache.json")
+    return tuple(paths)
+
+
 def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="afs_codex_local_") as tmp:
         work_dir = Path(tmp)
@@ -166,6 +231,10 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
             "workspace-write",
             "--skip-git-repo-check",
         ]
+        if plan.get("cli_model"):
+            command.extend(["--model", str(plan["cli_model"])])
+        if plan.get("cli_reasoning_effort"):
+            command.extend(["-c", f'model_reasoning_effort="{plan["cli_reasoning_effort"]}"'])
         if isinstance(schema, dict):
             command.extend(
                 [
@@ -180,7 +249,7 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
             [
                 "--cd",
                 str(work_dir),
-                "Read request.json and prompt.md in the current directory, then return only the requested answer.",
+                "-",
             ]
         )
         codex_env = codex_subprocess_env()
@@ -189,6 +258,7 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
                 command,
                 cwd=str(work_dir),
                 capture_output=True,
+                input=_codex_prompt(request_payload),
                 text=True,
                 encoding="utf-8",
                 errors="replace",
@@ -196,6 +266,8 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
                 timeout=float(plan.get("timeout_sec") or 120.0),
                 check=False,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise ModelGatewayError("Codex local provider timed out before returning structured output") from exc
         except OSError as exc:
             raise ModelGatewayError("Codex local provider command is not available") from exc
         finally:
@@ -293,11 +365,14 @@ def _validate_controlled_schema(value: Any, schema: dict[str, Any]) -> None:
         raise TypeError("boolean required")
 
 def _codex_prompt(request: dict[str, Any]) -> str:
+    request_json = json.dumps(request, ensure_ascii=False, sort_keys=True)
     if request.get("structured_output_contract_id"):
         return (
             "You are the local Codex structured script worker for AFS.\n"
-            "Read request.json and return exactly one final JSON object that conforms to output.schema.json.\n"
+            "Return exactly one final JSON object that conforms to output.schema.json.\n"
             "Do not include markdown fences, prefaces, suffixes, explanations, credentials, paths, or raw metadata.\n"
+            "Use only this safe request payload:\n"
+            f"<request_json>{request_json}</request_json>"
         )
 
     if request["capability"] == "vision":
@@ -309,11 +384,13 @@ def _codex_prompt(request: dict[str, Any]) -> str:
             '{"observation":{"description":"...","summary":"...","labels":["..."],"feature_card":{},"segments":[]}}\n'
             "Do not include local absolute paths, signed URLs, credentials, raw provider payloads, or media bytes.\n"
             f"Reference image files:\n{refs or '- none'}\n"
+            f"Safe request payload:\n<request_json>{request_json}</request_json>"
         )
     return (
         "You are the local Codex prompt optimization worker for AFS.\n"
-        "Read request.json and produce only the optimized prompt text requested by the user prompt.\n"
+        "Produce only the optimized prompt text requested by the safe request payload.\n"
         "Do not include explanations, markdown fences, credentials, paths, or raw provider metadata.\n"
+        f"<request_json>{request_json}</request_json>"
     )
 
 

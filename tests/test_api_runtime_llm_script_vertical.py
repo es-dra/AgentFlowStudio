@@ -161,6 +161,36 @@ def test_llm_script_plan_reuses_prior_script_feedback_as_candidate_constraints(t
     assert script_artifact["writes_company_kb"] is False
 
 
+def test_legacy_llm_script_scaffold_does_not_claim_success_when_gate_is_open(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    result = client.post(
+        "/provider/script-draft-plan",
+        json={
+            "project_id": "proj_script_gate_open",
+            "goal": "Draft a 45 second script while preserving provider evidence boundaries.",
+            "target_platform": "douyin",
+            "style": "clear_demo",
+            "generated_at": "2026-07-21T09:00:00+00:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    safe_manifest = payload["safe_manifest"]
+    assert payload["job"]["status"] == "blocked"
+    assert payload["provider_gate"] == {
+        "capability": "llm",
+        "env": "AFS_ALLOW_REMOTE_LLM",
+        "status": "ready_not_run",
+    }
+    assert payload["provider_calls_started"] is False
+    assert safe_manifest["status"] == "rehearsal"
+    assert safe_manifest["provider_calls_started"] is False
+    assert safe_manifest["blocks"][0]["block_id"] == "local_pre_provider_scaffold_rehearsal"
+
+
 def test_llm_script_plan_exports_openapi_without_provider_secret_surface(tmp_path) -> None:
     output_path = tmp_path / "frontend" / "afs-runtime-service.openapi.json"
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
