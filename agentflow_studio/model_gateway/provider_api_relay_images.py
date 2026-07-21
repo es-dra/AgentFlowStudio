@@ -200,17 +200,25 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     if parsed.scheme not in {"https", "http"} or not host:
         raise ModelGatewayError("API relay image URL must use HTTP(S)")
     if not allowed_url_hosts or not _host_allowed(host, allowed_url_hosts):
-        raise ModelGatewayError("API relay image URL host is not allowed")
-    request = urllib.request.Request(url, headers={"Accept": "image/png,image/jpeg,image/webp,*/*"})
+        raise ModelGatewayError(f"API relay image URL host is not allowed: {host}")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "image/png,image/jpeg,image/webp,*/*",
+            "User-Agent": "AgentFlowStudio/1.0 media-artifact-fetcher",
+        },
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout_sec) as response:
             image_bytes = response.read(MAX_IMAGE_DOWNLOAD_BYTES + 1)
     except TimeoutError as exc:
         raise ModelGatewayError("API relay image URL download timed out") from exc
+    except urllib.error.HTTPError as exc:
+        raise ModelGatewayError(f"API relay image URL download HTTP error {exc.code} from host: {host}") from exc
     except urllib.error.URLError as exc:
         if _looks_like_timeout(str(exc.reason)):
             raise ModelGatewayError("API relay image URL download timed out") from exc
-        raise ModelGatewayError("API relay image URL download failed") from exc
+        raise ModelGatewayError(f"API relay image URL download failed from host: {host}") from exc
     if len(image_bytes) > MAX_IMAGE_DOWNLOAD_BYTES:
         raise ModelGatewayError("API relay image URL download exceeded size limit")
     return image_bytes

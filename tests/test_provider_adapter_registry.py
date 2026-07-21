@@ -1062,8 +1062,8 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
             captured["authorization"] = request.get_header("Authorization")
             captured["payload"] = json.loads(request.data.decode("utf-8"))
             captured["timeout"] = timeout
-            return _JsonResponse({"data": [{"url": "http://251000800.vod2.myqcloud.com/task-artifacts/result.png"}]})
-        if request.full_url == "http://251000800.vod2.myqcloud.com/task-artifacts/result.png":
+            return _JsonResponse({"data": [{"url": "https://pub-82fd2ca4648e49a9b89dc6f4b28873ff.r2.dev/task-artifacts/result.png"}]})
+        if request.full_url == "https://pub-82fd2ca4648e49a9b89dc6f4b28873ff.r2.dev/task-artifacts/result.png":
             captured["downloaded"] = True
             return _BytesResponse(_png_bytes())
         raise AssertionError(f"unexpected URL: {request.full_url}")
@@ -1108,7 +1108,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert result["outputs"][0]["provider_url_persisted"] is False
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
-    assert "media.crazyrouter.com" not in json.dumps(result, ensure_ascii=False)
+    assert "r2.dev" not in json.dumps(result, ensure_ascii=False)
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
