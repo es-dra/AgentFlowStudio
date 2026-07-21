@@ -9,6 +9,7 @@ from apps.api.runtime_m6_script_plan_asset_bible import (
     build_m6_script_plan_asset_bible,
     validate_m6_candidate,
 )
+from apps.api import runtime_m6_server_codex_planner
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -90,6 +91,78 @@ def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tm
     assert not (tmp_path / "runtime" / "projects" / "m6-graph" / "studio_state.json").exists()
 
 
+def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_path, monkeypatch) -> None:
+    provider_config = tmp_path / "provider_config.json"
+    provider_config.write_text('{"schema_version":"company_provider_secrets.v0.1","accounts":{},"account_pools":{},"services":{}}', encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    for gate in (
+        "AFS_ALLOW_REMOTE_IMAGE",
+        "AFS_ALLOW_REMOTE_VIDEO",
+        "AFS_ALLOW_REMOTE_AUDIO",
+        "AFS_ALLOW_REMOTE_ASR",
+        "AFS_ALLOW_REMOTE_VISION",
+        "AFS_ALLOW_EXTERNAL_DOWNLOAD",
+    ):
+        monkeypatch.setenv(gate, "false")
+
+    calls: list[dict[str, object]] = []
+
+    def fake_dispatch(*, prompt, output_dir, schema, schema_digest):
+        calls.append({"prompt": prompt, "output_dir": output_dir, "schema_digest": schema_digest})
+        return {
+            "provider_calls_started": True,
+            "structured_output": _server_codex_payload(),
+        }
+
+    monkeypatch.setattr(runtime_m6_server_codex_planner, "_dispatch_server_codex_structured_plan", fake_dispatch)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+
+    first = client.post("/projects/m6-codex/m6/script-plan-asset-bible/preview", json={
+        "source_kind": "script",
+        "source_text": SCRIPT_TEXT,
+    })
+    assert first.status_code == 200, first.text
+    first_payload = first.json()
+    first_candidate = first_payload["candidate"]
+    first_digest = first_payload["candidate_digest"]
+    assert first_payload["provider_dispatch_count"] == 1
+    assert first_candidate["provider_lineage"]["service_id"] == "server_codex"
+    assert first_candidate["provider_lineage"]["provider"] == "codex_local"
+    assert first_candidate["provider_lineage"]["provider_calls_started"] is True
+    assert first_candidate["provider_lineage"]["provider_raw_response_stored"] is False
+    assert first_payload["validation"]["provider_dispatch_count"] == 1
+    assert len(calls) == 1
+    assert "固定 4x15" in str(calls[0]["prompt"])
+
+    second = client.post("/projects/m6-codex/m6/script-plan-asset-bible/preview", json={
+        "source_kind": "script",
+        "source_text": SCRIPT_TEXT,
+        "parent_candidate_digest": first_digest,
+        "revision_instruction": "第二轮请加深米拉和阿衡的关系压力，并补强罗盘和玻璃杯的连续性锁定。",
+    })
+    assert second.status_code == 200, second.text
+    second_candidate = second.json()["candidate"]
+    assert second_candidate["script_revision"]["revision_number"] == 2
+    assert second_candidate["brief"]["lineage"]["parent_candidate_digest"] == first_digest
+    assert len(calls) == 2
+    assert first_digest in str(calls[1]["prompt"])
+
+    confirmed = client.post("/projects/m6-codex/m6/script-plan-asset-bible/confirm", json={
+        "expected_graph_version": 0,
+        "idempotency_key": "confirm-m6-codex",
+        "candidate": second_candidate,
+    })
+    assert confirmed.status_code == 200, confirmed.text
+    graph = confirmed.json()["graph"]
+    assert confirmed.json()["provider_dispatch_count"] == 1
+    assert graph["provider_gates"] == {key: False for key in graph["provider_gates"]}
+    workspace = client.get("/projects/m6-codex/m5/sequence-workspace").json()
+    assert workspace["graph_digest"] == graph["graph_digest"]
+    assert workspace["sequence"]["reference_sets"]
+    assert not (tmp_path / "runtime" / "projects" / "m6-codex" / "studio_state.json").exists()
+
+
 def test_m6_confirm_rejects_template_gaming_and_unresolved_lineage(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     candidate = build_m6_script_plan_asset_bible("m6-bad", {"source_kind": "script", "source_text": SCRIPT_TEXT})["candidate"]
@@ -137,3 +210,190 @@ def test_m6_preview_requires_named_entities_and_story_beats() -> None:
 
     valid = build_m6_script_plan_asset_bible("m6-direct", {"source_kind": "idea", "source_text": IDEA_TEXT})["candidate"]
     assert validate_m6_candidate(valid)["P0"] == 0
+
+
+def _server_codex_payload() -> dict[str, object]:
+    return {
+        "language": "zh-CN",
+        "title": "雨季观测台的回声",
+        "logline": "三名角色在雨季设备故障里追查旧呼救，最终把关系亏欠变成下一场戏的压力。",
+        "draft_text": (
+            "傍晚观测台上，米拉要求陶记录偏移信号，铜色罗盘在轨道边轻微倒转。"
+            "信号室里，陶发现裂开的玻璃杯纹路与波形一致，阿衡的耳机传来十年前的旧广播。"
+            "水泵间的手电硬光把三人的沉默切开，阿衡承认自己当年听过呼救却没有上报。"
+            "米拉不追逐神秘源头，而把镜头留给三个人必须共同承担的真相。"
+        ),
+        "revision_notes": "补强角色关系、权利时间摘要和罗盘连续性，镜头时长按动作密度重新分配。",
+        "structure": {
+            "sequence_count": 1,
+            "scene_count": 3,
+            "turning_points": ["信号偏移暴露异常", "玻璃裂纹对应波形", "阿衡承认旧呼救"],
+            "rhythm_strategy": "从观测台的开阔误判压缩到水泵间的窄距对质，停顿逐步变长。",
+            "rights_time_summary": "素材来自用户剧本输入，故事时间为雨季同一傍晚到夜间，摘要闭环到三人共同承担。",
+        },
+        "characters": [
+            {
+                "display_name": "米拉",
+                "goal": "用镜头证明信号偏移不是天气误差，并让真相进入可拍证据。",
+                "conflict": "她需要陶的技术记录，却必须面对阿衡隐瞒旧广播的关系裂缝。",
+                "relationship_arc": "从指挥同伴完成记录，转向逼迫三人共同承认十年前的缺口。",
+                "change_vector": "从追逐信号源转为把镜头留给沉默和责任。",
+                "appearance": "短发，银灰外套，雨水压住发梢，动作克制。",
+                "wardrobe": "银灰防雨外套、深色内搭，整夜保持湿冷褶皱。",
+                "age_range": "二十七到三十二岁",
+                "proportion": "真人写实比例，肩颈线条在三场保持一致。",
+                "signature_features": ["短发湿冷轮廓", "单手扶镜头的动作"],
+                "do_not_change": ["银灰外套", "短发轮廓", "镜头掌控位置"],
+            },
+            {
+                "display_name": "阿衡",
+                "goal": "确认耳机里的旧广播来源，同时避免暴露自己十年前没有上报。",
+                "conflict": "广播把他的旧选择拖回现场，米拉的镜头让逃避失效。",
+                "relationship_arc": "从沉默旁观到主动承认，关系从被质疑转为共同承担。",
+                "change_vector": "从隐瞒变为摘下耳机承认旧事实。",
+                "appearance": "戴旧耳机，眼神回避，水泵间硬光切出脸侧阴影。",
+                "wardrobe": "深色夹克和旧耳机，湿痕贯穿三场。",
+                "age_range": "三十到三十五岁",
+                "proportion": "真人写实比例，微驼背姿态保持。",
+                "signature_features": ["旧耳机", "摘耳机前的停顿"],
+                "do_not_change": ["旧耳机", "湿冷夹克", "回避视线"],
+            },
+        ],
+        "scenes": [
+            {
+                "name": "傍晚观测台",
+                "space": "环形轨道包围设备，远处天线被雨云压低。",
+                "time_of_day": "傍晚",
+                "lighting": "雨后橙光混合设备反光，角色脸部有冷暖分区。",
+                "season": "雨季",
+                "continuity": "铜色罗盘一直在观测台轨道边，指针首次轻微倒转。",
+                "action": "米拉校准镜头，陶记录频率，阿衡在后景监听异常。",
+                "rhythm": "开阔场景内动作较快，但每次信号偏移后有短暂停顿。",
+                "emotion": "专业克制下出现不安。",
+                "visual_expression": "用轨道弧线和镜头反光制造被观察的压力。",
+                "dialogue_or_sound": ["米拉要求记录频率", "远处电噪突然升高"],
+                "do_not_change": ["罗盘在轨道边", "雨季湿痕", "傍晚橙光"],
+            },
+            {
+                "name": "雨后的信号室",
+                "space": "狭窄设备间，桌面只够放电池、玻璃杯和记录本。",
+                "time_of_day": "入夜前",
+                "lighting": "绿色设备灯和窗外残光交替闪动。",
+                "season": "雨季",
+                "continuity": "玻璃杯裂纹在每个近景中方向一致，罗盘被移到桌角。",
+                "action": "陶打开备用电池，米拉对齐裂纹和波形，阿衡开始沉默。",
+                "rhythm": "由技术动作转为发现后的停顿，节奏明显收窄。",
+                "emotion": "疑惑变成逼近真相的压力。",
+                "visual_expression": "玻璃裂纹叠在监视器波形上，形成证据图像。",
+                "dialogue_or_sound": ["备用电池咔哒入位", "陶压低声音读出频率"],
+                "do_not_change": ["玻璃裂纹方向", "绿色设备灯", "桌角罗盘"],
+            },
+            {
+                "name": "地下水泵间",
+                "space": "低顶潮湿空间，水管把人物切成前后层。",
+                "time_of_day": "夜间",
+                "lighting": "手电硬光和水面反光制造不稳定阴影。",
+                "season": "雨季",
+                "continuity": "旧耳机、罗盘、玻璃杯碎纹记录都必须在关键镜头可追溯。",
+                "action": "三人沿水声进入，阿衡摘下耳机承认旧广播，米拉把镜头停住。",
+                "rhythm": "每句话后留出沉默，结尾不追动作而停在责任上。",
+                "emotion": "恐惧转为承认后的沉重。",
+                "visual_expression": "硬光压近人物，水声吞没辩解。",
+                "dialogue_or_sound": ["旧广播片段断续出现", "阿衡摘下耳机时水泵声压过对白"],
+                "do_not_change": ["手电硬光方向", "旧耳机", "水声压力"],
+            },
+        ],
+        "assets": [
+            {
+                "name": "铜色罗盘",
+                "kind": "prop",
+                "source": "用户剧本输入的项目道具",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.86,
+                "rights_boundary": "用户提供或项目原创，待创作者确认后进入媒体生成",
+                "style": "旧铜金属、磨损边缘",
+                "do_not_change": ["铜色材质", "指针方向连续", "相对尺寸"],
+            },
+            {
+                "name": "玻璃杯裂纹特写",
+                "kind": "closeup",
+                "source": "用户剧本输入的特写需求",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.84,
+                "rights_boundary": "项目内原创特写，不引用外部图片",
+                "style": "裂纹与波形叠化的写实特写",
+                "do_not_change": ["裂纹方向", "杯口形状", "桌面位置"],
+            },
+            {
+                "name": "雨季设备空间 ReferenceSet",
+                "kind": "reference_set",
+                "source": "项目文本抽取的场景和道具连续性参考",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.81,
+                "rights_boundary": "仅项目内文本参考，未含外部图片授权",
+                "style": "冷绿色设备灯、雨后湿痕、手电硬光",
+                "do_not_change": ["雨季湿痕", "设备灯色", "罗盘和耳机位置"],
+            },
+            {
+                "name": "克制悬疑写实风格",
+                "kind": "style",
+                "source": "用户剧本输入的风格方向",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.79,
+                "rights_boundary": "风格描述为项目偏好，不声明外部作品复制",
+                "style": "克制写实、冷暖对照、窄空间压迫",
+                "do_not_change": ["写实比例", "冷暖对照", "低饱和雨季质感"],
+            },
+        ],
+        "shots": [
+            {
+                "scene_index": 1,
+                "duration_seconds": 8.5,
+                "intent": "建立观测台空间和罗盘倒转的第一处异常。",
+                "character_indexes": [1, 2],
+                "asset_indexes": [1, 3],
+                "shot_size": "全景",
+                "camera_angle": "平视略低",
+                "camera_movement": "沿环形轨道缓慢横移",
+                "blocking": "米拉在前景扶镜头，阿衡带耳机站在后景设备旁。",
+                "sound": "雨后风声和信号电噪逐渐抬高。",
+                "transition": "信号声匹配切入",
+                "narrative_purpose": "把异常从环境故障推进到可追踪证据。",
+                "content_driven_duration_reason": "需要交代空间、三人位置和罗盘状态，因此长于后续特写。",
+            },
+            {
+                "scene_index": 2,
+                "duration_seconds": 5.0,
+                "intent": "用玻璃裂纹和波形建立证据连接。",
+                "character_indexes": [1],
+                "asset_indexes": [2, 3],
+                "shot_size": "特写",
+                "camera_angle": "俯拍",
+                "camera_movement": "静止后微推",
+                "blocking": "米拉手指停在裂纹旁，监视器波形在后景虚化。",
+                "sound": "电池入位声后留出半秒静默。",
+                "transition": "图形匹配转场",
+                "narrative_purpose": "把抽象频率变成观众能看见的线索。",
+                "content_driven_duration_reason": "信息密度集中在道具特写，短镜头足以传递证据。",
+            },
+            {
+                "scene_index": 3,
+                "duration_seconds": 11.0,
+                "intent": "让阿衡摘下耳机承认旧广播，完成关系变化。",
+                "character_indexes": [1, 2],
+                "asset_indexes": [1, 3],
+                "shot_size": "中景",
+                "camera_angle": "平视",
+                "camera_movement": "手持轻微后退",
+                "blocking": "阿衡站在水管阴影中摘下耳机，米拉没有追问，只稳住镜头。",
+                "sound": "水泵声压过第一句对白，旧广播断续出现。",
+                "transition": "沉默后切出",
+                "narrative_purpose": "把悬疑落到角色责任和下一场戏压力。",
+                "content_driven_duration_reason": "承认需要沉默和反应时间，时长由表演节奏决定。",
+            },
+        ],
+    }

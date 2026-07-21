@@ -72,6 +72,66 @@ def test_server_codex_dispatch_uses_managed_codex_cli(tmp_path: Path, monkeypatc
     assert args[1] == "exec"
 
 
+def test_server_codex_dispatch_uses_whitelisted_cli_model_and_reasoning(tmp_path: Path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    payload = _codex_local_provider_config()
+    _add_server_codex_pool(payload)
+    payload["services"][SERVER_CODEX_SERVICE_ID] = {
+        "provider": "codex_local",
+        "account_ref": "local_codex",
+        "capability": "llm",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "cli_model": "gpt-5.3-codex-spark",
+        "cli_reasoning_effort": "medium",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "llm",
+            "execution_mode": "sync",
+            "capabilities": ["llm"],
+            "account_pool_id": "server_codex_pool",
+            "reference_image_slots": 0,
+            "supported_aspect_ratios": ["1:1"],
+            "prompt_char_limit": 5000,
+            "seed_supported": False,
+            "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        },
+    }
+
+    def completed(args, **kwargs):  # noqa: ANN001, ANN202
+        captured["args"] = args
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_codex_local.subprocess.run", completed)
+    _enable_codex_test_env(tmp_path, monkeypatch)
+    registry = ProviderRegistry.from_store(_store(tmp_path, payload))
+    result = registry.dispatch("llm", SERVER_CODEX_SERVICE_ID, ProviderDispatchRequest(prompt="hello", output_dir=tmp_path))
+
+    args = captured["args"]
+    assert result["provider_calls_started"] is True
+    assert args[args.index("--model") + 1] == "gpt-5.3-codex-spark"
+    assert 'model_reasoning_effort="medium"' in args
+
+
+def test_server_codex_rejects_unlisted_cli_model(tmp_path: Path, monkeypatch) -> None:
+    payload = _codex_local_provider_config()
+    _add_server_codex_pool(payload)
+    payload["services"][SERVER_CODEX_SERVICE_ID] = {
+        "provider": "codex_local",
+        "account_ref": "local_codex",
+        "capability": "llm",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "cli_model": "../not-a-model",
+        "descriptor": {
+            **payload["services"]["prompt_optimizer"]["descriptor"],
+            "account_pool_id": "server_codex_pool",
+        },
+    }
+    _enable_codex_test_env(tmp_path, monkeypatch)
+    registry = ProviderRegistry.from_store(_store(tmp_path, payload))
+    with pytest.raises(ModelConfigError, match="safe model slug"):
+        registry.dispatch("llm", SERVER_CODEX_SERVICE_ID, ProviderDispatchRequest(prompt="hello", output_dir=tmp_path))
+
+
 def _structured_schema() -> dict[str, object]:
     return {
         "type": "object",
@@ -104,6 +164,7 @@ def test_server_codex_structured_output_reads_only_last_message(tmp_path: Path, 
 
     def completed(args, **kwargs):  # noqa: ANN001, ANN202
         captured["args"] = args
+        captured["input"] = kwargs.get("input")
         final_path = Path(args[args.index("--output-last-message") + 1])
         final_path.write_text('{"title":"final"}', encoding="utf-8")
         schema_path = Path(args[args.index("--output-schema") + 1])
@@ -121,6 +182,9 @@ def test_server_codex_structured_output_reads_only_last_message(tmp_path: Path, 
     assert "--ephemeral" in captured["args"]
     assert "--output-schema" in captured["args"]
     assert "--output-last-message" in captured["args"]
+    assert captured["args"][-1] == "-"
+    assert "<request_json>" in str(captured["input"])
+    assert "write title" not in captured["args"]
 
 
 @pytest.mark.parametrize(
@@ -196,6 +260,23 @@ def _store(tmp_path: Path, payload: dict) -> object:
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return load_company_provider_secrets(path)
+
+
+def _add_server_codex_pool(payload: dict) -> None:
+    payload["account_pools"]["server_codex_pool"] = {
+        "accounts": [
+            {
+                "account_id": "local_codex",
+                "service_id": SERVER_CODEX_SERVICE_ID,
+                "enabled_capabilities": ["llm"],
+                "enabled": True,
+                "priority": 1,
+                "weight": 1,
+                "concurrency_limit": 1,
+                "health_state": "healthy",
+            }
+        ]
+    }
 
 
 def _codex_local_provider_config() -> dict:
