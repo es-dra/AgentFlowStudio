@@ -8,7 +8,7 @@ from typing import Any
 
 
 EXPECTED_CASES = ("dialogue_room", "four_person_action", "sci_fi_chamber")
-EXPECTED_VIEWPORTS = ("1440x900", "1024x768", "800x900", "390x844")
+EXPECTED_VIEWPORTS = ("1440x900", "1024x768", "800x900", "430x932", "390x844")
 EXPECTED_ROLES = (
     "first_time_creator",
     "screenwriter",
@@ -29,6 +29,8 @@ EXPECTED_MICRO_CHECKS = (
     "review_shot_selection_available",
     "agent_chat_compact_default",
     "agent_chat_expand_collapse",
+    "agent_chat_viewport_bound",
+    "phone_agent_chat_no_background_sliver",
     "phone_reviewer_flow",
     "paid_action_preview_not_execution",
     "safe_media_urls",
@@ -95,6 +97,8 @@ def _evaluate_browser_round(label: str, report: dict[str, Any], findings: list[d
                 "project_title_discoverable",
                 "agent_chat_compact_default",
                 "agent_chat_expand_collapse",
+                "agent_chat_viewport_bound",
+                "phone_agent_chat_no_background_sliver",
                 "phone_reviewer_flow",
                 "redo_preview",
                 "redo_version_compare",
@@ -116,7 +120,7 @@ def _evaluate_browser_round(label: str, report: dict[str, Any], findings: list[d
             findings.append({"severity": "P1", "issue": f"{label} micro UX check failed: {check}"})
 
     screenshots = report.get("screenshots") if isinstance(report.get("screenshots"), dict) else {}
-    if len(screenshots) < 102:
+    if len(screenshots) < 132:
         findings.append({"severity": "P1", "issue": f"{label} has insufficient screenshot evidence: {len(screenshots)}"})
     for key, value in screenshots.items():
         path = Path(str(value))
