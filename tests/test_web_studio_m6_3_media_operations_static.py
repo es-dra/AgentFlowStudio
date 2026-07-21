@@ -100,11 +100,17 @@ def test_m6_3_owner_review_responsive_chat_and_title_contract() -> None:
     assert "buildMediaShotSelector" in shell
     assert "media-shot-selector" in styles
     assert ".agent-mobile-backdrop" in styles
+    assert "storyboard-section.agent-responsive-compact.agent-mobile-open:not(.agent-collapsed) .studio-storyboard" in styles
+    assert ".studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open" in styles
     assert "storyboard-section.agent-responsive-compact.agent-collapsed .studio-storyboard" in styles
+    assert "width\": 430, \"height\": 932" in browser_qa
     assert "width\": 390, \"height\": 844" in browser_qa
     assert "verify_responsive_agent_chat" in browser_qa
+    assert "assert_agent_chat_expanded_geometry" in browser_qa
     assert "verify_project_title_discovery" in browser_qa
     assert "primary_review_unclipped" in browser_qa
+    assert "phone_agent_chat_no_background_sliver" in evaluator
+    assert "agent_chat_viewport_bound" in evaluator
     assert "phone_reviewer_flow" in evaluator
     assert "project_title_discoverable" in evaluator
     assert "\"P2\": p2_open" in evaluator

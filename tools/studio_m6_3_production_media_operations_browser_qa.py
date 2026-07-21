@@ -19,6 +19,7 @@ VIEWPORTS = (
     {"width": 1440, "height": 900},
     {"width": 1024, "height": 768},
     {"width": 800, "height": 900},
+    {"width": 430, "height": 932},
     {"width": 390, "height": 844},
 )
 CASES = ("dialogue_room", "four_person_action", "sci_fi_chamber")
@@ -201,6 +202,8 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
             "project_title_discoverable": title_discoverable,
             "agent_chat_compact_default": responsive_result["compact_default"],
             "agent_chat_expand_collapse": responsive_result["expand_collapse"],
+            "agent_chat_viewport_bound": responsive_result["viewport_bound"],
+            "phone_agent_chat_no_background_sliver": responsive_result["phone_no_background_sliver"],
             "phone_reviewer_flow": responsive_result["phone_reviewer_flow"],
             "redo_preview": True,
             "redo_version_compare": True,
@@ -297,7 +300,13 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
     if width > 900:
         expect(page.locator(".studio-agent-chat")).to_be_visible()
         return (
-            {"compact_default": True, "expand_collapse": True, "phone_reviewer_flow": True},
+            {
+                "compact_default": True,
+                "expand_collapse": True,
+                "viewport_bound": True,
+                "phone_no_background_sliver": True,
+                "phone_reviewer_flow": True,
+            },
             screenshots,
         )
 
@@ -315,6 +324,7 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
     expect(page.locator(".studio-agent-chat.mobile-open")).to_be_visible()
     if has_horizontal_document_overflow(page):
         raise AssertionError(f"horizontal overflow after chat expand for {case_id}:{viewport_key}")
+    geometry = assert_agent_chat_expanded_geometry(page, width, case_id, viewport_key)
     expanded_shot = screenshot_dir / f"m6-3-{case_id}-agent-chat-expanded-{viewport_key}.png"
     page.screenshot(path=str(expanded_shot), full_page=True)
     screenshots[f"{case_id}:{viewport_key}:agent_chat_expanded"] = str(expanded_shot.resolve())
@@ -338,9 +348,76 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
             and page.locator(".media-shot-selector button[aria-current='true']").count() == 1
         )
     return (
-        {"compact_default": True, "expand_collapse": True, "phone_reviewer_flow": phone_flow},
+        {
+            "compact_default": True,
+            "expand_collapse": True,
+            "viewport_bound": geometry["viewport_bound"],
+            "phone_no_background_sliver": geometry["phone_no_background_sliver"],
+            "phone_reviewer_flow": phone_flow,
+        },
         screenshots,
     )
+
+
+def assert_agent_chat_expanded_geometry(page: Any, width: int, case_id: str, viewport_key: str) -> dict[str, bool]:
+    metrics = page.evaluate(
+        """() => {
+          const rectFor = (selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return null;
+            const rect = el.getBoundingClientRect();
+            return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+          };
+          const chat = document.querySelector('.studio-agent-chat.mobile-open');
+          const workspace = document.querySelector('.studio-unified-workspace');
+          const withinChat = (x, y) => {
+            const el = document.elementFromPoint(x, y);
+            return Boolean(chat && el && (el === chat || chat.contains(el)));
+          };
+          const workspaceRect = rectFor('.studio-unified-workspace') || { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight };
+          const pointY = Math.min(workspaceRect.top + 10, window.innerHeight - 72);
+          return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            chat: rectFor('.studio-agent-chat.mobile-open'),
+            workspace: workspaceRect,
+            backdrop: rectFor('.agent-mobile-backdrop'),
+            mediaWorkspace: rectFor('.media-operations-workspace'),
+            chatHead: rectFor('.agent-chat-head'),
+            composer: rectFor('.agent-chat-composer'),
+            topLeftWithinChat: withinChat(8, pointY),
+            topCenterWithinChat: withinChat(Math.floor(window.innerWidth / 2), pointY),
+            workspacePosition: workspace ? getComputedStyle(workspace).position : '',
+          };
+        }"""
+    )
+    chat = metrics.get("chat") or {}
+    workspace = metrics.get("workspace") or {}
+    backdrop = metrics.get("backdrop") or {}
+    media_workspace = metrics.get("mediaWorkspace") or {}
+    viewport = metrics.get("viewport") or {}
+    viewport_bound = (
+        chat.get("left", 99) >= -1
+        and chat.get("right", 0) <= float(viewport.get("width") or width) + 1
+        and chat.get("width", 0) >= min(320, width - 2)
+    )
+    phone_no_background_sliver = True
+    if width <= 760:
+        phone_no_background_sliver = (
+            abs(float(chat.get("top") or 0) - float(workspace.get("top") or 0)) <= 2
+            and abs(float(chat.get("bottom") or 0) - float(workspace.get("bottom") or 0)) <= 4
+            and abs(float(backdrop.get("top") or 0) - float(workspace.get("top") or 0)) <= 2
+            and abs(float(backdrop.get("bottom") or 0) - float(workspace.get("bottom") or 0)) <= 4
+            and float(media_workspace.get("width") or 0) >= min(320, width - 4)
+            and metrics.get("topLeftWithinChat") is True
+            and metrics.get("topCenterWithinChat") is True
+        )
+    if not viewport_bound or not phone_no_background_sliver:
+        raise AssertionError(
+            "agent chat expanded geometry failed "
+            f"for {case_id}:{viewport_key}: viewport_bound={viewport_bound} "
+            f"phone_no_background_sliver={phone_no_background_sliver} metrics={metrics}"
+        )
+    return {"viewport_bound": True, "phone_no_background_sliver": True}
 
 
 def viewport_width(viewport_key: str) -> int:
@@ -380,6 +457,8 @@ def build_micro_experience_checks(case_results: dict[str, Any]) -> dict[str, Any
         "review_shot_selection_available": all(item.get("review_shot_selected") for item in all_cases),
         "agent_chat_compact_default": all(item.get("agent_chat_compact_default") for item in all_cases),
         "agent_chat_expand_collapse": all(item.get("agent_chat_expand_collapse") for item in all_cases),
+        "agent_chat_viewport_bound": all(item.get("agent_chat_viewport_bound") for item in all_cases),
+        "phone_agent_chat_no_background_sliver": all(item.get("phone_agent_chat_no_background_sliver") for item in all_cases),
         "phone_reviewer_flow": all(item.get("phone_reviewer_flow") for item in all_cases),
         "paid_action_preview_not_execution": all(item.get("redo_preview") and item.get("provider_dispatch_count") == 0 for item in all_cases),
         "safe_media_urls": all(item.get("media_url_safe") for item in all_cases),
@@ -397,6 +476,7 @@ def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str])
     values = list(case_results.values())
     desktop_dialogue = "dialogue_room:1440x900"
     narrow_dialogue = "dialogue_room:800x900"
+    phone_dialogue = "dialogue_room:430x932"
     mobile_dialogue = "dialogue_room:390x844"
     recovery_desktop = "sci_fi_chamber:1440x900"
     return {
@@ -445,8 +525,15 @@ def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str])
                 screenshots.get(f"{mobile_dialogue}:storyboard_initial")
                 and screenshots.get(f"{mobile_dialogue}:agent_chat_collapsed")
                 and screenshots.get(f"{mobile_dialogue}:agent_chat_expanded")
+                and screenshots.get(f"{phone_dialogue}:storyboard_initial")
+                and screenshots.get(f"{phone_dialogue}:agent_chat_collapsed")
+                and screenshots.get(f"{phone_dialogue}:agent_chat_expanded")
             ),
             "evidence": [
+                f"{phone_dialogue}:storyboard_initial",
+                f"{phone_dialogue}:agent_chat_collapsed",
+                f"{phone_dialogue}:agent_chat_expanded",
+                f"{phone_dialogue}:agent_chat_returned",
                 f"{mobile_dialogue}:storyboard_initial",
                 f"{mobile_dialogue}:agent_chat_collapsed",
                 f"{mobile_dialogue}:agent_chat_expanded",

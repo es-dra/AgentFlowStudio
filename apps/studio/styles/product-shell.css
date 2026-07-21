@@ -1625,12 +1625,33 @@ body,
     justify-self: stretch;
   }
 
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open {
+    position: relative;
+  }
+
+  .studio-unified-workspace.storyboard-section.agent-responsive-compact.agent-mobile-open:not(.agent-collapsed) .studio-storyboard {
+    margin-right: 0;
+  }
+
   .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .agent-mobile-backdrop {
-    top: 0;
-    right: 0;
-    bottom: calc(62px + env(safe-area-inset-bottom));
-    left: 0;
+    position: absolute;
+    z-index: calc(var(--z-agent-chat) - 1);
+    inset: 0;
     display: block;
+    background: rgba(2, 8, 12, .68);
+  }
+
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open {
+    position: absolute;
+    z-index: var(--z-agent-chat);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    box-shadow: none;
   }
 }
 
