@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -146,6 +147,9 @@ def _evaluate_case(
     final_path = run_dir / "final" / "adaptive_canvas_v2_final.mp4"
     contact_sheet = run_dir / "qa" / "contact_sheet_1fps.jpg"
     probe = _ffprobe(final_path) if final_path.exists() else {"status": "FAIL", "error": "missing final video"}
+    media_metrics = _media_metrics(final_path, probe) if final_path.exists() else {"status": "FAIL", "error": "missing final video"}
+    qa_metrics = qa.get("media_metrics") if isinstance(qa.get("media_metrics"), dict) else {}
+    technical_scores = qa.get("technical_scores") if isinstance(qa.get("technical_scores"), dict) else _technical_scores(qa, media_metrics)
 
     case_summary = {
         "case_id": case_id,
@@ -163,6 +167,9 @@ def _evaluate_case(
         "technical_qa_status": qa.get("status"),
         "technical_qa_findings": qa.get("findings") or [],
         "ffprobe_status": probe.get("status"),
+        "media_metrics": media_metrics,
+        "media_metrics_source": "technical_qa" if qa_metrics else "evaluator_recomputed",
+        "technical_scores": technical_scores,
         "idempotency": result.get("idempotency") or {},
         "paid_attempt_count": int(ledger.get("paid_attempt_count") or 0),
         "attempt_rows": len(attempts),
@@ -188,6 +195,8 @@ def _evaluate_case(
         and final_path.exists()
         and contact_sheet.exists()
         and probe.get("status") == "PASS"
+        and _media_metrics_pass(media_metrics)
+        and _technical_scores_pass(technical_scores)
         and not any(str(item.get("severity")) in {"P0", "P1"} for item in qa.get("findings") or [])
     )
     ledger_clean = not duplicate_attempt_ids and not nonterminal and not succeeded_with_error and not unresolved_failed
@@ -335,7 +344,7 @@ def _ffprobe(path: Path) -> dict[str, Any]:
             "-v",
             "error",
             "-show_entries",
-            "format=duration,size:stream=codec_type,width,height,r_frame_rate,nb_frames",
+            "format=duration,size:stream=codec_type,width,height,avg_frame_rate,r_frame_rate,nb_frames",
             "-of",
             "json",
             str(path),
@@ -351,6 +360,135 @@ def _ffprobe(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {"status": "FAIL", "stderr_tail": "ffprobe returned invalid JSON"}
     return {"status": "PASS", **payload}
+
+
+def _media_metrics(path: Path, probe: dict[str, Any]) -> dict[str, Any]:
+    if probe.get("status") != "PASS":
+        return {"status": "FAIL", "error": probe.get("stderr_tail") or probe.get("error") or "ffprobe failed"}
+    streams = probe.get("streams") if isinstance(probe.get("streams"), list) else []
+    video = next((item for item in streams if item.get("codec_type") == "video"), {})
+    duration = float((probe.get("format") or {}).get("duration") or 0.0)
+    fps = _parse_frame_rate(str(video.get("avg_frame_rate") or video.get("r_frame_rate") or "0/1"))
+    frame_count = _coerce_int(video.get("nb_frames"))
+    if frame_count <= 0 and fps > 0 and duration > 0:
+        frame_count = int(round(fps * duration))
+    scan = _video_event_scan(path)
+    metrics = {
+        "status": "PASS",
+        "width": int(video.get("width") or 0),
+        "height": int(video.get("height") or 0),
+        "duration_sec": duration,
+        "fps": fps,
+        "frame_count": frame_count,
+        "black_segment_count": len(scan.get("black_segments") or []),
+        "freeze_event_count": len(scan.get("freeze_events") or []),
+        "repeat_or_freeze_event_count": len(scan.get("freeze_events") or []),
+        "abnormal_frame_decode_status": scan.get("status"),
+        "black_segments": scan.get("black_segments") or [],
+        "freeze_events": scan.get("freeze_events") or [],
+    }
+    if metrics["width"] <= 0 or metrics["height"] <= 0 or metrics["fps"] <= 0 or metrics["frame_count"] <= 0:
+        metrics["status"] = "FAIL"
+        metrics["error"] = "missing resolution, fps, or frame count"
+    if scan.get("status") != "PASS":
+        metrics["status"] = "FAIL"
+        metrics["error"] = scan.get("stderr_tail") or scan.get("error") or "video event scan failed"
+    return metrics
+
+
+def _media_metrics_pass(metrics: dict[str, Any]) -> bool:
+    return (
+        metrics.get("status") == "PASS"
+        and int(metrics.get("width") or 0) > 0
+        and int(metrics.get("height") or 0) > 0
+        and float(metrics.get("fps") or 0.0) > 0
+        and int(metrics.get("frame_count") or 0) > 0
+        and int(metrics.get("black_segment_count") or 0) == 0
+        and int(metrics.get("freeze_event_count") or 0) == 0
+    )
+
+
+def _technical_scores(qa: dict[str, Any], media_metrics: dict[str, Any]) -> dict[str, Any]:
+    qa_findings = qa.get("findings") if isinstance(qa.get("findings"), list) else []
+    p0_or_p1 = any(str(item.get("severity")) in {"P0", "P1"} for item in qa_findings)
+    temporal_clean = int(media_metrics.get("black_segment_count") or 0) == 0 and int(media_metrics.get("freeze_event_count") or 0) == 0
+    return {
+        "decode_duration_audio": 5 if qa.get("status") == "pass" and not p0_or_p1 else 0,
+        "resolution_fps_frame_count": 5 if _media_metrics_pass({**media_metrics, "black_segment_count": 0, "freeze_event_count": 0}) else 0,
+        "black_freeze_repeat_anomaly": 5 if temporal_clean and media_metrics.get("status") == "PASS" else 0,
+        "contact_sheet_artifact": 5 if qa.get("contact_sheet_sha256") else 0,
+        "lineage_cost_artifacts": 5,
+        "scale": "0-5",
+        "boundary": "automated technical media QA scores; not Owner human acceptance or business validation",
+    }
+
+
+def _technical_scores_pass(scores: dict[str, Any]) -> bool:
+    required = (
+        "decode_duration_audio",
+        "resolution_fps_frame_count",
+        "black_freeze_repeat_anomaly",
+        "contact_sheet_artifact",
+        "lineage_cost_artifacts",
+    )
+    return all(float(scores.get(key) or 0.0) >= 4.0 for key in required)
+
+
+def _parse_frame_rate(value: str) -> float:
+    if "/" not in value:
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+    numerator, denominator = value.split("/", 1)
+    try:
+        denominator_value = float(denominator)
+        if denominator_value == 0:
+            return 0.0
+        return float(numerator) / denominator_value
+    except ValueError:
+        return 0.0
+
+
+def _coerce_int(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _video_event_scan(path: Path) -> dict[str, Any]:
+    proc = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-v",
+            "info",
+            "-i",
+            str(path),
+            "-vf",
+            "blackdetect=d=0.75:pic_th=0.98,freezedetect=n=-60dB:d=1",
+            "-an",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return {"status": "FAIL", "stderr_tail": proc.stderr[-500:]}
+    black_segments: list[dict[str, float]] = []
+    freeze_events: list[dict[str, float]] = []
+    for line in proc.stderr.splitlines():
+        black = re.search(r"black_start:(?P<start>[0-9.]+)\s+black_end:(?P<end>[0-9.]+)\s+black_duration:(?P<duration>[0-9.]+)", line)
+        if black:
+            black_segments.append({key: float(value) for key, value in black.groupdict().items()})
+        freeze = re.search(r"freeze_start:\s*(?P<start>[0-9.]+).*freeze_duration:\s*(?P<duration>[0-9.]+).*freeze_end:\s*(?P<end>[0-9.]+)", line)
+        if freeze:
+            freeze_events.append({key: float(value) for key, value in freeze.groupdict().items()})
+    return {"status": "PASS", "black_segments": black_segments, "freeze_events": freeze_events}
 
 
 def _is_inside_git_worktree(path: Path) -> bool:

@@ -1254,21 +1254,45 @@ def _run_technical_qa(
     decode = _decode_check(Path(final["path"]))
     if decode["status"] != "pass":
         findings.append({"severity": "P0", "scope": "final", "issue": "decode_failed", "details": decode})
+    media_metrics = _video_quality_metrics(Path(final["path"]))
+    if media_metrics["status"] != "pass":
+        findings.append({"severity": "P0", "scope": "final", "issue": "media_metrics_failed", "details": media_metrics})
+    if media_metrics.get("black_segment_count", 0) > 0:
+        findings.append(
+            {
+                "severity": "P1",
+                "scope": "final",
+                "issue": "black_segment_detected",
+                "count": media_metrics["black_segment_count"],
+            }
+        )
+    if media_metrics.get("freeze_event_count", 0) > 0:
+        findings.append(
+            {
+                "severity": "P1",
+                "scope": "final",
+                "issue": "freeze_or_repeated_frames_detected",
+                "count": media_metrics["freeze_event_count"],
+            }
+        )
     contact_sheet = run_root / "qa" / "contact_sheet_1fps.jpg"
     _contact_sheet(Path(final["path"]), contact_sheet)
+    qa_scores = _technical_qa_scores(findings, media_metrics)
     qa = {
         "artifact_type": "afs_adaptive_canvas_v2_technical_qa",
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "project_id": options.project_id,
         "run_id": options.run_id,
-        "status": "pass" if not any(item["severity"] == "P0" for item in findings) else "failed",
+        "status": "pass" if not any(item["severity"] in {"P0", "P1"} for item in findings) else "failed",
         "findings": findings,
         "final_duration_sec": final_duration,
         "shot_durations_sec": [float(item.get("duration_sec") or 0.0) for item in shot_composes],
         "final_sha256": final["sha256"],
         "final_decode_status": decode["status"],
+        "media_metrics": media_metrics,
+        "technical_scores": qa_scores,
         "contact_sheet_sha256": sha256_file(contact_sheet),
-        "visual_qa_boundary": "technical decode, duration, hash, no-audio, and contact-sheet evidence only",
+        "visual_qa_boundary": "automated technical decode, duration, resolution, fps, frame count, black/freeze event scan, hash, no-audio, and contact-sheet evidence only",
     }
     write_json(run_root / "qa" / "technical_qa.json", qa)
     _emit(callback, "QA", qa["status"], finding_count=len(findings))
@@ -1872,7 +1896,7 @@ def _probe(path: Path) -> dict[str, Any]:
                 "-v",
                 "error",
                 "-show_entries",
-                "format=duration:stream=codec_type,width,height",
+                "format=duration:stream=codec_type,width,height,avg_frame_rate,r_frame_rate,nb_frames",
                 "-of",
                 "json",
                 str(path),
@@ -1887,6 +1911,119 @@ def _probe(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise AdaptiveCanvasError("ffprobe returned non-object JSON")
     return payload
+
+
+def _video_quality_metrics(path: Path) -> dict[str, Any]:
+    try:
+        probe = _probe(path)
+    except AdaptiveCanvasError as exc:
+        return {"status": "failed", "error": str(exc)}
+    streams = probe.get("streams") if isinstance(probe.get("streams"), list) else []
+    video = next((item for item in streams if item.get("codec_type") == "video"), {})
+    duration = float((probe.get("format") or {}).get("duration") or 0.0)
+    fps = _parse_frame_rate(str(video.get("avg_frame_rate") or video.get("r_frame_rate") or "0/1"))
+    frame_count = _coerce_int(video.get("nb_frames"))
+    if frame_count <= 0 and fps > 0 and duration > 0:
+        frame_count = int(round(duration * fps))
+    scan = _video_event_scan(path)
+    metrics = {
+        "status": "pass",
+        "width": int(video.get("width") or 0),
+        "height": int(video.get("height") or 0),
+        "duration_sec": duration,
+        "fps": fps,
+        "frame_count": frame_count,
+        "black_segment_count": len(scan.get("black_segments") or []),
+        "freeze_event_count": len(scan.get("freeze_events") or []),
+        "repeat_or_freeze_event_count": len(scan.get("freeze_events") or []),
+        "abnormal_frame_decode_status": scan.get("status"),
+        "black_segments": scan.get("black_segments") or [],
+        "freeze_events": scan.get("freeze_events") or [],
+    }
+    if metrics["width"] <= 0 or metrics["height"] <= 0 or metrics["fps"] <= 0 or metrics["frame_count"] <= 0:
+        metrics["status"] = "failed"
+        metrics["error"] = "missing resolution, fps, or frame count"
+    if scan.get("status") != "pass":
+        metrics["status"] = "failed"
+        metrics["error"] = scan.get("stderr_tail") or scan.get("error") or "video event scan failed"
+    return metrics
+
+
+def _technical_qa_scores(findings: list[dict[str, Any]], media_metrics: dict[str, Any]) -> dict[str, Any]:
+    severities = {str(item.get("severity")) for item in findings}
+    integrity_score = 5 if not severities.intersection({"P0", "P1"}) else 3 if "P1" in severities else 0
+    metrics_score = 5 if media_metrics.get("status") == "pass" else 0
+    temporal_score = 5
+    if media_metrics.get("black_segment_count", 0) or media_metrics.get("freeze_event_count", 0):
+        temporal_score = 3
+    return {
+        "decode_duration_audio": integrity_score,
+        "resolution_fps_frame_count": metrics_score,
+        "black_freeze_repeat_anomaly": temporal_score,
+        "contact_sheet_artifact": 5,
+        "lineage_cost_artifacts": 5,
+        "scale": "0-5",
+        "boundary": "automated technical media QA scores; not Owner human acceptance or business validation",
+    }
+
+
+def _parse_frame_rate(value: str) -> float:
+    if "/" not in value:
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+    numerator, denominator = value.split("/", 1)
+    try:
+        den = float(denominator)
+        if den == 0:
+            return 0.0
+        return float(numerator) / den
+    except ValueError:
+        return 0.0
+
+
+def _coerce_int(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _video_event_scan(path: Path) -> dict[str, Any]:
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-v",
+                "info",
+                "-i",
+                str(path),
+                "-vf",
+                "blackdetect=d=0.75:pic_th=0.98,freezedetect=n=-60dB:d=1",
+                "-an",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return {"status": "failed", "stderr_tail": "ffmpeg executable not found"}
+    if proc.returncode != 0:
+        return {"status": "failed", "stderr_tail": proc.stderr[-1000:]}
+    black_segments: list[dict[str, float]] = []
+    freeze_events: list[dict[str, float]] = []
+    for line in proc.stderr.splitlines():
+        black = re.search(r"black_start:(?P<start>[0-9.]+)\s+black_end:(?P<end>[0-9.]+)\s+black_duration:(?P<duration>[0-9.]+)", line)
+        if black:
+            black_segments.append({key: float(value) for key, value in black.groupdict().items()})
+        freeze = re.search(r"freeze_start:\s*(?P<start>[0-9.]+).*freeze_duration:\s*(?P<duration>[0-9.]+).*freeze_end:\s*(?P<end>[0-9.]+)", line)
+        if freeze:
+            freeze_events.append({key: float(value) for key, value in freeze.groupdict().items()})
+    return {"status": "pass", "black_segments": black_segments, "freeze_events": freeze_events}
 
 
 def _decode_check(path: Path) -> dict[str, Any]:
