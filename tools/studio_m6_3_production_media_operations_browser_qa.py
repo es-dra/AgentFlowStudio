@@ -15,7 +15,12 @@ from studio_asset_context_browser_qa_support import chrome_path, free_port, stop
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VIEWPORTS = ({"width": 1440, "height": 900}, {"width": 1024, "height": 768}, {"width": 800, "height": 900})
+VIEWPORTS = (
+    {"width": 1440, "height": 900},
+    {"width": 1024, "height": 768},
+    {"width": 800, "height": 900},
+    {"width": 390, "height": 844},
+)
 CASES = ("dialogue_room", "four_person_action", "sci_fi_chamber")
 CLEAN_CASES = {"dialogue_room", "four_person_action"}
 RECOVERY_CASES = {"sci_fi_chamber"}
@@ -111,6 +116,7 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
     page.screenshot(path=str(canvas_shot), full_page=True)
     canvas_text = page.locator("#product-shell-root").inner_text()
     assert_user_language(canvas_text, "canvas", case_id, viewport_key)
+    title_discoverable, title_screens = verify_project_title_discovery(page, case_id, viewport_key, screenshot_dir)
 
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_function("document.querySelector('#product-shell-root')?.dataset.view === 'storyboard'")
@@ -128,9 +134,13 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
         expect(page.locator(".media-operations-workspace")).to_contain_text("只作为恢复证据")
     if has_horizontal_document_overflow(page):
         raise AssertionError(f"horizontal document overflow for {case_id}:{viewport_key}")
+    if not primary_review_unclipped(page):
+        raise AssertionError(f"primary review content is clipped for {case_id}:{viewport_key}")
 
     storyboard_initial = screenshot_dir / f"m6-3-{case_id}-storyboard-initial-{viewport_key}.png"
     page.screenshot(path=str(storyboard_initial), full_page=True)
+    shot_selected = select_review_shot(page)
+    responsive_result, responsive_screens = verify_responsive_agent_chat(page, case_id, viewport_key, screenshot_dir)
 
     metadata = page.locator(".media-viewer video").first.evaluate(
         """video => new Promise((resolve, reject) => {
@@ -158,6 +168,9 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
     expect(page.locator(".studio-agent-chat")).to_be_visible()
     command_preview_shot = screenshot_dir / f"m6-3-{case_id}-command-preview-{viewport_key}.png"
     page.screenshot(path=str(command_preview_shot), full_page=True)
+    if viewport_width(viewport_key) <= 900:
+        page.keyboard.press("Escape")
+        expect(page.locator(".media-operations-workspace")).to_be_visible()
 
     page.locator(".cost-recovery-panel").scroll_into_view_if_needed()
     recovery_shot = screenshot_dir / f"m6-3-{case_id}-recovery-cost-{viewport_key}.png"
@@ -183,6 +196,12 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
             "media_url_safe": True,
             "canvas_first_screen": True,
             "storyboard_operations": True,
+            "review_shot_selected": shot_selected,
+            "primary_review_unclipped": True,
+            "project_title_discoverable": title_discoverable,
+            "agent_chat_compact_default": responsive_result["compact_default"],
+            "agent_chat_expand_collapse": responsive_result["expand_collapse"],
+            "phone_reviewer_flow": responsive_result["phone_reviewer_flow"],
             "redo_preview": True,
             "redo_version_compare": True,
             "recovery_and_cost_state": True,
@@ -193,7 +212,9 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
         },
         {
             f"{case_id}:{viewport_key}:canvas": str(canvas_shot.resolve()),
+            **title_screens,
             f"{case_id}:{viewport_key}:storyboard_initial": str(storyboard_initial.resolve()),
+            **responsive_screens,
             f"{case_id}:{viewport_key}:redo_compare": str(redo_compare_shot.resolve()),
             f"{case_id}:{viewport_key}:command_preview": str(command_preview_shot.resolve()),
             f"{case_id}:{viewport_key}:recovery_cost": str(recovery_shot.resolve()),
@@ -218,6 +239,112 @@ def has_horizontal_document_overflow(page: Any) -> bool:
           return Math.max(root.scrollWidth, body.scrollWidth) > window.innerWidth + 2;
         }"""
     ))
+
+
+def primary_review_unclipped(page: Any) -> bool:
+    return bool(page.evaluate(
+        """() => {
+          const preview = document.querySelector('.media-preview-panel');
+          const next = document.querySelector('.media-next-action');
+          if (!preview || !next) return false;
+          const previewRect = preview.getBoundingClientRect();
+          const nextRect = next.getBoundingClientRect();
+          const chat = document.querySelector('.studio-agent-chat.collapsed');
+          const chatRect = chat?.getBoundingClientRect();
+          const railReserve = chatRect && chatRect.width > 0 ? chatRect.width + 8 : 0;
+          const usableRight = window.innerWidth - railReserve;
+          const previewRoom = previewRect.width >= Math.min(320, window.innerWidth - 96);
+          const previewClear = !railReserve || previewRect.right <= usableRight + 2;
+          const nextClear = nextRect.left >= -1 && nextRect.right <= window.innerWidth + 2;
+          return previewRoom && previewClear && nextClear;
+        }"""
+    ))
+
+
+def verify_project_title_discovery(page: Any, case_id: str, viewport_key: str, screenshot_dir: Path) -> tuple[bool, dict[str, str]]:
+    button = page.locator(".studio-project-button").first
+    expect(button).to_be_visible()
+    project_name = button.locator("strong").inner_text().strip()
+    aria = button.get_attribute("aria-label") or ""
+    title = button.get_attribute("title") or ""
+    if project_name and project_name not in f"{aria} {title}":
+        raise AssertionError(f"full project title not exposed for {case_id}:{viewport_key}: aria={aria!r} title={title!r}")
+    button.focus()
+    button.click()
+    summary = page.locator(".studio-current-project-summary").first
+    expect(summary).to_be_visible()
+    expect(summary).to_contain_text(project_name)
+    shot = screenshot_dir / f"m6-3-{case_id}-title-disclosure-{viewport_key}.png"
+    page.screenshot(path=str(shot), full_page=True)
+    page.keyboard.press("Escape")
+    expect(summary).to_be_hidden()
+    return True, {f"{case_id}:{viewport_key}:title_disclosure": str(shot.resolve())}
+
+
+def select_review_shot(page: Any) -> bool:
+    selector = page.locator(".media-shot-selector button")
+    if selector.count() <= 1:
+        return False
+    selector.nth(1).click()
+    expect(selector.nth(1)).to_have_attribute("aria-current", "true")
+    return True
+
+
+def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, screenshot_dir: Path) -> tuple[dict[str, bool], dict[str, str]]:
+    width = viewport_width(viewport_key)
+    selected_before = page.locator(".media-panel-head strong").first.inner_text()
+    screenshots: dict[str, str] = {}
+    if width > 900:
+        expect(page.locator(".studio-agent-chat")).to_be_visible()
+        return (
+            {"compact_default": True, "expand_collapse": True, "phone_reviewer_flow": True},
+            screenshots,
+        )
+
+    collapsed_shot = screenshot_dir / f"m6-3-{case_id}-agent-chat-collapsed-{viewport_key}.png"
+    page.screenshot(path=str(collapsed_shot), full_page=True)
+    screenshots[f"{case_id}:{viewport_key}:agent_chat_collapsed"] = str(collapsed_shot.resolve())
+
+    if width <= 760:
+        expect(page.locator(".product-mobile-nav")).to_be_visible()
+        page.locator(".product-mobile-nav button").filter(has_text="Agent").first.click()
+    else:
+        expect(page.locator(".studio-agent-chat.collapsed")).to_be_visible()
+        page.get_by_role("button", name="展开 Agent Chat").click()
+
+    expect(page.locator(".studio-agent-chat.mobile-open")).to_be_visible()
+    if has_horizontal_document_overflow(page):
+        raise AssertionError(f"horizontal overflow after chat expand for {case_id}:{viewport_key}")
+    expanded_shot = screenshot_dir / f"m6-3-{case_id}-agent-chat-expanded-{viewport_key}.png"
+    page.screenshot(path=str(expanded_shot), full_page=True)
+    screenshots[f"{case_id}:{viewport_key}:agent_chat_expanded"] = str(expanded_shot.resolve())
+
+    page.keyboard.press("Escape")
+    if width <= 760:
+        expect(page.locator(".studio-agent-chat")).to_be_hidden()
+    else:
+        expect(page.locator(".studio-agent-chat.collapsed")).to_be_visible()
+    selected_after = page.locator(".media-panel-head strong").first.inner_text()
+    if selected_after != selected_before:
+        raise AssertionError(f"selected shot changed after chat collapse for {case_id}:{viewport_key}")
+    returned_shot = screenshot_dir / f"m6-3-{case_id}-agent-chat-returned-{viewport_key}.png"
+    page.screenshot(path=str(returned_shot), full_page=True)
+    screenshots[f"{case_id}:{viewport_key}:agent_chat_returned"] = str(returned_shot.resolve())
+    phone_flow = True
+    if width <= 430:
+        phone_flow = (
+            page.locator(".media-viewer video").first.is_visible()
+            and page.locator(".cost-recovery-panel").first.is_visible()
+            and page.locator(".media-shot-selector button[aria-current='true']").count() == 1
+        )
+    return (
+        {"compact_default": True, "expand_collapse": True, "phone_reviewer_flow": phone_flow},
+        screenshots,
+    )
+
+
+def viewport_width(viewport_key: str) -> int:
+    return int(viewport_key.split("x", 1)[0])
 
 
 def collect_focus_sequence(page: Any) -> list[dict[str, str]]:
@@ -248,6 +375,12 @@ def build_micro_experience_checks(case_results: dict[str, Any]) -> dict[str, Any
     return {
         "first_screen_10s": all(item.get("canvas_first_screen") for item in all_cases),
         "primary_next_action_visible": all(item.get("storyboard_operations") for item in all_cases),
+        "project_title_discoverable": all(item.get("project_title_discoverable") for item in all_cases),
+        "primary_review_not_clipped": all(item.get("primary_review_unclipped") for item in all_cases),
+        "review_shot_selection_available": all(item.get("review_shot_selected") for item in all_cases),
+        "agent_chat_compact_default": all(item.get("agent_chat_compact_default") for item in all_cases),
+        "agent_chat_expand_collapse": all(item.get("agent_chat_expand_collapse") for item in all_cases),
+        "phone_reviewer_flow": all(item.get("phone_reviewer_flow") for item in all_cases),
         "paid_action_preview_not_execution": all(item.get("redo_preview") and item.get("provider_dispatch_count") == 0 for item in all_cases),
         "safe_media_urls": all(item.get("media_url_safe") for item in all_cases),
         "version_compare_available": all(item.get("redo_version_compare") for item in all_cases),
@@ -263,7 +396,8 @@ def build_micro_experience_checks(case_results: dict[str, Any]) -> dict[str, Any
 def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str]) -> dict[str, Any]:
     values = list(case_results.values())
     desktop_dialogue = "dialogue_room:1440x900"
-    mobile_dialogue = "dialogue_room:800x900"
+    narrow_dialogue = "dialogue_room:800x900"
+    mobile_dialogue = "dialogue_room:390x844"
     recovery_desktop = "sci_fi_chamber:1440x900"
     return {
         "first_time_creator": {
@@ -298,7 +432,7 @@ def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str])
         },
         "runtime_operator": {
             "completed": bool(screenshots.get(f"{recovery_desktop}:recovery_cost")),
-            "evidence": [f"{recovery_desktop}:recovery_cost", f"{recovery_desktop}:command_preview"],
+            "evidence": [f"{recovery_desktop}:recovery_cost", f"{narrow_dialogue}:agent_chat_expanded", f"{recovery_desktop}:command_preview"],
             "task": "验证失败/恢复/重试是 fail-closed，预览不重复收费或写第二事实。",
         },
         "owner_decision_maker": {
@@ -307,9 +441,18 @@ def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str])
             "task": "快速理解进度、质量边界、风险和下一决策；高级证据可查但不淹没主流程。",
         },
         "mobile_reviewer": {
-            "completed": bool(screenshots.get(f"{mobile_dialogue}:storyboard_initial")),
-            "evidence": [f"{mobile_dialogue}:storyboard_initial"],
-            "task": "在窄屏快速播放、看状态和下一步，不执行复杂编辑。",
+            "completed": bool(
+                screenshots.get(f"{mobile_dialogue}:storyboard_initial")
+                and screenshots.get(f"{mobile_dialogue}:agent_chat_collapsed")
+                and screenshots.get(f"{mobile_dialogue}:agent_chat_expanded")
+            ),
+            "evidence": [
+                f"{mobile_dialogue}:storyboard_initial",
+                f"{mobile_dialogue}:agent_chat_collapsed",
+                f"{mobile_dialogue}:agent_chat_expanded",
+                f"{mobile_dialogue}:agent_chat_returned",
+            ],
+            "task": "在真实手机视口快速播放、看状态/费用/恢复，展开并收起 Agent Chat 后回到当前审片。",
         },
         "keyboard_low_vision": {
             "completed": all(bool(item.get("keyboard_focus_sequence")) for item in values),

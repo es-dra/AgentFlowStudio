@@ -81,3 +81,31 @@ def test_m6_3_media_operations_copy_keeps_cost_recovery_and_nonclaim_boundaries(
         "card-stack",
     ):
         assert forbidden not in shell
+
+
+def test_m6_3_owner_review_responsive_chat_and_title_contract() -> None:
+    shell = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "product-shell.css").read_text(encoding="utf-8")
+    topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    browser_qa = (STUDIO_ROOT.parent.parent / "tools" / "studio_m6_3_production_media_operations_browser_qa.py").read_text(encoding="utf-8")
+    evaluator = (STUDIO_ROOT.parent.parent / "tools" / "evaluate_m6_3_production_media_operations_ux.py").read_text(encoding="utf-8")
+
+    assert "function syncResponsiveAgentState" in shell
+    assert "function setAgentChatExpanded" in shell
+    assert "function closeResponsiveAgentOverlay" in shell
+    assert "agent-responsive-compact" in shell
+    assert "buildAgentMobileBackdrop" in shell
+    assert "studio-current-project-summary" in shell
+    assert "当前项目：" in shell
+    assert "buildMediaShotSelector" in shell
+    assert "media-shot-selector" in styles
+    assert ".agent-mobile-backdrop" in styles
+    assert "storyboard-section.agent-responsive-compact.agent-collapsed .studio-storyboard" in styles
+    assert "width\": 390, \"height\": 844" in browser_qa
+    assert "verify_responsive_agent_chat" in browser_qa
+    assert "verify_project_title_discovery" in browser_qa
+    assert "primary_review_unclipped" in browser_qa
+    assert "phone_reviewer_flow" in evaluator
+    assert "project_title_discoverable" in evaluator
+    assert "\"P2\": p2_open" in evaluator
+    assert "title.setAttribute(\"aria-label\", `当前项目：" in topbar
