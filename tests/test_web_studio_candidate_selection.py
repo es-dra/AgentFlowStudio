@@ -937,6 +937,7 @@ def test_candidate_selection_ui_exposes_accessible_explicit_actions_and_mobile_r
     handler = (STUDIO / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     styles = (STUDIO / "styles" / "node-result.css").read_text(encoding="utf-8")
     main = (STUDIO / "src" / "main.js").read_text(encoding="utf-8")
+    startup = (STUDIO / "src" / "studio-startup-project.js").read_text(encoding="utf-8")
     media_preview = (STUDIO / "src" / "media-preview-modal.js").read_text(encoding="utf-8")
 
     for marker in (
@@ -972,8 +973,10 @@ def test_candidate_selection_ui_exposes_accessible_explicit_actions_and_mobile_r
     assert '.candidate-selection-status[data-state="duplicate_replayed"]' in styles
     assert '.candidate-selection-status[data-state="saving"]' in styles
     assert "min-height: 44px" in styles
-    assert main.count("restoreCandidateSelectionsAfterLoad(store") == 2
-    assert main.index("await store.hydrateRuntime(runtime)") < main.index("await restoreCandidateSelectionsAfterLoad(store, runtime)")
+    assert "createProjectReadyHandler" in main
+    assert startup.count("await refreshProjectRuntimeDecorations({") == 2
+    assert "restoreCandidateSelectionsAfterLoad(store, runtimeClient)" in startup
+    assert startup.index("await store.hydrateRuntime(runtime)") < startup.index("syncAssets: true")
     assert 'closeBtn.setAttribute("aria-label", "Close media preview")' in media_preview
     assert "showModal(modal, { initialFocus: closeBtn })" in media_preview
 

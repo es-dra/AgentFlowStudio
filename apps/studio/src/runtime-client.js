@@ -501,6 +501,13 @@ export function createRuntimeClient(projectId = "") {
     sequenceWorkspace() {
       return requestJson(`/projects/${encoded}/m5/sequence-workspace`);
     },
+    adaptiveCanvasOperations(runId = "paid-media-v2") {
+      const query = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
+      return requestJson(`/projects/${encoded}/adaptive-canvas-v2/operations-review${query}`);
+    },
+    previewAdaptiveCanvasOperation(payload) {
+      return requestJson(`/projects/${encoded}/adaptive-canvas-v2/operations/command-preview`, { method: "POST", payload });
+    },
     confirmFilmCandidate(payload) {
       return requestJson(`/projects/${encoded}/m4/film-candidates/confirm`, { method: "POST", payload });
     },

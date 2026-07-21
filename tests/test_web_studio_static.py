@@ -194,6 +194,7 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     overlay = (STUDIO_ROOT / "src" / "overlay.js").read_text(encoding="utf-8")
     topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    startup = (STUDIO_ROOT / "src" / "studio-startup-project.js").read_text(encoding="utf-8")
 
     assert "AUTH_TOKEN_STORAGE_KEY" in runtime_client
     assert "Authorization" in runtime_client
@@ -206,7 +207,7 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "saveStudioState(state, expectedVersion" in runtime_client
     assert "expected_version" in runtime_client
     assert "ensureAuthSession" in main
-    assert "ensureAccessibleStartupProject" in main
+    assert "ensureAccessibleStartupProject" in startup
     assert "bindProjectAccessRecovery" in main
     assert "afs:project-access-denied" in main
     assert "closeOnOutside: false" in auth_gate

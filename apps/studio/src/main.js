@@ -9,10 +9,8 @@ import { renderDrawer } from "./panels/drawer.js";
 import { renderInspectorPanel } from "./panels/inspector-panel.js";
 import { renderDock } from "./panels/dock.js";
 import { el, showModal } from "./overlay.js";
-import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { WORKFLOW_STARTERS, createWorkflowStarter } from "./workflow-starters.js";
 import { openProjectHub } from "./project-hub.js";
-import { syncRuntimeAssets } from "./runtime-asset-sync.js";
 import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT } from "./quality-feedback.js";
@@ -27,7 +25,6 @@ import { createStudioProductShell, mountStudioDom } from "./studio-product-boots
 import { renderSpriteWidget } from "./sprite-widget.js";
 import { formatRuntimeError } from "./runtime-error-utils.js";
 import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
-import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
 import { createDomainCrewController } from "./domain-crew-controller.js";
 import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
@@ -37,6 +34,7 @@ import { fitVisibleCanvasViewport, visibleCanvasCenter } from "./canvas-safe-are
 import { createNode } from "./nodes.js";
 import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCardDraft } from "./studio-runtime-events.js";
+import { createProjectReadyHandler, hydrateStartupProject } from "./studio-startup-project.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -95,11 +93,14 @@ async function bootstrap() {
   projectController.setAuthUser(authState?.user);
   await refreshRuntimeSurfaceStatus({ authState });
 
-  await projectController.ensureAccessibleStartupProject();
-  if (hasActiveProject()) {
-    await store.hydrateRuntime(runtime); await syncRuntimeAssets(store, runtime);
-    await restoreCandidateSelectionsAfterLoad(store, runtime); await refreshPendingKeyframeGenerations(store, runtime); await refreshScriptCoreTruth(runtime); await refreshProductionPlanTruth(runtime);
-  }
+  await hydrateStartupProject({
+    store,
+    runtime,
+    projectController,
+    hasActiveProject,
+    refreshScriptCoreTruth,
+    refreshProductionPlanTruth,
+  });
   await projectController.refreshProjectSummaries(); await refreshProductOverview();
 }
 function initializeStudio(authUser) {
@@ -142,15 +143,13 @@ function initializeStudio(authUser) {
       domainCrewController.setContext({ runtime, userId: projectController.authUser?.user_id || "" });
       void refreshRuntimeSurfaceStatus();
     },
-    onProjectReady: async (runtimeClient) => {
-      if (editorMounted) {
-        await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
-        await refreshPendingKeyframeGenerations(store, runtimeClient);
-        await refreshScriptCoreTruth(runtimeClient);
-        await refreshProductionPlanTruth(runtimeClient);
-      }
-      await refreshProductOverview();
-    },
+    onProjectReady: createProjectReadyHandler({
+      isEditorMounted: () => editorMounted,
+      store,
+      refreshScriptCoreTruth,
+      refreshProductionPlanTruth,
+      refreshProductOverview,
+    }),
     render: () => renderAll(store.get()),
   });
   projectController.setAuthUser(authUser);

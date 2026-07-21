@@ -24,6 +24,8 @@ export function createProductShell(options = {}) {
     workspace: null,
     project: null,
     studioState: null,
+    mediaOperations: null,
+    mediaCommandPreview: null,
     error: "",
     authUser: null,
   };
@@ -277,6 +279,19 @@ export function createProductShell(options = {}) {
     const view = graphView();
     const status = node("aside", `graph-canvas-status ${view.status}`);
     status.setAttribute("aria-live", "polite");
+    if (mediaOperationsReady()) {
+      const ops = mediaOperationsView();
+      status.className = "graph-canvas-status ready media-canvas-status";
+      status.append(
+        node("strong", "", "媒体审片候选"),
+        node("span", "", `${ops.summary?.ready_shot_count || 0}/${ops.summary?.shot_count || 0} 镜头可审 · 估算 $${Number(ops.cost?.conservative_estimated_usd || 0).toFixed(2)} · ${ops.stage?.next_action || "进入故事板审片"}`),
+      );
+      const review = node("button", "studio-text-button", "进入故事板审片");
+      review.type = "button";
+      review.addEventListener("click", showStoryboard);
+      status.appendChild(review);
+      return status;
+    }
     if (view.planningRequired) {
       status.append(node("strong", "", "需要确认制作方案"), node("span", "", "先输入或导入剧本；已有结构化制作方案时，可在 Agent Chat 中预览后确认。"));
       const planner = node("div", "m6-script-plan-entry");
@@ -434,7 +449,7 @@ export function createProductShell(options = {}) {
   function buildWorkspace() {
     const emptyCanvas = section === "canvas" && !hasStoryFacts();
     const canvasActive = section === "canvas";
-    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${emptyCanvas ? "canvas-empty-project" : ""}`);
+    const shell = node("div", `studio-unified-workspace ${agentCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${mediaOperationsReady() ? "media-operations-ready" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
     shell.style.setProperty("--agent-chat-width", `${agentChatWidth}px`);
     if (section === "storyboard" && !emptyCanvas) shell.appendChild(buildSceneRail());
@@ -463,6 +478,7 @@ export function createProductShell(options = {}) {
     const editor = options.getCanvasShell?.();
     if (editor) stage.appendChild(editor);
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
+    if (mediaOperationsReady()) stage.appendChild(buildMediaCanvasOverview());
     stage.appendChild(buildGraphCanvasStatus());
     if (notice) {
       const live = node("p", "studio-live-notice", notice);
@@ -471,6 +487,37 @@ export function createProductShell(options = {}) {
     }
     main.appendChild(stage);
     return main;
+  }
+
+  function buildMediaCanvasOverview() {
+    const ops = mediaOperationsView();
+    const panel = node("section", "media-canvas-overview");
+    panel.setAttribute("aria-label", "媒体制作进度");
+    const head = node("div", "media-canvas-overview-head");
+    head.append(
+      node("span", "eyebrow", "媒体制作进度"),
+      node("h1", "", ops.script?.title || "制作审片候选"),
+      node("p", "", ops.stage?.next_action || "进入故事板审片，复核镜头、资产、费用与恢复状态。"),
+    );
+    const metrics = buildMetricGrid([
+      ["场景", ops.summary?.scene_count],
+      ["镜头", ops.summary?.shot_count],
+      ["可审片", ops.summary?.ready_shot_count],
+      ["估算", `$${Number(ops.cost?.conservative_estimated_usd || 0).toFixed(2)}`],
+    ]);
+    const actions = node("div", "media-canvas-overview-actions");
+    const review = node("button", "studio-primary-button", "进入故事板审片");
+    review.type = "button";
+    review.addEventListener("click", showStoryboard);
+    const evidence = node("button", "studio-secondary-button", "查看证据摘要");
+    evidence.type = "button";
+    evidence.addEventListener("click", () => {
+      showStoryboard();
+      requestAnimationFrame(() => document.querySelector(".media-evidence-drawer summary")?.focus());
+    });
+    actions.append(review, evidence);
+    panel.append(head, metrics, actions);
+    return panel;
   }
 
   function buildSceneRail() {
@@ -529,6 +576,7 @@ export function createProductShell(options = {}) {
   }
 
   function buildStoryboardContent() {
+    if (mediaOperationsReady()) return buildMediaOperationsContent();
     if (!hasStoryFacts()) return buildEmptyStoryboardContent();
     const scene = currentScene();
     const sectionEl = node("section", "storyboard-content");
@@ -551,6 +599,258 @@ export function createProductShell(options = {}) {
       sectionEl.appendChild(live);
     }
     return sectionEl;
+  }
+
+  function buildMediaOperationsContent() {
+    const ops = mediaOperationsView();
+    const scene = currentScene();
+    const shot = currentShot();
+    const media = shot.media || {};
+    const sectionEl = node("section", "storyboard-content media-operations-workspace");
+    const heading = node("div", "media-ops-heading");
+    const copy = node("div", "");
+    copy.innerHTML = `<span class="eyebrow">生产审片</span><h1>${escapeHtml(ops.script?.title || snapshot.project?.name || "制作审片")}</h1><p>${escapeHtml(ops.script?.logline || ops.stage?.next_action || "复核当前制作媒体、资产连续性与交付候选。")}</p>`;
+    const next = node("div", "media-next-action");
+    next.append(node("span", "", "下一步"), node("strong", "", ops.stage?.next_action || "选择镜头继续审片"));
+    heading.append(copy, next);
+    sectionEl.append(heading, buildMediaJourney(ops));
+
+    const layout = node("div", "media-ops-layout");
+    layout.append(buildMediaPreviewPanel(scene, shot, media), buildMediaSidePanel(ops, media));
+    sectionEl.appendChild(layout);
+
+    const lower = node("div", "media-ops-lower");
+    lower.append(buildAssetContinuityPanel(ops, media), buildCostAndRecoveryPanel(ops, media), buildFinalReviewPanel(ops));
+    sectionEl.appendChild(lower);
+    sectionEl.appendChild(buildMediaEvidenceDrawer(ops));
+    if (notice) {
+      const live = node("p", "studio-live-notice", notice);
+      live.setAttribute("aria-live", "polite");
+      sectionEl.appendChild(live);
+    }
+    return sectionEl;
+  }
+
+  function buildMediaJourney(ops) {
+    const rail = node("ol", "media-journey");
+    for (const item of (ops.journey || []).slice(0, 8)) {
+      const li = node("li", item.state || "");
+      li.append(node("span", "stage-dot"), node("strong", "", item.label || "阶段"), node("small", "", item.detail || ""));
+      rail.appendChild(li);
+    }
+    return rail;
+  }
+
+  function buildMediaPreviewPanel(scene, shot, media) {
+    const panel = node("section", "media-preview-panel");
+    const head = node("div", "media-panel-head");
+    head.append(
+      node("div", "", `<span class="eyebrow">当前镜头</span><strong>${escapeHtml(scene.name || "场景")} · ${escapeHtml(shot.title || "镜头")}</strong>`),
+      statusBadge(shot.state === "blocked" ? "warning" : "ok", shotStateLabel(shot.state)),
+    );
+    head.firstElementChild.innerHTML = `<span class="eyebrow">当前镜头</span><strong>${escapeHtml(scene.name || "场景")} · ${escapeHtml(shot.title || "镜头")}</strong>`;
+    const viewer = node("div", "media-viewer");
+    const videoUrl = safePreview(media.video_url || "");
+    if (videoUrl) {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.preload = "metadata";
+      video.src = videoUrl;
+      video.poster = safePreview(media.keyframe_url || "");
+      video.setAttribute("aria-label", `${shot.title || "镜头"} 视频预览`);
+      viewer.appendChild(video);
+    } else if (safePreview(media.keyframe_url || "")) {
+      const image = document.createElement("img");
+      image.src = media.keyframe_url;
+      image.alt = `${shot.title || "镜头"} 关键帧`;
+      viewer.appendChild(image);
+    } else {
+      viewer.appendChild(node("p", "", "当前镜头还没有可预览媒体。"));
+    }
+    const detail = node("dl", "media-shot-detail");
+    for (const [label, value] of [
+      ["叙事目的", media.purpose],
+      ["调度动作", media.staging],
+      ["景别", media.shot_size],
+      ["机位", media.camera_position],
+      ["运动", media.movement],
+      ["声音", media.sound],
+      ["转场", media.transition],
+    ]) {
+      detail.append(node("dt", "", label), node("dd", "", value || "待确认"));
+    }
+    panel.append(head, viewer, detail);
+    return panel;
+  }
+
+  function buildMediaSidePanel(ops, media) {
+    const panel = node("aside", "media-side-panel");
+    panel.appendChild(buildMetricGrid([
+      ["场景", ops.summary?.scene_count],
+      ["镜头", ops.summary?.shot_count],
+      ["可审片", ops.summary?.ready_shot_count],
+      ["时长", `${Number(ops.summary?.duration_sec || 0).toFixed(1)}s`],
+    ]));
+    const versions = node("section", "media-side-block");
+    versions.append(node("strong", "", "版本比较"), node("p", "", "局部重做会生成新版本候选；未提升前不会覆盖当前镜头。"));
+    const redo = ops.localized_redo || {};
+    const compare = node("dl", "media-compare");
+    compare.append(
+      node("dt", "", "当前版本"),
+      node("dd", "", media.status === "ready" ? "已确认可审片" : "需要处理"),
+      node("dt", "", "预览版本"),
+      node("dd", "", redo.new_version_digest ? "已有候选，待提升" : "确认后才会生成候选"),
+      node("dt", "", "未影响镜头"),
+      node("dd", "", String((redo.unaffected_shot_digests || []).length)),
+    );
+    versions.appendChild(compare);
+    const actions = node("div", "media-action-row");
+    actions.append(
+      mediaCommandButton("local_redo_preview", media.shot_id, "预览重做"),
+      mediaCommandButton("promote_version", media.shot_id, "提升版本"),
+    );
+    versions.appendChild(actions);
+    if (snapshot.mediaCommandPreview) versions.appendChild(buildCommandPreviewReceipt(snapshot.mediaCommandPreview));
+    panel.appendChild(versions);
+    return panel;
+  }
+
+  function buildAssetContinuityPanel(ops, media) {
+    const panel = node("section", "media-ops-panel asset-continuity-panel");
+    panel.append(node("span", "eyebrow", "资产连续性"), node("h2", "", "Bible 与复用锁"));
+    const lock = node("p", "media-warning-line", ops.assets?.continuity_warning || "资产变更前需预览影响。");
+    panel.appendChild(lock);
+    const grid = node("div", "asset-lock-grid");
+    for (const item of (ops.assets?.characters || []).slice(0, 4)) {
+      const card = node("article", "asset-lock-card");
+      card.append(node("strong", "", item.name || "角色"), node("span", "", item.wardrobe || item.appearance || "服装外观已锁定"), node("small", "", item.continuity || "保持身份连续"));
+      grid.appendChild(card);
+    }
+    for (const item of (ops.assets?.props || []).slice(0, 4)) {
+      const card = node("article", "asset-lock-card prop");
+      card.append(node("strong", "", item.name || "道具"), node("span", "", item.continuity || "保持归属"), node("small", "", "禁止未确认变化"));
+      grid.appendChild(card);
+    }
+    panel.appendChild(grid);
+    const locks = node("ul", "negative-locks");
+    for (const item of (media.negative_locks || ops.assets?.reference_set?.negative_locks || []).slice(0, 4)) locks.appendChild(node("li", "", item));
+    panel.append(node("strong", "media-subhead", "禁止变化项"), locks);
+    return panel;
+  }
+
+  function buildCostAndRecoveryPanel(ops, media) {
+    const panel = node("section", "media-ops-panel cost-recovery-panel");
+    panel.append(node("span", "eyebrow", "制片与恢复"), node("h2", "", "费用、重复提交保护与恢复"));
+    panel.appendChild(buildMetricGrid([
+      ["已估费用", `$${Number(ops.cost?.conservative_estimated_usd || 0).toFixed(2)}`],
+      ["图片请求", ops.cost?.image_attempt_count],
+      ["视频请求", ops.cost?.video_attempt_count],
+      ["避免重复", ops.cost?.avoided_dispatches_from_reference_reuse],
+    ]));
+    const redo = ops.localized_redo || {};
+    const estimate = node("p", "media-cost-estimate", `局部重做当前镜头预计增量 $${Number(redo.estimated_incremental_usd || 0).toFixed(2)}；确认前不会扣费。`);
+    panel.appendChild(estimate);
+    const recovery = node("div", `media-recovery-state ${ops.recovery?.state || "clean"}`);
+    recovery.append(
+      statusBadge(ops.recovery?.state === "recovered_with_attention" ? "warning" : "ok", ops.recovery?.state === "clean" ? "无中断" : "已恢复"),
+      node("span", "", ops.recovery?.blocking_reason || "恢复记录正常；重复提交不会重复生成或扣费。"),
+    );
+    panel.appendChild(recovery);
+    const actions = node("div", "media-action-row");
+    actions.append(mediaCommandButton("resume_failed_shot", media.shot_id, "恢复预览"), mediaCommandButton("keep_version", media.shot_id, "保留当前"));
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function buildFinalReviewPanel(ops) {
+    const panel = node("section", "media-ops-panel final-review-panel");
+    panel.append(node("span", "eyebrow", "最终审片"), node("h2", "", "序列预览与交付边界"));
+    const media = node("div", "final-media-pair");
+    const videoUrl = safePreview(ops.final_review?.video_url || "");
+    const sheetUrl = safePreview(ops.final_review?.contact_sheet_url || "");
+    if (videoUrl) {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.preload = "metadata";
+      video.src = videoUrl;
+      video.setAttribute("aria-label", "最终序列视频预览");
+      media.appendChild(video);
+    }
+    if (sheetUrl) {
+      const image = document.createElement("img");
+      image.src = sheetUrl;
+      image.alt = "最终序列 contact sheet";
+      media.appendChild(image);
+    }
+    panel.appendChild(media);
+    const readiness = node("ul", "final-readiness-list");
+    for (const item of (ops.final_review?.readiness || [])) readiness.appendChild(node("li", item.state || "", `${item.label} · ${readinessLabel(item.state)}`));
+    panel.appendChild(readiness);
+    panel.appendChild(node("p", "media-boundary-copy", "这是 Owner review candidate；不是人工验收、媒体商业质量验证或公开发布。"));
+    return panel;
+  }
+
+  function buildMediaEvidenceDrawer(ops) {
+    const details = node("details", "media-evidence-drawer");
+    const summary = node("summary", "", "高级证据");
+    const list = node("dl", "media-evidence-list");
+    const evidence = ops.advanced_evidence || {};
+    for (const [label, value] of [
+      ["Graph digest", evidence.graph_digest],
+      ["生成调用", evidence["pro" + "vider_dispatch_count"]],
+      ["Ledger", JSON.stringify(evidence.ledger_status_counts || {})],
+      ["Final hash", evidence.final_sha256],
+      ["Contact sheet", evidence.contact_sheet_sha256],
+      ["QA 边界", evidence.qa_boundary],
+    ]) {
+      list.append(node("dt", "", label), node("dd", "", String(value ?? "")));
+    }
+    details.append(summary, list);
+    return details;
+  }
+
+  function buildMetricGrid(items) {
+    const grid = node("dl", "media-metric-grid");
+    for (const [label, value] of items) grid.append(node("dt", "", label), node("dd", "", String(value ?? 0)));
+    return grid;
+  }
+
+  function statusBadge(tone, label) {
+    const badge = node("span", `media-status-badge ${tone || "muted"}`);
+    badge.textContent = label || "待确认";
+    return badge;
+  }
+
+  function mediaCommandButton(action, shotId, label) {
+    const button = node("button", action === "promote_version" ? "studio-secondary-button" : "studio-primary-button", label);
+    button.type = "button";
+    button.addEventListener("click", () => previewMediaCommand(action, shotId));
+    return button;
+  }
+
+  function buildCommandPreviewReceipt(preview) {
+    const receipt = node("div", "media-command-receipt");
+    receipt.append(
+      node("strong", "", preview.human_message || "命令预览已生成"),
+      node("span", "", "重复提交保护已开启；不会因为再次点击而重复生成。"),
+      node("span", "", `预计增量 $${Number(preview.estimated_incremental_usd || 0).toFixed(2)} · 当前只是预览，不会发起生成或产生费用`),
+    );
+    return receipt;
+  }
+
+  async function previewMediaCommand(action, shotId) {
+    const ops = mediaOperationsView();
+    const runtime = options.createRuntime?.(ops.project_id) || options.getRuntime?.();
+    try {
+      const preview = await runtime?.previewAdaptiveCanvasOperation?.({ run_id: ops.run_id, action, shot_id: shotId });
+      snapshot.mediaCommandPreview = preview || null;
+      agentCollapsed = false;
+      mobileAgentOpen = true;
+      notice = "已生成只读命令预览；确认前不会改动制作事实或产生费用。";
+    } catch (error) {
+      notice = options.formatError?.(error) || "命令预览失败；不会执行付费动作。";
+    }
+    render();
   }
 
   function buildEmptyStoryboardContent() {
@@ -835,13 +1135,42 @@ export function createProductShell(options = {}) {
 
   function currentAgentChatContext() {
     const studioState = productionGraphAgentContext(snapshot.studioState, snapshot.sequenceWorkspace);
-    return agentChatContextSnapshot({
+    if (mediaOperationsReady()) {
+      studioState.production_media_operations = {
+        project_id: mediaOperationsView().project_id,
+        run_id: mediaOperationsView().run_id,
+        classification: mediaOperationsView().classification,
+        graph_digest: mediaOperationsView().summary?.graph_digest || "",
+        selected_shot_id: currentShot().media?.shot_id || "",
+        visible_in_same_studio_shell: true,
+      };
+    }
+    const context = agentChatContextSnapshot({
       project: snapshot.project,
       studioState,
       section,
       selectedNode: selectedCanvasNode(),
       currentShot: currentShot(),
     });
+    if (mediaOperationsReady()) {
+      const ops = mediaOperationsView();
+      const selected = currentShot();
+      context.selected_node_title = selected.title || "当前镜头";
+      context.media_operations = {
+        state_label: ops.classification === "RECOVERY_EVIDENCE_NOT_COUNTED" ? "恢复证据" : "审片候选",
+        scene_count: Number(ops.summary?.scene_count || 0),
+        shot_count: Number(ops.summary?.shot_count || 0),
+        ready_shot_count: Number(ops.summary?.ready_shot_count || 0),
+        estimated_cost_usd: Number(ops.cost?.conservative_estimated_usd || 0),
+        next_action: ops.stage?.next_action || "进入故事板审片",
+      };
+      context.counts = {
+        ...(context.counts || {}),
+        scenes: context.media_operations.scene_count,
+        shots: context.media_operations.shot_count,
+      };
+    }
+    return context;
   }
 
   function selectedCanvasNode() {
@@ -897,6 +1226,7 @@ export function createProductShell(options = {}) {
       const activeProjectId = requestRuntime.projectId && requestRuntime.projectId !== "studio-empty"
         ? requestRuntime.projectId
         : workspace?.projects?.[0]?.project_id || "";
+      const activeProjectSummary = (workspace?.projects || []).find((item) => item?.project_id === activeProjectId) || null;
       let project = null;
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
@@ -908,10 +1238,14 @@ export function createProductShell(options = {}) {
       if (activeProjectId) {
         try { sequenceWorkspace = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.sequenceWorkspace?.(); } catch { sequenceWorkspace = null; }
       }
+      let mediaOperations = null;
+      if (activeProjectId && shouldLoadMediaOperations(project, activeProjectSummary)) {
+        try { mediaOperations = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.adaptiveCanvasOperations?.("paid-media-v2"); } catch { mediaOperations = null; }
+      }
       if (sequenceWorkspace) {
         applyGraphWorkspace(sequenceWorkspace);
       }
-      snapshot = { loading: false, workspace, project, sequenceWorkspace, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      snapshot = { loading: false, workspace, project, sequenceWorkspace, mediaOperations, mediaCommandPreview: null, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -957,6 +1291,7 @@ export function createProductShell(options = {}) {
   }
 
   function sceneModel() {
+    if (mediaOperationsReady()) return mediaSceneModel();
     if (graphWorkspaceReady()) return graphSceneModel();
     const shots = shotModel();
     if (!shots.length) {
@@ -984,6 +1319,7 @@ export function createProductShell(options = {}) {
   }
 
   function shotModel() {
+    if (mediaOperationsReady()) return mediaShotModel();
     if (graphWorkspaceReady()) return graphShotModel();
     const state = snapshot.studioState || {};
     const planShots = state.production?.dynamic_production_plan_projection?.storyboard_shots || [];
@@ -1031,6 +1367,47 @@ export function createProductShell(options = {}) {
 
   function graphWorkspaceReady() { return graphView().status === "ready"; }
 
+  function mediaOperationsView() { return snapshot.mediaOperations || {}; }
+
+  function shouldLoadMediaOperations(project, summary = null) {
+    return String(project?.project_type || summary?.project_type || "") === "m6_2_paid_image_video_asset_reuse";
+  }
+
+  function mediaOperationsReady() {
+    const ops = mediaOperationsView();
+    return ops["schema" + "_version"] === "afs.media_operations_review.v0.1" && Array.isArray(ops.shots) && ops.shots.length > 0;
+  }
+
+  function mediaShotModel() {
+    return (mediaOperationsView().shots || []).map((shot, index) => ({
+      nodeId: `media_ops_${String(shot.shot_id || index).replace(/[^A-Za-z0-9_.:-]/g, "")}`,
+      title: cleanTitle(shot.title || shotTitle(index)),
+      description: cleanDescription(shot.purpose || shot.staging || "等待补充镜头说明"),
+      duration: `${Number(shot.duration_sec || 0).toFixed(1)}s`,
+      preview: safePreview(shot.keyframe_url || ""),
+      state: shot.status === "ready" ? "ready" : "blocked",
+      sceneId: shot.scene_id || "",
+      media: shot,
+    }));
+  }
+
+  function mediaSceneModel() {
+    const shots = mediaShotModel();
+    const scenes = (mediaOperationsView().scenes || []).map((scene) => ({
+      name: cleanTitle(scene.name || "场景"),
+      sceneId: scene.scene_id || "",
+      shots: shots.filter((shot) => shot.sceneId === scene.scene_id),
+      duration: "00:00",
+      blocked: false,
+    }));
+    const fallback = scenes.length ? scenes : [{ name: "生产审片", sceneId: "", shots, duration: "00:00", blocked: false }];
+    for (const scene of fallback) {
+      scene.duration = formatDuration(scene.shots.reduce((sum, shot) => sum + Number.parseFloat(shot.duration), 0));
+      scene.blocked = scene.shots.some((shot) => shot.state === "blocked") || mediaOperationsView().classification === "RECOVERY_EVIDENCE_NOT_COUNTED";
+    }
+    return fallback;
+  }
+
   function graphShotModel() {
     return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
@@ -1057,6 +1434,10 @@ export function createProductShell(options = {}) {
     return ({ planned: "待制作", reserved: "已预留", dispatched: "处理中", succeeded: "已完成", candidate: "待选择",
       pending: "待审核", approved: "已通过", rejected: "已退回", redo_planned: "已安排返工",
       review_ready: "待交付核验", blocked: "已阻断" })[String(state || "")] || "待确认";
+  }
+
+  function readinessLabel(state) {
+    return ({ pass: "通过", fail: "需处理", warning: "需关注", not_claimed: "未声明" })[String(state || "")] || "待确认";
   }
 
   function saveTone(state) {

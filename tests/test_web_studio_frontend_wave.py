@@ -311,7 +311,7 @@ def test_generation_projection_is_split_from_node_actions() -> None:
 
 
 def test_keyframe_progress_uses_percentage_long_polling_without_timeout_failure() -> None:
-    main = _read("src/main.js")
+    startup = _read("src/studio-startup-project.js")
     progress = _read("src/node-generation-progress.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")
     project_controller = _read("src/studio-project-controller.js")
@@ -328,7 +328,7 @@ def test_keyframe_progress_uses_percentage_long_polling_without_timeout_failure(
     assert "startBackgroundKeyframePolling" in keyframe_actions
     assert "void startBackgroundKeyframePolling" in keyframe_actions
     assert "runtime.pollKeyframe(jobId)" in keyframe_actions
-    assert "refreshPendingKeyframeGenerations(store, runtime)" in main
+    assert "refreshPendingKeyframeGenerations(store, runtimeClient)" in startup
     assert "onProjectReady?.(runtimeClient)" in project_controller
     assert "throw new Error(`图片生成仍在处理中" not in keyframe_actions
     assert "const isIndeterminate = !progress || progress?.percent == null" in body

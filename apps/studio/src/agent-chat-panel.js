@@ -70,8 +70,19 @@ function contextStrip(context) {
     strip.append(el("dt", "", label), el("dd", "", value));
   }
   const counts = context?.counts || {};
-  strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
-  if (context?.production_graph_version) {
+  if (context?.media_operations) {
+    const media = context.media_operations;
+    strip.append(
+      el("dt", "", "媒体制作"),
+      el("dd", "", `${Number(media.ready_shot_count || 0)}/${Number(media.shot_count || 0)} 镜头可审 · 估算 $${Number(media.estimated_cost_usd || 0).toFixed(2)}`),
+    );
+    strip.append(el("dt", "", "状态"), el("dd", "", `${media.state_label || "审片候选"} · ${media.next_action || "选择镜头继续"}`));
+  } else {
+    strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
+  }
+  if (context?.media_operations) {
+    strip.append(el("dt", "", "计划"), el("dd", "", "从已确认脚本、分镜和资产 Bible 只读投影"));
+  } else if (context?.production_graph_version) {
     strip.append(el("dt", "", "制作序列"), el("dd", "", `版本 ${Number(context.production_graph_version)} · ${Number(counts.graph_tasks || 0)} 项任务 · ${Number(counts.graph_pending_reviews || 0)} 项待审`));
   } else {
     strip.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));

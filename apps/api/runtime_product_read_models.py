@@ -139,6 +139,7 @@ def _project_overview(
     progress = round((completed / len(stages)) * 100) if stages else 0
     result: dict[str, Any] = {
         "project_id": project_id,
+        "project_type": str(summary.get("project_type") or manifest.get("project_type") or ""),
         "name": str(studio_meta.get("projectName") or summary.get("goal") or "未命名项目"),
         "episode": _episode_label(latest_run),
         "status": _localized_project_status(str(summary.get("status") or ""), delivery),

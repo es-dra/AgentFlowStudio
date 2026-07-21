@@ -55,11 +55,13 @@ def test_product_overview_allows_auth_disabled_local_runtime(tmp_path, monkeypat
     payload = workspace.json()
     assert payload["workspace"]["project_count"] == 1
     assert [item["project_id"] for item in payload["projects"]] == ["local-project"]
+    assert payload["projects"][0]["project_type"] == "short_video_campaign"
 
     project = client.get("/projects/local-project/product-overview")
     assert project.status_code == 200, project.text
     product = project.json()["project"]
     assert product["project_id"] == "local-project"
+    assert product["project_type"] == "short_video_campaign"
     assert product["progress_percent"] == 0
     assert product["current_stage"] == "创作简报"
     assert product["next_action"] == "继续创作简报"

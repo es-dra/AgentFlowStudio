@@ -118,11 +118,12 @@ export function createStore(projectId = "") {
     notifySoon();
   }
 
-  async function switchProject(projectId, runtime) {
+  async function switchProject(projectId, runtime, options = {}) {
     runtimeClient = runtime;
     runtimePersistence.reset();
     state = loadPersisted(projectId) || initialState(projectId);
     state.meta.projectId = projectId;
+    if (options.persistenceMode) runtimePersistence.setMode(options.persistenceMode);
     history.past = [];
     history.future = [];
     notifySoon();
