@@ -25,6 +25,7 @@ from agentflow_studio.production.runtime_safe_io import read_json, safe_id
 
 GenerationStrategy = Literal["text_to_video", "image_to_video"]
 ScriptSourceType = Literal["provider", "agent_authored_test_input"]
+MediaPromptStyle = Literal["anime", "cinematic_live_action"]
 Callback = Callable[[dict[str, Any]], None]
 ADAPTIVE_SCHEMA_VERSION = "afs.adaptive_canvas_v2.production_run.v0.1"
 LEDGER_SCHEMA_VERSION = "afs.adaptive_canvas_v2.charge_ledger.v0.1"
@@ -81,6 +82,11 @@ class AdaptiveProductionProfile:
     provider_supported_video_durations_sec: tuple[int, ...] = (10, 5)
     reference_sheet_required: bool = True
     max_paid_attempts: int = DEFAULT_PROVIDER_ATTEMPT_CAP
+    media_prompt_style: MediaPromptStyle = "anime"
+    media_aspect_ratio: str = "9:16"
+    video_resolution: str = "480p"
+    video_motion: str = "smooth anime camera motion; maintain story continuity"
+    media_negative_locks: tuple[str, ...] = ()
 
     @property
     def target_duration_sec(self) -> float:
@@ -110,6 +116,15 @@ class AdaptiveProductionProfile:
             raise AdaptiveCanvasError("profile requires at least one shot")
         if self.max_paid_attempts > DEFAULT_PROVIDER_ATTEMPT_CAP:
             raise AdaptiveCanvasError("paid provider attempt cap cannot exceed 20")
+        if self.media_prompt_style not in {"anime", "cinematic_live_action"}:
+            raise AdaptiveCanvasError("unsupported media prompt style")
+        left, sep, right = self.media_aspect_ratio.partition(":")
+        if sep != ":" or not left.isdigit() or not right.isdigit() or int(left) <= 0 or int(right) <= 0:
+            raise AdaptiveCanvasError("media_aspect_ratio must use positive N:N format")
+        if not self.video_resolution.strip():
+            raise AdaptiveCanvasError("video_resolution must be non-empty")
+        if not self.video_motion.strip():
+            raise AdaptiveCanvasError("video_motion must be non-empty")
         if any(float(shot.duration_sec) <= 0 for shot in self.shots):
             raise AdaptiveCanvasError("all shot durations must be positive")
         supported = sorted({int(value) for value in self.provider_supported_video_durations_sec if int(value) > 0})
@@ -238,7 +253,7 @@ class ChargeLedger:
         attempt = {
             "attempt_id": safe_id(
                 f"{self.project_id}-{self.run_id}-{stage}-{shot_id or 'global'}-{chunk_id or 'whole'}-"
-                f"{candidate_id}-attempt-{attempt_index}"
+                f"{candidate_id}-{fingerprint[:12]}-attempt-{attempt_index}"
             ),
             "project_id": self.project_id,
             "run_id": self.run_id,
@@ -257,6 +272,8 @@ class ChargeLedger:
             "provider_calls_started": False,
             "created_at": utc_now(),
         }
+        if any(existing.get("attempt_id") == attempt["attempt_id"] for existing in self.attempts):
+            raise AdaptiveCanvasError("charge ledger attempt id collision")
         self.attempts.append(attempt)
         self.save()
         return dict(attempt)
@@ -264,6 +281,8 @@ class ChargeLedger:
     def mark_started(self, attempt_id: str) -> None:
         for attempt in self.attempts:
             if attempt.get("attempt_id") == attempt_id:
+                if attempt.get("status") in {"failed", "succeeded"}:
+                    raise AdaptiveCanvasError("completed provider attempt cannot be restarted")
                 if not attempt.get("provider_calls_started"):
                     attempt["provider_calls_started"] = True
                     attempt["status"] = "started"
@@ -273,9 +292,29 @@ class ChargeLedger:
                 return
         raise KeyError(attempt_id)
 
+    def mark_submitted(self, attempt_id: str, *, provider_task_id: str, provider_poll_task: dict[str, Any]) -> None:
+        for attempt in self.attempts:
+            if attempt.get("attempt_id") == attempt_id:
+                if attempt.get("status") in {"failed", "succeeded"}:
+                    raise AdaptiveCanvasError("completed provider attempt cannot be marked submitted")
+                if not attempt.get("provider_calls_started"):
+                    raise AdaptiveCanvasError("provider attempt must be marked started before submit recovery")
+                if not str(provider_task_id or "").strip():
+                    raise AdaptiveCanvasError("provider task id is required for submit recovery")
+                attempt["status"] = "submitted"
+                attempt["submitted_at"] = utc_now()
+                attempt["provider_task_id"] = provider_task_id
+                attempt["provider_task_id_sha256"] = sha256_text(provider_task_id)
+                attempt["provider_poll_task"] = _safe_provider_poll_task(provider_poll_task)
+                self.save()
+                return
+        raise KeyError(attempt_id)
+
     def mark_succeeded(self, attempt_id: str, artifact: dict[str, Any], *, provider_task_id: str | None = None) -> None:
         for attempt in self.attempts:
             if attempt.get("attempt_id") == attempt_id:
+                if attempt.get("status") == "failed":
+                    raise AdaptiveCanvasError("failed provider attempt cannot be marked succeeded")
                 attempt["status"] = "succeeded"
                 attempt["completed_at"] = utc_now()
                 attempt["artifact_version_id"] = artifact.get("artifact_version_id")
@@ -283,9 +322,21 @@ class ChargeLedger:
                 attempt["artifact_kind"] = artifact.get("kind")
                 if provider_task_id:
                     attempt["provider_task_id_sha256"] = sha256_text(provider_task_id)
+                attempt.pop("safe_error", None)
                 self.save()
                 return
         raise KeyError(attempt_id)
+
+    def resumable_submitted_attempt(self, fingerprint: str) -> dict[str, Any] | None:
+        for attempt in reversed(self.attempts):
+            if attempt.get("charge_fingerprint") != fingerprint:
+                continue
+            if attempt.get("status") != "submitted":
+                continue
+            poll_task = attempt.get("provider_poll_task")
+            if isinstance(poll_task, dict) and str(attempt.get("provider_task_id") or "").strip():
+                return dict(attempt)
+        return None
 
     def mark_failed(self, attempt_id: str, error: Exception) -> None:
         for attempt in self.attempts:
@@ -898,7 +949,7 @@ def _ensure_reference_sheet(
         _emit(callback, "REFERENCE", "not_required")
         return None
     path = run_root / "reference_sheet.png"
-    prompt = _reference_prompt(script)
+    prompt = _reference_prompt(script, options.profile)
     if path.exists():
         artifact = _image_artifact("reference_sheet", path, run_root, options.project_id, options.run_id)
         _emit(callback, "REFERENCE", "reused", sha256=artifact["sha256"])
@@ -935,7 +986,7 @@ def _ensure_reference_sheet(
             prompt=prompt,
             output_dir=output_dir,
             image_operation="generate",
-            aspect_ratio="9:16",
+            aspect_ratio=options.profile.media_aspect_ratio,
             candidate_count=1,
             timeout_sec=360.0,
         ),
@@ -970,7 +1021,7 @@ def _ensure_keyframes(
         if reference_path is None:
             raise AdaptiveCanvasError("image_to_video shot requires a reference sheet")
         path = run_root / "keyframes" / f"{shot_id}.png"
-        prompt = _shot_keyframe_prompt(script, shot)
+        prompt = _shot_keyframe_prompt(script, shot, options.profile)
         if path.exists():
             artifact = _image_artifact("keyframe", path, run_root, options.project_id, options.run_id, shot_id=shot_id)
             keyframes[shot_id] = artifact
@@ -1012,7 +1063,7 @@ def _ensure_keyframes(
                 edit_source_image_path=reference_path,
                 edit_reference_image_paths=(reference_path,),
                 image_input_fidelity="high",
-                aspect_ratio="9:16",
+                aspect_ratio=options.profile.media_aspect_ratio,
                 candidate_count=1,
                 timeout_sec=360.0,
             ),
@@ -1045,7 +1096,7 @@ def _ensure_video_chunks(
         for chunk_index, chunk in enumerate(shot["chunk_plan"], start=1):
             chunk_id = str(chunk["chunk_id"])
             path = run_root / "video_chunks" / shot_id / f"{chunk_id}.mp4"
-            prompt = _shot_video_prompt(script, shot, chunk_index, int(chunk["provider_duration_sec"]))
+            prompt = _shot_video_prompt(script, shot, chunk_index, int(chunk["provider_duration_sec"]), options.profile)
             anchor = first_frame
             if chunk.get("requires_continuity_anchor"):
                 previous = run_root / "video_chunks" / shot_id / f"chunk-{chunk_index - 1:02d}.mp4"
@@ -1461,7 +1512,15 @@ def _real_video_attempt(
     duration_sec: int,
     output_dir: Path,
 ) -> dict[str, Any]:
-    attempt = ledger.reserve(
+    fingerprint = ledger.fingerprint(
+        stage="video_chunk",
+        shot_id=shot_id,
+        chunk_id=chunk_id,
+        candidate_id="candidate-001",
+        prompt=prompt,
+    )
+    resumable = ledger.resumable_submitted_attempt(fingerprint)
+    attempt = resumable or ledger.reserve(
         stage="video_chunk",
         shot_id=shot_id,
         chunk_id=chunk_id,
@@ -1471,21 +1530,26 @@ def _real_video_attempt(
         prompt=prompt,
     )
     try:
-        request = ProviderDispatchRequest(
-            prompt=prompt,
-            output_dir=output_dir,
-            aspect_ratio="9:16",
-            candidate_count=1,
-            timeout_sec=900.0,
-            duration_sec=duration_sec,
-            resolution="480p",
-            motion="smooth anime camera motion; maintain story continuity",
-            input_mode="first_frame" if first_frame else None,
-            reference_image_paths=(first_frame,) if first_frame else (),
-        )
-        ledger.mark_started(str(attempt["attempt_id"]))
-        submitted = registry.submit("video", VIDEO_PROVIDER_SERVICE_ID, request)
-        task_id = str((submitted.get("task") or {}).get("task_id") or "")
+        if resumable:
+            submitted = dict(resumable["provider_poll_task"])
+            task_id = str(resumable.get("provider_task_id") or "")
+        else:
+            request = ProviderDispatchRequest(
+                prompt=prompt,
+                output_dir=output_dir,
+                aspect_ratio=options.profile.media_aspect_ratio,
+                candidate_count=1,
+                timeout_sec=900.0,
+                duration_sec=duration_sec,
+                resolution=options.profile.video_resolution,
+                motion=options.profile.video_motion,
+                input_mode="first_frame" if first_frame else None,
+                reference_image_paths=(first_frame,) if first_frame else (),
+            )
+            ledger.mark_started(str(attempt["attempt_id"]))
+            submitted = registry.submit("video", VIDEO_PROVIDER_SERVICE_ID, request)
+            task_id = str((submitted.get("task") or {}).get("task_id") or "")
+            ledger.mark_submitted(str(attempt["attempt_id"]), provider_task_id=task_id, provider_poll_task=submitted)
         deadline = time.monotonic() + options.video_poll_timeout_sec
         while True:
             raw = registry.poll("video", VIDEO_PROVIDER_SERVICE_ID, submitted)
@@ -1600,15 +1664,32 @@ def _needs_reference(script: dict[str, Any], profile: AdaptiveProductionProfile)
     return any(shot.get("generation_strategy") == "image_to_video" for shot in script.get("shots", []))
 
 
-def _reference_prompt(script: dict[str, Any]) -> str:
+def _reference_prompt(script: dict[str, Any], profile: AdaptiveProductionProfile) -> str:
+    if profile.media_prompt_style == "cinematic_live_action":
+        return (
+            "Create one cinematic storyboard animatic production reference board for all image-to-video shots. "
+            "Show recurring fictional characters as simplified non-photoreal silhouettes, wardrobe color blocks, "
+            "key environments, props, lighting palette, and continuity anchors. Avoid close facial detail. "
+            "No celebrity likeness, no logos, no readable text, no smoke, no blood, no weapons. "
+            f"{_negative_lock_sentence(profile)} "
+            f"Script assets: {json.dumps({'characters': script['characters'], 'scenes': script['scenes'], 'style': script['style_bible']}, ensure_ascii=False)}"
+        )
     return (
         "Create one compact vertical anime reference sheet for all image-to-video shots. Include recurring "
         "characters, key environments, wardrobe, props, and style palette. No text labels or subtitles. "
+        f"{_negative_lock_sentence(profile)} "
         f"Script assets: {json.dumps({'characters': script['characters'], 'scenes': script['scenes'], 'style': script['style_bible']}, ensure_ascii=False)}"
     )
 
 
 def _keyframe_prompt_for(profile: AdaptiveProductionProfile, shot: AdaptiveShotSpec) -> str:
+    if profile.media_prompt_style == "cinematic_live_action":
+        return (
+            f"Cinematic storyboard animatic keyframe for {profile.title}, {shot.shot_id}: {shot.summary}. "
+            f"Location: {shot.location}. Action: {shot.action}. Camera: {shot.camera}. "
+            "Original fictional cast shown as simplified silhouettes, production-safe previsualization, "
+            "no close facial likeness, no readable text, no logos."
+        )
     return (
         f"Vertical anime keyframe for {profile.title}, {shot.shot_id}: {shot.summary}. "
         f"Location: {shot.location}. Action: {shot.action}. Camera: {shot.camera}."
@@ -1616,26 +1697,103 @@ def _keyframe_prompt_for(profile: AdaptiveProductionProfile, shot: AdaptiveShotS
 
 
 def _video_prompt_for(profile: AdaptiveProductionProfile, shot: AdaptiveShotSpec) -> str:
+    if profile.media_prompt_style == "cinematic_live_action":
+        return (
+            f"Silent cinematic storyboard animatic video for {profile.title}, {shot.shot_id}. {shot.summary}. "
+            f"Action: {shot.action}. Continue from {shot.continuity_in}; end with {shot.continuity_out}. "
+            "Preserve the same simplified silhouettes, wardrobe color blocks, props, space, lighting direction, and camera intent."
+        )
     return (
         f"Silent vertical anime video for {profile.title}, {shot.shot_id}. {shot.summary}. "
         f"Action: {shot.action}. Continue from {shot.continuity_in}; end with {shot.continuity_out}."
     )
 
 
-def _shot_keyframe_prompt(script: dict[str, Any], shot: dict[str, Any]) -> str:
+def _shot_keyframe_prompt(script: dict[str, Any], shot: dict[str, Any], profile: AdaptiveProductionProfile) -> str:
     return (
         "Use the supplied reference sheet as visual identity anchor. "
-        f"Story: {script['title']}. Shot: {shot['shot_id']}. {shot['keyframe_prompt']}"
+        f"Story: {script['title']}. Shot: {shot['shot_id']}. {shot['keyframe_prompt']} "
+        f"{_negative_lock_sentence(profile)}"
     )
 
 
-def _shot_video_prompt(script: dict[str, Any], shot: dict[str, Any], chunk_index: int, duration_sec: int) -> str:
+def _shot_video_prompt(
+    script: dict[str, Any],
+    shot: dict[str, Any],
+    chunk_index: int,
+    duration_sec: int,
+    profile: AdaptiveProductionProfile,
+) -> str:
     continuity = shot["continuity_in"] if chunk_index == 1 else "continue directly from the prior tail frame"
+    if profile.media_prompt_style == "cinematic_live_action":
+        action = _video_safety_text(shot.get("action") or shot.get("summary") or "")
+        camera = _video_safety_text(shot.get("camera") or "controlled camera move")
+        summary = _video_safety_text(shot.get("summary") or "")
+        return (
+            f"{duration_sec} second silent cinematic storyboard animatic. Story: {script['title']}. "
+            f"Shot: {shot['shot_id']}. Chunk {chunk_index}. "
+            f"Scene intent: {summary}. Safe motion: {action}. "
+            "Original fictional adult performers as simplified silhouettes in a controlled production previsualization. "
+            f"Camera: {camera}. Movement should be gentle and physically plausible. "
+            f"Continuity: {_video_safety_text(continuity)}. Maintain the same wardrobe color blocks, props, room layout, lighting direction, and camera intent. "
+            f"{_negative_lock_sentence(profile)} No subtitles, no logos, no audio, no readable text, no close facial detail."
+        )
+    style = "silent vertical anime video"
     return (
-        f"{duration_sec} second silent vertical anime video chunk. Story: {script['title']}. "
+        f"{duration_sec} second {style} chunk. Story: {script['title']}. "
         f"Shot: {shot['shot_id']}. Chunk {chunk_index}. Strategy: {shot['generation_strategy']}. "
-        f"Continuity: {continuity}. {shot['video_prompt']} No subtitles, no logos, no audio."
+        f"Continuity: {continuity}. {shot['video_prompt']} "
+        f"{_negative_lock_sentence(profile)} No subtitles, no logos, no audio."
     )
+
+
+def _video_safety_text(value: Any) -> str:
+    text = " ".join(str(value or "").split())
+    replacements = {
+        "对峙": "professional conversation",
+        "冲突": "production discussion",
+        "危机": "production planning",
+        "压力": "schedule focus",
+        "旧镜头": "film reel prop",
+        "删错": "editing issue",
+        "失误": "editing issue",
+        "限时": "timed production task",
+        "倒计时": "timer display",
+        "三分钟": "short time window",
+        "失重": "low-gravity rehearsal",
+        "倒置": "careful angled reach",
+        "腰绳": "support line",
+        "钢索": "support rail",
+        "氧气": "life-support panel",
+        "阀门": "control wheel",
+        "阀盘": "control wheel",
+        "氧气阀": "life-support control wheel",
+        "束带": "colored marker band",
+        "机械臂": "service arm",
+        "维修槽": "service bay",
+        "气闸": "door module",
+        "裂纹": "surface mark",
+        "告警": "status light",
+        "红色": "warm color",
+        "伤": "mark",
+        "血": "red label",
+        "武器": "tool",
+        "烟": "soft haze lighting",
+        "gore": "mark",
+        "blood": "red label",
+        "weapon": "tool",
+        "smoke": "soft haze lighting",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text[:360]
+
+
+def _negative_lock_sentence(profile: AdaptiveProductionProfile) -> str:
+    locks = [str(item).strip() for item in profile.media_negative_locks if str(item).strip()]
+    if not locks:
+        return ""
+    return "Negative locks: " + "; ".join(locks[:20]) + "."
 
 
 def _artifact_version(
@@ -1876,6 +2034,31 @@ def _safe_message(value: str) -> str:
     return text[-1000:]
 
 
+def _safe_provider_poll_task(payload: dict[str, Any]) -> dict[str, Any]:
+    def normalize(value: Any) -> Any:
+        if isinstance(value, Path):
+            return str(value)
+        if isinstance(value, tuple):
+            return [normalize(item) for item in value]
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): normalize(item) for key, item in value.items() if _safe_poll_key(str(key))}
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    normalized = normalize(payload)
+    if not isinstance(normalized, dict):
+        raise AdaptiveCanvasError("provider poll task must normalize to an object")
+    return normalized
+
+
+def _safe_poll_key(key: str) -> bool:
+    lowered = key.lower()
+    return not any(marker in lowered for marker in ("api_key", "authorization", "bearer", "secret", "credential"))
+
+
 __all__ = [
     "AdaptiveCanvasError",
     "AGENT_SCRIPT_INPUT_FILENAME",
@@ -1889,6 +2072,7 @@ __all__ = [
     "AdaptiveShotSpec",
     "ChargeLedger",
     "GenerationStrategy",
+    "MediaPromptStyle",
     "PaidAttemptLimitExceeded",
     "ScriptSourceType",
     "build_agent_authored_script_input",

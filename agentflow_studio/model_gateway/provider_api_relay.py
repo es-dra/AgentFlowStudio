@@ -18,7 +18,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com",)
+CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com", ".r2.dev")
 
 
 class ApiRelayAdapter:
@@ -144,6 +144,7 @@ class ApiRelayAdapter:
                 "provider_calls_started": True,
                 "provider_raw_response_stored": False,
                 "outputs": raw.get("outputs") if isinstance(raw.get("outputs"), list) else [],
+                "usage": _safe_usage(raw),
             }
         return raw
 
@@ -381,6 +382,20 @@ def _safe_error(value: str) -> str:
     if any(term in lowered for term in ("api", "key", "secret", "token", "authorization", "cookie")):
         return "API relay configuration is not ready."
     return " ".join(value.split())[:160] or "API relay request failed."
+
+
+def _safe_usage(raw: dict[str, Any]) -> dict[str, Any]:
+    usage = raw.get("usage")
+    if not isinstance(usage, dict) and isinstance(raw.get("data"), dict):
+        usage = raw["data"].get("usage")
+    if not isinstance(usage, dict):
+        return {"provider_reported_usage": False}
+    safe: dict[str, Any] = {"provider_reported_usage": True}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens", "input_tokens", "output_tokens"):
+        value = usage.get(key)
+        if isinstance(value, (int, float)):
+            safe[key] = value
+    return safe
 
 
 def _looks_like_timeout(value: str) -> bool:

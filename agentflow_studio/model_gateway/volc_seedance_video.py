@@ -95,6 +95,9 @@ class VolcSeedanceVideoAdapter:
         return {
             "status": "submitted",
             "task_id": task_id,
+            "model": str((plan.get("payload") or {}).get("model") or ""),
+            "duration_sec": int((plan.get("payload") or {}).get("duration") or 0),
+            "resolution": str((plan.get("payload") or {}).get("resolution") or ""),
             "query_url_template": _join_url(str(plan["base_url"]), str(plan["query_endpoint"])),
             "timeout_sec": float(plan.get("timeout_sec") or 120.0),
             "download_timeout_sec": float(plan.get("download_timeout_sec") or 180.0),
@@ -136,6 +139,8 @@ class VolcSeedanceVideoAdapter:
             "status": "succeeded",
             "provider_calls_started": True,
             "provider_raw_response_stored": False,
+            "usage": _safe_usage(response),
+            "billing": _seedance_billing_hint(task, response),
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
@@ -236,6 +241,56 @@ def _download_video(url: str, *, timeout_sec: float, allowed_url_hosts: tuple[st
     if not body:
         raise ModelProviderError("Seedance video download returned empty content")
     return body, content_type
+
+
+def _safe_usage(response: dict[str, Any]) -> dict[str, Any]:
+    usage = _find_usage_object(response)
+    if not usage:
+        return {"provider_reported_usage": False}
+    safe: dict[str, Any] = {"provider_reported_usage": True}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens", "input_tokens", "output_tokens"):
+        value = usage.get(key)
+        if isinstance(value, (int, float)):
+            safe[key] = value
+    return safe
+
+
+def _find_usage_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        usage = value.get("usage")
+        if isinstance(usage, dict):
+            return usage
+        for item in value.values():
+            found = _find_usage_object(item)
+            if found:
+                return found
+    if isinstance(value, list):
+        for item in value:
+            found = _find_usage_object(item)
+            if found:
+                return found
+    return {}
+
+
+def _seedance_billing_hint(task: dict[str, Any], response: dict[str, Any]) -> dict[str, Any]:
+    usage = _safe_usage(response)
+    output_tokens = usage.get("output_tokens") or usage.get("completion_tokens")
+    if not isinstance(output_tokens, (int, float)):
+        return {
+            "provider_reported_cost": False,
+            "billing_mode": "output_tokens_if_reported",
+            "model": str(task.get("model") or ""),
+            "duration_sec": int(task.get("duration_sec") or 0),
+            "resolution": str(task.get("resolution") or ""),
+        }
+    return {
+        "provider_reported_cost": False,
+        "billing_mode": "output_tokens",
+        "model": str(task.get("model") or ""),
+        "duration_sec": int(task.get("duration_sec") or 0),
+        "resolution": str(task.get("resolution") or ""),
+        "output_tokens": output_tokens,
+    }
 
 
 def _task_id(response: dict[str, Any]) -> str:

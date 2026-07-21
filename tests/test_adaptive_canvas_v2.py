@@ -141,6 +141,38 @@ def test_paid_profile_is_a_profile_not_core_constant(tmp_path: Path, offline_ada
     assert workspace["final_demo"]["duration_sec"] >= 59.0
 
 
+def test_cinematic_media_profile_keeps_adaptive_workspace_contract(
+    tmp_path: Path,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
+    profile = replace(
+        real_anime_4shot_paid_profile(),
+        title="M6.2 cinematic paid media profile",
+        media_prompt_style="cinematic_live_action",
+        media_aspect_ratio="16:9",
+        video_motion="controlled live-action camera movement; preserve continuity",
+        media_negative_locks=("no logos", "no readable text", "no smoke"),
+    )
+
+    result = run_adaptive_canvas_production(
+        AdaptiveRunOptions(
+            runtime_root=tmp_path / "runtime",
+            project_id="m6-2-cinematic-profile",
+            run_id="run-001",
+            profile=profile,
+            mode="fake",
+        )
+    )
+
+    store = RuntimeStore(tmp_path / "runtime")
+    workspace = load_adaptive_workspace(store, project_id="m6-2-cinematic-profile", run_id="run-001")
+    assert result["status"] == "succeeded"
+    assert result["paid_attempt_count"] == 0
+    assert workspace["script"]["shot_count"] == profile.shot_count
+    assert workspace["assets"]["style_bible"] == profile.style_bible
+    assert workspace["provider_dispatch_count"] == 0
+
+
 def test_run_state_clears_current_error_after_recovery_and_preserves_audit_history(tmp_path: Path) -> None:
     path = tmp_path / "run_state.json"
     state = {
@@ -201,6 +233,87 @@ def test_failed_script_v1_is_preserved_and_script_v2_has_a_new_fingerprint(tmp_p
     assert new["service_id"] == "server_codex"
     assert new["candidate_id"] == "script-v2"
     assert old["charge_fingerprint"] != new["charge_fingerprint"]
+
+
+def test_charge_ledger_attempt_id_includes_fingerprint_for_prompt_retry(tmp_path: Path) -> None:
+    ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    old = ledger.reserve(
+        stage="video_chunk",
+        shot_id="shot-005",
+        chunk_id="chunk-01",
+        candidate_id="candidate-001",
+        capability="video",
+        service_id="seedance_i2v",
+        prompt="risky provider prompt",
+    )
+    ledger.mark_started(old["attempt_id"])
+    ledger.mark_failed(old["attempt_id"], RuntimeError("provider rejected prompt"))
+
+    new = ledger.reserve(
+        stage="video_chunk",
+        shot_id="shot-005",
+        chunk_id="chunk-01",
+        candidate_id="candidate-001",
+        capability="video",
+        service_id="seedance_i2v",
+        prompt="safe provider prompt",
+    )
+    ledger.mark_started(new["attempt_id"])
+
+    payload = read_json(ledger.path)
+    assert old["charge_fingerprint"] != new["charge_fingerprint"]
+    assert old["attempt_id"] != new["attempt_id"]
+    assert payload["attempts"][0]["status"] == "failed"
+    assert payload["attempts"][0]["safe_error"]["message"] == "provider rejected prompt"
+    assert payload["attempts"][1]["status"] == "started"
+    assert payload["attempts"][1].get("safe_error") is None
+
+
+def test_charge_ledger_rejects_completed_attempt_resurrection(tmp_path: Path) -> None:
+    ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    attempt = ledger.reserve(
+        stage="video_chunk",
+        shot_id="shot-005",
+        chunk_id="chunk-01",
+        candidate_id="candidate-001",
+        capability="video",
+        service_id="seedance_i2v",
+        prompt="provider prompt",
+    )
+    ledger.mark_started(attempt["attempt_id"])
+    ledger.mark_failed(attempt["attempt_id"], RuntimeError("provider rejected prompt"))
+
+    with pytest.raises(AdaptiveCanvasError, match="completed provider attempt cannot be restarted"):
+        ledger.mark_started(attempt["attempt_id"])
+    with pytest.raises(AdaptiveCanvasError, match="completed provider attempt cannot be marked submitted"):
+        ledger.mark_submitted(attempt["attempt_id"], provider_task_id="task-1", provider_poll_task={"task": {"task_id": "task-1"}})
+    with pytest.raises(AdaptiveCanvasError, match="failed provider attempt cannot be marked succeeded"):
+        ledger.mark_succeeded(attempt["attempt_id"], {"artifact_version_id": "a", "sha256": "b", "kind": "video"})
+
+    payload = read_json(ledger.path)
+    assert payload["paid_attempt_count"] == 1
+    assert payload["attempts"][0]["status"] == "failed"
+    assert payload["attempts"][0]["safe_error"]["message"] == "provider rejected prompt"
+
+
+def test_charge_ledger_submit_recovery_requires_task_id(tmp_path: Path) -> None:
+    ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    attempt = ledger.reserve(
+        stage="video_chunk",
+        shot_id="shot-005",
+        chunk_id="chunk-01",
+        candidate_id="candidate-001",
+        capability="video",
+        service_id="seedance_i2v",
+        prompt="provider prompt",
+    )
+    ledger.mark_started(attempt["attempt_id"])
+
+    with pytest.raises(AdaptiveCanvasError, match="provider task id is required"):
+        ledger.mark_submitted(attempt["attempt_id"], provider_task_id="", provider_poll_task={"task": {"task_id": ""}})
+
+    payload = read_json(ledger.path)
+    assert payload["attempts"][0]["status"] == "started"
 
 
 def _provider_script_v3_profile():
@@ -376,6 +489,78 @@ def test_script_v3_schema_digest_changes_charge_fingerprint(tmp_path: Path) -> N
     )
 
     assert first != second
+
+
+def test_video_attempt_resumes_submitted_task_without_second_provider_start(tmp_path: Path) -> None:
+    class ResumeRegistry:
+        def __init__(self) -> None:
+            self.submit_calls = 0
+            self.poll_calls = 0
+
+        def submit(self, capability: str, service_id: str, request: object) -> dict[str, object]:
+            self.submit_calls += 1
+            raise AssertionError("resumed video jobs must not submit a second provider request")
+
+        def poll(self, capability: str, service_id: str, task: dict[str, object]) -> dict[str, object]:
+            self.poll_calls += 1
+            assert capability == "video"
+            assert service_id == "seedance_i2v"
+            assert (task.get("task") or {}).get("task_id") == "task-123"
+            return {
+                "status": "succeeded",
+                "provider_calls_started": True,
+                "outputs": [{"candidate_id": "candidate_001", "video_path": "video_candidates/candidate_001.mp4"}],
+            }
+
+    profile = real_anime_4shot_paid_profile()
+    options = AdaptiveRunOptions(tmp_path / "runtime", "project", "run", profile, mode="real")
+    ledger = ChargeLedger(tmp_path / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
+    prompt = "safe video prompt"
+    attempt = ledger.reserve(
+        stage="video_chunk",
+        shot_id="shot-001",
+        chunk_id="chunk-01",
+        candidate_id="candidate-001",
+        capability="video",
+        service_id="seedance_i2v",
+        prompt=prompt,
+    )
+    ledger.mark_started(attempt["attempt_id"])
+    ledger.mark_submitted(
+        attempt["attempt_id"],
+        provider_task_id="task-123",
+        provider_poll_task={
+            "service_id": "seedance_i2v",
+            "capability": "video",
+            "task": {
+                "status": "submitted",
+                "task_id": "task-123",
+                "query_url_template": "https://provider.example/tasks/{id}",
+                "timeout_sec": 5.0,
+                "download_timeout_sec": 5.0,
+                "allowed_url_hosts": (".example",),
+                "output_dir": tmp_path / "provider_outputs",
+            },
+        },
+    )
+
+    registry = ResumeRegistry()
+    result = adaptive_canvas._real_video_attempt(
+        options,
+        ledger,
+        registry,
+        shot_id="shot-001",
+        chunk_id="chunk-01",
+        prompt=prompt,
+        first_frame=tmp_path / "first.png",
+        duration_sec=5,
+        output_dir=tmp_path / "provider_outputs",
+    )
+
+    assert result["status"] == "succeeded"
+    assert registry.submit_calls == 0
+    assert registry.poll_calls == 1
+    assert ledger.paid_attempt_count == 1
 
 
 def test_script_v3_parser_exception_marks_attempt_failed(tmp_path: Path, monkeypatch) -> None:
