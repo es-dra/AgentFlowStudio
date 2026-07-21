@@ -55,7 +55,7 @@ def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
 
 def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_assets() -> None:
     store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
-    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    startup = (STUDIO_ROOT / "src" / "studio-startup-project.js").read_text(encoding="utf-8")
     runtime_asset_sync = (STUDIO_ROOT / "src" / "runtime-asset-sync.js").read_text(encoding="utf-8")
     drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
     history_modal = (STUDIO_ROOT / "src" / "panels" / "history-modal.js").read_text(encoding="utf-8")
@@ -64,7 +64,7 @@ def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_asse
     assert "seedAssets()" not in store
     for placeholder in ("asset_director_seed", "asset_character_seed", "asset_keyframe_seed"):
         assert placeholder not in store
-    assert 'from "./runtime-asset-sync.js"' in main
+    assert 'from "./runtime-asset-sync.js"' in startup
     assert "assetStableKey" in runtime_asset_sync
     assert "mergeAsset" in runtime_asset_sync
     assert "visual_asset_id: asset.asset_id" in runtime_asset_sync

@@ -31,6 +31,7 @@ def test_overlay_modal_semantics_focus_trap_and_escape_gate_contract() -> None:
 def test_auth_status_failure_blocks_bootstrap_until_retry_confirms_status() -> None:
     auth_gate = _read("src/auth-gate.js")
     main = _read("src/main.js")
+    startup = _read("src/studio-startup-project.js")
 
     assert "showAuthStatusBlocked(runtime, options, error)" in auth_gate
     assert "auth_status_unknown: true" in auth_gate
@@ -43,7 +44,8 @@ def test_auth_status_failure_blocks_bootstrap_until_retry_confirms_status() -> N
 
     blocked_guard = "if (authState?.auth_status_unknown || authState?.blocked) return;"
     assert blocked_guard in main
-    assert main.index(blocked_guard) < main.index("await projectController.ensureAccessibleStartupProject()")
+    assert "await projectController.ensureAccessibleStartupProject()" in startup
+    assert main.index(blocked_guard) < main.index("await hydrateStartupProject({")
 
 
 def test_product_shell_does_not_render_sign_out_for_anonymous_local_runtime() -> None:

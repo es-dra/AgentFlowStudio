@@ -9,7 +9,6 @@ import {
 } from "./studio-project-session.js";
 import { el, showModal } from "./overlay.js";
 import { icon } from "./icons.js";
-import { formatRuntimeError } from "./runtime-error-utils.js";
 import {
   createProjectWithRetry,
   isTestProject,
@@ -17,6 +16,11 @@ import {
   reportProjectCreateClientError,
   reportProjectDeleteClientError,
 } from "./studio-project-runtime-ops.js";
+import {
+  emptyProjectRuntimeClient,
+  isReadOnlyProjectionProject,
+  safeProjectRuntimeError as safeError,
+} from "./studio-project-controller-policy.js";
 
 const EMPTY_PROJECT_ID = "studio-empty";
 
@@ -36,7 +40,10 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     rememberProject(safe);
     syncProjectUrl(safe);
     setRuntime(runtimeClient);
-    const switchResult = await store.switchProject(safe, runtimeClient);
+    const readOnlyProjection = isReadOnlyProjectionProject(safe, projectSummaries);
+    const switchResult = await store.switchProject(safe, runtimeClient, {
+      persistenceMode: readOnlyProjection ? "production_graph_read_only" : "studio_state",
+    });
     if (isProjectAccessDeniedError(switchResult?.error)) {
       if (recoverOnDenied) {
         await recoverProjectAccessDenied(switchResult.error);
@@ -51,8 +58,9 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
         if (!s.meta.canvasName) s.meta.canvasName = "画布 1";
       }, { history: false });
     }
-    await store.flushRuntimeSave();
-    if (syncAssets) {
+    if (readOnlyProjection) store.setRuntimePersistenceMode("production_graph_read_only");
+    else await store.flushRuntimeSave();
+    if (syncAssets && !readOnlyProjection) {
       await syncRuntimeAssets(store, runtimeClient);
     }
     await onProjectReady?.(runtimeClient);
@@ -74,6 +82,9 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     await refreshProjectSummaries();
     const runtime = getRuntime();
     if (projectSummaries.some((item) => item.project_id === runtime.projectId)) {
+      if (isReadOnlyProjectionProject(runtime.projectId, projectSummaries)) {
+        store.setRuntimePersistenceMode("production_graph_read_only");
+      }
       return;
     }
     if (projectSummaries.length) {
@@ -81,6 +92,12 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       return;
     }
     await showEmptyProjectState();
+  }
+
+  function currentProjectIsReadOnlyProjection() {
+    const runtime = getRuntime();
+    const currentId = runtime.projectId || store.get().meta.projectId;
+    return isReadOnlyProjectionProject(currentId, projectSummaries);
   }
 
   async function recoverProjectAccessDenied(error = null) {
@@ -217,6 +234,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     refreshProjectSummaries,
     ensureAccessibleStartupProject,
     recoverProjectAccessDenied,
+    currentProjectIsReadOnlyProjection,
     switchProject,
     createNewProject,
     deleteProject,
@@ -262,15 +280,6 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     }, { history: false, persist: false });
     render();
   }
-}
-
-function emptyProjectRuntimeClient() {
-  const runtime = createRuntimeClient(EMPTY_PROJECT_ID);
-  return {
-    ...runtime,
-    loadStudioState: null,
-    saveStudioState: null,
-  };
 }
 
 function requestProjectName(existingProjects = []) {
@@ -483,12 +492,4 @@ function showProjectDeleteSuccess(projectName, remainingCount = 0) {
   const close = showModal(modal);
   closeBtn.addEventListener("click", close);
   ok.addEventListener("click", close);
-}
-
-function safeError(error) {
-  const formatted = formatRuntimeError(error, "未知错误");
-  if (/network connection interrupted|Failed to fetch|Gateway timeout/i.test(formatted)) {
-    return "Runtime 连接短暂中断，请刷新项目列表后再重试。";
-  }
-  return formatted;
 }

@@ -22,6 +22,11 @@ from agentflow_studio.production.adaptive_canvas_v2 import (
     run_adaptive_canvas_production,
     seed_agent_authored_script_truth,
 )
+from agentflow_studio.production.media_operations_review import (
+    build_media_operations_command_preview,
+    load_media_operations_review,
+    media_file_path,
+)
 from agentflow_studio.production.real_anime_4shot import alternate_no_provider_profile, real_anime_4shot_paid_profile
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore, read_json
@@ -207,6 +212,107 @@ def test_cinematic_media_profile_keeps_adaptive_workspace_contract(
     assert workspace["script"]["shot_count"] == profile.shot_count
     assert workspace["assets"]["style_bible"] == profile.style_bible
     assert workspace["provider_dispatch_count"] == 0
+
+
+def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
+    tmp_path: Path,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
+    profile = replace(
+        real_anime_4shot_paid_profile(),
+        title="M6.3 operations contract profile",
+        media_negative_locks=("no logos", "no readable text"),
+    )
+    run_adaptive_canvas_production(
+        AdaptiveRunOptions(
+            runtime_root=tmp_path / "runtime",
+            project_id="m6-3-ops-profile",
+            run_id="run-001",
+            profile=profile,
+            mode="fake",
+        )
+    )
+
+    store = RuntimeStore(tmp_path / "runtime")
+    review = load_media_operations_review(store, project_id="m6-3-ops-profile", run_id="run-001")
+    serialized = json.dumps(review, ensure_ascii=False, sort_keys=True)
+
+    assert review["schema_version"] == "afs.media_operations_review.v0.1"
+    assert review["summary"]["shot_count"] == profile.shot_count
+    assert review["summary"]["graph_digest"]
+    assert review["shots"][0]["keyframe_url"].startswith("/projects/m6-3-ops-profile/adaptive-canvas-v2/media/keyframe/")
+    assert review["shots"][0]["video_url"].startswith("/projects/m6-3-ops-profile/adaptive-canvas-v2/media/shot-video/")
+    assert review["assets"]["reference_set"]["reference_sheet_url"].endswith("run_id=run-001")
+    assert review["provider_boundary"] == {
+        "browser_dispatch_count": 0,
+        "incremental_cost_usd": 0.0,
+        "uses_existing_paid_evidence": True,
+        "production_provider_gates_expected_closed": True,
+    }
+    assert review["commands"][0]["paid_until_confirmed"] is False
+    assert "not_human_creative_acceptance" in review["advanced_evidence"]["non_claims"]
+    assert not any(token in serialized.lower() for token in ("/home/", "/tmp/", "/var/", "api_key", "authorization", "bearer", "secret", ".mp4", ".png"))
+
+    preview = build_media_operations_command_preview(
+        store,
+        project_id="m6-3-ops-profile",
+        run_id="run-001",
+        action="local_redo_preview",
+        shot_id=review["shots"][0]["shot_id"],
+    )
+    assert preview["schema_version"] == "afs.media_operations_command_preview.v0.1"
+    assert preview["will_dispatch_provider_now"] is False
+    assert preview["will_mutate_now"] is False
+    assert preview["requires_explicit_charge_confirmation"] is True
+    assert len(preview["unaffected_shot_digests_preserved"]) == profile.shot_count - 1
+    assert preview["idempotency_key"].startswith("m6-3-")
+    assert "不会发起生成或产生费用" in preview["human_message"]
+    assert "Provider" not in preview["human_message"]
+
+
+def test_media_operations_preview_route_serves_only_known_runtime_media(
+    tmp_path: Path,
+    offline_adaptive_media: dict[Path, dict[str, object]],
+) -> None:
+    profile = real_anime_4shot_paid_profile()
+    run_adaptive_canvas_production(
+        AdaptiveRunOptions(
+            runtime_root=tmp_path / "runtime",
+            project_id="m6-3-route-profile",
+            run_id="run-001",
+            profile=profile,
+            mode="fake",
+        )
+    )
+    store = RuntimeStore(tmp_path / "runtime")
+    review = load_media_operations_review(store, project_id="m6-3-route-profile", run_id="run-001")
+    keyframe, image_type = media_file_path(
+        store,
+        project_id="m6-3-route-profile",
+        run_id="run-001",
+        media_kind="keyframe",
+        media_id=review["shots"][0]["shot_id"],
+    )
+    final, video_type = media_file_path(
+        store,
+        project_id="m6-3-route-profile",
+        run_id="run-001",
+        media_kind="final-video",
+        media_id="primary",
+    )
+
+    assert keyframe.is_file()
+    assert image_type == "image/png"
+    assert final.is_file()
+    assert video_type == "video/mp4"
+    with pytest.raises(KeyError):
+        media_file_path(
+            store,
+            project_id="m6-3-route-profile",
+            run_id="run-001",
+            media_kind="keyframe",
+            media_id="../../secret",
+        )
 
 
 def test_run_state_clears_current_error_after_recovery_and_preserves_audit_history(tmp_path: Path) -> None:
