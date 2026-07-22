@@ -10,6 +10,19 @@ import {
   undoAgentReceiptWithRuntime,
 } from "./agent-chat-lifecycle.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
+import {
+  applyEmbeddedCreativeAction,
+  cancelEmbeddedCreativeAction,
+  clearEmbeddedCreativeAction,
+  editEmbeddedCreativePreview,
+  startEmbeddedCreativeAction,
+} from "./embedded-creative-actions.js";
+import {
+  screenplayCandidateSummary,
+  shotPlanSummary,
+  taskPhaseLabel,
+  taskStateLabel,
+} from "./creative-task-contract.js";
 
 export function buildAgentChatPanel({
   session,
@@ -32,6 +45,8 @@ export function buildAgentChatPanel({
 
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
+  const taskReview = currentTaskReview({ store, runtime, onRender });
+  if (taskReview) body.appendChild(taskReview);
   body.appendChild(messageLog(session));
   if (session?.conversationRequest) body.appendChild(conversationStatus({ session, context, runtime, onRender }));
   if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, runtime, onRender }));
@@ -166,7 +181,9 @@ function commandPreview({ session, store, runtime, onRender }) {
     confirm.addEventListener("click", () => {
       command.status = "executing";
       onRender?.();
-      const run = command.execution_mode === "runtime"
+      const run = command.command_type === "start_embedded_creative_action"
+        ? executeEmbeddedCreativeCommand({ session, store, runtime, command })
+        : command.execution_mode === "runtime"
         ? executePendingAgentCommandWithRuntime(session, store, runtime)
         : Promise.resolve().then(() => {
           store.set((state) => executePendingAgentCommand(session, state));
@@ -187,6 +204,243 @@ function commandPreview({ session, store, runtime, onRender }) {
   actions.appendChild(cancel);
   preview.appendChild(actions);
   return preview;
+}
+
+async function executeEmbeddedCreativeCommand({ session, store, runtime, command }) {
+  const node = store?.get?.()?.nodes?.[command.node_id];
+  if (!node) throw new Error("selected node no longer exists");
+  session.pendingCommand = null;
+  pushAssistantMessage(session, `已在「${node.title || "当前节点"}」打开${command.action_type === "shot_breakdown" ? "分镜拆解" : "剧本化修订"}任务；结果会在当前任务区审阅，确认前不改动画布。`);
+  await startEmbeddedCreativeAction(store, runtime, node, command.action_type, { mode: command.mode });
+  return null;
+}
+
+function currentTaskReview({ store, runtime, onRender }) {
+  const state = store?.get?.() || {};
+  const node = selectedCanvasNode(state);
+  const action = node?.params?.embeddedCreativeAction;
+  if (!node || !action || action.status === "cancelled") return null;
+  const task = action.creative_task || {};
+  const wrap = el("section", `agent-current-task-review ${action.status || "idle"}`);
+  wrap.dataset.nodeId = node.id;
+  wrap.dataset.creativeAction = action.action_type || "script_revision";
+  const header = el("header", "agent-current-task-head");
+  header.append(
+    el("span", "eyebrow", "当前任务"),
+    el("strong", "", currentTaskTitle(action)),
+    el("small", "", `${taskStateLabel(task)} · ${taskPhaseLabel(task.phase || action.status || "queued")}`),
+  );
+  wrap.appendChild(header);
+  wrap.appendChild(taskPhaseList(task, action));
+  if (action.status === "running") {
+    wrap.appendChild(el("p", "agent-current-task-copy", action.message || "正在生成可审查预览；确认前不会写入画布。"));
+  } else if (action.status === "preview") {
+    wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action.preview?.shot_plan) : screenplayReview(action, store, node));
+  } else if (action.status === "unavailable") {
+    wrap.appendChild(el("p", "agent-current-task-error", action.message || action.error || "任务失败；当前节点没有改变。"));
+  } else if (action.status === "applied") {
+    wrap.appendChild(el("p", "agent-current-task-copy", action.message || "结果已应用；可以使用画布撤销恢复。"));
+    if (action.applied_subgraph) wrap.appendChild(appliedSubgraphSummary(action.applied_subgraph));
+  }
+  wrap.appendChild(currentTaskActions({ store, runtime, node, action, onRender }));
+  const evidence = currentTaskEvidence(action);
+  if (evidence) wrap.appendChild(evidence);
+  return wrap;
+}
+
+function currentTaskActions({ store, runtime, node, action, onRender }) {
+  const row = el("div", "agent-current-task-actions");
+  if (action.status === "preview") {
+    row.appendChild(taskButton("应用", "studio-primary-button", () => {
+      applyEmbeddedCreativeAction(store, node.id);
+      onRender?.();
+    }));
+    row.appendChild(taskButton("取消", "studio-secondary-button", () => {
+      cancelEmbeddedCreativeAction(store, node.id);
+      onRender?.();
+    }));
+  }
+  if (["preview", "unavailable"].includes(action.status)) {
+    row.appendChild(taskButton("重新生成", "studio-secondary-button", () => {
+      void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], action.action_type, { mode: action.mode })
+        .finally(() => onRender?.());
+      onRender?.();
+    }));
+  }
+  if (["running"].includes(action.status)) {
+    row.appendChild(taskButton("取消任务", "studio-secondary-button", () => {
+      cancelEmbeddedCreativeAction(store, node.id);
+      onRender?.();
+    }));
+  }
+  if (["unavailable", "applied"].includes(action.status)) {
+    row.appendChild(taskButton("收起", "studio-text-button", () => {
+      clearEmbeddedCreativeAction(store, node.id);
+      onRender?.();
+    }));
+  }
+  return row;
+}
+
+function screenplayReview(action, store, node) {
+  const preview = action.preview || {};
+  const wrap = el("div", "agent-screenplay-review");
+  const summary = screenplayCandidateSummary(preview.screenplay_candidate);
+  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.title} · ${summary.scene_count} 场 · ${summary.character_count} 名角色 · ${summary.dialogue_blocks} 段对白。`));
+  const diff = el("div", "agent-current-diff");
+  const before = el("section", "");
+  before.append(el("strong", "", "原文"), el("p", "", excerpt(action.source_text, 360)));
+  diff.appendChild(before);
+  const after = el("section", "");
+  after.appendChild(el("strong", "", "可编辑预览"));
+  const editor = document.createElement("textarea");
+  editor.className = "agent-current-task-editor";
+  editor.value = preview.revised_text || "";
+  editor.maxLength = 40000;
+  editor.rows = 10;
+  editor.setAttribute("aria-label", "编辑剧本化预览文本");
+  editor.addEventListener("input", () => editEmbeddedCreativePreview(store, node.id, editor.value));
+  after.appendChild(editor);
+  diff.appendChild(after);
+  wrap.appendChild(diff);
+  if (preview.screenplay_candidate) wrap.appendChild(screenplayCandidateView(preview.screenplay_candidate));
+  if (Array.isArray(preview.change_summary) && preview.change_summary.length) wrap.appendChild(simpleList("改动摘要", preview.change_summary));
+  if (preview.rationale) wrap.appendChild(el("p", "agent-current-task-copy", preview.rationale));
+  return wrap;
+}
+
+function screenplayCandidateView(candidate) {
+  const details = el("details", "agent-screenplay-candidate");
+  details.open = true;
+  details.appendChild(el("summary", "", "专业剧本结构"));
+  const meta = el("dl", "agent-current-task-kv");
+  for (const [label, value] of [
+    ["标题", candidate?.title],
+    ["版本", candidate?.version_label],
+    ["梗概", candidate?.logline],
+  ]) {
+    if (value) meta.append(el("dt", "", label), el("dd", "", value));
+  }
+  details.appendChild(meta);
+  const characters = Array.isArray(candidate?.characters) ? candidate.characters : [];
+  if (characters.length) {
+    details.appendChild(simpleList("角色目标/冲突/变化", characters.slice(0, 6).map((item) => `${item.name || "角色"}：目标 ${item.goal || "待定"}；冲突 ${item.conflict || "待定"}；变化 ${item.change || "待定"}`)));
+  }
+  const sceneWrap = el("div", "agent-screenplay-scenes");
+  (candidate?.scenes || []).slice(0, 5).forEach((scene, index) => {
+    const section = el("section", "");
+    section.appendChild(el("strong", "", `${index + 1}. ${scene.heading || scene.title || "场景"}`));
+    section.appendChild(el("p", "", `${scene.location || "地点待定"} · ${scene.time_of_day || "时间待定"} · ${scene.purpose || "场景目的待定"}`));
+    const blocks = el("ol", "");
+    (scene.blocks || []).slice(0, 8).forEach((block) => {
+      blocks.appendChild(el("li", "", `${screenplayBlockLabel(block.type)}${block.character ? ` / ${block.character}` : ""}：${block.text || ""}`));
+    });
+    section.appendChild(blocks);
+    sceneWrap.appendChild(section);
+  });
+  details.appendChild(sceneWrap);
+  return details;
+}
+
+function shotPlanReview(plan) {
+  const summary = shotPlanSummary(plan);
+  const wrap = el("div", "agent-shot-plan-review");
+  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 约 ${Math.round(summary.estimated_duration_sec)} 秒。应用后会创建可见候选分镜子图，确认前不写成最终制作事实。`));
+  const details = el("details", "agent-shot-plan-candidate");
+  details.open = true;
+  details.appendChild(el("summary", "", "分镜候选结构"));
+  (plan?.scenes || []).slice(0, 5).forEach((scene, sceneIndex) => {
+    const section = el("section", "");
+    section.appendChild(el("strong", "", `${sceneIndex + 1}. ${scene.title || "场景"}`));
+    section.appendChild(el("p", "", scene.purpose || "叙事目的待定"));
+    const list = el("ol", "");
+    (scene.shots || []).slice(0, 10).forEach((shot) => {
+      list.appendChild(el("li", "", `${shot.title || "镜头"} · ${Number(shot.duration_sec || 0)} 秒 · ${shot.shot_size || "景别"} · ${shot.camera_angle || "机位"} · ${shot.movement || "运动"} · ${shot.sound || "声音"} · ${shot.transition || "转场"} · ${shot.narrative_purpose || "目的"}`));
+    });
+    section.appendChild(list);
+    details.appendChild(section);
+  });
+  wrap.appendChild(details);
+  return wrap;
+}
+
+function appliedSubgraphSummary(subgraph) {
+  return simpleList("已创建候选子图", [
+    `${Number(subgraph.scene_count || 0)} 场 · ${Number(subgraph.shot_count || 0)} 镜头`,
+    `新增节点 ${Number(subgraph.created_node_ids?.length || 0)} 个，连线 ${Number(subgraph.created_edge_ids?.length || 0)} 条`,
+  ]);
+}
+
+function taskPhaseList(task, action) {
+  const phases = Array.isArray(task?.completed_phases) ? task.completed_phases : [];
+  const current = task?.phase || action?.status || "";
+  const line = el("ol", "agent-task-phases");
+  for (const phase of [...phases, current].filter(Boolean).slice(-5)) {
+    const item = el("li", phase === current ? "current" : "", taskPhaseLabel(phase));
+    line.appendChild(item);
+  }
+  return line;
+}
+
+function currentTaskEvidence(action) {
+  const lineage = action.provider_lineage || {};
+  if (!lineage.provider_calls_started && !action.latency_ms && !action.creative_task?.task_id) return null;
+  return evidenceDetails("高级证据", [
+    ["task_id", action.creative_task?.task_id],
+    ["node_version", action.creative_task?.node_version],
+    ["request_id", lineage.request_id],
+    ["model_surface", lineage.model_surface],
+    ["schema_digest", lineage.structured_output_schema_digest],
+    ["latency_ms", action.latency_ms ? Math.round(Number(action.latency_ms)) : ""],
+    ["cost_usd", `$${Number(action.cost_usd || 0).toFixed(4)}`],
+  ]);
+}
+
+function selectedCanvasNode(state) {
+  const nodeId = state?.selection?.nodeIds?.[0];
+  return nodeId ? state.nodes?.[nodeId] || null : null;
+}
+
+function currentTaskTitle(action) {
+  if (action.action_type === "shot_breakdown") return "动态分镜候选审阅";
+  return action.mode === "professional_screenplay" ? "剧本化扩写审阅" : "节点修订审阅";
+}
+
+function taskButton(label, className, onClick) {
+  const button = el("button", className, label);
+  button.type = "button";
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function simpleList(title, items) {
+  const wrap = el("section", "agent-current-list");
+  wrap.appendChild(el("strong", "", title));
+  const list = el("ul", "");
+  for (const item of (items || []).filter(Boolean)) list.appendChild(el("li", "", item));
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function screenplayBlockLabel(type) {
+  return {
+    action: "动作",
+    character: "人物",
+    dialogue: "对白",
+    parenthetical: "括注",
+    transition: "转场",
+  }[String(type || "")] || "文本";
+}
+
+function excerpt(value, limit) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text || "空";
+}
+
+function pushAssistantMessage(session, text) {
+  const messages = Array.isArray(session.messages) ? session.messages : [];
+  messages.push({ role: "assistant", text });
+  session.messages = messages.slice(-28);
 }
 
 function receiptList({ session, store, runtime, onRender }) {

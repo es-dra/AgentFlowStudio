@@ -23,7 +23,7 @@ from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
 
-EMBEDDED_CREATIVE_CONTRACT_ID = "afs.runtime.embedded_creative_action.v0.1"
+EMBEDDED_CREATIVE_CONTRACT_ID = "afs.runtime.embedded_creative_action.v0.2"
 EMBEDDED_CREATIVE_NON_CLAIMS = [
     "not_canvas_mutation_until_user_apply",
     "not_paid_image_video_generation",
@@ -117,6 +117,7 @@ def register_runtime_embedded_creative_action_routes(
                 "mode": result["mode"],
                 "action_type": body.action_type,
                 "target": result["target"],
+                "creative_task": result.get("creative_task") or {},
                 "preview": result.get("preview") or {},
                 "provider_lineage": result.get("provider_lineage") or {},
                 "graph_mutation": result["graph_mutation"],
@@ -145,6 +146,7 @@ def register_runtime_embedded_creative_action_routes(
             "mode": result["mode"],
             "action_type": body.action_type,
             "target": result["target"],
+            "creative_task": result.get("creative_task") or {},
             "preview": result.get("preview") or {},
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
@@ -167,6 +169,7 @@ def _preview_creative_action(
     graph_before: dict[str, Any],
 ) -> dict[str, Any]:
     gate = llm_provider_gate()
+    task_id = _creative_task_id(project_id, request)
     target = {
         "node_id": _safe_token(request.node_id, 160),
         "node_type": _safe_token(request.node_type, 80),
@@ -175,11 +178,11 @@ def _preview_creative_action(
         "scope": "selected_node_only" if request.action_type == "script_revision" else "selected_node_shot_plan",
     }
     if request.provider_service_id != SERVER_CODEX_SERVICE_ID:
-        return _unavailable_preview(project_id, request, gate, target, reason="unsupported_provider_service")
+        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="unsupported_provider_service")
     if gate.get("status") != "ready_not_run":
-        return _unavailable_preview(project_id, request, gate, target, reason="remote_llm_gate_closed")
+        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="remote_llm_gate_closed")
     if _contains_unsafe_fragment(request.source_text):
-        return _unavailable_preview(project_id, request, gate, target, reason="unsafe_source_text")
+        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="unsafe_source_text")
     schema = _creative_action_output_schema(request.action_type)
     schema_digest = structured_output_schema_digest(schema)
     try:
@@ -200,9 +203,9 @@ def _preview_creative_action(
         structured = provider_result.get("structured_output") if isinstance(provider_result, dict) else None
         preview = _validate_preview_payload(request, structured or {})
     except (ModelConfigError, ModelGatewayError):
-        return _unavailable_preview(project_id, request, gate, target, reason="llm_not_ready")
+        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="llm_not_ready")
     except ValueError:
-        return _unavailable_preview(project_id, request, gate, target, reason="unsafe_or_invalid_llm_preview")
+        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="unsafe_or_invalid_llm_preview")
     lineage = {
         "service_id": SERVER_CODEX_SERVICE_ID,
         "provider": "codex_local",
@@ -218,6 +221,14 @@ def _preview_creative_action(
         "mode": "llm",
         "target": target,
         "preview": preview,
+        "creative_task": _creative_task(
+            task_id,
+            project_id,
+            request,
+            state="preview_ready",
+            phase="preview_ready",
+            completed_phases=["queued", "context", "dispatching", "validating", "preview_ready"],
+        ),
         "provider_gate": gate,
         "provider_calls_started": True,
         "provider_lineage": lineage,
@@ -244,6 +255,9 @@ def _creative_action_output_schema(action_type: str) -> dict[str, Any]:
         "unresolved_decisions": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
         "quality_flags": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
     }
+    if action_type == "script_revision":
+        base_required.append("screenplay_candidate")
+        properties["screenplay_candidate"] = _screenplay_candidate_schema()
     if action_type == "shot_breakdown":
         base_required.append("shot_plan")
         properties["shot_plan"] = {
@@ -308,6 +322,69 @@ def _creative_action_output_schema(action_type: str) -> dict[str, Any]:
     }
 
 
+def _screenplay_candidate_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["title", "version_label", "logline", "characters", "scenes"],
+        "properties": {
+            "title": {"type": "string", "minLength": 2},
+            "version_label": {"type": "string", "minLength": 1},
+            "logline": {"type": "string", "minLength": 12},
+            "characters": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 12,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["name", "goal", "conflict", "change"],
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1},
+                        "goal": {"type": "string", "minLength": 4},
+                        "conflict": {"type": "string", "minLength": 4},
+                        "change": {"type": "string", "minLength": 4},
+                    },
+                },
+            },
+            "scenes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 12,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+            "required": ["heading", "space_type", "location", "time_of_day", "purpose", "blocks"],
+            "properties": {
+                "heading": {"type": "string", "minLength": 4},
+                "space_type": {"type": "string", "enum": ["内景", "外景", "INT.", "EXT."]},
+                "location": {"type": "string", "minLength": 2},
+                "time_of_day": {"type": "string", "minLength": 1},
+                "purpose": {"type": "string", "minLength": 6},
+                        "blocks": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 36,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": ["type", "text"],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["action", "character", "dialogue", "parenthetical", "transition"],
+                                    },
+                                    "text": {"type": "string", "minLength": 1},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
 def _creative_action_prompt(
     project_id: str,
     request: EmbeddedCreativeActionRequest,
@@ -337,6 +414,11 @@ def _creative_action_prompt(
             "必须使用用户给定原文和安全上下文，不允许关键词模板、固定大纲、固定4x15/10x6或空泛标题。",
             "如果是普通优化/改写，输出应保留同一节点身份；只有用户明确要求分支才可建议分支。",
             "中文输出，内容必须可拍、可审、可继续拆分。",
+            "如果动作是 script_revision，必须输出 screenplay_candidate：片名/版本/logline、角色目标冲突变化、按场排序的场景标题、地点、时间、动作、人物名、对白、转场；不要只写散文故事。",
+            "screenplay_candidate.scenes[].space_type 必须是 内景、外景、INT. 或 EXT.；heading 必须以 内景 -、外景 -、INT. 或 EXT. 开头，禁止“内景/外景待定”、数字标题或散文小标题。",
+            "每个场景标题必须包含空间类型、地点、时间三段，例如“内景 - 旧摄影棚 - 夜”；人物名提示后必须在同一场景内接对白，可夹一个括号提示，禁止悬空人物名。",
+            "revised_text 只是 screenplay_candidate 的可读投影；镜头和摄影语言只在 shot_breakdown 里使用，不要混进文学剧本文本。",
+            "如果动作是 shot_breakdown，只输出可审查分镜候选，不创建图片、不生成关键帧。",
             "不要输出内部路径、端口、provider raw、密钥、请求头、schema 名称或调度细节。",
             f"项目：{project_id}",
             f"节点：{request.node_id} / {request.node_type}",
@@ -377,8 +459,168 @@ def _validate_preview_payload(request: EmbeddedCreativeActionRequest, value: dic
         if not isinstance(plan, dict):
             raise ValueError("shot plan is missing")
         preview["shot_plan"] = _safe_shot_plan(plan)
+    if request.action_type == "script_revision":
+        candidate = value.get("screenplay_candidate")
+        if not isinstance(candidate, dict):
+            raise ValueError("screenplay candidate is missing")
+        safe_candidate = _safe_screenplay_candidate(candidate)
+        preview["screenplay_candidate"] = safe_candidate
+        preview["revised_text"] = _screenplay_text_projection(safe_candidate)
     reject_unsafe_payload(preview)
     return preview
+
+
+def _safe_screenplay_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    # A long prose story must fail this gate unless it is backed by typed screenplay scenes.
+    characters = []
+    for item in candidate.get("characters") or []:
+        if not isinstance(item, dict):
+            continue
+        character = {
+            "name": _safe_text(item.get("name"), 80),
+            "goal": _safe_text(item.get("goal"), 180),
+            "conflict": _safe_text(item.get("conflict"), 180),
+            "change": _safe_text(item.get("change"), 180),
+        }
+        if all(character.values()):
+            characters.append(character)
+    scenes = []
+    has_dialogue = False
+    has_action = False
+    for scene in candidate.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        blocks = []
+        for block in scene.get("blocks") or []:
+            if not isinstance(block, dict):
+                continue
+            block_type = _safe_token(block.get("type"), 32)
+            text = _safe_text(block.get("text"), 600)
+            if block_type not in {"action", "character", "dialogue", "parenthetical", "transition"} or not text:
+                continue
+            if block_type == "dialogue":
+                has_dialogue = True
+            if block_type == "action":
+                has_action = True
+            blocks.append({"type": block_type, "text": text})
+        if not _valid_screenplay_block_flow(blocks):
+            continue
+        location = _safe_text(scene.get("location"), 120)
+        time_of_day = _safe_text(scene.get("time_of_day"), 80)
+        space_type = _safe_space_type(scene.get("space_type"))
+        safe_scene = {
+            "heading": _safe_scene_heading(scene.get("heading"), space_type=space_type, location=location, time_of_day=time_of_day),
+            "space_type": space_type,
+            "location": location,
+            "time_of_day": time_of_day,
+            "purpose": _safe_text(scene.get("purpose"), 220),
+            "blocks": blocks[:36],
+        }
+        if safe_scene["heading"] and safe_scene["space_type"] and safe_scene["location"] and safe_scene["time_of_day"] and safe_scene["purpose"] and len(safe_scene["blocks"]) >= 2:
+            scenes.append(safe_scene)
+    if not characters or not scenes or not has_action:
+        raise ValueError("screenplay candidate lacks professional scene/action structure")
+    if not has_dialogue and len(characters) > 1:
+        raise ValueError("screenplay candidate lacks dialogue for multi-character material")
+    return {
+        "schema_version": "afs.screenplay_candidate.v0.1",
+        "title": _safe_text(candidate.get("title"), 120) or "未命名剧本",
+        "version_label": _safe_text(candidate.get("version_label"), 80) or "v1",
+        "logline": _safe_text(candidate.get("logline"), 360),
+        "characters": characters[:12],
+        "scenes": scenes[:12],
+    }
+
+
+def _safe_space_type(value: Any) -> str:
+    text = _safe_text(value, 16).upper()
+    if text in {"INT.", "INT"}:
+        return "INT."
+    if text in {"EXT.", "EXT"}:
+        return "EXT."
+    if str(value or "").strip() in {"内景", "外景"}:
+        return str(value).strip()
+    return ""
+
+
+def _safe_scene_heading(value: Any, *, space_type: str, location: str, time_of_day: str) -> str:
+    text = _safe_text(value, 160)
+    if space_type and location and time_of_day:
+        fallback = f"{space_type} - {location} - {time_of_day}"
+    else:
+        fallback = ""
+    if not text:
+        return fallback
+    upper = text.upper()
+    if "内景/外景待定" in text or upper.startswith(("1.", "2.", "3.", "4.", "5.", "6.")):
+        return fallback
+    normalized = text.replace("—", "-").replace("－", "-")
+    parts = [part.strip() for part in normalized.split("-") if part.strip()]
+    if parts and parts[0] in {"内景", "外景"}:
+        if len(parts) >= 3:
+            return f"{parts[0]} - {parts[1]} - {parts[2]}"
+        return fallback
+    if upper.startswith(("INT.", "EXT.")):
+        if len(parts) >= 2 and parts[-1]:
+            return text
+        return fallback
+    return ""
+
+
+def _valid_screenplay_block_flow(blocks: list[dict[str, str]]) -> bool:
+    if not blocks:
+        return False
+    expecting_dialogue = False
+    for block in blocks:
+        block_type = block.get("type")
+        if block_type == "character":
+            if expecting_dialogue:
+                return False
+            expecting_dialogue = True
+        elif block_type == "parenthetical":
+            if not expecting_dialogue:
+                return False
+        elif block_type == "dialogue":
+            if not expecting_dialogue:
+                return False
+            expecting_dialogue = False
+        elif block_type in {"action", "transition"}:
+            if expecting_dialogue:
+                return False
+        else:
+            return False
+    return not expecting_dialogue
+
+
+def _screenplay_text_projection(candidate: dict[str, Any]) -> str:
+    lines = [
+        f"《{candidate.get('title') or '未命名剧本'}》",
+        f"版本：{candidate.get('version_label') or 'v1'}",
+        f"一句话梗概：{candidate.get('logline') or ''}",
+        "",
+        "角色",
+    ]
+    for character in candidate.get("characters") or []:
+        lines.append(
+            f"- {character.get('name') or '角色'}：目标 {character.get('goal') or '待定'}；"
+            f"冲突 {character.get('conflict') or '待定'}；变化 {character.get('change') or '待定'}"
+        )
+    for scene in candidate.get("scenes") or []:
+        lines.extend(["", scene.get("heading") or "场景", f"场景目的：{scene.get('purpose') or '待定'}", ""])
+        for block in scene.get("blocks") or []:
+            block_type = block.get("type")
+            text = block.get("text") or ""
+            if block_type == "action":
+                lines.extend([text, ""])
+            elif block_type == "character":
+                lines.append(text)
+            elif block_type == "dialogue":
+                lines.extend([text, ""])
+            elif block_type == "parenthetical":
+                lines.append(f"（{text.strip('（）()')}）")
+            elif block_type == "transition":
+                lines.extend([f"转场：{text}", ""])
+    return "\n".join(lines).strip()
 
 
 def _safe_shot_plan(plan: dict[str, Any]) -> dict[str, Any]:
@@ -427,6 +669,7 @@ def _unavailable_preview(
     gate: dict[str, str],
     target: dict[str, Any],
     *,
+    task_id: str,
     reason: str,
 ) -> dict[str, Any]:
     preview = {
@@ -443,10 +686,62 @@ def _unavailable_preview(
         "mode": "unavailable",
         "target": target,
         "preview": preview,
+        "creative_task": _creative_task(
+            task_id,
+            project_id,
+            request,
+            state="failed",
+            phase="failed",
+            completed_phases=["queued", "context"],
+            error_owner="llm_provider",
+            error_category=reason,
+        ),
         "provider_gate": gate,
         "provider_calls_started": False,
         "safe_manifest": _safe_manifest(project_id, request, gate, target, mode="unavailable", fallback_reason=reason),
     }
+
+
+def _creative_task_id(project_id: str, request: EmbeddedCreativeActionRequest) -> str:
+    return "_".join([
+        "creative_task",
+        _safe_token(project_id, 80) or "project",
+        _safe_token(request.node_id, 80) or "node",
+        _safe_token(request.action_type, 40) or "action",
+        str(int(time.time() * 1000)),
+    ])
+
+
+def _creative_task(
+    task_id: str,
+    project_id: str,
+    request: EmbeddedCreativeActionRequest,
+    *,
+    state: str,
+    phase: str,
+    completed_phases: list[str],
+    error_owner: str = "",
+    error_category: str = "",
+) -> dict[str, Any]:
+    task = {
+        "schema_version": "afs.creative_task.v0.1",
+        "task_id": task_id,
+        "project_id": project_id,
+        "node_id": request.node_id,
+        "node_type": request.node_type,
+        "action_type": request.action_type,
+        "mode": request.mode,
+        "state": state,
+        "phase": phase,
+        "completed_phases": completed_phases,
+        "cancel_requested": False,
+        "idempotency_key": f"{project_id}:{request.node_id}:{request.action_type}:{request.generated_at}",
+        "result_scope": "same_node_revision" if request.action_type == "script_revision" else "candidate_storyboard_subgraph",
+        "error_owner": error_owner,
+        "error_category": error_category,
+    }
+    reject_unsafe_payload(task)
+    return task
 
 
 def _safe_manifest(

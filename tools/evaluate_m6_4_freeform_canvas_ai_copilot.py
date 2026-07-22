@@ -40,7 +40,7 @@ SOURCE_CONTRACTS = (
         "scope": "revision_semantics",
         "issue": "ordinary optimize must not create a script-version node or canned local template",
         "path": "apps/studio/src/agent-chat-lifecycle.js",
-        "must_include": ("revise_selected_node", "不会用本地固定模板冒充专业修订", "fork_selected_node"),
+        "must_include": ("start_embedded_creative_action", "same_node_revision_preview", "fork_selected_node"),
         "must_exclude": ("核心意图", "叙事推进", "制作优化"),
     },
     {
@@ -188,12 +188,13 @@ const state = {
 
 const beforeNodeCount = state.order.length;
 const optimizePreview = submitAgentChatMessage(session, '优化当前文本', context);
-assert(optimizePreview.status === 'blocked', 'global optimize must not use the old local template path');
-assert(session.pendingCommand?.command_type === 'revise_selected_node', 'ordinary optimize must stay same-node scoped');
-assert(!optimizePreview.command.after_text, 'blocked optimize must not carry canned after_text');
-assert(String(optimizePreview.command.error_message || '').includes('不会用本地固定模板'), 'blocked optimize must explain the honest node-local route');
-assert(state.order.length === beforeNodeCount, 'blocked optimize must not create a node');
-assert(!state.nodes.node_1.params.revisions, 'blocked optimize must not create revision history');
+assert(optimizePreview.status === 'preview', 'global optimize must open a typed embedded task preview');
+assert(session.pendingCommand?.command_type === 'start_embedded_creative_action', 'ordinary optimize must use the same embedded task contract');
+assert(session.pendingCommand?.action_type === 'script_revision', 'ordinary optimize must stay same-node scoped');
+assert(session.pendingCommand?.impact?.relation === 'same_node_revision_preview', 'ordinary optimize must declare same-node preview scope');
+assert(!optimizePreview.command.after_text, 'embedded optimize preview must not carry canned after_text');
+assert(state.order.length === beforeNodeCount, 'optimize preview must not create a node');
+assert(!state.nodes.node_1.params.revisions, 'optimize preview must not create revision history');
 
 const forkPreview = submitAgentChatMessage(session, '创建分支版本：换成哥哥视角', context);
 assert(forkPreview.status === 'preview', 'fork must return preview');

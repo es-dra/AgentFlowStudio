@@ -27,6 +27,7 @@ import {
 } from "./asset-revision-references.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 import { startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
+import { activeEmbeddedTask } from "./creative-task-contract.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
@@ -35,7 +36,11 @@ export function renderPromptBar(state, store, runtime) {
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
   const graphReadOnly = node?.params?.productionGraphProjection || node?.params?.productionGraphLegacyProjection;
-  const show = node && !graphReadOnly && PROMPT_NODE_TYPES.has(node.type) && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
+  const show = node
+    && !graphReadOnly
+    && !activeEmbeddedTask(node)
+    && PROMPT_NODE_TYPES.has(node.type)
+    && (isEditableTextPromptNode(node) || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {

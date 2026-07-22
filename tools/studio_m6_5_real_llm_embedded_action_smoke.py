@@ -31,7 +31,7 @@ from tools.studio_asset_context_browser_qa_support import free_port, stop_runtim
 DEFAULT_EVIDENCE_BASE = Path(
     "/home/afs-ops/.codex/afs-evidence/afs-m6-5-embedded-creative-action-ux-20260722"
 )
-LLM_MODEL = "gpt-5.3-codex-spark"
+LLM_MODEL = "gpt-5.5"
 LLM_REASONING_EFFORT = "medium"
 LLM_GATE = "AFS_ALLOW_REMOTE_LLM"
 NON_LLM_GATES = (

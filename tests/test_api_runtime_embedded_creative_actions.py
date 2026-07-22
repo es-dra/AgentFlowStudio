@@ -84,6 +84,42 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
                     "rationale": "这版把短想法扩写成可继续拆分的戏剧场面，同时保留同一节点身份。",
                     "unresolved_decisions": ["是否加入唐僧旁观反应"],
                     "quality_flags": ["preview_only"],
+                    "screenplay_candidate": {
+                        "title": "花果山误会",
+                        "version_label": "v1",
+                        "logline": "孙悟空误会猪八戒偷吃供果，两人从嬉闹冲突转向发现妖怪踪迹后的默契联手。",
+                        "characters": [
+                            {
+                                "name": "孙悟空",
+                                "goal": "查清供果失踪并保护师父",
+                                "conflict": "急躁误判八戒，几乎错过真正妖怪线索",
+                                "change": "从追问压迫转为听取解释并主动联手",
+                            },
+                            {
+                                "name": "猪八戒",
+                                "goal": "证明自己没有偷吃并保住最后一篮供果",
+                                "conflict": "馋嘴名声让解释缺乏可信度",
+                                "change": "从躲闪辩解转为指出妖气并配合行动",
+                            },
+                        ],
+                        "scenes": [
+                            {
+                                "heading": "外景 - 花果山果林 - 傍晚",
+                                "space_type": "外景",
+                                "location": "花果山果林",
+                                "time_of_day": "傍晚",
+                                "purpose": "建立误会、关系冲突和转向联手的线索",
+                                "blocks": [
+                                    {"type": "action", "text": "空篮倒在石阶旁，桃核滚进草丛，孙悟空握紧金箍棒逼近猪八戒。"},
+                                    {"type": "character", "text": "孙悟空"},
+                                    {"type": "dialogue", "text": "呆子，供果少了三颗，你还敢护着篮子？"},
+                                    {"type": "character", "text": "猪八戒"},
+                                    {"type": "dialogue", "text": "猴哥，我只闻了闻，真动手的是林子里那股腥风。"},
+                                    {"type": "action", "text": "两人的追打戛然而止，枝头黑影掠过，八戒把篮子递回，悟空抬眼锁定妖气。"},
+                                ],
+                            }
+                        ],
+                    },
                 },
             }
 
@@ -105,8 +141,11 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     assert payload["provider_calls_started"] is True
     assert payload["provider_lineage"]["service_id"] == "server_codex"
     assert payload["provider_lineage"]["provider"] == "codex_local"
-    assert payload["provider_lineage"]["structured_output_contract_id"] == "afs.runtime.embedded_creative_action.v0.1"
-    assert payload["preview"]["revised_text"].startswith("花果山傍晚")
+    assert payload["provider_lineage"]["structured_output_contract_id"] == "afs.runtime.embedded_creative_action.v0.2"
+    assert payload["preview"]["revised_text"].startswith("《花果山误会》")
+    assert "外景 - 花果山果林 - 傍晚" in payload["preview"]["revised_text"]
+    assert payload["preview"]["screenplay_candidate"]["scenes"][0]["heading"].startswith("外景")
+    assert payload["preview"]["screenplay_candidate"]["scenes"][0]["space_type"] == "外景"
     assert payload["graph_mutation"]["mutated"] is False
     after = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert after["version"] == before["version"]
@@ -114,11 +153,102 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     assert calls and calls[0][0] == "llm"
     assert calls[0][1] == "server_codex"
     request = calls[0][2]
-    assert request.structured_output_contract_id == "afs.runtime.embedded_creative_action.v0.1"
+    assert request.structured_output_contract_id == "afs.runtime.embedded_creative_action.v0.2"
     assert request.structured_output_schema_digest
     assert "不修改画布" in request.prompt
     assert "孙悟空大战猪八戒" in request.prompt
     assert "固定4x15/10x6" in request.prompt
+    assert "screenplay_candidate" in request.prompt
+
+
+def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "script_revision",
+                    "mode": "professional_expansion",
+                    "revised_text": "孙悟空和猪八戒在花果山发生冲突，后来发现妖怪踪迹并联手追击。这个故事强调误会和伙伴关系。",
+                    "change_summary": ["只有散文扩写", "没有专业剧本结构"],
+                    "rationale": "这是一段散文故事，不是剧本候选。",
+                    "unresolved_decisions": [],
+                    "quality_flags": ["prose_only"],
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-action-prose-rejected"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "unavailable"
+    assert payload["provider_calls_started"] is False
+    assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
+    assert payload["creative_task"]["error_category"] == "unsafe_or_invalid_llm_preview"
+
+
+def test_embedded_script_revision_rejects_dangling_character_cue(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "script_revision",
+                    "mode": "professional_expansion",
+                    "revised_text": "《停机之后》\n内景 - 旧摄影棚 - 夜\n林澈\n\n下一场继续。",
+                    "change_summary": ["尝试输出剧本格式", "但人物提示悬空"],
+                    "rationale": "这段结果故意留下悬空人物名，应该被安全验证拒绝。",
+                    "unresolved_decisions": [],
+                    "quality_flags": ["dangling_character_cue"],
+                    "screenplay_candidate": {
+                        "title": "停机之后",
+                        "version_label": "v1",
+                        "logline": "导演与制片人在停电摄影棚里围绕是否继续拍摄发生冲突。",
+                        "characters": [
+                            {"name": "林澈", "goal": "拍完最后一条", "conflict": "被预算和停电影响", "change": "从执拗转为承担风险"},
+                            {"name": "许岚", "goal": "控制预算和安全", "conflict": "必须阻止导演冒险", "change": "从否决转为要求边界"},
+                        ],
+                        "scenes": [{
+                            "heading": "内景 - 旧摄影棚 - 夜",
+                            "space_type": "内景",
+                            "location": "旧摄影棚",
+                            "time_of_day": "夜",
+                            "purpose": "建立导演与制片人的正面冲突",
+                            "blocks": [
+                                {"type": "action", "text": "停电后的摄影棚只剩应急灯，林澈盯着黑屏。"},
+                                {"type": "character", "text": "林澈"},
+                                {"type": "action", "text": "许岚把预算表放到监视器旁，示意所有人收工。"},
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-action-dangling-cue-rejected"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(source_text="林澈和许岚在停电摄影棚争执是否继续拍。"),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "unavailable"
+    assert payload["provider_calls_started"] is False
+    assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
 
 
 def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(tmp_path, monkeypatch) -> None:

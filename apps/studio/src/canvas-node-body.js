@@ -8,6 +8,7 @@ import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
+import { screenplayCandidateSummary, shotPlanSummary, taskPhaseLabel, taskStateLabel } from "./creative-task-contract.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -193,8 +194,8 @@ function embeddedCreativeActionPanel(node) {
   if (action.status === "needs_input") panel.appendChild(actionButtons(action, { clear: true }));
   if (action.status === "unavailable") panel.appendChild(actionButtons(action, { retry: true, clear: true }));
   if (action.status === "preview") {
-    panel.appendChild(creativePreview(action));
-    panel.appendChild(actionButtons(action, { apply: true, cancel: true, retry: true }));
+    panel.appendChild(compactCreativeTaskResult(action));
+    panel.appendChild(actionButtons(action, { cancel: true, retry: true, reviewHint: true }));
   }
   if (action.status === "applied") panel.appendChild(actionButtons(action, { clear: true, undoHint: true }));
   return panel;
@@ -205,6 +206,27 @@ function progressStrip(label) {
   strip.className = "embedded-creative-progress";
   strip.innerHTML = `<span class="spinner"></span><span>${escapeHtml(label)}</span>`;
   return strip;
+}
+
+function compactCreativeTaskResult(action) {
+  const preview = action.preview || {};
+  const task = action.creative_task || {};
+  const wrap = document.createElement("div");
+  wrap.className = "embedded-creative-compact-result";
+  const label = document.createElement("strong");
+  label.textContent = taskStateLabel(task);
+  const phase = document.createElement("span");
+  phase.textContent = `阶段：${taskPhaseLabel(task.phase || "preview_ready")}`;
+  wrap.append(label, phase);
+  if (preview.screenplay_candidate) {
+    const summary = screenplayCandidateSummary(preview.screenplay_candidate);
+    wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.character_count} 角色 · ${summary.dialogue_blocks} 段对白`));
+  } else if (preview.shot_plan) {
+    const summary = shotPlanSummary(preview.shot_plan);
+    wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 约 ${Math.round(summary.estimated_duration_sec)} 秒`));
+  }
+  wrap.appendChild(textBlock("embedded-creative-compact-line", "完整预览、差异、应用和取消在右侧 AI 创作搭档中审阅。"));
+  return wrap;
 }
 
 function creativePreview(action) {
@@ -301,6 +323,11 @@ function actionButtons(action, flags = {}) {
     row.appendChild(retry);
   }
   if (flags.clear) row.appendChild(actionButton("embedded-creative-clear", "收起", "studio-text-button"));
+  if (flags.reviewHint) {
+    const hint = document.createElement("small");
+    hint.textContent = "请在右侧审阅后应用。";
+    row.appendChild(hint);
+  }
   if (flags.undoHint) {
     const hint = document.createElement("small");
     hint.textContent = "本次应用已进入画布历史，可用撤销恢复。";

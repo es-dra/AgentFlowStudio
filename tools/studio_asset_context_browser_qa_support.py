@@ -140,7 +140,7 @@ def make_studio_static_route(repo: Path):
 
     def route_studio_static(route: Any) -> None:
         parsed = urlsplit(route.request.url)
-        relative = parsed.path.removeprefix("/studio/").replace("/", "\\")
+        relative = parsed.path.removeprefix("/studio/").lstrip("/")
         path = (studio_root / relative).resolve()
         try:
             path.relative_to(studio_root)

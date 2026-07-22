@@ -694,6 +694,16 @@ function previewAgentCommand(message, context = {}) {
     });
   }
 
+  if (/^\/screenplay-selected$/i.test(message) || /^把当前节点剧本化$/i.test(message) || /^剧本化当前节点$/i.test(message)) {
+    return embeddedCreativeActionCommand({
+      context,
+      actionType: "script_revision",
+      mode: "professional_screenplay",
+      title: "剧本化扩写当前节点",
+      summary: "确认后在当前节点打开真实 LLM 剧本化任务；预览、diff、应用和取消都绑定同一节点，不创建新节点。",
+    });
+  }
+
   if (/^\/optimize-selected-default$/i.test(message) || /^默认优化(?:当前)?文本$/i.test(message) || /^优化当前文本$/i.test(message)) {
     return scriptOptimizationCommand({
       context,
@@ -1017,22 +1027,54 @@ function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary
 }
 
 function scriptOptimizationCommand({ context, mode }) {
+  return embeddedCreativeActionCommand({
+    context,
+    actionType: "script_revision",
+    mode: mode === "default" ? "professional_expansion" : "instructed_revision",
+    title: mode === "default" ? "优化当前节点" : "按要求优化当前节点",
+    summary: "确认后在当前节点打开真实 LLM 修订任务；结果先审阅，应用后只更新同一节点修订历史。",
+  });
+}
+
+function embeddedCreativeActionCommand({ context, actionType, mode, title, summary }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("revise_selected_node", "优化当前节点", "故事板是只读投影。请切回画布后再优化文本。", context);
+    return blockedCommand("start_embedded_creative_action", title, "故事板是只读投影。请切回画布后再启动节点内 AI 动作。", context);
   }
-  if (!["text", "script"].includes(context.selected_node_type)) {
-    return blockedCommand("revise_selected_node", "优化当前节点", "请先选择一个文本或脚本节点。", context);
+  const allowedTypes = actionType === "shot_breakdown" ? ["text", "script", "sequence", "scene"] : ["text", "script"];
+  if (!allowedTypes.includes(context.selected_node_type)) {
+    return blockedCommand("start_embedded_creative_action", title, "请先选择一个可写的文本、剧本、场景或镜头相关节点。", context);
   }
   const sourceText = cleanSourceText(context.selected_node_text, 12000);
   if (!sourceText) {
-    return blockedCommand("revise_selected_node", "优化当前节点", "当前文本节点还没有内容。", context);
+    return blockedCommand("start_embedded_creative_action", title, "当前节点在制作图中的正文为空；请先输入内容。", context);
   }
-  return blockedCommand(
-    "revise_selected_node",
-    mode === "default" ? "默认优化文本" : "按要求优化文本",
-    "节点文本优化现在需要通过当前节点内的 AI 预览生成真实改写；不会用本地固定模板冒充专业修订。请点击节点上的“优化”。",
-    context,
-  );
+  const commandId = `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: commandId,
+    command_type: "start_embedded_creative_action",
+    execution_mode: "embedded_creative_action",
+    status: "preview",
+    title,
+    summary,
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    node_id: cleanToken(context.selected_node_id, 120),
+    action_type: actionType,
+    mode,
+    source_digest: cleanToken(context.studio_state_revision_id, 80),
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: actionType === "shot_breakdown" ? "visible_candidate_storyboard_subgraph" : "same_node_revision_preview",
+      storyboard_write: actionType === "shot_breakdown",
+    },
+    requires_confirmation: true,
+    provider_label: "server_codex 文本模型",
+    tool_label: "节点内 AI 动作",
+    cost_label: "外部付费 $0；确认后才调用文本模型",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
 }
 
 function createCanvasNodeCommand(context, intent) {
@@ -1354,38 +1396,13 @@ function storyPlanCandidateCommand({ context, candidate }) {
 }
 
 function storyPlanRequestCommand(context) {
-  if (context?.section === "storyboard_read_only") {
-    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "故事板是只读投影。请切回画布后再请求动态分镜。", context);
-  }
-  if (!["text", "script"].includes(context.selected_node_type)) {
-    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "请先选择一个文本或脚本节点。", context);
-  }
-  if (!context.script_revision_id || !context.script_source_digest) {
-    return blockedCommand("request_story_plan_candidate", "自动拆分分镜", "请先把当前文本创建为剧本版本；动态分镜必须绑定可追溯的剧本版本。", context);
-  }
-  return {
-    schema_version: SCHEMA_VERSION,
-    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    command_type: "request_story_plan_candidate",
-    execution_mode: "runtime",
-    status: "preview",
+  return embeddedCreativeActionCommand({
+    context,
+    actionType: "shot_breakdown",
+    mode: "dynamic_shot_breakdown",
     title: "自动拆分分镜",
-    summary: "检查当前剧本版本是否已有可信动态分镜候选；没有可信候选时返回待规划，需要智能规划器生成候选。",
-    context_key: agentChatContextKey(context),
-    project_id: cleanToken(context.project_id, 120),
-    revision_id: cleanToken(context.script_revision_id, 140),
-    script_revision_id: cleanToken(context.script_revision_id, 140),
-    source_digest: cleanToken(context.script_source_digest, 80),
-    planning_state: "planning_required",
-    impact: {
-      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
-      relation: "script_revision_to_story_plan_candidate_request",
-      storyboard_write: false,
-    },
-    requires_confirmation: true,
-    remote_dispatch_count: 0,
-    provider_dispatch_count: 0,
-  };
+    summary: "确认后在当前节点打开真实 LLM 分镜任务；预览完成后可见候选分镜子图，应用前不写最终制作事实。",
+  });
 }
 
 function m3ContextPackCommand(context, instruction) {
@@ -2094,6 +2111,7 @@ function userCommandDisplayText(command, fallbackText) {
   if (type === "change_edge_relation") return "调整连线关系";
   if (type === "delete_selected_edge") return "删除当前连线";
   if (type === "preview_generation_from_selected") return command.title || "预览生成命令";
+  if (type === "start_embedded_creative_action") return command.title || "启动节点内 AI 动作";
   if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
   if (type === "request_story_plan_candidate") return "自动拆分分镜";
   if (type === "build_m3_context_pack") return "构建精准上下文包";
