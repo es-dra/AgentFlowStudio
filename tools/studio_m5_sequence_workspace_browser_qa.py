@@ -209,7 +209,9 @@ def assert_graph_lifecycle(page: Page, base_url: str) -> dict[str, Any]:
     run_drawer_action(page, "选择最新候选"); run_drawer_action(page, "退回修改"); run_drawer_action(page, "安排返工"); run_drawer_action(page, "提交交付核验")
     page.get_by_role("tab", name="故事板").click(); page.get_by_role("button", name="预览修改影响").click()
     expect(page.locator(".agent-command-preview")).to_contain_text("确认镜头局部修改")
-    page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click(); page.wait_for_selector(".agent-receipt")
+    page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
+    open_agent_activity_receipts(page)
+    expect(page.locator(".agent-receipt").first).to_be_visible()
     expect(page.locator(".agent-recovery-hint").first).to_contain_text("安全重试")
     page.wait_for_function("document.body.innerText.includes('制作图已更新到版本')")
     workspace = http_json(f"{base_url}/projects/{GRAPH_PROJECT}/m5/sequence-workspace")
@@ -259,6 +261,15 @@ def run_drawer_action(page: Page, label: str) -> None:
     page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
     page.wait_for_function("!document.querySelector('.agent-command-preview')")
     page.wait_for_timeout(100)
+
+
+def open_agent_activity_receipts(page: Page) -> None:
+    receipts = page.locator(".agent-receipts")
+    expect(receipts).to_be_visible()
+    if receipts.locator(".agent-receipt:visible").count():
+        return
+    receipts.locator("summary").click()
+    expect(receipts.locator(".agent-receipt").first).to_be_visible()
 
 
 def ensure_agent_visible(page: Page) -> None:

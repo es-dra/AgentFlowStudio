@@ -1,0 +1,34 @@
+.edge-relation-button {
+  position: absolute;
+  z-index: 6;
+  min-width: 34px;
+  min-height: 24px;
+  max-width: 88px;
+  padding: 0 8px;
+  border: 1px solid rgba(171, 235, 255, 0.36);
+  border-radius: 999px;
+  background: rgba(11, 20, 27, 0.88);
+  color: var(--text-secondary);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  font-size: 11px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  transition: border-color 0.14s ease, background-color 0.14s ease, color 0.14s ease, opacity 0.14s ease;
+}
+
+.edge-relation-button:hover,
+.edge-relation-button:focus-visible,
+.edge-relation-button[data-edge-selected="true"] {
+  border-color: rgba(90, 200, 250, 0.78);
+  background: rgba(18, 39, 50, 0.96);
+  color: var(--text-primary);
+}
+
+.edge-relation-button:focus-visible {
+  outline: 2px solid rgba(230, 248, 255, 0.92);
+  outline-offset: 2px;
+}

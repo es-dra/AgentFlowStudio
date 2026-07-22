@@ -574,20 +574,23 @@ process.stdout.write(JSON.stringify({ textRendered, imageRendered }));
         assert "provider_raw_response" not in rendered
 
 
-def test_text_node_uses_agent_chat_optimization_instead_of_fixed_script_tools() -> None:
+def test_text_node_uses_embedded_creative_actions_instead_of_chat_templates() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     script_file_import = (STUDIO_ROOT / "src" / "script-file-import.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
 
-    assert "/optimize-selected-default" in prompt_bar
+    assert "startEmbeddedCreativeAction" in prompt_bar
+    assert '"script_revision"' in prompt_bar
+    assert '"shot_breakdown"' in prompt_bar
     assert "syncTextAreaToNode(store, node.id, textarea)" in prompt_bar
     assert "expandTextIdeaToScript" not in prompt_bar
     assert "splitTextNodeToStoryboardNodes" not in prompt_bar
     assert "导入剧本" not in prompt_bar
     assert "扩写剧本" not in prompt_bar
-    assert "/plan-selected-script-shots" in prompt_bar
+    assert "/optimize-selected-default" not in prompt_bar
+    assert "/plan-selected-script-shots" not in prompt_bar
     assert "text-script-tool" in prompt_bar
     assert "export function splitScriptIntoShots" in script_breakdown
     assert "formal_script_before_storyboard_breakdown" in script_breakdown

@@ -135,6 +135,7 @@ def test_default_canvas_edges_use_solid_frame_connection() -> None:
     assert './styles/canvas-edges.css' in index
     assert "stroke-linecap: round" in base_rule
     assert "stroke-width: 1.15" in base_rule
+    assert "pointer-events: none" in base_rule
     assert "stroke-dasharray" not in edge_rule
     assert "animation:" not in edge_rule
     assert "edge-spark" in canvas_edges
@@ -152,13 +153,23 @@ def test_canvas_edges_support_lightweight_disconnect_affordance() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     canvas_edges = (STUDIO_ROOT / "src" / "canvas-edges.js").read_text(encoding="utf-8")
+    relation_buttons = (STUDIO_ROOT / "src" / "canvas-edge-relation-buttons.js").read_text(encoding="utf-8")
     edge_actions = (STUDIO_ROOT / "src" / "canvas-edge-actions.js").read_text(encoding="utf-8")
     keyboard = (STUDIO_ROOT / "src" / "studio-keyboard.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
+    relation_styles = (STUDIO_ROOT / "styles" / "canvas-edge-relation-buttons.css").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "canvas-edge-actions.css").read_text(encoding="utf-8")
 
     assert './styles/canvas-edge-actions.css' in index
+    assert './styles/canvas-edge-relation-buttons.css' in index
     assert "renderEdges(state, relations, store)" in canvas_view
+    assert "syncEdgeRelationButton(actionLayer, edge, from, to, state, store)" in canvas_edges
+    assert 'return document.getElementById("node-layer")' in relation_buttons
+    assert "draft.selection = { nodeIds: [], edgeId: edge.id }" in relation_buttons
+    assert "button.dataset.edgeFrom = edge.from" in relation_buttons
+    assert "button.dataset.edgeTo = edge.to" in relation_buttons
+    assert "button.dataset.edgeRelation = relation" in relation_buttons
+    assert "button.style.transform = `translate(" in relation_buttons
     assert "syncEdgeActionButton" in canvas_edges
     assert "edge-disconnect-button" in canvas_edges
     assert "bindEdgeActionButton" in edge_actions
@@ -176,7 +187,15 @@ def test_canvas_edges_support_lightweight_disconnect_affordance() -> None:
         "pointer-events: auto",
     ):
         assert marker in styles
+    for marker in (
+        ".edge-relation-button",
+        "z-index: 6",
+        "pointer-events: auto",
+    ):
+        assert marker in relation_styles
     assert len(edge_actions.splitlines()) <= 120
+    assert len(relation_buttons.splitlines()) <= 120
+    assert len(relation_styles.splitlines()) <= 80
     assert len(styles.splitlines()) <= 120
 
 
@@ -278,7 +297,11 @@ const port = {
   getBoundingClientRect() {
     return { left: 390, top: 210, width: 22, height: 22 };
   },
+  matches() {
+    return false;
+  },
 };
+globalThis.getComputedStyle = () => ({ opacity: '0', visibility: 'visible' });
 globalThis.document = {
   querySelectorAll(selector) {
     if (selector !== '.node') return [];
@@ -307,14 +330,64 @@ if (point.x !== 380 || point.y !== 100.5) throw new Error(`unexpected point ${JS
     assert completed.returncode == 0, completed.stderr
 
 
+def test_port_geometry_hidden_ports_use_canvas_relative_coordinates() -> None:
+    code = r"""
+import { nodeFramePortWorldPoint } from './apps/studio/src/interaction/port-geometry.js';
+
+const port = {
+  getBoundingClientRect() {
+    return { left: 390, top: 210, width: 34, height: 34 };
+  },
+  matches() {
+    return false;
+  },
+};
+globalThis.getComputedStyle = () => ({ opacity: '0', visibility: 'visible' });
+globalThis.document = {
+  getElementById(id) {
+    if (id !== 'canvas-root') return null;
+    return {
+      getBoundingClientRect() {
+        return { left: 20, top: 112, width: 1200, height: 700 };
+      },
+    };
+  },
+  querySelectorAll(selector) {
+    if (selector !== '.node') return [];
+    return [{
+      dataset: { nodeId: 'node_1' },
+      querySelector(inner) {
+        return inner === '.node-port.out' ? port : null;
+      },
+    }];
+  },
+};
+const point = nodeFramePortWorldPoint(
+  { id: 'node_1', x: 100, y: 120, w: 280, h: 240 },
+  'out',
+  { x: 10, y: 20, scale: 2 },
+);
+if (point.x !== 380 || point.y !== 47.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
     source = (STUDIO_ROOT / "src" / "panels" / "add-node-menu.js").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "studio-interactions.css").read_text(encoding="utf-8")
     overlay = (STUDIO_ROOT / "src" / "overlay.js").read_text(encoding="utf-8")
 
-    assert 'const QUICK_ACTION_IDS = ["node_text", "node_script", "node_ref", "node_image"]' in source
-    assert 'node_ref: "上传参考"' in source
-    assert 'node_script: "拆脚本"' in source
+    assert 'const QUICK_ACTION_IDS = ["node_text", "node_script", "node_sequence", "asset_character", "node_image", "node_video"]' in source
+    assert 'node_image: "上传或描述"' in source
+    assert 'node_script: "导入/改写"' in source
+    assert 'HANDLE_PRIMARY_TYPES = ["text", "script", "sequence", "scene", "shot", "character", "location", "prop", "ref", "image", "video"]' in source
     assert '"compact-create-menu"' in source
     assert '"advanced-create-list"' in source
     assert '"advanced-create-content"' in source

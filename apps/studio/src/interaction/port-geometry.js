@@ -2,6 +2,7 @@ import { clientToCanvasPoint, screenToWorld } from "../geometry.js";
 import { effectiveHeight } from "../nodes.js";
 
 const PORT_CENTER_OUTSET = 25;
+const VISIBLE_PORT_OPACITY = 0.12;
 
 export function nodePortWorldPoint(node, port, viewport) {
   if (!node) return null;
@@ -12,8 +13,9 @@ export function nodePortWorldPoint(node, port, viewport) {
 
 export function nodeFramePortWorldPoint(node, port, viewport) {
   if (!node) return null;
-  const fallback = fallbackNodePortPoint(node, port);
-  const screenCenter = nodePortScreenCenter(node.id, port);
+  const fallback = nodeCardBorderPoint(node, port);
+  const portEl = nodePortElement(node.id, port);
+  const screenCenter = nodePortScreenCenter(node.id, port, portEl);
   if (!screenCenter || !viewport) return fallback;
   const canvasRoot = typeof document !== "undefined" && typeof document.getElementById === "function"
     ? document.getElementById("canvas-root")
@@ -22,12 +24,13 @@ export function nodeFramePortWorldPoint(node, port, viewport) {
   const canvasCenter = rootRect
     ? clientToCanvasPoint(screenCenter.x, screenCenter.y, canvasRoot)
     : null;
-  if (canvasCenter) return screenToWorld(viewport, canvasCenter.x, canvasCenter.y);
-  const visibleCenter = screenToWorld(viewport, screenCenter.x, screenCenter.y);
-  return {
-    x: port === "in" ? node.x : node.x + node.w,
-    y: visibleCenter.y,
-  };
+  const portWorldCenter = canvasCenter
+    ? screenToWorld(viewport, canvasCenter.x, canvasCenter.y)
+    : screenToWorld(viewport, screenCenter.x, screenCenter.y);
+  if (!isPortVisiblyExposed(portEl)) {
+    return { x: fallback.x, y: portWorldCenter.y };
+  }
+  return portWorldCenter;
 }
 
 export function fallbackNodePortPoint(node, port) {
@@ -37,8 +40,15 @@ export function fallbackNodePortPoint(node, port) {
   };
 }
 
-export function nodePortScreenCenter(nodeId, port) {
-  const portEl = nodePortElement(nodeId, port);
+export function nodeCardBorderPoint(node, port) {
+  return {
+    x: port === "in" ? node.x : node.x + node.w,
+    y: node.y + effectiveHeight(node) / 2,
+  };
+}
+
+export function nodePortScreenCenter(nodeId, port, existingPortEl = null) {
+  const portEl = existingPortEl || nodePortElement(nodeId, port);
   if (!portEl?.getBoundingClientRect) return null;
   const rect = portEl.getBoundingClientRect();
   if (!rect.width && !rect.height) return null;
@@ -62,4 +72,13 @@ export function nodePortElement(nodeId, port) {
     return nodeEl.querySelector?.(`.node-port.${port}`) || null;
   }
   return null;
+}
+
+function isPortVisiblyExposed(portEl) {
+  if (!portEl) return false;
+  if (portEl.matches?.(":hover,:focus-visible")) return true;
+  if (typeof getComputedStyle !== "function") return true;
+  const style = getComputedStyle(portEl);
+  const opacity = Number(style.opacity);
+  return Number.isFinite(opacity) && opacity > VISIBLE_PORT_OPACITY && style.visibility !== "hidden";
 }

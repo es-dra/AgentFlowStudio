@@ -328,8 +328,11 @@ def test_script_nodes_keep_prompt_bar_visible_with_content() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
 
     assert "isTextContentNode(node)" in prompt_bar
-    assert "/optimize-selected-default" in prompt_bar
-    assert "/plan-selected-script-shots" in prompt_bar
+    assert "startEmbeddedCreativeAction" in prompt_bar
+    assert '"script_revision"' in prompt_bar
+    assert '"shot_breakdown"' in prompt_bar
+    assert "/optimize-selected-default" not in prompt_bar
+    assert "/plan-selected-script-shots" not in prompt_bar
 
 
 def test_studio_asset_context_workflow_is_single_canvas() -> None:

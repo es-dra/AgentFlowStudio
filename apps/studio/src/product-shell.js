@@ -12,6 +12,8 @@ export function createProductShell(options = {}) {
   let agentCollapsed = false;
   let projectDrawerOpen = false;
   let contextOpen = false;
+  let helpOpen = false;
+  let accountMenuOpen = false;
   let mobileAgentOpen = false;
   let agentPreferenceProjectKey = "";
   let notice = "";
@@ -52,13 +54,23 @@ export function createProductShell(options = {}) {
     else if (snapshot.error) root.appendChild(statePanel("error"));
     else if (!snapshot.project) root.appendChild(statePanel("empty"));
     else root.appendChild(buildWorkspace());
+    if (helpOpen && isMobileNavigationLayout()) root.appendChild(buildMobileHelpSheet());
     root.appendChild(buildMobileNav());
   }
 
   function buildHeader() {
     const header = node("header", "studio-unified-header");
-    const brand = node("div", "studio-unified-brand");
-    brand.innerHTML = '<strong aria-label="AgentFlow Studio">AFS</strong><span>AgentFlow Studio</span>';
+    const brand = node("button", "studio-unified-brand");
+    brand.type = "button";
+    brand.setAttribute("aria-label", "返回项目画布");
+    brand.innerHTML = '<strong aria-label="AgentFlow Studio">AFS</strong>';
+    brand.addEventListener("click", () => {
+      projectDrawerOpen = false;
+      contextOpen = false;
+      helpOpen = false;
+      accountMenuOpen = false;
+      showCanvas();
+    });
 
     const project = node("div", "studio-project-context");
     const projectLabel = node("button", "studio-project-button");
@@ -71,6 +83,8 @@ export function createProductShell(options = {}) {
     projectLabel.innerHTML = `<strong>${escapeHtml(projectName)}</strong><span>${escapeHtml(episodeName)}</span>${icon("chevronDown", 13)}`;
     projectLabel.addEventListener("click", () => {
       contextOpen = !contextOpen;
+      helpOpen = false;
+      accountMenuOpen = false;
       render();
     });
     project.appendChild(projectLabel);
@@ -81,9 +95,11 @@ export function createProductShell(options = {}) {
     navigator.setAttribute("aria-label", "打开项目导航");
     navigator.setAttribute("aria-controls", "studio-context-drawer");
     navigator.setAttribute("aria-expanded", String(projectDrawerOpen));
-    navigator.innerHTML = `<span>项目导航</span>${icon("chevronDown", 13)}`;
+    navigator.innerHTML = `<span>项目</span>${icon("chevronDown", 13)}`;
     navigator.addEventListener("click", () => {
       projectDrawerOpen = !projectDrawerOpen;
+      helpOpen = false;
+      accountMenuOpen = false;
       render();
       requestCanvasSafeAreaUpdate();
     });
@@ -101,29 +117,20 @@ export function createProductShell(options = {}) {
     appendHeaderSummary(summary, progress);
 
     const actions = node("div", "studio-header-actions");
-    if (options.onOpenExternalVideoDemo) {
-      const externalVideo = node("button", "studio-secondary-button studio-external-video-button");
-      externalVideo.type = "button";
-      externalVideo.innerHTML = icon("video", 13) + "<span>AI 漫剧</span>";
-      externalVideo.addEventListener("click", () => options.onOpenExternalVideoDemo?.());
-      actions.appendChild(externalVideo);
-    }
     actions.appendChild(buildSaveStatus());
-    const language = node("button", "studio-icon-button", locale === "zh-CN" ? "中" : "EN");
+    actions.appendChild(buildHelpEntry());
+    const language = node("button", "studio-icon-button");
+    const account = buildAccountEntry();
     language.type = "button";
-    language.setAttribute("aria-label", `${message("language", locale)}：${language.textContent}`);
+    language.innerHTML = icon("translate", 15);
+    language.title = locale === "zh-CN" ? "语言设置：中文" : "Language: English";
+    language.setAttribute("aria-label", language.title);
     language.addEventListener("click", () => {
       locale = setLocale(locale === "zh-CN" ? "en" : "zh-CN");
       render();
     });
     actions.appendChild(language);
-    if (snapshot.authUser) {
-      const account = node("button", "studio-account-button", userLabel(snapshot.authUser));
-      account.type = "button";
-      account.setAttribute("aria-label", message("signOut", locale));
-      account.addEventListener("click", () => options.onSignOut?.());
-      actions.appendChild(account);
-    }
+    actions.appendChild(account);
 
     header.append(brand, project, navigator, viewSwitch, summary, actions);
     return header;
@@ -134,9 +141,91 @@ export function createProductShell(options = {}) {
     if (hasStoryFacts() || mediaOperationsReady() || Number(progress) > 0) {
       summary.append(statusItem("check", `交付就绪 ${progress}%`, "ok"));
     } else {
-      summary.append(statusItem("check", "自由画布", "muted"));
+      summary.append(statusItem("sparkles", "任意节点开始", "muted"));
     }
     if (pending) summary.append(statusItem("clock", `待处理 ${pending}`, "warning"));
+  }
+
+  function buildHelpEntry() {
+    const wrap = node("div", "studio-help-context");
+    const help = node("button", "studio-icon-button");
+    help.type = "button";
+    help.setAttribute("aria-label", "打开使用指南");
+    help.setAttribute("aria-expanded", String(helpOpen));
+    help.innerHTML = icon("help", 15);
+    help.addEventListener("click", () => {
+      helpOpen = !helpOpen;
+      accountMenuOpen = false;
+      contextOpen = false;
+      render();
+    });
+    wrap.appendChild(help);
+    if (helpOpen && !isMobileNavigationLayout()) wrap.appendChild(buildHelpMenu());
+    return wrap;
+  }
+
+  function buildHelpMenu() {
+    const menu = node("section", "studio-help-menu");
+    menu.setAttribute("aria-label", "使用指南");
+    menu.append(
+      node("strong", "", "AFS 能做什么"),
+      node("p", "", "从任意节点开始：在同一画布里从想法、剧本、镜头、角色、参考图、图片或视频开始；需要改写、拆分、生成或恢复时先预览影响，再确认写入制作图。"),
+    );
+    const list = node("ul", "");
+    for (const item of [
+      "画布负责创建和连接对象，故事板负责逐镜审看。",
+      "节点内 AI 动作只改变当前对象的预览；应用后进入同一节点修订历史。",
+      "AI 创作搭档用于提问、解释和跨对象编排；付费或不可逆动作会先说明范围和费用。",
+      "高级证据、模型和谱系信息在详情里查看，不暴露密钥或服务器路径。",
+    ]) {
+      list.appendChild(node("li", "", item));
+    }
+    menu.appendChild(list);
+    return menu;
+  }
+
+  function buildAccountEntry() {
+    const wrap = node("div", "studio-account-context");
+    const account = node("button", "studio-account-button", userLabel(snapshot.authUser));
+    account.type = "button";
+    account.setAttribute("aria-label", snapshot.authUser ? "打开账户菜单" : "打开工作区与偏好菜单");
+    account.setAttribute("aria-expanded", String(accountMenuOpen));
+    account.addEventListener("click", () => {
+      accountMenuOpen = !accountMenuOpen;
+      helpOpen = false;
+      contextOpen = false;
+      render();
+    });
+    wrap.appendChild(account);
+    if (accountMenuOpen) wrap.appendChild(buildAccountMenu());
+    return wrap;
+  }
+
+  function buildAccountMenu() {
+    const menu = node("div", "studio-account-menu");
+    menu.setAttribute("role", "menu");
+    menu.appendChild(node("strong", "", "账户与工作区"));
+    menu.appendChild(accountMenuButton("项目管理", () => {
+      accountMenuOpen = false;
+      projectDrawerOpen = true;
+      render();
+    }));
+    menu.appendChild(accountMenuButton(locale === "zh-CN" ? "切换 English" : "切换中文", () => {
+      locale = setLocale(locale === "zh-CN" ? "en" : "zh-CN");
+      accountMenuOpen = false;
+      render();
+    }));
+    if (snapshot.authUser) menu.appendChild(accountMenuButton(message("signOut", locale), () => options.onSignOut?.(), "danger"));
+    return menu;
+  }
+
+  function accountMenuButton(label, onClick, tone = "") {
+    const button = node("button", tone);
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
   }
 
   function buildProjectMenu() {
@@ -235,10 +324,32 @@ export function createProductShell(options = {}) {
         scenes.appendChild(item);
       });
     }
-    panel.append(close, copy, stages, scenes);
+    panel.append(close, copy, stages, scenes, buildDrawerAccountSummary());
     if (graphWorkspaceReady()) panel.appendChild(buildGraphProductionSummary());
     panel.appendChild(next);
     return panel;
+  }
+
+  function buildDrawerAccountSummary() {
+    const sectionEl = node("section", "context-drawer-account");
+    sectionEl.appendChild(node("strong", "", "账户与工作区"));
+    sectionEl.appendChild(node("p", "", snapshot.authUser ? "当前账号可管理项目、语言偏好与会话。" : "当前为本地制作会话，可管理项目与语言偏好。"));
+    const row = node("div", "context-drawer-account-actions");
+    const language = node("button", "studio-text-button", locale === "zh-CN" ? "切换 English" : "切换中文");
+    language.type = "button";
+    language.addEventListener("click", () => {
+      locale = setLocale(locale === "zh-CN" ? "en" : "zh-CN");
+      render();
+    });
+    row.appendChild(language);
+    if (snapshot.authUser) {
+      const signOut = node("button", "studio-text-button danger", message("signOut", locale));
+      signOut.type = "button";
+      signOut.addEventListener("click", () => options.onSignOut?.());
+      row.appendChild(signOut);
+    }
+    sectionEl.appendChild(row);
+    return sectionEl;
   }
 
   function buildGraphProductionSummary() {
@@ -1109,8 +1220,8 @@ export function createProductShell(options = {}) {
   function buildMobileNav() {
     const nav = node("nav", "product-mobile-nav");
     nav.setAttribute("aria-label", "移动端 Studio 导航");
-    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["agent", "搭档"]]) {
-      const active = key === "agent" ? mobileAgentOpen : section === key;
+    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["help", "指南"], ["agent", "搭档"]]) {
+      const active = key === "agent" ? mobileAgentOpen : key === "help" ? helpOpen : section === key;
       const button = node("button", active ? "active" : "", label);
       button.type = "button";
       button.setAttribute("aria-current", active ? "page" : "false");
@@ -1122,13 +1233,21 @@ export function createProductShell(options = {}) {
         } else if (key === "context") {
           projectDrawerOpen = true;
           closeResponsiveAgentOverlay();
+          helpOpen = false;
+        } else if (key === "help") {
+          helpOpen = !helpOpen;
+          projectDrawerOpen = false;
+          closeResponsiveAgentOverlay();
         } else {
           setAgentChatExpanded(true);
+          helpOpen = false;
         }
         render();
         requestCanvasSafeAreaUpdate();
         requestAnimationFrame(() => {
-          const focusTarget = key === "agent"
+          const focusTarget = key === "help"
+            ? document.querySelector(".studio-mobile-help-sheet button, .studio-mobile-help-sheet")
+            : key === "agent"
             ? document.querySelector(".studio-agent-chat button, .agent-chat-composer textarea")
             : document.getElementById("product-main");
           focusTarget?.focus();
@@ -1137,6 +1256,23 @@ export function createProductShell(options = {}) {
       nav.appendChild(button);
     }
     return nav;
+  }
+
+  function buildMobileHelpSheet() {
+    const sheet = node("section", "studio-mobile-help-sheet");
+    sheet.tabIndex = -1;
+    sheet.setAttribute("aria-label", "移动端使用指南");
+    const close = node("button", "studio-icon-button");
+    close.type = "button";
+    close.setAttribute("aria-label", "关闭使用指南");
+    close.innerHTML = icon("x", 15);
+    close.addEventListener("click", () => {
+      helpOpen = false;
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
+    sheet.append(close, buildHelpMenu());
+    return sheet;
   }
 
   function viewButton(key, label) {
@@ -1235,11 +1371,16 @@ export function createProductShell(options = {}) {
       render();
       requestCanvasSafeAreaUpdate();
     });
+    mobileNavigationMediaQuery()?.addEventListener?.("change", () => {
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
     window.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (projectDrawerOpen || contextOpen || mobileAgentOpen) {
+      if (projectDrawerOpen || contextOpen || mobileAgentOpen || helpOpen) {
         projectDrawerOpen = false;
         contextOpen = false;
+        helpOpen = false;
         if (mobileAgentOpen) closeResponsiveAgentOverlay();
         render();
         requestCanvasSafeAreaUpdate();
@@ -1303,9 +1444,19 @@ export function createProductShell(options = {}) {
     return Boolean(responsiveAgentMediaQuery()?.matches);
   }
 
+  function isMobileNavigationLayout() {
+    return Boolean(mobileNavigationMediaQuery()?.matches);
+  }
+
   function responsiveAgentMediaQuery() {
     return typeof window !== "undefined" && typeof window.matchMedia === "function"
       ? window.matchMedia("(max-width: 1100px)")
+      : null;
+  }
+
+  function mobileNavigationMediaQuery() {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 760px)")
       : null;
   }
 

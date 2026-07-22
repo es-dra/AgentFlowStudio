@@ -917,5 +917,12 @@ export function createRuntimeClient(projectId = "") {
         signal: options?.signal || null,
       });
     },
+    previewEmbeddedCreativeAction(payload, options = {}) {
+      return requestJson(`/projects/${encoded}/embedded-creative-actions/preview`, {
+        method: "POST",
+        payload,
+        signal: options?.signal || null,
+      });
+    },
   };
 }

@@ -62,39 +62,47 @@ function panelHeader({ context, collapsed, onToggleCollapse }) {
 }
 
 function contextStrip(context) {
-  const strip = el("dl", "agent-context-strip");
-  for (const [label, value] of [
-    ["项目", context?.project_name || "未命名项目"],
-    ["剧本", context?.script_revision_id ? "已有可追溯版本" : "可从任意节点开始"],
-    ["节点", context?.selected_node_title || "未选择"],
-  ]) {
-    strip.append(el("dt", "", label), el("dd", "", value));
-  }
+  const strip = el("section", "agent-context-strip");
+  strip.appendChild(el("span", "agent-context-chip", context?.selected_node_title ? `当前：${context.selected_node_title}` : "当前：画布"));
+  strip.appendChild(el("span", "agent-context-chip", context?.script_revision_id ? "剧本可追溯" : "可从任意节点开始"));
   if (context?.selected_edge_id) {
-    strip.append(
-      el("dt", "", "连线"),
-      el("dd", "", `${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"} · ${relationLabel(context.selected_edge_relation_type)}`),
+    strip.appendChild(
+      el("span", "agent-context-chip", `连线：${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"}`),
     );
   }
   const counts = context?.counts || {};
   if (context?.media_operations) {
     const media = context.media_operations;
-    strip.append(
-      el("dt", "", "媒体制作"),
-      el("dd", "", `${Number(media.ready_shot_count || 0)}/${Number(media.shot_count || 0)} 镜头可审 · 估算 $${Number(media.estimated_cost_usd || 0).toFixed(2)}`),
-    );
-    strip.append(el("dt", "", "状态"), el("dd", "", `${media.state_label || "审片候选"} · ${media.next_action || "选择镜头继续"}`));
+    strip.appendChild(el("span", "agent-context-chip", "媒体制作"));
+    strip.appendChild(el("span", "agent-context-chip", `${Number(media.ready_shot_count || 0)}/${Number(media.shot_count || 0)} 镜头可审`));
+    strip.appendChild(el("span", "agent-context-chip", `估算 $${Number(media.estimated_cost_usd || 0).toFixed(2)}`));
   } else {
-    strip.append(el("dt", "", "画布"), el("dd", "", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
+    strip.appendChild(el("span", "agent-context-chip", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
+  }
+  strip.appendChild(contextDetails(context));
+  return strip;
+}
+
+function contextDetails(context) {
+  const details = el("details", "agent-context-details");
+  details.appendChild(el("summary", "", "上下文范围"));
+  const list = el("dl", "");
+  for (const [label, value] of [
+    ["项目", context?.project_name || "未命名项目"],
+    ["节点", context?.selected_node_title || "未选择"],
+    ["画布", `${Number(context?.counts?.nodes || 0)} 节点 · ${Number(context?.counts?.scenes || 0)} 场景 · ${Number(context?.counts?.shots || 0)} 镜头`],
+  ]) {
+    list.append(el("dt", "", label), el("dd", "", value));
   }
   if (context?.media_operations) {
-    strip.append(el("dt", "", "计划"), el("dd", "", "从已确认脚本、分镜和资产 Bible 只读投影"));
+    list.append(el("dt", "", "计划"), el("dd", "", "从已确认脚本、分镜和资产 Bible 只读投影"));
   } else if (context?.production_graph_version) {
-    strip.append(el("dt", "", "制作序列"), el("dd", "", `版本 ${Number(context.production_graph_version)} · ${Number(counts.graph_tasks || 0)} 项任务 · ${Number(counts.graph_pending_reviews || 0)} 项待审`));
+    list.append(el("dt", "", "制作序列"), el("dd", "", `版本 ${Number(context.production_graph_version)} · ${Number(context?.counts?.graph_tasks || 0)} 项任务 · ${Number(context?.counts?.graph_pending_reviews || 0)} 项待审`));
   } else {
-    strip.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
+    list.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
   }
-  strip.appendChild(evidenceDetails("上下文证据", [
+  details.appendChild(list);
+  details.appendChild(evidenceDetails("开发证据", [
     ["project_id", context?.project_id],
     ["script_revision_id", context?.script_revision_id],
     ["source_digest", context?.script_source_digest],
@@ -104,7 +112,7 @@ function contextStrip(context) {
     ["production_graph_digest", context?.production_graph_digest],
     ["selected_node_id", context?.selected_node_id],
   ]));
-  return strip;
+  return details;
 }
 
 function messageLog(session) {
@@ -183,13 +191,15 @@ function commandPreview({ session, store, runtime, onRender }) {
 
 function receiptList({ session, store, runtime, onRender }) {
   const receipts = (session?.receipts || []).slice(-3).reverse();
-  const wrap = el("section", "agent-receipts");
+  const wrap = el("details", "agent-receipts");
   if (!receipts.length) {
     return wrap;
   }
-  wrap.appendChild(el("span", "eyebrow", "执行回执"));
+  wrap.appendChild(el("summary", "", `活动记录 · ${receipts.length} 条执行回执`));
   for (const receipt of receipts) {
     const item = el("article", `agent-receipt ${receipt.status}`);
+    if (receipt.command_type) item.dataset.commandType = String(receipt.command_type);
+    if (receipt.receipt_id) item.dataset.receiptId = String(receipt.receipt_id);
     item.append(el("strong", "", receipt.status === "undone" ? "已撤销" : "已执行"));
     item.append(el("p", "", receipt.summary));
     if (receipt.recovery_available && !receipt.undo_available) {

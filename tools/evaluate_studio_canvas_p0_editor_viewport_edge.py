@@ -56,6 +56,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         "shell": root / "apps/studio/src/product-shell.js",
         "store": root / "apps/studio/src/store.js",
         "store_notify": root / "apps/studio/src/store-notify-meta.js",
+        "store_persistence": root / "apps/studio/src/store-runtime-persistence-controller.js",
         "stable_input": root / "apps/studio/src/stable-text-input.js",
         "node_body": root / "apps/studio/src/canvas-node-body.js",
         "prompt_bar": root / "apps/studio/src/prompt-bar.js",
@@ -66,7 +67,9 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         "add_node_menu": root / "apps/studio/src/panels/add-node-menu.js",
         "safe_area": root / "apps/studio/src/canvas-safe-area.js",
         "edges": root / "apps/studio/src/canvas-edges.js",
+        "edge_state": root / "apps/studio/src/canvas-edge-state.js",
         "edge_css": root / "apps/studio/styles/canvas-edges.css",
+        "edge_motion_css": root / "apps/studio/styles/canvas-edge-motion.css",
     }
     text: dict[str, str] = {}
     for key, path in files.items():
@@ -77,21 +80,24 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             text[key] = path.read_text(encoding="utf-8")
 
     required = {
-        "store": ["mergeNotifyMeta", "renderScope", "save-status"],
+        "store": ["mergeNotifyMeta"],
         "store_notify": ["renderScopes", "emptyNotifyMeta", "mergeNotifyMeta"],
+        "store_persistence": ['renderScope: "save-status"'],
         "main": ["shouldRenderProductShell", "isCanvasTextEditingActive", "canvas-local-edit"],
         "shell": ["options.render === false", "syncSaveStatusElement"],
         "stable_input": ["compositionstart", "compositionupdate", "compositionend", "beforeinput", "paste", "inputType"],
         "node_body": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"'],
-        "prompt_bar": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"', "自动拆分分镜", "/plan-selected-script-shots"],
+        "prompt_bar": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"', "自动拆分分镜", "startEmbeddedCreativeAction", '"shot_breakdown"'],
         "lifecycle": ["request_story_plan_candidate", "planning_required", "需要智能规划器提交结构化候选"],
         "geometry": ["clientToCanvasPoint", "clientToWorld"],
         "port_geometry": ["nodePortCanvasCenter", "clientToCanvasPoint"],
         "canvas_input": ["clientToCanvasPoint", "clientToWorld"],
         "add_node_menu": ["coordinateSpace", "canvasPointFromMenuPoint", "clientPointFromMenuPoint"],
         "safe_area": ["isVisibleCanvasFrameUsable", "return null", 'coordinateSpace: "canvas"'],
-        "edges": ["edgeLifecycleState", "edge-failed", "edge-paused"],
-        "edge_css": ["prefers-reduced-motion: reduce", "edge-failed", "edge-paused"],
+        "edges": ["edgeLifecycleState"],
+        "edge_state": ["edge-failed", "edge-paused"],
+        "edge_css": ["edge-failed", "edge-paused"],
+        "edge_motion_css": ["prefers-reduced-motion: reduce"],
     }
     for key, markers in required.items():
         for marker in markers:
@@ -110,7 +116,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
 
     evidence["static"] = {
         "stable_canvas_text_input": not any(item["scope"] in {"main", "shell", "store", "stable_input", "node_body", "prompt_bar"} for item in findings),
-        "auto_split_entry_restored": "自动拆分分镜" in text["prompt_bar"] and "/plan-selected-script-shots" in text["prompt_bar"],
+        "auto_split_entry_restored": "自动拆分分镜" in text["prompt_bar"] and "startEmbeddedCreativeAction" in text["prompt_bar"],
         "legacy_split_not_bound": "splitTextNodeToStoryboardNodes" not in text["prompt_bar"],
         "edge_selection_spark_removed": "touchesSelection" not in text["edges"],
     }

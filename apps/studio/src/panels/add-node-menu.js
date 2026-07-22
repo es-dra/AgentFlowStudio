@@ -5,7 +5,8 @@ import { showPopover, el } from "../overlay.js";
 import { icon } from "../icons.js";
 import { ACTION_GROUPS, createActionNode } from "../action-registry.js";
 
-const QUICK_ACTION_IDS = ["node_text", "node_script", "node_ref", "node_image"];
+const QUICK_ACTION_IDS = ["node_text", "node_script", "node_sequence", "asset_character", "node_image", "node_video"];
+const HANDLE_PRIMARY_TYPES = ["text", "script", "sequence", "scene", "shot", "character", "location", "prop", "ref", "image", "video"];
 
 export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   let closeRef = () => {};
@@ -46,38 +47,42 @@ export function openReferenceMenu(store, runtime, fromNode, anchorEl, options = 
   const direction = options.direction || "downstream";
   const allowed = new Set(direction === "upstream" ? upstreamTypesFor(fromNode.type) : downstreamTypesFor(fromNode.type));
   const pop = el("div");
-  pop.appendChild(el("div", "menu-title", direction === "upstream" ? "在前面添加节点" : "引用该节点生成"));
-  for (const type of NODE_MENU_ORDER) {
-    if (type === "library") continue;
+  pop.classList.add("compact-create-menu", "handle-create-menu");
+  pop.appendChild(el("div", "menu-title", direction === "upstream" ? "添加上游" : "添加下游"));
+  const primary = HANDLE_PRIMARY_TYPES.filter((type) => allowed.has(type));
+  const advanced = NODE_MENU_ORDER.filter((type) => allowed.has(type) && !primary.includes(type) && type !== "library");
+  const items = primary.length ? primary : [...allowed].filter((type) => type && NODE_TYPES[type]);
+  for (const type of items) {
     const def = NODE_TYPES[type];
-    const item = menuItem(def.icon, def.label, def.tag);
-    item.disabled = !allowed.has(type);
+    const item = menuItem(def.icon, handleLabel(type, def), handleTag(type));
     item.addEventListener("click", () => {
-      if (item.disabled) return;
       const x = direction === "upstream" ? fromNode.x - def.size.w - 160 : fromNode.x + fromNode.w + 160;
-      const node = spawn(store, { id: `node_${type}`, type, label: def.label }, x, fromNode.y);
+      const node = spawn(store, { id: `node_${type}`, type, label: handleLabel(type, def) }, x, fromNode.y);
       if (direction === "upstream") connect(store, node.id, fromNode.id);
       else connect(store, fromNode.id, node.id);
       close();
     });
     pop.appendChild(item);
   }
-  const refItem = menuItem("link", "参考节点");
-  refItem.addEventListener("click", () => {
-    const x = direction === "upstream" ? fromNode.x - NODE_TYPES.ref.size.w - 160 : fromNode.x + fromNode.w + 160;
-    const node = spawn(store, { id: "node_ref", type: "ref", label: "参考集" }, x, fromNode.y);
-    store.set((s) => {
-      const n = s.nodes[node.id];
-      n.title = "参考集";
-      n.prompt = `引用：${fromNode.title}`;
-      n.params.isReference = true;
-      n.params.referenceIntent = "edge_reference";
-    });
-    if (direction === "upstream") connect(store, node.id, fromNode.id);
-    else connect(store, fromNode.id, node.id);
-    close();
-  });
-  pop.appendChild(refItem);
+  if (advanced.length) {
+    const details = el("details", "advanced-create-list handle-advanced-list");
+    details.appendChild(el("summary", "advanced-create-summary", "更多/高级"));
+    const content = el("div", "advanced-create-content");
+    for (const type of advanced) {
+      const def = NODE_TYPES[type];
+      const item = menuItem(def.icon, handleLabel(type, def), handleTag(type));
+      item.addEventListener("click", () => {
+        const x = direction === "upstream" ? fromNode.x - def.size.w - 160 : fromNode.x + fromNode.w + 160;
+        const node = spawn(store, { id: `node_${type}`, type, label: handleLabel(type, def) }, x, fromNode.y);
+        if (direction === "upstream") connect(store, node.id, fromNode.id);
+        else connect(store, fromNode.id, node.id);
+        close();
+      });
+      content.appendChild(item);
+    }
+    details.appendChild(content);
+    pop.appendChild(details);
+  }
   const close = showPopover(anchorEl, pop, { place: "right" });
 }
 
@@ -86,10 +91,10 @@ function buildMenu(onPick, onDone) {
   pop.classList.add("action-registry-menu", "compact-create-menu");
   pop.appendChild(quickCreatePanel(onPick, onDone));
   const advanced = el("details", "advanced-create-list");
-  advanced.appendChild(el("summary", "advanced-create-summary", "更多节点类型"));
+  advanced.appendChild(el("summary", "advanced-create-summary", "更多/高级"));
   const content = el("div", "advanced-create-content");
-  pop.appendChild(el("div", "menu-title secondary", "全部类型"));
   for (const group of ACTION_GROUPS) {
+    if (group.id === "basic_nodes") continue;
     content.appendChild(el("div", "menu-title", group.label));
     for (const action of group.actions) {
       const item = menuItem(action.icon, action.label, action.tag, action.requires_gate);
@@ -114,8 +119,8 @@ function bindDynamicMenuPosition(pop, closeRef) {
 
 function quickCreatePanel(onPick, onDone) {
   const panel = el("div", "quick-create-panel");
-  panel.appendChild(el("div", "quick-create-title", "双击创建"));
-  panel.appendChild(el("div", "quick-create-hint", "先放一个常用节点，再继续连接生成流程。"));
+  panel.appendChild(el("div", "quick-create-title", "从这里开始"));
+  panel.appendChild(el("div", "quick-create-hint", "选择常用入口；专家类型在更多/高级里。"));
   const grid = el("div", "quick-create-grid");
   for (const action of quickActions()) {
     const item = el("button", "quick-create-card");
@@ -145,6 +150,8 @@ function quickTone(action) {
     node_image: "scene",
     node_video: "video",
     node_script: "story",
+    node_sequence: "revision",
+    asset_character: "character",
     node_ref: "scene",
     node_director: "revision",
   }[action.id] || "story";
@@ -153,12 +160,41 @@ function quickTone(action) {
 function quickHint(action) {
   return {
     node_text: "写想法",
-    node_image: "放参考图",
-    node_video: "做片段",
-    node_script: "拆脚本",
+    node_image: "上传或描述",
+    node_video: "导入或生成预览",
+    node_script: "导入/改写",
+    node_sequence: "拆场景镜头",
+    asset_character: "角色/道具/空间",
     node_ref: "上传参考",
     node_director: "控镜头",
   }[action.id] || "新节点";
+}
+
+function handleLabel(type, def) {
+  return {
+    text: "想法/文本",
+    script: "剧本/导入",
+    sequence: "场景与镜头",
+    scene: "场景故事单元",
+    shot: "镜头设计",
+    character: "角色设定",
+    location: "空间设定",
+    prop: "道具设定",
+    ref: "参考资料",
+    image: "参考图/图片",
+    video: "视频",
+    audio: "音频",
+    video_merge: "剪辑合成草稿",
+    director: "镜头调度板",
+  }[type] || def.label;
+}
+
+function handleTag(type) {
+  return {
+    video_merge: "高级",
+    director: "高级",
+    audio: "高级",
+  }[type] || "";
 }
 
 function spawn(store, action, wx, wy) {
