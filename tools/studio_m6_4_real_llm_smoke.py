@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_BASE = Path(
     "/home/afs-ops/.codex/afs-evidence/afs-m6-4-freeform-canvas-ai-copilot-20260722"
 )
-LLM_MODEL = "gpt-5.3-codex-spark"
+LLM_MODEL = "gpt-5.5"
 LLM_REASONING_EFFORT = "medium"
 
 

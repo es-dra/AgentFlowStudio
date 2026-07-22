@@ -101,7 +101,8 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         "lifecycle": [
             "revise_selected_node",
             "request_story_plan_candidate",
-            "不会用本地固定模板冒充专业修订",
+            "start_embedded_creative_action",
+            "same_node_revision_preview",
             "selectScriptRevision(receipt.previous_revision_id)",
             "scriptAnalysisStateLabel",
             "productionPlanStateLabel",
@@ -252,7 +253,7 @@ process.stdout.write(JSON.stringify({
   nodeCountAfterPreview: state.order.length,
   nodeIdentityPreserved: state.order.length === originalNodeCount,
   contentChangedAfterPreview: state.nodes.n1.content !== originalContent,
-  errorMessage: preview.command.error_message,
+  errorMessage: preview.command.error_message || null,
   instructedStatus: instructed.status,
   instructedType: instructed.command.command_type,
   storyboardBlockedStatus: storyboardBlocked.status,
@@ -275,8 +276,8 @@ process.stdout.write(JSON.stringify({
         return {}
     payload = json.loads(completed.stdout)
     expected = {
-        "previewStatus": "blocked",
-        "commandType": "revise_selected_node",
+        "previewStatus": "preview",
+        "commandType": "start_embedded_creative_action",
         "rawCommandPreserved": True,
         "visibleRawCommandLeak": False,
         "hasLocalAfterText": False,
@@ -284,9 +285,9 @@ process.stdout.write(JSON.stringify({
         "nodeCountAfterPreview": 1,
         "nodeIdentityPreserved": True,
         "contentChangedAfterPreview": False,
-        "errorMessage": "节点文本优化现在需要通过当前节点内的 AI 预览生成真实改写；不会用本地固定模板冒充专业修订。请点击节点上的“优化”。",
-        "instructedStatus": "blocked",
-        "instructedType": "revise_selected_node",
+        "errorMessage": None,
+        "instructedStatus": "preview",
+        "instructedType": "start_embedded_creative_action",
         "storyboardBlockedStatus": "blocked",
         "storyboardRequiresConfirmation": False,
         "providerDispatchCount": 0,

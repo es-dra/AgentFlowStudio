@@ -130,13 +130,12 @@ process.stdout.write(JSON.stringify({ point, expectedX, expectedY }));
     assert abs(payload["point"]["y"] - payload["expectedY"]) < 0.001
 
 
-def test_p0_agent_chat_auto_split_request_is_planning_required_and_provider_closed() -> None:
+def test_p0_agent_chat_auto_split_request_opens_visible_embedded_task_preview() -> None:
     payload = run_node_probe(
         r'''
 import {
   agentChatContextKey,
   createAgentChatContextStore,
-  executePendingAgentCommandWithRuntime,
   submitAgentChatMessage,
 } from "./apps/studio/src/agent-chat-lifecycle.js";
 
@@ -154,48 +153,30 @@ const context = {
 };
 const session = createAgentChatContextStore().get(agentChatContextKey(context));
 const preview = submitAgentChatMessage(session, "/plan-selected-script-shots", context);
-const state = { meta: { projectId: "p0" }, nodes: {}, edges: {}, order: [], production: {}, viewport: { x: 0, y: 0, scale: 1 } };
-const store = { get: () => state, set: (mutator) => mutator(state) };
-const runtime = {
-  loadProductionPlanTruth: async () => ({
-    projection: {
-      schema_version: "afs.dynamic_production_plan_projection.v0.1",
-      project_id: "p0",
-      planning_state: "planning_required",
-      shots: [],
-      chunks: [],
-      provider_dispatch_count: 0,
-      remote_dispatch_count: 0,
-    },
-    provider_dispatch_count: 0,
-    remote_dispatch_count: 0,
-  }),
-};
-const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
 const visibleRawLeak = session.messages.some((message) => String(message.text || "").includes("/plan-selected-script-shots"));
 process.stdout.write(JSON.stringify({
   previewStatus: preview.status,
   commandType: preview.command.command_type,
   title: preview.command.title,
+  actionType: preview.command.action_type,
+  mode: preview.command.mode,
   rawPreserved: preview.command.raw_command_text === "/plan-selected-script-shots",
   visibleRawLeak,
-  receiptStatus: receipt.status,
-  receiptSummary: receipt.summary,
-  runtimeDomain: receipt.runtime_domain,
-  undoAvailable: receipt.undo_available,
-  providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count,
+  providerDispatchCount: preview.command.provider_dispatch_count,
+  relation: preview.command.impact.relation,
   storyboardWrite: preview.command.impact.storyboard_write,
+  costLabel: preview.command.cost_label,
 }));
 '''
     )
     assert payload["previewStatus"] == "preview"
-    assert payload["commandType"] == "request_story_plan_candidate"
+    assert payload["commandType"] == "start_embedded_creative_action"
     assert payload["title"] == "自动拆分分镜"
+    assert payload["actionType"] == "shot_breakdown"
+    assert payload["mode"] == "dynamic_shot_breakdown"
     assert payload["rawPreserved"] is True
     assert payload["visibleRawLeak"] is False
-    assert payload["receiptStatus"] == "executed"
-    assert payload["runtimeDomain"] == "production_plan"
-    assert payload["undoAvailable"] is False
-    assert "需要智能规划器" in payload["receiptSummary"]
     assert payload["providerDispatchCount"] == 0
-    assert payload["storyboardWrite"] is False
+    assert payload["relation"] == "visible_candidate_storyboard_subgraph"
+    assert payload["storyboardWrite"] is True
+    assert "确认后才调用文本模型" in payload["costLabel"]

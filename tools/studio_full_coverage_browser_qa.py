@@ -12,6 +12,12 @@ from playwright.sync_api import Page, expect, sync_playwright
 
 from studio_asset_context_browser_qa_support import chrome_path, free_port, make_mutating_runtime_proxy, make_studio_static_route
 from studio_asset_context_browser_qa_support import runtime_test_client, start_runtime, stop_runtime, wait_for_http
+from studio_m6_4_freeform_canvas_ai_copilot_browser_qa import ensure_ai_open, graph_counts, send_ai
+from studio_m6_5_embedded_creative_action_browser_qa import (
+    attach_real_reference_image,
+    create_global_image_node,
+    uploaded_reference_ok,
+)
 
 
 PROJECT_ID = f"studio-full-browser-qa-{int(time.time())}"
@@ -114,8 +120,8 @@ def run_browser_scenarios(
             page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa={int(time.time())}", wait_until="commit")
             expect(page.locator("#canvas-root")).to_be_visible()
 
-            asset_result = assert_asset_drawer_preview_and_delete(page, runtime_root)
-            sprite_result = assert_sprite_pending_state(page)
+            asset_result = assert_reference_image_entry(page)
+            companion_result = assert_ai_companion_provider_closed_state(page)
             save_result = assert_save_restore_and_small_viewport(page, base_url)
 
             page.screenshot(path=str(screenshot_path), full_page=True)
@@ -133,8 +139,8 @@ def run_browser_scenarios(
                 "runtime_root": str(runtime_root),
                 "screenshot": str(screenshot_path),
                 "scenarios": {
-                    "asset_librarian_delete": asset_result,
-                    "sprite_pending": sprite_result,
+                    "reference_image_entry": asset_result,
+                    "ai_companion_provider_closed": companion_result,
                     "returning_creator_small_viewport": save_result,
                 },
                 "console_error_count": len(console_errors),
@@ -171,66 +177,40 @@ def inject_delayed_sprite_reply(page: Page) -> None:
     )
 
 
-def assert_asset_drawer_preview_and_delete(page: Page, runtime_root: Path) -> dict[str, Any]:
-    page.locator(".drawer-tabs .drawer-tab").filter(has_text="素材").click()
-    card = page.locator(".asset-card").first
-    expect(card).to_be_visible()
-    img = card.locator("img").first
+def assert_reference_image_entry(page: Page) -> dict[str, Any]:
+    image_id = create_global_image_node(page, PROJECT_ID, {"width": 1366, "height": 900})
+    attach_real_reference_image(page, PROJECT_ID, image_id)
+    if not uploaded_reference_ok(page, PROJECT_ID, image_id):
+        raise AssertionError("reference image node did not retain preview URL and upload asset id")
+    img = page.locator(f'.node[data-node-id="{image_id}"] img').first
     expect(img).to_be_visible()
     loaded = img.evaluate("(node) => Boolean(node.complete && node.naturalWidth > 0)")
     if not loaded:
-        raise AssertionError("asset preview image did not load")
-    card.click()
-    expect(page.locator(".asset-detail-popover")).to_be_visible()
-    page.keyboard.press("Escape")
-    card.click(button="right")
-    menu = page.locator(".asset-context-menu")
-    expect(menu).to_be_visible()
-    if not menu.locator("text=删除图片素材").count():
-        raise AssertionError("asset context menu does not expose image delete")
-    menu.locator("text=删除图片素材").click()
-    expect(page.locator(".asset-card")).to_have_count(0)
-    assets = runtime_test_client(runtime_root).get(f"/projects/{PROJECT_ID}/image-assets").json()["assets"]
-    if assets:
-        raise AssertionError("runtime image asset still exists after drawer delete")
-    return {"preview_loaded": True, "context_menu_delete": True, "runtime_asset_count_after_delete": 0}
+        raise AssertionError("reference image preview did not load")
+    return {"image_node_id": image_id, "preview_loaded": True, "upload_asset_bound": True}
 
 
-def assert_sprite_pending_state(page: Page) -> dict[str, Any]:
-    orb = page.locator(".afs-sprite-orb")
-    expect(orb).to_be_visible()
-    orb.click()
-    input_box = page.locator(".afs-sprite-form input")
-    expect(input_box).to_be_visible()
-    input_box.fill("目前画布是什么状态")
-    input_box.press("Enter")
-    pending = page.locator(".afs-sprite-msg.pending")
-    expect(pending).to_be_visible()
-    first_text = pending.inner_text()
-    if "团团正在" not in first_text:
-        raise AssertionError(f"unexpected pending text: {first_text}")
-    has_shimmer = pending.evaluate("(node) => getComputedStyle(node).animationName.includes('generating-text-shimmer')")
-    if not has_shimmer:
-        raise AssertionError("pending text shimmer animation is missing")
-    page.wait_for_timeout(2900)
-    second_text = page.locator(".afs-sprite-msg.pending").inner_text()
-    if second_text == first_text:
-        raise AssertionError("pending text did not rotate")
-    expect(page.locator(".afs-sprite-msg.pending")).to_have_count(0, timeout=10_000)
-    expect(page.locator(".afs-sprite-msg.sprite").last).to_contain_text("我看到了当前画布")
-    calls = page.evaluate("() => window.__afsSpriteFetchCalls || 0")
-    return {"pending_rotated": True, "shimmer": True, "sprite_fetch_calls": calls}
+def assert_ai_companion_provider_closed_state(page: Page) -> dict[str, Any]:
+    before = graph_counts(page, PROJECT_ID)
+    ensure_ai_open(page, {"width": 1366, "height": 900})
+    send_ai(page, "这个节点是什么")
+    expect(page.locator(".agent-chat-log")).to_contain_text("不会用本地固定回答冒充理解")
+    after = graph_counts(page, PROJECT_ID)
+    if after != before:
+        raise AssertionError(f"AI companion provider-closed conversation mutated graph: before={before} after={after}")
+    return {"provider_closed_honest": True, "zero_mutation": True}
 
 
 def assert_save_restore_and_small_viewport(page: Page, base_url: str) -> dict[str, Any]:
-    page.locator("#canvas-root").click(position={"x": 780, "y": 360})
-    page.locator("#dock .dock-btn.primary").click()
-    page.locator(".popover .quick-create-grid .quick-create-card[data-tone='scene']").click()
-    expect(page.locator(".node")).to_have_count(1)
+    before_count = page.locator(".node").count()
+    page.locator('#corner-controls button[aria-label="添加节点"]').first.click()
+    page.locator(".popover button").filter(has_text="场景与镜头").first.click()
+    expected_count = before_count + 1
+    expect(page.locator(".node")).to_have_count(expected_count)
     page.wait_for_timeout(1200)
-    expect(page.locator(".save-pill")).to_contain_text("已保存", timeout=15_000)
-    page.reload(wait_until="commit")
-    expect(page.locator(".node")).to_have_count(1)
+    expect(page.locator(".studio-save-status")).to_contain_text("已保存", timeout=15_000)
+    page.reload(wait_until="networkidle")
+    expect(page.locator(".node")).to_have_count(expected_count)
     page.locator(".node").first.click()
     page.set_viewport_size({"width": 390, "height": 820})
     expect(page.locator("#canvas-root")).to_be_visible()
@@ -243,9 +223,9 @@ def assert_save_restore_and_small_viewport(page: Page, base_url: str) -> dict[st
     )
     if overflow["scrollWidth"] > overflow["width"] + 4:
         raise AssertionError(f"small viewport has horizontal overflow: {overflow}")
-    page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa=restore-{int(time.time())}", wait_until="commit")
-    expect(page.locator(".node")).to_have_count(1)
-    return {"node_restored_after_reload": True, "small_viewport": overflow}
+    page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa=restore-{int(time.time())}", wait_until="networkidle")
+    expect(page.locator(".node")).to_have_count(expected_count)
+    return {"node_restored_after_reload": True, "expected_node_count": expected_count, "small_viewport": overflow}
 
 
 if __name__ == "__main__":

@@ -1365,6 +1365,12 @@ export function createProductShell(options = {}) {
       });
     });
     window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
+    window.addEventListener("afs:agent-chat-open-task", () => {
+      setAgentChatExpanded(true);
+      notice = "当前节点的 AI 创作任务已打开；确认前不会改动画布。";
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
     const narrowAgentQuery = responsiveAgentMediaQuery();
     narrowAgentQuery?.addEventListener?.("change", () => {
       syncResponsiveAgentState({ force: true });

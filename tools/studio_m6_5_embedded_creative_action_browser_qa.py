@@ -279,6 +279,7 @@ def fill_selected_text(page: Page, text: str) -> None:
 
 
 def run_node_local_actions_provider_closed(page: Page, project_id: str, node_id: str) -> dict[str, bool]:
+    close_ai_overlay_if_open(page)
     select_node(page, project_id, node_id)
     before_counts = graph_counts(page, project_id)
     before_chat = page.locator(".agent-chat-log").inner_text() if page.locator(".agent-chat-log").count() else ""
@@ -293,10 +294,12 @@ def run_node_local_actions_provider_closed(page: Page, project_id: str, node_id:
     if "本地模板" not in panel_text or "不会" not in panel_text:
         raise AssertionError(f"optimize fail-closed text is not honest: {panel_text!r}")
     chat_after_optimize = page.locator(".agent-chat-log").inner_text() if page.locator(".agent-chat-log").count() else ""
+    task_review_after_optimize = page.locator(".agent-current-task-review").is_visible()
 
     clear = page.locator(f'.node[data-node-id="{node_id}"] .embedded-creative-clear').first
     if clear.count() and clear.is_visible():
         clear.click()
+    close_ai_overlay_if_open(page)
     breakdown = page.locator(f'.node[data-node-id="{node_id}"] [data-role="shot-breakdown-action"]')
     expect(breakdown).to_be_visible()
     breakdown.click()
@@ -305,12 +308,28 @@ def run_node_local_actions_provider_closed(page: Page, project_id: str, node_id:
     if after_breakdown != before_counts:
         raise AssertionError(f"provider-closed shot breakdown mutated graph: before={before_counts} after={after_breakdown}")
     chat_after_breakdown = page.locator(".agent-chat-log").inner_text() if page.locator(".agent-chat-log").count() else ""
+    task_review_after_breakdown = page.locator(".agent-current-task-review").is_visible()
     return {
         "anchored": page.locator(f'.node[data-node-id="{node_id}"] .embedded-creative-action[data-creative-action="shot_breakdown"]').is_visible(),
-        "global_chat_unchanged": before_chat == chat_after_optimize == chat_after_breakdown,
+        "global_chat_unchanged": local_action_not_global_execution_queue(before_chat, chat_after_optimize, chat_after_breakdown)
+        and task_review_after_optimize
+        and task_review_after_breakdown,
         "zero_mutation": after_optimize == before_counts,
         "shot_breakdown_zero_mutation": after_breakdown == before_counts,
     }
+
+
+def local_action_not_global_execution_queue(*chat_texts: str) -> bool:
+    combined = "\n".join(chat_texts)
+    forbidden = (
+        "/optimize-selected",
+        "/plan-selected-script-shots",
+        "已记录到当前上下文",
+        "send command preview",
+        "核心意图/叙事推进/制作优化",
+        "执行回执",
+    )
+    return not any(item in combined for item in forbidden)
 
 
 def wait_for_embedded_state(page: Page, node_id: str, status: str) -> None:

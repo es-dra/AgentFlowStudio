@@ -23,6 +23,25 @@ def evaluate(root: Path) -> dict[str, Any]:
     evidence["fit_probe"] = _node_probe(root, FIT_PROBE, findings, "fit_probe")
     evidence["port_geometry_probe"] = _node_probe(root, PORT_GEOMETRY_PROBE, findings, "port_geometry_probe")
     evidence["agent_split_probe"] = _node_probe(root, AGENT_SPLIT_PROBE, findings, "agent_split_probe")
+    expected_split = {
+        "commandType": "start_embedded_creative_action",
+        "previewStatus": "preview",
+        "title": "自动拆分分镜",
+        "actionType": "shot_breakdown",
+        "mode": "dynamic_shot_breakdown",
+        "rawPreserved": True,
+        "visibleRawLeak": False,
+        "relation": "visible_candidate_storyboard_subgraph",
+        "storyboardWrite": True,
+        "providerDispatchCount": 0,
+        "remoteDispatchCount": 0,
+    }
+    if evidence["agent_split_probe"] and evidence["agent_split_probe"] != expected_split:
+        findings.append({
+            "severity": "P0",
+            "scope": "agent_split_probe",
+            "issue": f"unexpected embedded shot breakdown payload: {evidence['agent_split_probe']}",
+        })
     provider_dispatch_count = int(evidence["agent_split_probe"].get("providerDispatchCount", 0) or 0)
     if provider_dispatch_count != 0:
       findings.append({"severity": "P0", "scope": "provider_gate", "issue": "provider dispatch count was non-zero"})
@@ -171,7 +190,6 @@ AGENT_SPLIT_PROBE = r'''
 import {
   agentChatContextKey,
   createAgentChatContextStore,
-  executePendingAgentCommandWithRuntime,
   submitAgentChatMessage,
 } from "./apps/studio/src/agent-chat-lifecycle.js";
 const context = {
@@ -188,33 +206,19 @@ const context = {
 };
 const session = createAgentChatContextStore().get(agentChatContextKey(context));
 const preview = submitAgentChatMessage(session, "/plan-selected-script-shots", context);
-const state = { meta: { projectId: "p0" }, nodes: {}, edges: {}, order: [], production: {}, viewport: { x: 0, y: 0, scale: 1 } };
-const store = { get: () => state, set: (mutator) => mutator(state) };
-const runtime = {
-  loadProductionPlanTruth: async () => ({
-    projection: {
-      schema_version: "afs.dynamic_production_plan_projection.v0.1",
-      project_id: "p0",
-      planning_state: "planning_required",
-      shots: [],
-      chunks: [],
-      provider_dispatch_count: 0,
-      remote_dispatch_count: 0,
-    },
-    provider_dispatch_count: 0,
-    remote_dispatch_count: 0,
-  }),
-};
-const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
 const visibleRawLeak = session.messages.some((message) => String(message.text || "").includes("/plan-selected-script-shots"));
 process.stdout.write(JSON.stringify({
   commandType: preview.command.command_type,
   previewStatus: preview.status,
+  title: preview.command.title,
+  actionType: preview.command.action_type,
+  mode: preview.command.mode,
+  rawPreserved: preview.command.raw_command_text === "/plan-selected-script-shots",
   visibleRawLeak,
-  planningRequired: receipt.summary.includes("需要智能规划器"),
+  relation: preview.command.impact.relation,
   storyboardWrite: preview.command.impact.storyboard_write,
-  providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count,
-  remoteDispatchCount: preview.command.remote_dispatch_count + receipt.remote_dispatch_count
+  providerDispatchCount: preview.command.provider_dispatch_count,
+  remoteDispatchCount: preview.command.remote_dispatch_count
 }));
 '''
 

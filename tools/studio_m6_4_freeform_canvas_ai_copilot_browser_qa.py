@@ -189,11 +189,12 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
 
     before_optimize = graph_counts(page, project_id)
     send_ai(page, "优化当前文本")
-    expect(page.locator(".agent-command-preview")).to_contain_text("无法执行默认优化文本")
-    expect(page.locator(".agent-command-preview")).to_contain_text("请点击节点上的“优化”")
+    expect(page.locator(".agent-command-preview")).to_contain_text("优化当前节点")
+    expect(page.locator(".agent-command-preview")).to_contain_text("确认后在当前节点打开真实 LLM 修订任务")
+    expect(page.locator(".agent-command-preview")).to_contain_text("server_codex 文本模型")
     after_optimize = graph_counts(page, project_id)
     if after_optimize != before_optimize:
-        raise AssertionError("global optimize guidance changed graph state")
+        raise AssertionError("global optimize preview changed graph state before confirmation")
     revisions = page.evaluate(
         """({ key, nodeId }) => {
           const s = JSON.parse(localStorage.getItem(key) || '{}');
@@ -202,7 +203,7 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
         {"key": storage_key(project_id), "nodeId": first_id},
     )
     if revisions:
-        raise AssertionError("global optimize guidance created a local revision")
+        raise AssertionError("global optimize preview created a local revision before confirmation")
     page.get_by_role("button", name="取消").last.click()
 
     send_ai(page, "创建分支版本：哥哥视角")
