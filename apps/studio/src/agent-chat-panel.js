@@ -5,7 +5,7 @@ import {
   executePendingAgentCommand,
   executePendingAgentCommandWithRuntime,
   recordAgentCommandError,
-  submitAgentChatMessage,
+  submitAgentChatMessageWithRuntime,
   undoAgentReceipt,
   undoAgentReceiptWithRuntime,
 } from "./agent-chat-lifecycle.js";
@@ -33,9 +33,10 @@ export function buildAgentChatPanel({
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
   body.appendChild(messageLog(session));
+  if (session?.conversationRequest) body.appendChild(conversationStatus({ session, context, runtime, onRender }));
   if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, runtime, onRender }));
   body.appendChild(receiptList({ session, store, runtime, onRender }));
-  body.appendChild(composer({ session, context, onOpen, onRender }));
+  body.appendChild(composer({ session, context, runtime, onOpen, onRender }));
   aside.appendChild(body);
   return aside;
 }
@@ -217,7 +218,38 @@ function receiptList({ session, store, runtime, onRender }) {
   return wrap;
 }
 
-function composer({ session, context, onOpen, onRender }) {
+function conversationStatus({ session, context, runtime, onRender }) {
+  const state = session.conversationRequest || {};
+  const wrap = el("section", `agent-conversation-status ${state.status || ""}`);
+  const label = state.status === "loading" ? "正在回答" : state.status === "failed" ? "模型不可用" : "对话状态";
+  wrap.append(el("span", "eyebrow", label), el("p", "", state.message || "AI 创作搭档会通过运行服务回答，不会改动画布。"));
+  const actions = el("div", "agent-command-actions");
+  if (state.status === "loading" && typeof state.cancel === "function") {
+    const cancel = el("button", "studio-secondary-button", "取消回答");
+    cancel.type = "button";
+    cancel.addEventListener("click", () => {
+      state.cancel();
+      state.status = "cancelled";
+      state.message = "已取消这次回答；如果服务端已经开始处理，结果不会写入画布。";
+      onRender?.();
+    });
+    actions.appendChild(cancel);
+  }
+  if (["failed", "unavailable", "cancelled"].includes(state.status) && state.lastMessage) {
+    const retry = el("button", "studio-secondary-button", "重试");
+    retry.type = "button";
+    retry.addEventListener("click", () => {
+      submitAgentChatMessageWithRuntime(session, state.lastMessage, context, runtime)
+        .finally(() => onRender?.());
+      onRender?.();
+    });
+    actions.appendChild(retry);
+  }
+  if (actions.childNodes.length) wrap.appendChild(actions);
+  return wrap;
+}
+
+function composer({ session, context, runtime, onOpen, onRender }) {
   const form = el("form", "agent-chat-composer");
   const input = document.createElement("textarea");
   input.rows = 3;
@@ -257,13 +289,20 @@ function composer({ session, context, onOpen, onRender }) {
   form.append(input, send);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const result = submitAgentChatMessage(session, input.value || session.draftMessage || "", context);
-    if (result.status !== "empty") {
+    const message = input.value || session.draftMessage || "";
+    const run = submitAgentChatMessageWithRuntime(session, message, context, runtime)
+      .then((result) => {
+        if (result.status === "empty") return;
+        onOpen?.();
+      })
+      .finally(() => onRender?.());
+    if (message.trim()) {
       session.draftMessage = "";
       input.value = "";
     }
     onOpen?.();
     onRender?.();
+    return run;
   });
   return form;
 }

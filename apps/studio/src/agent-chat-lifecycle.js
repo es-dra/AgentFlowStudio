@@ -249,6 +249,68 @@ export function submitAgentChatMessage(session, rawText, context) {
   return { status: answer?.status || "answered", conversation: answer };
 }
 
+export async function submitAgentChatMessageWithRuntime(session, rawText, context, runtime = null) {
+  const commandText = cleanSourceText(rawText, 12000);
+  const displayText = cleanText(rawText, 900);
+  if (!commandText) return { status: "empty" };
+  const command = previewAgentCommand(commandText, context);
+  if (command.command_type !== "none") {
+    return submitAgentChatMessage(session, rawText, context);
+  }
+  appendMessage(session, { role: "user", text: displayText || commandText });
+  if (!runtime?.agentChatConversation) {
+    const unavailable = unavailableConversation("runtime_unavailable");
+    session.conversationRequest = {
+      status: "unavailable",
+      message: unavailable.text,
+      lastMessage: commandText,
+    };
+    appendMessage(session, { role: "assistant", text: unavailable.text, tone: "warning" });
+    return { status: "unavailable", conversation: unavailable };
+  }
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  session.conversationRequest = {
+    status: "loading",
+    message: "AI 创作搭档正在通过运行服务结合当前画布回答；这不会改动画布。",
+    lastMessage: commandText,
+    cancel: () => controller?.abort(),
+  };
+  try {
+    const response = await runtime.agentChatConversation({
+      message: commandText,
+      node_id: context?.selected_node_id || "",
+      canvas_summary: agentChatRuntimeSummary(context),
+      provider_service_id: "server_codex",
+      generated_at: new Date().toISOString(),
+    }, { signal: controller?.signal || null });
+    if (response?.mode !== "llm" || response?.provider_calls_started !== true) {
+      const unavailable = unavailableConversation(response?.safe_manifest?.fallback_reason || response?.mode || "llm_unavailable");
+      session.conversationRequest = {
+        status: "unavailable",
+        message: unavailable.text,
+        lastMessage: commandText,
+      };
+      appendMessage(session, { role: "assistant", text: unavailable.text, tone: "warning" });
+      return { status: "unavailable", conversation: unavailable, response };
+    }
+    const answer = runtimeConversationAnswer(response);
+    session.conversationRequest = null;
+    session.lastConversation = answer;
+    appendMessage(session, { role: "assistant", text: answer.text });
+    return { status: answer.status, conversation: answer, response };
+  } catch (error) {
+    const aborted = error?.name === "AbortError";
+    const failure = unavailableConversation(aborted ? "cancelled" : "runtime_request_failed");
+    session.conversationRequest = {
+      status: aborted ? "cancelled" : "failed",
+      message: failure.text,
+      lastMessage: commandText,
+    };
+    appendMessage(session, { role: "assistant", text: failure.text, tone: aborted ? "warning" : "error" });
+    return { status: session.conversationRequest.status, conversation: failure, error };
+  }
+}
+
 export function cancelAgentCommand(session) {
   if (!session?.pendingCommand) return null;
   const command = session.pendingCommand;
@@ -2209,6 +2271,53 @@ function appendMessage(session, message) {
     tone: cleanToken(message.tone, 24),
     created_at: new Date().toISOString(),
   }].slice(-MESSAGE_LIMIT);
+}
+
+function runtimeConversationAnswer(response) {
+  return {
+    status: "answered",
+    text: cleanText(response?.reply || "我已结合当前画布回答。", 900),
+    source: "runtime_llm",
+    provider_dispatch_count: 1,
+    remote_dispatch_count: 1,
+    request_id: cleanToken(response?.provider_lineage?.request_id, 180),
+    latency_ms: Number(response?.latency_ms || 0),
+    cost_usd: Number(response?.cost_usd || 0),
+    graph_mutation: {
+      mutated: response?.graph_mutation?.mutated === true,
+      before_digest: cleanToken(response?.graph_mutation?.before_digest, 80),
+      after_digest: cleanToken(response?.graph_mutation?.after_digest, 80),
+    },
+  };
+}
+
+function unavailableConversation(reason) {
+  return {
+    status: "unavailable",
+    text: reason === "cancelled"
+      ? "已取消这次回答；画布事实没有改变。"
+      : "AI 模型当前不可用，我不会用本地固定回答冒充理解；请稍后重试，或先用画布按钮创建节点和预览命令。",
+    source: "runtime_llm_unavailable",
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+    reason: cleanToken(reason, 80),
+  };
+}
+
+function agentChatRuntimeSummary(context = {}) {
+  const counts = context?.counts || {};
+  return {
+    nodes: Number(counts.nodes || 0),
+    edges: Number(counts.edges || 0),
+    assets: Number(counts.assets || 0),
+    selected_node_type: cleanToken(context?.selected_node_type, 40),
+    selected_node_status: cleanToken(context?.selected_node_status, 40),
+    selected_node_title: cleanText(context?.selected_node_title, 120),
+    selected_edge_relation_type: cleanToken(context?.selected_edge_relation_type, 80),
+    selected_edge_from_title: cleanText(context?.selected_edge_from_title, 120),
+    selected_edge_to_title: cleanText(context?.selected_edge_to_title, 120),
+    section: cleanToken(context?.section, 80),
+  };
 }
 
 function isProductionPlanRuntimeCommand(commandType) {

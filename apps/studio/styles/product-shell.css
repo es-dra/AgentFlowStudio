@@ -778,6 +778,11 @@
 .agent-message.error p { border: 1px solid rgba(241, 108, 112, .32); background: rgba(241, 108, 112, .08); color: #ffcbcd; }
 .agent-command-preview,
 .agent-receipts { display: grid; gap: 8px; border-top: 1px solid var(--product-line); padding-top: 10px; }
+.agent-conversation-status { display: grid; gap: 7px; border-top: 1px solid var(--product-line); padding-top: 10px; }
+.agent-conversation-status p { margin: 0; color: var(--product-muted); font-size: 12px; line-height: 1.5; }
+.agent-conversation-status.loading p { color: #d3e0e6; }
+.agent-conversation-status.failed p,
+.agent-conversation-status.unavailable p { color: #ffd0aa; }
 .agent-command-preview strong { color: var(--product-text); font-size: 13px; }
 .agent-command-preview p,
 .agent-empty-copy,
@@ -1660,6 +1665,30 @@ body,
     left: 0;
     display: block;
   }
+
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open {
+    max-height: calc(100dvh - 88px);
+    overflow: hidden;
+  }
+
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-chat-body {
+    display: grid;
+    grid-template-rows: auto minmax(64px, 1fr) auto auto auto;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-context-strip,
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-conversation-status,
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-command-preview,
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-receipts {
+    max-height: min(140px, 22dvh);
+    overflow: auto;
+  }
+
+  .studio-unified-workspace.agent-responsive-compact.agent-mobile-open .studio-agent-chat.mobile-open .agent-chat-composer {
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1754,6 +1783,7 @@ body,
   }
 
   .studio-agent-chat.mobile-open .agent-context-strip,
+  .studio-agent-chat.mobile-open .agent-conversation-status,
   .studio-agent-chat.mobile-open .agent-command-preview,
   .studio-agent-chat.mobile-open .agent-receipts {
     max-height: 24dvh;

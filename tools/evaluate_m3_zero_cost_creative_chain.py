@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -157,8 +158,21 @@ def _check_static_contract(root: Path, findings: list[dict[str, Any]]) -> None:
         "remote_dispatch_count: 1",
     )
     for marker in forbidden_markers:
-        if marker in production_text:
+        for match in re.finditer(re.escape(marker), production_text):
+            if _allowed_runtime_llm_dispatch_marker(production_text, match.start()):
+                continue
             findings.append(_finding("P1", "production_pollution", f"forbidden production marker present: {marker}"))
+
+
+def _allowed_runtime_llm_dispatch_marker(production_text: str, marker_index: int) -> bool:
+    function_start = production_text.rfind("function runtimeConversationAnswer", 0, marker_index)
+    if function_start < 0:
+        return False
+    function_end = production_text.find("\n}\n", marker_index)
+    if function_end < 0:
+        return False
+    function_body = production_text[function_start:function_end]
+    return 'source: "runtime_llm"' in function_body and "graph_mutation" in function_body
 
 
 def _load_corpus(root: Path, corpus_path: Path, findings: list[dict[str, Any]]) -> dict[str, Any]:

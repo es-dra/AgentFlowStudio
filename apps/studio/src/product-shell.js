@@ -2,7 +2,7 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessage } from "./agent-chat-lifecycle.js";
+import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 
 export function createProductShell(options = {}) {
@@ -1207,10 +1207,10 @@ export function createProductShell(options = {}) {
     requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
   }
 
-  function submitToAgentChat(messageText) {
+  async function submitToAgentChat(messageText) {
     const context = currentAgentChatContext();
     const session = agentChatContexts.get(agentChatContextKey(context));
-    const result = submitAgentChatMessage(session, messageText, context);
+    const result = await submitAgentChatMessageWithRuntime(session, messageText, context, options.getRuntime?.());
     setAgentChatExpanded(true);
     if (result.status === "empty") focusAgentComposer();
     else render();
@@ -1221,7 +1221,12 @@ export function createProductShell(options = {}) {
 
   function bindShellEvents() {
     window.addEventListener("afs:agent-chat-submit", (event) => {
-      submitToAgentChat(event.detail?.message || "");
+      submitToAgentChat(event.detail?.message || "").catch((error) => {
+        const context = currentAgentChatContext();
+        const session = agentChatContexts.get(agentChatContextKey(context));
+        recordAgentCommandError(session, error);
+        render();
+      });
     });
     window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
     const narrowAgentQuery = responsiveAgentMediaQuery();

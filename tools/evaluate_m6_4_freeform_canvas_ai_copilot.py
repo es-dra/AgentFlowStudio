@@ -22,10 +22,18 @@ SOURCE_CONTRACTS = (
     {
         "severity": "P0",
         "scope": "ai_panel",
-        "issue": "greeting fallback remains canned recorded-context response",
+        "issue": "AI panel non-command conversation does not route through runtime LLM when runtime is available",
         "path": "apps/studio/src/agent-chat-lifecycle.js",
-        "must_include": ("conversationalReply", "provider_dispatch_count: 0"),
+        "must_include": ("submitAgentChatMessageWithRuntime", "runtime.agentChatConversation", "runtime_llm_unavailable"),
         "must_exclude": ("已记录到当前上下文。需要改动画布时，请发送可预览命令。",),
+    },
+    {
+        "severity": "P0",
+        "scope": "runtime_llm_route",
+        "issue": "Runtime agent chat route is missing server_codex structured provider contract",
+        "path": "apps/api/runtime_agent_chat_conversation.py",
+        "must_include": ("AGENT_CHAT_CONTRACT_ID", "SERVER_CODEX_SERVICE_ID", "structured_output_schema_digest", "graph_mutation"),
+        "must_exclude": ("provider raw response persisted", "raw_provider_stdout_stored"),
     },
     {
         "severity": "P0",
@@ -92,6 +100,7 @@ import {
   cancelAgentCommand,
   createAgentChatContextStore,
   executePendingAgentCommand,
+  submitAgentChatMessageWithRuntime,
   submitAgentChatMessage,
 } from './apps/studio/src/agent-chat-lifecycle.js';
 
@@ -122,6 +131,29 @@ assert(!session.pendingCommand, 'greeting must not create pending command');
 assert(greeting.conversation?.provider_dispatch_count === 0 && greeting.conversation?.remote_dispatch_count === 0, 'greeting must not dispatch provider');
 assert(!session.messages.at(-1).text.includes('已记录到当前上下文'), 'greeting must not use canned recorded-context copy');
 assert(session.messages.at(-1).text.includes('AI 创作搭档'), 'greeting should identify the creative copilot');
+
+const runtimeSession = sessions.get(`${agentChatContextKey(context)}:runtime`);
+let runtimePayload = null;
+const runtimeGreeting = await submitAgentChatMessageWithRuntime(runtimeSession, '你好', context, {
+  agentChatConversation: async (payload) => {
+    runtimePayload = payload;
+    return {
+      mode: 'llm',
+      reply: '你好，我会结合当前画布回答；这个想法节点还在草稿状态，下一步可以先补角色目标和场景。',
+      provider_calls_started: true,
+      provider_lineage: { request_id: 'req_runtime_probe' },
+      graph_mutation: { mutated: false, before_digest: 'a'.repeat(64), after_digest: 'a'.repeat(64) },
+      latency_ms: 12,
+      cost_usd: 0,
+    };
+  },
+});
+assert(runtimeGreeting.status === 'answered', 'runtime greeting must answer through runtime route');
+assert(runtimeGreeting.conversation?.source === 'runtime_llm', 'runtime greeting must be marked runtime_llm');
+assert(runtimeGreeting.conversation?.provider_dispatch_count === 1, 'runtime greeting must record provider dispatch');
+assert(runtimePayload?.provider_service_id === 'server_codex', 'runtime greeting must request server_codex');
+assert(runtimePayload?.message === '你好', 'runtime greeting must pass exact user message');
+assert(runtimePayload?.canvas_summary?.selected_node_title === '雨夜想法', 'runtime greeting must include safe selected-node context');
 
 const nodeQuestion = submitAgentChatMessage(session, '这个节点是什么', context);
 assert(nodeQuestion.status === 'answered', 'node question must answer conversationally');

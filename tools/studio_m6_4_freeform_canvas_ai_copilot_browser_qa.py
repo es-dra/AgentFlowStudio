@@ -160,7 +160,7 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
 
     ensure_ai_open(page, viewport)
     send_ai(page, "你好")
-    expect(page.locator(".agent-chat-log")).to_contain_text("AI 创作搭档")
+    expect(page.locator(".agent-chat-log")).to_contain_text("不会用本地固定回答冒充理解")
     greeting_counts = graph_counts(page, project_id)
     if greeting_counts != initial:
         raise AssertionError(f"greeting mutated graph: before={initial} after={greeting_counts}")
@@ -174,7 +174,7 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
     fill_selected_text(page, "女孩在雨夜天台寻找失踪的哥哥，她必须在灯牌熄灭前找到线索。")
     node_question_before = graph_counts(page, project_id)
     send_ai(page, "这个节点是什么")
-    expect(page.locator(".agent-chat-log")).to_contain_text("类型是文本")
+    expect(page.locator(".agent-chat-log")).to_contain_text("不会用本地固定回答冒充理解")
     if graph_counts(page, project_id) != node_question_before:
         raise AssertionError("node explanation changed graph state")
 
@@ -224,8 +224,7 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
     ensure_ai_open(page, viewport)
     expect(page.locator(".studio-agent-chat .agent-context-strip")).to_contain_text("连线")
     send_ai(page, "这条连线代表什么")
-    expect(page.locator(".agent-chat-log")).to_contain_text("这条连线表示")
-    expect(page.locator(".agent-chat-log")).to_contain_text("参考关系")
+    expect(page.locator(".agent-chat-log")).to_contain_text("不会用本地固定回答冒充理解")
     send_ai(page, "把这条连线改成生成")
     expect(page.locator(".agent-command-preview")).to_contain_text("连线")
     confirm_latest_command(page)
@@ -415,11 +414,7 @@ def send_ai(page: Page, text: str) -> None:
     path_probe = install_send_path_probe(page)
     button.click()
     try:
-        page.wait_for_function(
-            """previous => document.querySelector('.agent-chat-log')?.innerText !== previous""",
-            arg=before,
-            timeout=10_000,
-        )
+        wait_for_agent_turn(page, before_messages, before_previews, before)
         probe = send_path_probe(page, path_probe)
         if probe.get("buttonClickCount") != 1:
             raise AssertionError(f"visible send button click count was {probe.get('buttonClickCount')}, expected 1")
@@ -500,11 +495,7 @@ def assert_keyboard_input_paths(page: Page) -> None:
     composer.fill("下一步建议是什么")
     composer.press("Enter")
     try:
-        page.wait_for_function(
-            """previous => document.querySelector('.agent-chat-log')?.innerText !== previous""",
-            arg=before_enter,
-            timeout=10_000,
-        )
+        wait_for_agent_turn(page, before_enter_messages, page.locator(".studio-agent-chat:not(.collapsed) .agent-command-preview").count(), before_enter)
     except Exception as error:
         diagnostics = page.evaluate(
             """args => {
@@ -530,8 +521,22 @@ def assert_keyboard_input_paths(page: Page) -> None:
     enter_path = send_path_probe(page, enter_probe)
     if enter_path.get("buttonClickCount") != 0 or enter_path.get("formSubmitCount") != 1:
         raise AssertionError(f"Enter did not use the keyboard submit path exactly once: {json.dumps(enter_path, ensure_ascii=False)}")
-    expect(page.locator(".agent-chat-log")).to_contain_text("下一步")
+    expect(page.locator(".agent-chat-log")).to_contain_text("不会用本地固定回答冒充理解")
     assert_chat_log_stable(page, "Enter key")
+
+
+def wait_for_agent_turn(page: Page, before_messages: int, before_previews: int, before_log: str, timeout_ms: int = 20_000) -> None:
+    page.wait_for_function(
+        """({ beforeMessages, beforePreviews, beforeLog }) => {
+          const messages = document.querySelectorAll('.agent-chat-log .agent-message').length;
+          const previews = document.querySelectorAll('.studio-agent-chat:not(.collapsed) .agent-command-preview').length;
+          const loading = document.querySelector('.agent-conversation-status.loading');
+          const log = document.querySelector('.agent-chat-log')?.innerText || '';
+          return !loading && (previews > beforePreviews || messages >= beforeMessages + 2 || log !== beforeLog);
+        }""",
+        arg={"beforeMessages": before_messages, "beforePreviews": before_previews, "beforeLog": before_log},
+        timeout=timeout_ms,
+    )
 
 
 def assert_chat_log_stable(page: Page, label: str) -> None:
