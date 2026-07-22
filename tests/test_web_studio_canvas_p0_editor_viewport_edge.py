@@ -47,7 +47,9 @@ def test_p0_static_contract_restores_split_entry_without_legacy_breakdown() -> N
     assert 'renderScope: "canvas-local-edit"' in prompt_bar
 
     assert "自动拆分分镜" in prompt_bar
-    assert "/plan-selected-script-shots" in prompt_bar
+    assert "startEmbeddedCreativeAction" in prompt_bar
+    assert '"shot_breakdown"' in prompt_bar
+    assert "/plan-selected-script-shots" not in prompt_bar
     assert "request_story_plan_candidate" in lifecycle
     assert "需要智能规划器提交结构化候选" in lifecycle
     assert "planning_required" in lifecycle

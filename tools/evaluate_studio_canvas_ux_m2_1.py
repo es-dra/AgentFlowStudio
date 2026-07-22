@@ -99,19 +99,18 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             "diffPreview(command.preview_diff)",
         ],
         "lifecycle": [
-            "optimize_script_revision",
+            "revise_selected_node",
             "request_story_plan_candidate",
-            "default_local_structure",
-            "instructed_local_structure",
+            "不会用本地固定模板冒充专业修订",
             "selectScriptRevision(receipt.previous_revision_id)",
             "scriptAnalysisStateLabel",
             "productionPlanStateLabel",
             "provider_dispatch_count: 0",
         ],
         "prompt_bar": [
-            "/optimize-selected-default",
-            "/plan-selected-script-shots",
-            "默认优化文本",
+            "startEmbeddedCreativeAction",
+            '"script_revision"',
+            '"shot_breakdown"',
             "自动拆分分镜",
             "优化提示词",
             "isEditableTextPromptNode",
@@ -201,13 +200,10 @@ import {
   agentChatContextKey,
   agentChatContextSnapshot,
   createAgentChatContextStore,
-  executePendingAgentCommandWithRuntime,
   submitAgentChatMessage,
-  undoAgentReceiptWithRuntime,
 } from "./apps/studio/src/agent-chat-lifecycle.js";
 
 const oldDigest = "a".repeat(64);
-const newDigest = "b".repeat(64);
 const state = {
   meta: { projectId: "p1", projectName: "Eval", canvasName: "Canvas", seq: 4 },
   nodes: {
@@ -232,49 +228,8 @@ const state = {
   selection: { nodeIds: ["n1"], edgeId: null },
   ui: {},
 };
-const store = { get: () => state, set: (mutator) => mutator(state) };
-let createPayload = null;
-let selectedRevision = "";
-const runtime = {
-  createScriptRevision: async (payload) => {
-    createPayload = payload;
-    return {
-      projection: {
-        schema_version: "afs.script_core_truth.v0.1",
-        project_id: "p1",
-        current_revision_id: "rev_new",
-        source_digest: newDigest,
-        source_length: payload.source_text.length,
-        analysis_state: "analysis_required",
-        current_revision: { revision_id: "rev_new", parent_revision_id: payload.parent_revision_id, source_kind: payload.source_kind, source_digest: newDigest, source_length: payload.source_text.length, analysis_state: "analysis_required" },
-        revision_history: [{ revision_id: "rev_old", source_digest: oldDigest }, { revision_id: "rev_new", source_digest: newDigest }],
-        assets: [],
-        asset_counts: { characters: 0, main_scenes: 0, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
-        provider_dispatch_count: 0,
-        remote_dispatch_count: 0,
-      },
-    };
-  },
-  selectScriptRevision: async (revisionId) => {
-    selectedRevision = revisionId;
-    return {
-      projection: {
-        schema_version: "afs.script_core_truth.v0.1",
-        project_id: "p1",
-        current_revision_id: "rev_old",
-        source_digest: oldDigest,
-        source_length: 42,
-        analysis_state: "confirmed",
-        current_revision: { revision_id: "rev_old", source_digest: oldDigest, analysis_state: "confirmed" },
-        revision_history: [{ revision_id: "rev_old", source_digest: oldDigest }],
-        assets: [],
-        asset_counts: { characters: 0, main_scenes: 0, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
-        provider_dispatch_count: 0,
-        remote_dispatch_count: 0,
-      },
-    };
-  },
-};
+const originalContent = state.nodes.n1.content;
+const originalNodeCount = state.order.length;
 const context = agentChatContextSnapshot({
   project: { project_id: "p1", name: "Eval" },
   studioState: state,
@@ -283,8 +238,6 @@ const context = agentChatContextSnapshot({
 });
 const session = createAgentChatContextStore().get(agentChatContextKey(context));
 const preview = submitAgentChatMessage(session, "/optimize-selected-default", context);
-const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
-const undo = await undoAgentReceiptWithRuntime(session, receipt, store, runtime);
 const instructed = submitAgentChatMessage(session, "/optimize-selected tighten rhythm and preserve ending", context);
 const storyboardContext = agentChatContextSnapshot({ project: { project_id: "p1", name: "Eval" }, studioState: state, section: "storyboard", selectedNode: state.nodes.n1 });
 const storyboardBlocked = submitAgentChatMessage(session, "/optimize-selected-default", storyboardContext);
@@ -294,20 +247,18 @@ process.stdout.write(JSON.stringify({
   commandType: preview.command.command_type,
   rawCommandPreserved: preview.command.raw_command_text === "/optimize-selected-default",
   visibleRawCommandLeak,
-  defaultMode: createPayload.provenance.optimization_mode,
-  sourceIncludesCoreIntent: createPayload.source_text.includes("核心意图"),
-  parentRevisionId: createPayload.parent_revision_id,
-  receiptDomain: receipt.runtime_domain,
-  receiptStatus: receipt.status,
-  undoStatus: undo.status,
-  selectedRevision,
+  hasLocalAfterText: Boolean(preview.command.after_text),
+  sourceIncludesTemplateHeading: String(preview.command.after_text || "").includes("核心意图"),
+  nodeCountAfterPreview: state.order.length,
+  nodeIdentityPreserved: state.order.length === originalNodeCount,
+  contentChangedAfterPreview: state.nodes.n1.content !== originalContent,
+  errorMessage: preview.command.error_message,
   instructedStatus: instructed.status,
   instructedType: instructed.command.command_type,
   storyboardBlockedStatus: storyboardBlocked.status,
   storyboardRequiresConfirmation: storyboardBlocked.command.requires_confirmation,
-  storyboardWrite: preview.command.impact.storyboard_write,
-  providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count + undo.provider_dispatch_count,
-  remoteDispatchCount: preview.command.remote_dispatch_count + receipt.remote_dispatch_count + undo.remote_dispatch_count,
+  providerDispatchCount: preview.command.provider_dispatch_count,
+  remoteDispatchCount: preview.command.remote_dispatch_count,
 }));
 '''
     try:
@@ -324,22 +275,20 @@ process.stdout.write(JSON.stringify({
         return {}
     payload = json.loads(completed.stdout)
     expected = {
-        "previewStatus": "preview",
-        "commandType": "optimize_script_revision",
+        "previewStatus": "blocked",
+        "commandType": "revise_selected_node",
         "rawCommandPreserved": True,
         "visibleRawCommandLeak": False,
-        "defaultMode": "default_local_structure",
-        "sourceIncludesCoreIntent": True,
-        "parentRevisionId": "rev_old",
-        "receiptDomain": "script_revision",
-        "receiptStatus": "executed",
-        "undoStatus": "undone",
-        "selectedRevision": "rev_old",
-        "instructedStatus": "preview",
-        "instructedType": "optimize_script_revision",
+        "hasLocalAfterText": False,
+        "sourceIncludesTemplateHeading": False,
+        "nodeCountAfterPreview": 1,
+        "nodeIdentityPreserved": True,
+        "contentChangedAfterPreview": False,
+        "errorMessage": "节点文本优化现在需要通过当前节点内的 AI 预览生成真实改写；不会用本地固定模板冒充专业修订。请点击节点上的“优化”。",
+        "instructedStatus": "blocked",
+        "instructedType": "revise_selected_node",
         "storyboardBlockedStatus": "blocked",
         "storyboardRequiresConfirmation": False,
-        "storyboardWrite": False,
         "providerDispatchCount": 0,
         "remoteDispatchCount": 0,
     }

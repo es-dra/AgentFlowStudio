@@ -698,7 +698,7 @@ function previewAgentCommand(message, context = {}) {
     return scriptOptimizationCommand({
       context,
       mode: "default",
-      instruction: "保留核心意图，改善结构、表达、节奏和可生产性。",
+      instruction: "保留原有创作目标，改善结构、表达、节奏和可生产性。",
     });
   }
 
@@ -1016,7 +1016,7 @@ function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary
   };
 }
 
-function scriptOptimizationCommand({ context, mode, instruction }) {
+function scriptOptimizationCommand({ context, mode }) {
   if (context?.section === "storyboard_read_only") {
     return blockedCommand("revise_selected_node", "优化当前节点", "故事板是只读投影。请切回画布后再优化文本。", context);
   }
@@ -1027,38 +1027,12 @@ function scriptOptimizationCommand({ context, mode, instruction }) {
   if (!sourceText) {
     return blockedCommand("revise_selected_node", "优化当前节点", "当前文本节点还没有内容。", context);
   }
-  const optimized = optimizedScriptDraft(sourceText, instruction);
-  return {
-    schema_version: SCHEMA_VERSION,
-    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    command_type: "revise_selected_node",
-    execution_mode: "local",
-    status: "preview",
-    title: mode === "default" ? "默认优化文本" : "按要求优化文本",
-    summary: "生成可审阅的节点内修订草案；确认后保留同一节点身份和修订历史，不新建剧本版本节点。",
-    context_key: agentChatContextKey(context),
-    project_id: cleanToken(context.project_id, 120),
-    revision_id: cleanToken(context.script_revision_id, 140),
-    node_id: cleanToken(context.selected_node_id, 120),
-    source_kind: "script",
-    source_text: sourceText,
-    after_text: optimized,
-    before_text: sourceText,
-    parent_revision_id: cleanToken(context.script_revision_id, 140) || null,
-    optimization_mode: mode === "default" ? "default_local_structure" : "instructed_local_structure",
-    optimization_instruction: cleanText(instruction, 500),
-    preview_diff: scriptDiffSummary(sourceText, optimized),
-    impact: {
-      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
-      relation: "script_revision_canonical_projection",
-      storyboard_write: false,
-    },
-    requires_confirmation: true,
-    tool_label: "本地节点修订",
-    cost_label: "不产生费用",
-    remote_dispatch_count: 0,
-    provider_dispatch_count: 0,
-  };
+  return blockedCommand(
+    "revise_selected_node",
+    mode === "default" ? "默认优化文本" : "按要求优化文本",
+    "节点文本优化现在需要通过当前节点内的 AI 预览生成真实改写；不会用本地固定模板冒充专业修订。请点击节点上的“优化”。",
+    context,
+  );
 }
 
 function createCanvasNodeCommand(context, intent) {
@@ -1222,38 +1196,6 @@ function generationPreviewCommand(context, intent) {
     cost_label: "本次不扣费；真实生成前需单独确认",
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
-  };
-}
-
-function optimizedScriptDraft(sourceText, instruction) {
-  const paragraphs = sourceText
-    .split(/\n{2,}/)
-    .map((part) => part.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean);
-  const lines = paragraphs.length ? paragraphs : sourceText.split(/\r?\n/).map((part) => part.trim()).filter(Boolean);
-  const lead = lines[0] || sourceText.trim();
-  const body = lines.slice(1);
-  const beats = body.length ? body : [lead];
-  return [
-    "核心意图",
-    trimSentence(lead, 360),
-    "",
-    "叙事推进",
-    ...beats.slice(0, 8).map((line, index) => `${index + 1}. ${trimSentence(line, 420)}`),
-    "",
-    "制作优化",
-    `- 优化方向：${cleanText(instruction, 260)}`,
-    "- 保留原始人物、地点、因果和关键情绪，不引入未确认角色或场景。",
-    "- 让下一步角色、主要场景、动态镜头和媒体计划更容易从同一版本追溯。",
-  ].join("\n").trim();
-}
-
-function scriptDiffSummary(before, after) {
-  return {
-    before_chars: before.length,
-    after_chars: after.length,
-    before_excerpt: cleanText(before, 220),
-    after_excerpt: cleanText(after, 260),
   };
 }
 

@@ -38,10 +38,10 @@ SOURCE_CONTRACTS = (
     {
         "severity": "P0",
         "scope": "revision_semantics",
-        "issue": "ordinary optimize must revise the same node instead of creating a script-version node",
+        "issue": "ordinary optimize must not create a script-version node or canned local template",
         "path": "apps/studio/src/agent-chat-lifecycle.js",
-        "must_include": ("command_type: \"revise_selected_node\"", "applySameNodeRevision", "fork_selected_node"),
-        "must_exclude": (),
+        "must_include": ("revise_selected_node", "不会用本地固定模板冒充专业修订", "fork_selected_node"),
+        "must_exclude": ("核心意图", "叙事推进", "制作优化"),
     },
     {
         "severity": "P0",
@@ -188,14 +188,12 @@ const state = {
 
 const beforeNodeCount = state.order.length;
 const optimizePreview = submitAgentChatMessage(session, '优化当前文本', context);
-assert(optimizePreview.status === 'preview', 'optimize must return a preview');
-assert(session.pendingCommand?.command_type === 'revise_selected_node', 'ordinary optimize must be same-node revision');
-assert(session.pendingCommand.impact.node_ids.includes('node_1'), 'optimize impact must name selected node');
-const reviseReceipt = executePendingAgentCommand(session, state);
-assert(state.order.length === beforeNodeCount, 'same-node revision must not create a node');
-assert(state.nodes.node_1.params.revisions.length === 1, 'same-node revision history must be stored');
-assert(state.nodes.node_1.status === 'draft', 'revised node must remain draft/reviewable');
-assert(reviseReceipt.provider_dispatch_count === 0, 'local revision must not dispatch provider');
+assert(optimizePreview.status === 'blocked', 'global optimize must not use the old local template path');
+assert(session.pendingCommand?.command_type === 'revise_selected_node', 'ordinary optimize must stay same-node scoped');
+assert(!optimizePreview.command.after_text, 'blocked optimize must not carry canned after_text');
+assert(String(optimizePreview.command.error_message || '').includes('不会用本地固定模板'), 'blocked optimize must explain the honest node-local route');
+assert(state.order.length === beforeNodeCount, 'blocked optimize must not create a node');
+assert(!state.nodes.node_1.params.revisions, 'blocked optimize must not create revision history');
 
 const forkPreview = submitAgentChatMessage(session, '创建分支版本：换成哥哥视角', context);
 assert(forkPreview.status === 'preview', 'fork must return preview');
@@ -246,7 +244,7 @@ console.log(JSON.stringify({
   status: 'passed',
   node_count: state.order.length,
   edge_count: Object.keys(state.edges).length,
-  revision_count: state.nodes.node_1.params.revisions.length,
+  revision_count: state.nodes.node_1.params.revisions?.length || 0,
   provider_dispatch_count: 0,
   cost_usd: 0
 }));

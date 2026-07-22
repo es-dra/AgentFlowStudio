@@ -7,6 +7,13 @@ import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { openNodeMenu } from "./panels/node-menu.js";
 import { handleProductionDeliveryAction } from "./production-delivery-controller.js";
+import {
+  applyEmbeddedCreativeAction,
+  cancelEmbeddedCreativeAction,
+  clearEmbeddedCreativeAction,
+  editEmbeddedCreativePreview,
+  startEmbeddedCreativeAction,
+} from "./embedded-creative-actions.js";
 
 export function handleCanvasNodeClick(store, runtime, e) {
   const nodeEl = e.target.closest(".node");
@@ -18,7 +25,24 @@ export function handleCanvasNodeClick(store, runtime, e) {
   const action = actionEl?.dataset.action;
   if (!action) return;
 
-  if (["candidate-select", "candidate-revise", "candidate-refresh"].includes(action)) {
+  if (action === "embedded-creative-action") {
+    void startEmbeddedCreativeAction(store, runtime, node, actionEl.dataset.creativeAction || "script_revision", {
+      mode: actionEl.dataset.creativeMode || "",
+    });
+  } else if (action === "embedded-creative-apply") {
+    const textarea = nodeEl.querySelector(".embedded-creative-preview-editor");
+    if (textarea) editEmbeddedCreativePreview(store, nodeId, textarea.value || "");
+    applyEmbeddedCreativeAction(store, nodeId);
+  } else if (action === "embedded-creative-cancel") cancelEmbeddedCreativeAction(store, nodeId);
+  else if (action === "embedded-creative-clear") clearEmbeddedCreativeAction(store, nodeId);
+  else if (action === "embedded-creative-retry") {
+    void startEmbeddedCreativeAction(store, runtime, node, actionEl.dataset.creativeAction || node.params?.embeddedCreativeAction?.action_type || "script_revision", {
+      mode: actionEl.dataset.creativeMode || node.params?.embeddedCreativeAction?.mode || "",
+    });
+  } else if (action === "embedded-creative-edit") {
+    const textarea = nodeEl.querySelector(".embedded-creative-preview-editor");
+    editEmbeddedCreativePreview(store, nodeId, textarea?.value || "");
+  } else if (["candidate-select", "candidate-revise", "candidate-refresh"].includes(action)) {
     void handleCandidateCreatorAction(store, runtime, node, actionEl);
   } else if (action === "production-quality-approve" || action === "production-export" || action === "production-delivery-refresh") {
     void handleProductionDeliveryAction(store, runtime, node, actionEl);

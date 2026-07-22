@@ -189,19 +189,21 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
 
     before_optimize = graph_counts(page, project_id)
     send_ai(page, "优化当前文本")
-    expect(page.locator(".agent-command-preview")).to_contain_text("默认优化文本")
-    expect(page.locator(".agent-command-preview")).to_contain_text("本地节点修订")
-    confirm_latest_command(page)
-    page.wait_for_function(
+    expect(page.locator(".agent-command-preview")).to_contain_text("无法执行默认优化文本")
+    expect(page.locator(".agent-command-preview")).to_contain_text("请点击节点上的“优化”")
+    after_optimize = graph_counts(page, project_id)
+    if after_optimize != before_optimize:
+        raise AssertionError("global optimize guidance changed graph state")
+    revisions = page.evaluate(
         """({ key, nodeId }) => {
           const s = JSON.parse(localStorage.getItem(key) || '{}');
-          return (s.nodes?.[nodeId]?.params?.revisions || []).length === 1 && s.order?.length === 1;
+          return (s.nodes?.[nodeId]?.params?.revisions || []).length;
         }""",
-        arg={"key": storage_key(project_id), "nodeId": first_id},
+        {"key": storage_key(project_id), "nodeId": first_id},
     )
-    after_optimize = graph_counts(page, project_id)
-    if after_optimize["nodes"] != before_optimize["nodes"]:
-        raise AssertionError("same-node refine created a new node")
+    if revisions:
+        raise AssertionError("global optimize guidance created a local revision")
+    page.get_by_role("button", name="取消").last.click()
 
     send_ai(page, "创建分支版本：哥哥视角")
     expect(page.locator(".agent-command-preview")).to_contain_text("创建分支版本")
@@ -217,8 +219,8 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
     screenshots[f"{key}:revision_fork"] = screenshot(page, screenshot_dir, f"{round_label}-{key}-03-revision-fork.png")
 
     select_node(page, project_id, first_id)
-    plus_node_id = create_node_from_handle(page, project_id, first_id, "镜头")
-    free_ref_id = create_node_from_global_palette(page, project_id, viewport, "参考集")
+    plus_node_id = create_node_from_handle(page, project_id, first_id, "镜头设计")
+    free_ref_id = create_node_from_global_palette(page, project_id, viewport, "参考图/图片")
     manual_edge_id = connect_nodes_by_drag(page, project_id, first_id, free_ref_id)
     manual_edge_id = select_edge(page, project_id, manual_edge_id)
     ensure_ai_open(page, viewport)
@@ -239,7 +241,7 @@ def verify_project(page: Page, base_url: str, project_id: str, viewport: dict[st
         """({ key, edgeId }) => !JSON.parse(localStorage.getItem(key) || '{}').edges?.[edgeId]""",
         arg={"key": storage_key(project_id), "edgeId": manual_edge_id},
     )
-    page.get_by_role("button", name="撤销").first.click()
+    undo_latest_agent_receipt(page)
     page.wait_for_function(
         """({ key, edgeId }) => Boolean(JSON.parse(localStorage.getItem(key) || '{}').edges?.[edgeId])""",
         arg={"key": storage_key(project_id), "edgeId": manual_edge_id},
@@ -384,6 +386,18 @@ def confirm_latest_command(page: Page) -> None:
             }"""
         )
         raise AssertionError(f"confirm button did not execute exactly once: {json.dumps(diagnostics, ensure_ascii=False)}") from error
+
+
+def undo_latest_agent_receipt(page: Page) -> None:
+    receipts = page.locator(".studio-agent-chat:not(.collapsed) .agent-receipts")
+    expect(receipts).to_be_visible()
+    if not receipts.locator(".agent-receipt:visible").count():
+        receipts.locator("summary").click()
+    receipt = receipts.locator('.agent-receipt[data-command-type="delete_selected_edge"]').first
+    expect(receipt).to_be_visible()
+    undo = receipt.get_by_role("button", name="撤销")
+    expect(undo).to_be_visible()
+    undo.click()
 
 
 def send_ai(page: Page, text: str) -> None:
@@ -616,7 +630,10 @@ def install_send_path_probe(page: Page) -> str:
           if (!button) throw new Error('visible AI send button not found');
           window.__afsQaSendPathProbes = window.__afsQaSendPathProbes || {};
           window.__afsQaSendPathProbes[probeId] = { buttonClickCount: 0, formSubmitCount: 0 };
-          button.addEventListener('click', () => {
+          document.addEventListener('click', (event) => {
+            const targetButton = event.target?.closest?.('button[aria-label="发送到 AI 创作搭档"]');
+            if (!targetButton) return;
+            if (!targetButton.closest('.studio-agent-chat:not(.collapsed) .agent-chat-composer')) return;
             window.__afsQaSendPathProbes[probeId].buttonClickCount += 1;
           }, { capture: true });
           form.addEventListener('submit', () => {
@@ -689,7 +706,7 @@ def create_node_from_handle(page: Page, project_id: str, from_node_id: str, labe
     port = page.locator(f'.node[data-node-id="{from_node_id}"] .node-port.out')
     expect(port).to_be_visible()
     port.click()
-    item = page.locator(".popover .menu-item").filter(has_text=label).first
+    item = page.locator(".popover .menu-item").filter(has_text=re.compile(f"^{re.escape(label)}")).first
     expect(item).to_be_visible()
     item.click()
     return stable_created_node_id(
@@ -717,10 +734,10 @@ def create_node_from_global_palette(page: Page, project_id: str, viewport: dict[
     else:
         page.mouse.click(x, y, button="right")
         page.get_by_role("button", name=re.compile("添加节点")).click()
-    target = page.locator(".popover button").filter(has_text=label).first
+    target = page.locator(".popover button").filter(has_text=re.compile(f"^{re.escape(label)}")).first
     expect(target).to_be_visible()
     target.click()
-    expected_type = "ref" if "参考" in label else ""
+    expected_type = "image" if "图片" in label else "ref" if "参考" in label else ""
     return stable_created_node_id(
         page,
         project_id,
@@ -748,30 +765,41 @@ def connect_nodes_by_drag(page: Page, project_id: str, from_id: str, to_id: str)
         project_id,
         from_id=from_id,
         to_id=to_id,
-        expected_relation="reference",
+        expected_relation="generation",
         before_dom=before_dom,
         before_graph=before_graph,
     )
 
 
 def select_edge(page: Page, project_id: str, edge_id: str) -> str:
-    assert_stable_edge_identity(page, project_id, edge_id)
-    point = page.evaluate(
-        """edgeId => {
-          const g = document.querySelector(`[data-edge-id="${edgeId}"]`);
-          const path = g?.querySelector('path.edge-flow');
-          if (!path?.getTotalLength) return null;
-          const svgPoint = path.getPointAtLength(path.getTotalLength() / 2);
-          const matrix = path.getScreenCTM();
-          if (!matrix) return null;
-          const screenPoint = new DOMPoint(svgPoint.x, svgPoint.y).matrixTransform(matrix);
-          return { x: screenPoint.x, y: screenPoint.y };
+    identity = assert_stable_edge_identity(page, project_id, edge_id)
+    page.wait_for_function(
+        """({ edgeId, fromId, toId, relation }) => {
+          const item = document.querySelector(`#edge-layer [data-edge-id="${edgeId}"]`);
+          const action = document.querySelector(`.edge-relation-button[data-edge-id="${edgeId}"]`);
+          return item
+            && action
+            && action.dataset.edgeFrom === fromId
+            && action.dataset.edgeTo === toId
+            && action.dataset.edgeRelation === relation
+            && !['pending', 'running'].includes(String(item.dataset.edgeLifecycle || ''));
         }""",
-        edge_id,
+        arg={
+            "edgeId": edge_id,
+            "fromId": identity["graph"]["from"],
+            "toId": identity["graph"]["to"],
+            "relation": identity["graph"]["relation"],
+        },
+        timeout=5_000,
     )
-    if not point:
-        raise AssertionError(f"edge path not measurable: {edge_id}")
-    page.mouse.click(point["x"], point["y"])
+    action_button = page.locator(
+        f'.edge-relation-button[data-edge-id="{edge_id}"]'
+        f'[data-edge-from="{identity["graph"]["from"]}"]'
+        f'[data-edge-to="{identity["graph"]["to"]}"]'
+        f'[data-edge-relation="{identity["graph"]["relation"]}"]'
+    )
+    expect(action_button).to_be_visible()
+    action_button.click()
     page.wait_for_timeout(100)
     selected = page.evaluate(
         """edgeId => Boolean(document.querySelector(`#edge-layer [data-edge-id="${edgeId}"][data-edge-selected="true"]`))""",
@@ -779,6 +807,32 @@ def select_edge(page: Page, project_id: str, edge_id: str) -> str:
     )
     if selected:
         return str(edge_id)
+    point = page.evaluate(
+        """edgeId => {
+          const g = document.querySelector(`#edge-layer [data-edge-id="${edgeId}"]`);
+          const path = g?.querySelector('path.edge-hit, path.edge-flow');
+          if (!path?.getTotalLength) return null;
+          const matrix = path.getScreenCTM();
+          if (!matrix) return null;
+          const length = path.getTotalLength();
+          const samples = [0.2, 0.35, 0.5, 0.65, 0.8].map((ratio) => {
+            const svgPoint = path.getPointAtLength(length * ratio);
+            const screenPoint = new DOMPoint(svgPoint.x, svgPoint.y).matrixTransform(matrix);
+            const hit = document.elementFromPoint(screenPoint.x, screenPoint.y);
+            return {
+              x: screenPoint.x,
+              y: screenPoint.y,
+              hitTag: hit?.tagName || '',
+              hitClass: hit?.getAttribute?.('class') || '',
+              hitEdge: hit?.closest?.('[data-edge-id]')?.dataset?.edgeId || '',
+            };
+          });
+          return samples.find((item) => item.hitEdge === edgeId) || { ...samples[Math.floor(samples.length / 2)], samples };
+        }""",
+        edge_id,
+    )
+    if not point:
+        raise AssertionError(f"edge path not measurable: {edge_id}")
     diagnostics = page.evaluate(
         """({ edgeId, point }) => {
           const hit = document.elementFromPoint(point.x, point.y);
@@ -793,6 +847,14 @@ def select_edge(page: Page, project_id: str, edge_id: str) -> str:
               id: item.dataset.edgeId,
               selected: item.dataset.edgeSelected,
               lifecycle: item.dataset.edgeLifecycle,
+            })),
+            actionEdges: [...document.querySelectorAll('.edge-relation-button[data-edge-id]')].map((item) => ({
+              id: item.dataset.edgeId,
+              from: item.dataset.edgeFrom,
+              to: item.dataset.edgeTo,
+              relation: item.dataset.edgeRelation,
+              selected: item.dataset.edgeSelected,
+              text: item.textContent,
             })),
           };
         }""",
@@ -839,6 +901,7 @@ def create_any_entry_nodes(page: Page, project_id: str, viewport: dict[str, int]
         ("character", "创建角色节点"),
         ("location", "创建场景空间节点"),
         ("prop", "创建道具节点"),
+        ("ref", "创建参考资料集节点"),
         ("image", "创建图片节点"),
         ("video", "创建视频节点"),
     ):

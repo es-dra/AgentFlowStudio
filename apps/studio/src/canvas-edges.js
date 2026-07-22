@@ -1,4 +1,5 @@
 import { bindEdgeActionButton } from "./canvas-edge-actions.js";
+import { edgeRelationLayer, pruneEdgeRelationButtons, syncEdgeRelationButton } from "./canvas-edge-relation-buttons.js";
 import {
   edgeAccessibleLabel,
   edgeLifecycleState,
@@ -15,6 +16,7 @@ const EDGE_OFFSET = 20000;
 
 export function renderEdges(state, relations, store) {
   const group = edgeGroup("edges");
+  const actionLayer = edgeRelationLayer();
   const seen = new Set();
   for (const edge of Object.values(state.edges)) {
     const from = state.nodes[edge.from];
@@ -23,10 +25,12 @@ export function renderEdges(state, relations, store) {
     seen.add(edge.id);
     const item = edgeElement(group, edge.id);
     syncEdgeElement(item, edge, from, to, state, relations, store);
+    syncEdgeRelationButton(actionLayer, edge, from, to, state, store);
   }
   for (const item of [...group.children]) {
     if (!seen.has(item.dataset.edgeId)) item.remove();
   }
+  pruneEdgeRelationButtons(actionLayer, seen);
 }
 
 function edgeElement(group, edgeId) {

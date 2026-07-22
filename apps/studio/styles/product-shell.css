@@ -38,7 +38,7 @@
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto minmax(210px, auto) auto 188px minmax(180px, 1fr) auto;
+  grid-template-columns: auto minmax(210px, auto) auto 188px minmax(160px, 1fr) auto;
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -63,9 +63,20 @@
   align-items: center;
 }
 
-.studio-unified-brand { gap: 10px; white-space: nowrap; }
-.studio-unified-brand strong { color: var(--product-accent); font-size: 21px; font-style: italic; letter-spacing: -1px; }
-.studio-unified-brand span { color: var(--product-muted); font-size: 12px; }
+.studio-unified-brand {
+  gap: 10px;
+  min-width: 46px;
+  min-height: 38px;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--product-accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studio-unified-brand strong { color: var(--product-accent); font-size: 21px; font-style: italic; }
 
 .studio-project-context { position: relative; min-width: 0; }
 .studio-project-button,
@@ -166,6 +177,8 @@
 .studio-status-item.ok { color: var(--product-ok); }
 .studio-status-item.warning { color: var(--product-warning); }
 .studio-header-actions { gap: 8px; }
+.studio-help-context,
+.studio-account-context { position: relative; display: inline-grid; }
 .studio-save-cluster { display: inline-flex; align-items: center; gap: 4px; }
 .studio-save-status { display: inline-flex; min-height: 30px; align-items: center; border: 0; border-radius: 5px; padding: 0 8px; background: transparent; color: var(--product-muted); font-size: 12px; white-space: nowrap; }
 .studio-save-status.success { color: var(--product-ok); }
@@ -177,6 +190,56 @@
 .studio-icon-button,
 .studio-account-button { display: inline-grid; min-width: 36px; height: 36px; place-items: center; border: 1px solid var(--product-line); border-radius: 6px; background: #0a1620; color: var(--product-muted); cursor: pointer; }
 .studio-account-button { width: 36px; border-radius: 50%; color: var(--product-text); font-size: 11px; font-weight: 800; }
+
+.studio-help-menu,
+.studio-account-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 32;
+  display: grid;
+  width: min(340px, calc(100vw - 24px));
+  gap: 8px;
+  border: 1px solid var(--product-line);
+  border-radius: 7px;
+  padding: 12px;
+  background: #0a1620;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .38);
+}
+
+.studio-help-menu strong,
+.studio-account-menu strong { font-size: 13px; }
+
+.studio-help-menu p,
+.studio-help-menu li {
+  margin: 0;
+  color: #c8d6de;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.studio-help-menu ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.studio-account-menu button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--product-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-account-menu button:hover,
+.studio-account-menu button:focus-visible { background: var(--product-accent-soft); }
+.studio-account-menu button.danger { color: #ffbdc0; }
 
 .studio-cockpit {
   position: relative;
@@ -763,11 +826,59 @@
 .agent-mark,
 .director-mark { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 6px; background: #174969; color: #c8f3ff; font-size: 11px; font-weight: 900; }
 .agent-chat-body { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 10px; padding: 12px; overflow: hidden; }
-.agent-context-strip { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 9px; margin: 0; border: 1px solid var(--product-line); border-radius: 6px; padding: 10px; background: #07131b; }
-.agent-context-strip dt,
-.agent-context-strip dd { min-width: 0; margin: 0; font-size: 11px; line-height: 1.35; }
-.agent-context-strip dt { color: var(--product-muted); font-weight: 800; }
-.agent-context-strip dd { overflow: hidden; color: var(--product-text); text-overflow: ellipsis; white-space: nowrap; }
+.agent-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--product-line-soft);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(7, 19, 27, .72);
+}
+
+.agent-context-chip {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(145, 166, 180, .2);
+  border-radius: 5px;
+  padding: 4px 7px;
+  color: #cfe0e8;
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-context-details {
+  flex-basis: 100%;
+  border-top: 1px solid var(--product-line-soft);
+  padding-top: 6px;
+}
+
+.agent-context-details summary {
+  color: var(--product-muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.agent-context-details dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 8px 0 0;
+}
+
+.agent-context-details dt,
+.agent-context-details dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.agent-context-details dt { color: var(--product-muted); font-weight: 800; }
+.agent-context-details dd { overflow: hidden; color: var(--product-text); text-overflow: ellipsis; white-space: nowrap; }
 .agent-chat-log { display: grid; min-height: 0; flex: 1; align-content: start; gap: 9px; overflow: auto; padding-right: 2px; }
 .agent-message { display: grid; grid-template-columns: 25px minmax(0, 1fr); align-items: start; gap: 7px; }
 .agent-message.user { grid-template-columns: minmax(0, 1fr) 25px; }
@@ -778,6 +889,7 @@
 .agent-message.error p { border: 1px solid rgba(241, 108, 112, .32); background: rgba(241, 108, 112, .08); color: #ffcbcd; }
 .agent-command-preview,
 .agent-receipts { display: grid; gap: 8px; border-top: 1px solid var(--product-line); padding-top: 10px; }
+.agent-receipts summary { color: var(--product-muted); cursor: pointer; font-size: 11px; }
 .agent-conversation-status { display: grid; gap: 7px; border-top: 1px solid var(--product-line); padding-top: 10px; }
 .agent-conversation-status p { margin: 0; color: var(--product-muted); font-size: 12px; line-height: 1.5; }
 .agent-conversation-status.loading p { color: #d3e0e6; }
@@ -960,9 +1072,12 @@ textarea:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .studio-director.mobile-open { display: flex; }
   .agent-collapsed .studio-agent-chat,
   .director-collapsed .studio-director { display: none; }
-  .product-mobile-nav { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); min-height: calc(62px + env(safe-area-inset-bottom)); border-top: 1px solid var(--product-line); padding: 4px 6px env(safe-area-inset-bottom); background: rgba(9, 20, 29, 0.98); }
+  .product-mobile-nav { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, 1fr); min-height: calc(62px + env(safe-area-inset-bottom)); border-top: 1px solid var(--product-line); padding: 4px 6px env(safe-area-inset-bottom); background: rgba(9, 20, 29, 0.98); }
   .product-mobile-nav button { min-width: 0; min-height: 52px; border: 0; background: transparent; color: var(--product-muted); text-align: center; font-size: 12px; }
   .product-mobile-nav button.active { color: var(--product-accent); }
+  .studio-mobile-help-sheet { position: fixed; z-index: 49; right: 0; bottom: calc(62px + env(safe-area-inset-bottom)); left: 0; max-height: min(68dvh, 620px); overflow: auto; border-top: 1px solid var(--product-line); background: #0a1620; box-shadow: 0 -18px 48px rgba(0, 0, 0, .45); padding: 12px; }
+  .studio-mobile-help-sheet > .studio-icon-button { float: right; margin-left: 8px; }
+  .studio-mobile-help-sheet .studio-help-menu { position: static; width: auto; max-width: none; box-shadow: none; border: 0; padding: 4px 4px 10px; }
   #studio-editor-shell { display: none !important; }
 }
 
@@ -1108,6 +1223,31 @@ body,
 .context-drawer-scenes small {
   color: var(--product-muted);
   font-size: 11px;
+}
+
+.context-drawer-account {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--product-line);
+  padding-top: 12px;
+}
+
+.context-drawer-account > strong {
+  color: var(--product-text);
+  font-size: 12px;
+}
+
+.context-drawer-account p {
+  margin: 0;
+  color: var(--product-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.context-drawer-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .studio-unified-workspace,

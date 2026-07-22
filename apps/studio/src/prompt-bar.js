@@ -26,6 +26,7 @@ import {
   buildUserAssetCardRevisionState,
 } from "./asset-revision-references.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
+import { startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
@@ -233,7 +234,9 @@ function buildBottomRow(store, runtime, node, textarea) {
     }
     if (isTextContentNode(node)) {
       syncTextAreaToNode(store, node.id, textarea);
-      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/optimize-selected-default" } }));
+      void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], "script_revision", {
+        mode: "professional_expansion",
+      });
       return;
     }
     openOptimizer(store, runtime, node.id, optimizeBtn, textarea);
@@ -247,10 +250,12 @@ function buildBottomRow(store, runtime, node, textarea) {
         return;
       }
       syncTextAreaToNode(store, node.id, textarea);
-      window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: "/plan-selected-script-shots" } }));
+      void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], "shot_breakdown", {
+        mode: "dynamic_shot_breakdown",
+      });
     });
     splitBtn.dataset.action = "plan-storyboard";
-    splitBtn.title = "从当前剧本版本规划专业分镜";
+    splitBtn.title = "在当前节点预览专业分镜草案";
     row.appendChild(splitBtn);
   }
 

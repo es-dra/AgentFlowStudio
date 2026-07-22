@@ -2,6 +2,7 @@ import { assetsFromNode } from "./asset-reference-summary.js";
 import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { renderEdges } from "./canvas-edges.js";
+import { canUseEmbeddedCreativeAction } from "./embedded-creative-actions.js";
 import { icon } from "./icons.js";
 import { canRunNodeGeneration } from "./node-actions.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
@@ -92,6 +93,8 @@ function nodeActions() {
   actions.className = "node-actions";
   actions.dataset.role = "actions";
   actions.innerHTML = [
+    `<button class="na-btn text-action" data-role="script-revision-action" data-action="embedded-creative-action" data-creative-action="script_revision" data-creative-mode="professional_expansion" title="节点内优化" aria-label="节点内优化">${icon("sparkles", 13)}</button>`,
+    `<button class="na-btn text-action" data-role="shot-breakdown-action" data-action="embedded-creative-action" data-creative-action="shot_breakdown" data-creative-mode="dynamic_shot_breakdown" title="自动拆分分镜" aria-label="自动拆分分镜">${icon("camera", 13)}</button>`,
     `<button class="na-btn" data-role="asset-action" data-action="fix-visual-asset" title="保存为素材" aria-label="保存为素材">${icon("bookmark", 13)}</button>`,
     `<button class="na-btn" data-role="run-action" data-action="run" title="生成" aria-label="生成">${icon("play", 13)}</button>`,
     `<button class="na-btn" data-role="duplicate-action" data-action="duplicate" title="复制节点" aria-label="复制节点">${icon("copy", 13)}</button>`,
@@ -244,5 +247,17 @@ function syncNodeActions(elNode, node, def) {
     const canUpload = Boolean(def.upload);
     upload.hidden = !canUpload;
     upload.disabled = !canUpload;
+  }
+  const revisionBtn = elNode.querySelector('[data-role="script-revision-action"]');
+  if (revisionBtn) {
+    const canRevise = canUseEmbeddedCreativeAction(node, "script_revision");
+    revisionBtn.hidden = !canRevise;
+    revisionBtn.disabled = !canRevise;
+  }
+  const breakdownBtn = elNode.querySelector('[data-role="shot-breakdown-action"]');
+  if (breakdownBtn) {
+    const canBreakdown = canUseEmbeddedCreativeAction(node, "shot_breakdown");
+    breakdownBtn.hidden = !canBreakdown;
+    breakdownBtn.disabled = !canBreakdown;
   }
 }

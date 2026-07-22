@@ -58,11 +58,13 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "evidenceDetails(\"查看证据/开发详情\"" in panel
     assert "diffPreview(command.preview_diff)" in panel
 
-    assert "/optimize-selected-default" in prompt_bar
-    assert "默认优化文本" in prompt_bar
+    assert "startEmbeddedCreativeAction" in prompt_bar
+    assert '"script_revision"' in prompt_bar
+    assert '"shot_breakdown"' in prompt_bar
     assert "优化提示词" in prompt_bar
     assert "自动拆分分镜" in prompt_bar
-    assert "/plan-selected-script-shots" in prompt_bar
+    assert "/optimize-selected-default" not in prompt_bar
+    assert "/plan-selected-script-shots" not in prompt_bar
     assert "expandTextIdeaToScript" not in prompt_bar
     assert "splitTextNodeToStoryboardNodes" not in prompt_bar
     assert "扩写剧本" not in prompt_bar
@@ -84,15 +86,13 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert ".studio-context-drawer" in safe_area
 
 
-def test_agent_chat_text_optimization_uses_same_node_revision_and_undo() -> None:
+def test_agent_chat_text_optimization_command_fails_closed_without_template_mutation() -> None:
     script = r'''
 import {
   agentChatContextKey,
   agentChatContextSnapshot,
   createAgentChatContextStore,
-  executePendingAgentCommand,
   submitAgentChatMessage,
-  undoAgentReceipt,
 } from "./apps/studio/src/agent-chat-lifecycle.js";
 
 const oldDigest = "a".repeat(64);
@@ -141,11 +141,6 @@ const context = agentChatContextSnapshot({
 });
 const session = createAgentChatContextStore().get(agentChatContextKey(context));
 const preview = submitAgentChatMessage(session, "/optimize-selected-default", context);
-const receipt = executePendingAgentCommand(session, state);
-const nodeCountAfterReceipt = state.order.length;
-const revisionCountAfterReceipt = state.nodes.n1.params.revisions?.length || 0;
-const contentAfterReceipt = state.nodes.n1.content;
-const undo = undoAgentReceipt(session, receipt, state);
 const instructedPreview = submitAgentChatMessage(session, "/optimize-selected 按用户要求压缩节奏并保留结尾", context);
 const visibleRawCommandLeak = session.messages.some((message) => String(message.text || "").includes("/optimize-selected"));
 process.stdout.write(JSON.stringify({
@@ -154,20 +149,17 @@ process.stdout.write(JSON.stringify({
   title: preview.command.title,
   rawCommandPreserved: preview.command.raw_command_text === "/optimize-selected-default",
   visibleRawCommandLeak,
-  providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count + undo.provider_dispatch_count,
-  nodeCountAfterReceipt,
-  nodeIdentityPreserved: receipt.node_id === "n1" && nodeCountAfterReceipt === originalNodeCount,
-  revisionCountAfterReceipt,
-  contentChangedAfterReceipt: contentAfterReceipt !== originalContent,
-  sourceIncludesCoreIntent: preview.command.after_text.includes("核心意图"),
-  optimizationMode: preview.command.optimization_mode,
-  receiptStatus: receipt.status,
-  undoAvailable: receipt.undo_available === true,
+  providerDispatchCount: preview.command.provider_dispatch_count,
+  nodeCountAfterPreview: state.order.length,
+  nodeIdentityPreserved: state.order.length === originalNodeCount,
+  revisionCountAfterPreview: state.nodes.n1.params.revisions?.length || 0,
+  contentChangedAfterPreview: state.nodes.n1.content !== originalContent,
+  sourceIncludesTemplateHeading: String(preview.command.after_text || "").includes("核心意图"),
+  errorMessage: preview.command.error_message,
   restoredContent: state.nodes.n1.content,
-  undoStatus: undo.status,
   instructedStatus: instructedPreview.status,
   instructedTitle: instructedPreview.command.title,
-  storyboardWrite: preview.command.impact.storyboard_write,
+  hasLocalAfterText: Boolean(preview.command.after_text),
 }));
 '''
     completed = subprocess.run(
@@ -179,23 +171,20 @@ process.stdout.write(JSON.stringify({
     )
     payload = json.loads(completed.stdout)
     assert payload == {
-        "previewStatus": "preview",
+        "previewStatus": "blocked",
         "commandType": "revise_selected_node",
         "title": "默认优化文本",
         "rawCommandPreserved": True,
         "visibleRawCommandLeak": False,
         "providerDispatchCount": 0,
-        "nodeCountAfterReceipt": 1,
+        "nodeCountAfterPreview": 1,
         "nodeIdentityPreserved": True,
-        "revisionCountAfterReceipt": 1,
-        "contentChangedAfterReceipt": True,
-        "sourceIncludesCoreIntent": True,
-        "optimizationMode": "default_local_structure",
-        "receiptStatus": "executed",
-        "undoAvailable": True,
+        "revisionCountAfterPreview": 0,
+        "contentChangedAfterPreview": False,
+        "sourceIncludesTemplateHeading": False,
+        "errorMessage": "节点文本优化现在需要通过当前节点内的 AI 预览生成真实改写；不会用本地固定模板冒充专业修订。请点击节点上的“优化”。",
         "restoredContent": "林夏在清晨的修理铺发现一台旧收音机，里面传来十年后的自己留下的求救信息。",
-        "undoStatus": "undone",
-        "instructedStatus": "preview",
+        "instructedStatus": "blocked",
         "instructedTitle": "按要求优化文本",
-        "storyboardWrite": False,
+        "hasLocalAfterText": False,
     }

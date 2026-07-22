@@ -231,11 +231,11 @@
 .node-port {
   position: absolute;
   top: 50%;
-  width: 30px; height: 30px;
-  margin-top: -15px;
+  width: 34px; height: 34px;
+  margin-top: -17px;
   border-radius: 50%;
   background: rgba(10, 21, 29, 0.96);
-  border: 1px solid rgba(90, 200, 250, 0.48);
+  border: 1px solid rgba(90, 200, 250, 0.72);
   color: var(--text-primary);
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 13px;
@@ -245,8 +245,8 @@
   transition: opacity 0.12s ease, border-color 0.12s ease, background-color 0.12s ease, transform 0.12s ease;
 }
 .node:hover .node-port, .node.selected .node-port { opacity: 1; }
-.node-port.in { left: -40px; }
-.node-port.out { right: -40px; }
+.node-port.in { left: -17px; }
+.node-port.out { right: -17px; }
 .node-port:hover,
 .node-port:focus-visible {
   border-color: var(--port-out);
