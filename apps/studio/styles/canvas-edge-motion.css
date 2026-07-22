@@ -1,0 +1,7 @@
+@media (prefers-reduced-motion: reduce) {
+  #edge-layer path.edge-spark,
+  #edge-layer path.pending,
+  #edge-layer path.just-connected {
+    animation: none !important;
+  }
+}

@@ -58,6 +58,13 @@ export function icon(name, size = 16) {
 
 export const NODE_TYPE_ICON = {
   text: "text",
+  sequence: "layers",
+  scene: "script",
+  shot: "camera",
+  character: "user",
+  location: "image",
+  prop: "bookmark",
+  ref: "link",
   image: "image",
   video: "video",
   video_merge: "scissors",

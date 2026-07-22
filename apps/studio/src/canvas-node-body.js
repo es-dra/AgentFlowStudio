@@ -90,6 +90,8 @@ export function nodeBodySignature(node) {
     node.collapsed ? 1 : 0,
     directorSig,
     node.params?.appliedDownstreamCount || 0,
+    (node.params?.revisions || []).map((revision) => `${revision.revision_id || ""}:${(revision.after_text || "").length}`).join(","),
+    node.params?.currentRevisionId || "",
     node.params?.scriptExpansionState?.status || "",
     node.params?.productionGraphProjection || "",
     node.params?.productionGraphLegacyProjection || "",
@@ -135,9 +137,12 @@ function completeBody(node) {
   if (node.type === "image" && node.previewUrl) return imageCompleteBody(node);
   const ok = document.createElement("div");
   ok.className = "node-status success";
-  ok.innerHTML = `${icon("check", 13)}<span>complete · ready for review · not yet accepted</span>`;
+  ok.innerHTML = `${icon("check", 13)}<span>已就绪，可审阅；尚未代表人工确认</span>`;
   const bundle = bundleSummary(node);
-  return bundle ? [ok, bundle, resultView(node)] : [ok, resultView(node)];
+  const revisionPanel = revisionHistoryPanel(node);
+  const items = bundle ? [ok, bundle, resultView(node)] : [ok, resultView(node)];
+  if (revisionPanel) items.push(revisionPanel);
+  return items;
 }
 
 function imageCompleteBody(node) {
@@ -154,7 +159,14 @@ function partialBody(node) {
 
 function contentBlock(node, store) {
   const expanding = node.params?.scriptExpansionState?.status === "running";
-  if (isEditableContentNode(node) && store) return editableContentBlock(node, store, expanding);
+  if (isEditableContentNode(node) && store) {
+    const out = document.createElement("div");
+    out.className = "node-editable-stack";
+    out.appendChild(editableContentBlock(node, store, expanding));
+    const revisions = revisionHistoryPanel(node);
+    if (revisions) out.appendChild(revisions);
+    return out;
+  }
   const view = document.createElement("div");
   view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
   view.textContent = node.content;
@@ -227,6 +239,12 @@ function editableContentBlock(node, store, expanding) {
   textarea.placeholder = node.type === "script" ? "输入剧本、分镜或制作说明" : "输入想法、剧本文字或参考说明";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;
+  textarea.addEventListener("focus", () => {
+    store.set((s) => {
+      if (!s.nodes[node.id]) return;
+      s.selection = { nodeIds: [node.id], edgeId: null };
+    }, { history: false, persist: false, renderScope: "canvas-local-edit" });
+  });
   bindStableTextInputLifecycle(textarea, () => persistEditorValue(textarea, node, store));
   bindAssetMentionSuggestions(textarea, store, node.id);
   return textarea;
@@ -243,14 +261,46 @@ function persistEditorValue(textarea, node, store) {
   store.set((s) => {
     const target = s.nodes[node.id];
     if (!target) return;
-    target.content = textarea.value;
-    target.prompt = textarea.value;
-    target.status = target.status === "empty" ? "complete" : target.status;
+    const text = textarea.value;
+    target.content = text;
+    target.prompt = text;
+    target.status = text.trim() ? "draft" : "empty";
     if (target.params?.assetCardDraft) {
-      target.params.assetCardDraft.user_edited_text = textarea.value;
+      target.params.assetCardDraft.user_edited_text = text;
       target.params.assetCardDraft.updated_by_user = true;
     }
   }, { history: false, renderScope: "canvas-local-edit" });
+}
+
+function revisionHistoryPanel(node) {
+  const revisions = Array.isArray(node.params?.revisions) ? node.params.revisions : [];
+  if (!revisions.length) return null;
+  const latest = revisions[revisions.length - 1] || {};
+  const panel = document.createElement("details");
+  panel.className = "node-revision-history";
+  panel.open = false;
+  const summary = document.createElement("summary");
+  summary.innerHTML = [
+    `${icon("retry", 12)}`,
+    `<span>节点内修订 ${revisions.length} 次</span>`,
+    `<small>同一节点身份，可撤销</small>`,
+  ].join("");
+  panel.appendChild(summary);
+
+  const before = revisionExcerpt(latest.before_text);
+  const after = revisionExcerpt(latest.after_text);
+  const body = document.createElement("div");
+  body.className = "node-revision-body";
+  body.innerHTML = [
+    `<div><strong>修订前</strong><p>${escapeHtml(before || "无可显示内容")}</p></div>`,
+    `<div><strong>修订后</strong><p>${escapeHtml(after || "无可显示内容")}</p></div>`,
+  ].join("");
+  panel.appendChild(body);
+  return panel;
+}
+
+function revisionExcerpt(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
 function errorBody(node) {

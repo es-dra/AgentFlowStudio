@@ -3,6 +3,7 @@ import { safeError, setNodeError } from "./node-action-utils.js";
 
 const IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg";
 const ACCEPTED_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg"]);
+const IMAGE_UPLOAD_NODE_TYPES = new Set(["image", "video", "ref", "character", "location", "prop", "shot"]);
 
 export function uploadNodeImage(store, runtime, node) {
   if (!runtime?.uploadImageAsset) {
@@ -103,8 +104,8 @@ export async function uploadSelectedImage(store, runtime, nodeId, file) {
 }
 
 function unsupportedUploadTargetMessage(node) {
-  if (!node) return "没有找到要绑定参考图的节点，请重新选择图片或视频节点。";
-  if (!["image", "video"].includes(node.type)) return "当前节点不支持参考图上传，请选择图片或视频节点。";
+  if (!node) return "没有找到要绑定参考图的节点，请先选择或创建一个参考、角色、场景、道具、镜头、图片或视频节点。";
+  if (!IMAGE_UPLOAD_NODE_TYPES.has(node.type)) return "当前节点不支持直接绑定参考图，请选择参考、资产、镜头、图片或视频节点。";
   return "";
 }
 
@@ -148,6 +149,46 @@ export function referenceUploadPolicyForNode(node) {
       referenceTarget: "video_first_frame",
       userIntent,
       uploadingText: "正在上传视频首帧参考图...",
+    };
+  }
+  if (node?.type === "character") {
+    return {
+      role: "asset_reference",
+      referenceTarget: "character_reference",
+      userIntent,
+      uploadingText: "正在上传角色参考图...",
+    };
+  }
+  if (node?.type === "location") {
+    return {
+      role: "asset_reference",
+      referenceTarget: "location_reference",
+      userIntent,
+      uploadingText: "正在上传场景空间参考图...",
+    };
+  }
+  if (node?.type === "prop") {
+    return {
+      role: "asset_reference",
+      referenceTarget: "prop_reference",
+      userIntent,
+      uploadingText: "正在上传道具参考图...",
+    };
+  }
+  if (node?.type === "ref") {
+    return {
+      role: "reference_set",
+      referenceTarget: "reference_set",
+      userIntent,
+      uploadingText: "正在上传参考集图片...",
+    };
+  }
+  if (node?.type === "shot") {
+    return {
+      role: "reference_image",
+      referenceTarget: "shot_reference",
+      userIntent,
+      uploadingText: "正在上传镜头参考图...",
     };
   }
   if (node?.params?.assetCardDraft || node?.params?.nodeRole === "asset_card_draft") {
@@ -195,13 +236,25 @@ function imageUploadRef(asset, file, policy) {
 function uploadResultText(uploadRef) {
   const lines = [
     uploadRef.reference_target === "video_first_frame" ? "已上传视频首帧参考图" : "已上传参考图",
-    `Asset: ${uploadRef.asset_id}`,
-    `Role: ${uploadRef.role}`,
-    `Target: ${uploadRef.reference_target}`,
-    `Size: ${uploadRef.width || "?"}x${uploadRef.height || "?"}`,
+    `用途：${referenceTargetLabel(uploadRef.reference_target)}`,
+    `尺寸：${uploadRef.width || "?"}x${uploadRef.height || "?"}`,
   ];
-  if (uploadRef.user_intent) lines.push(`Intent: ${uploadRef.user_intent}`);
+  if (uploadRef.user_intent) lines.push(`说明：${uploadRef.user_intent}`);
   return lines.join("\n");
+}
+
+function referenceTargetLabel(value) {
+  return {
+    video_first_frame: "视频首帧",
+    character_reference: "角色参考",
+    location_reference: "场景空间参考",
+    prop_reference: "道具参考",
+    reference_set: "参考集",
+    shot_reference: "镜头参考",
+    asset_card_draft: "资产设定卡",
+    keyframe_generation: "关键帧参考",
+    image_reference: "图片参考",
+  }[String(value || "")] || "参考素材";
 }
 
 function safeUserIntent(value) {

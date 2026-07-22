@@ -292,6 +292,6 @@ def test_reference_upload_unsupported_target_and_file_fail_before_runtime() -> N
     assert payload["fileReads"] == 0
     assert payload["runtimeCalls"] == 0
     assert payload["textNode"]["status"] == "error"
-    assert "当前节点不支持参考图上传，请选择图片或视频节点。" in payload["textNode"]["result"]
+    assert "当前节点不支持直接绑定参考图，请选择参考、资产、镜头、图片或视频节点。" in payload["textNode"]["result"]
     assert payload["imageNode"]["status"] == "error"
     assert "仅支持 PNG 或 JPEG 图片，请重新选择参考图。" in payload["imageNode"]["result"]

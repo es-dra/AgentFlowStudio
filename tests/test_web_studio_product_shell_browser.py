@@ -26,15 +26,18 @@ def test_product_shell_is_chinese_first_and_hides_diagnostics_from_primary_flow(
     assert './styles/product-shell.css' in index
 
 
-def test_mobile_shell_has_no_canvas_mount_and_no_horizontal_page_overflow_contract() -> None:
+def test_mobile_shell_mounts_canvas_without_horizontal_page_overflow_contract() -> None:
     bootstrap = (STUDIO / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
     styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
 
-    assert 'const editorMounted = !window.matchMedia("(max-width: 760px)").matches;' in bootstrap
-    assert "if (editorMounted) {" in bootstrap
+    assert "const editorMounted = true;" in bootstrap
+    assert 'window.matchMedia("(max-width: 760px)")' not in bootstrap
+    assert "editorParking.appendChild(editorShell)" in bootstrap
     assert "@media (max-width: 760px)" in styles
     assert "html, body { max-width: 100%; overflow-x: clip; }" in styles
-    assert "#studio-editor-shell { display: none !important; }" in styles
+    assert ".canvas-workspace-stage #studio-editor-shell" in styles
+    assert "display: block !important" in styles
+    assert "#corner-controls" in styles
     assert "grid-template-columns: repeat(4, 1fr)" in styles
     assert "min-height: 52px" in styles
 
@@ -217,7 +220,7 @@ def test_director_review_panel_does_not_fabricate_versions_or_recovery_actions()
     assert '"当前候选", "v3"' not in shell
     assert '"已确认版本", "v2"' not in shell
     assert "恢复上一确认版本" not in shell
-    assert "版本记录只随画布事实读取；恢复命令需要在 Agent Chat 中预览和确认。" in shell
+    assert "版本记录只随画布事实读取；恢复命令需要在 AI 创作搭档中预览和确认。" in shell
     assert "安排返工" in shell
     assert "确认后新增返工任务，不覆盖原候选。" in shell
 

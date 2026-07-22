@@ -312,7 +312,9 @@ def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
     styles = (STUDIO_ROOT / "styles" / "studio-interactions.css").read_text(encoding="utf-8")
     overlay = (STUDIO_ROOT / "src" / "overlay.js").read_text(encoding="utf-8")
 
-    assert 'const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_director"]' in source
+    assert 'const QUICK_ACTION_IDS = ["node_text", "node_script", "node_ref", "node_image"]' in source
+    assert 'node_ref: "上传参考"' in source
+    assert 'node_script: "拆脚本"' in source
     assert '"compact-create-menu"' in source
     assert '"advanced-create-list"' in source
     assert '"advanced-create-content"' in source

@@ -17,6 +17,9 @@ export function createProductShell(options = {}) {
   let notice = "";
   let pendingGraphImpact = null;
   let m6SourceText = "";
+  let planningPanelOpen = false;
+  let planningPanelPreferenceKey = "";
+  let planningPanelHeight = readPlanningPanelHeight();
   let graphRefreshPending = false;
   let agentChatWidth = readAgentChatWidth();
   const agentChatContexts = createAgentChatContextStore();
@@ -35,6 +38,7 @@ export function createProductShell(options = {}) {
   function render(next = {}) {
     snapshot = { ...snapshot, ...next };
     snapshot.studioState = snapshot.studioState || options.getStudioState?.() || null;
+    syncPlanningPanelPreference();
     syncResponsiveAgentState();
     const root = document.getElementById("product-shell-root");
     if (!root) return;
@@ -94,10 +98,7 @@ export function createProductShell(options = {}) {
 
     const summary = node("div", "studio-header-summary");
     const progress = Math.max(0, Math.min(100, Number(snapshot.project?.progress_percent || candidateDeliveryProgress(snapshot.project))));
-    summary.append(
-      statusItem("check", `交付就绪 ${progress}%`, "ok"),
-      statusItem("clock", `待处理 ${pendingCount()}`, pendingCount() ? "warning" : "muted"),
-    );
+    appendHeaderSummary(summary, progress);
 
     const actions = node("div", "studio-header-actions");
     if (options.onOpenExternalVideoDemo) {
@@ -126,6 +127,16 @@ export function createProductShell(options = {}) {
 
     header.append(brand, project, navigator, viewSwitch, summary, actions);
     return header;
+  }
+
+  function appendHeaderSummary(summary, progress) {
+    const pending = pendingCount();
+    if (hasStoryFacts() || mediaOperationsReady() || Number(progress) > 0) {
+      summary.append(statusItem("check", `交付就绪 ${progress}%`, "ok"));
+    } else {
+      summary.append(statusItem("check", "自由画布", "muted"));
+    }
+    if (pending) summary.append(statusItem("clock", `待处理 ${pending}`, "warning"));
   }
 
   function buildProjectMenu() {
@@ -308,43 +319,7 @@ export function createProductShell(options = {}) {
       return status;
     }
     if (view.planningRequired) {
-      status.append(node("strong", "", "需要确认制作方案"), node("span", "", "先输入或导入剧本；已有结构化制作方案时，可在 Agent Chat 中预览后确认。"));
-      const planner = node("div", "m6-script-plan-entry");
-      const textarea = document.createElement("textarea");
-      textarea.rows = 5;
-      textarea.value = m6SourceText;
-      textarea.placeholder = "角色、场景、目标、冲突、道具和剧本段落";
-      textarea.setAttribute("aria-label", "输入想法或已有剧本");
-      textarea.addEventListener("input", () => {
-        m6SourceText = textarea.value;
-      });
-      const preview = node("button", "studio-primary-button", "生成剧本制作方案");
-      preview.type = "button";
-      preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
-      planner.append(textarea, preview);
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = "application/json,.json";
-      input.hidden = true;
-      input.setAttribute("aria-label", "选择结构化制作方案文件");
-      const importButton = node("button", "studio-secondary-button", "导入结构化制作方案");
-      importButton.type = "button";
-      importButton.addEventListener("click", () => input.click());
-      input.addEventListener("change", async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-          const candidate = JSON.parse(await file.text());
-          stageGraphCandidate(candidate);
-        } catch {
-          notice = "制作方案无法读取；请检查文件格式后重试，现有项目未改变。";
-          render();
-        } finally {
-          input.value = "";
-        }
-      });
-      status.append(planner, importButton, input);
-      return status;
+      return buildContextualPlanSurface(status);
     }
     if (view.status !== "ready") {
       status.hidden = true;
@@ -368,6 +343,118 @@ export function createProductShell(options = {}) {
     return status;
   }
 
+  function buildContextualPlanSurface(status) {
+    const expanded = isPlanningPanelExpanded();
+    status.className = `graph-canvas-status planning-required ${expanded ? "expanded" : "compact"}`;
+    status.dataset.expanded = String(expanded);
+    if (!expanded) return buildCompactPlanSurface(status);
+    return buildExpandedPlanSurface(status);
+  }
+
+  function buildCompactPlanSurface(status) {
+    status.append(
+      node("strong", "", "可自由开始"),
+      node("span", "", "先创建想法、剧本、参考图、角色、图片或视频；需要结构化方案时再展开。"),
+    );
+    const actions = node("div", "plan-compact-actions");
+    const expand = node("button", "studio-secondary-button", "展开制作方案");
+    expand.type = "button";
+    expand.setAttribute("aria-expanded", "false");
+    expand.addEventListener("click", () => {
+      setPlanningPanelOpen(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      requestAnimationFrame(() => document.querySelector(".m6-script-plan-entry textarea")?.focus());
+    });
+    const ask = node("button", "studio-text-button", "让 AI 创作搭档建议下一步");
+    ask.type = "button";
+    ask.addEventListener("click", () => submitToAgentChat("下一步建议是什么"));
+    actions.append(expand, ask, ...planningImportControls());
+    status.appendChild(actions);
+    return status;
+  }
+
+  function buildExpandedPlanSurface(status) {
+    status.style.setProperty("--graph-plan-height", `${planningPanelHeight}px`);
+    const head = node("div", "graph-plan-head");
+    head.append(
+      node("span", "eyebrow", "制作方案草案"),
+      node("strong", "", "先预览，再确认"),
+      node("span", "", "只有生成草案或导入方案后才进入确认；确认前不会建立制作图。"),
+    );
+    const controls = node("div", "graph-plan-controls");
+    const collapse = node("button", "studio-text-button", "收起");
+    collapse.type = "button";
+    collapse.setAttribute("aria-expanded", "true");
+    collapse.addEventListener("click", () => {
+      setPlanningPanelOpen(false);
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
+    const defer = node("button", "studio-secondary-button", "稍后处理");
+    defer.type = "button";
+    defer.addEventListener("click", () => {
+      m6SourceText = "";
+      setPlanningPanelOpen(false);
+      notice = "已暂不处理制作方案；画布仍可从任意节点继续。";
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
+    controls.append(collapse, defer);
+    head.appendChild(controls);
+    status.appendChild(head);
+
+    const planner = node("div", "m6-script-plan-entry");
+    const textarea = document.createElement("textarea");
+    textarea.rows = 4;
+    textarea.value = m6SourceText;
+    textarea.placeholder = "可粘贴想法、已有剧本、场景、镜头、角色、参考图用途或制作目标";
+    textarea.setAttribute("aria-label", "输入想法或已有剧本");
+    textarea.addEventListener("input", () => {
+      m6SourceText = textarea.value;
+    });
+    const preview = node("button", "studio-primary-button", "生成剧本制作方案");
+    preview.type = "button";
+    preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
+    planner.append(textarea, preview, ...planningImportControls());
+    status.append(planner, planResizeHandle());
+    return status;
+  }
+
+  function planningImportControls() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.hidden = true;
+    input.setAttribute("aria-label", "选择结构化制作方案文件");
+    const importButton = node("button", "studio-secondary-button", "导入结构化制作方案");
+    importButton.type = "button";
+    importButton.addEventListener("click", () => input.click());
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const candidate = JSON.parse(await file.text());
+        stageGraphCandidate(candidate);
+      } catch {
+        notice = "制作方案无法读取；请检查文件格式后重试，现有项目未改变。";
+        render();
+      } finally {
+        input.value = "";
+      }
+    });
+    return [importButton, input];
+  }
+
+  function planResizeHandle() {
+    const handle = node("div", "graph-plan-resize");
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-label", "调整制作方案面板高度");
+    handle.setAttribute("aria-orientation", "horizontal");
+    handle.addEventListener("pointerdown", bindPlanResize);
+    return handle;
+  }
+
   function stageGraphCommand(details) {
     const context = currentAgentChatContext();
     context.context_key = agentChatContextKey(context);
@@ -375,7 +462,7 @@ export function createProductShell(options = {}) {
     stageProductionGraphCommand(session, context, details);
     projectDrawerOpen = false;
     setAgentChatExpanded(true);
-    notice = "命令已送入 Agent Chat；确认前不会改变制作事实。";
+    notice = "命令已送入 AI 创作搭档；确认前不会改变制作事实。";
     render();
     requestCanvasSafeAreaUpdate();
   }
@@ -393,7 +480,7 @@ export function createProductShell(options = {}) {
     }
     projectDrawerOpen = false;
     setAgentChatExpanded(true);
-    notice = "制作方案已送入 Agent Chat；确认前不会建立制作图。";
+    notice = "制作方案已送入 AI 创作搭档；确认前不会建立制作图。";
     render();
     requestCanvasSafeAreaUpdate();
   }
@@ -410,7 +497,7 @@ export function createProductShell(options = {}) {
       stageM6ScriptPlanCandidateCommand(session, context, preview);
       projectDrawerOpen = false;
       setAgentChatExpanded(true);
-      notice = "M6方案已送入 Agent Chat；确认前不会建立制作图。";
+      notice = "M6 方案已送入 AI 创作搭档；确认前不会建立制作图。";
     } catch (error) {
       notice = error?.message || "M6方案生成失败，项目未改变。";
     }
@@ -476,7 +563,7 @@ export function createProductShell(options = {}) {
   function buildAgentMobileBackdrop() {
     const backdrop = node("button", "agent-mobile-backdrop");
     backdrop.type = "button";
-    backdrop.setAttribute("aria-label", "收起 Agent Chat，返回当前审片");
+    backdrop.setAttribute("aria-label", "收起 AI 创作搭档，返回当前审片");
     backdrop.addEventListener("click", () => {
       setAgentChatExpanded(false);
       render();
@@ -499,7 +586,10 @@ export function createProductShell(options = {}) {
     main.id = "product-main";
     main.tabIndex = -1;
     const stage = node("section", "canvas-workspace-stage");
-    if (graphView().planningRequired) stage.classList.add("graph-planning-mode");
+    if (graphView().planningRequired && isPlanningPanelExpanded()) {
+      stage.classList.add("graph-planning-mode");
+      stage.style.setProperty("--graph-plan-height", `${planningPanelHeight}px`);
+    }
     stage.setAttribute("aria-label", `画布 · ${currentShot().title}`);
     stage.dataset.canvasTarget = currentShot().nodeId || "empty-project";
     const editor = options.getCanvasShell?.();
@@ -972,7 +1062,7 @@ export function createProductShell(options = {}) {
     versions.type = "button";
     versions.addEventListener("click", () => {
       setAgentChatExpanded(true);
-      notice = "版本记录只随画布事实读取；恢复命令需要在 Agent Chat 中预览和确认。";
+      notice = "版本记录只随画布事实读取；恢复命令需要在 AI 创作搭档中预览和确认。";
       render();
     });
     bar.append(script, node("p", "", currentShot().description), versions);
@@ -1019,7 +1109,7 @@ export function createProductShell(options = {}) {
   function buildMobileNav() {
     const nav = node("nav", "product-mobile-nav");
     nav.setAttribute("aria-label", "移动端 Studio 导航");
-    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["agent", "Agent"]]) {
+    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["agent", "搭档"]]) {
       const active = key === "agent" ? mobileAgentOpen : section === key;
       const button = node("button", active ? "active" : "", label);
       button.type = "button";
@@ -1070,7 +1160,7 @@ export function createProductShell(options = {}) {
     setAgentChatExpanded(true);
     selectContext(target.sceneIndex, target.shotIndex, {
       actionLabel,
-      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，Agent Chat 已绑定当前上下文。`,
+      noticeText: `已定位到场景 ${String(target.sceneIndex + 1).padStart(2, "0")} · 镜头 ${String(target.shotIndex + 1).padStart(2, "0")}，AI 创作搭档已绑定当前上下文。`,
     });
   }
 
@@ -1111,7 +1201,7 @@ export function createProductShell(options = {}) {
 
   function focusAgentComposer() {
     setAgentChatExpanded(true);
-    notice = "Agent Chat 已绑定当前画布上下文；确认前不会创建场景或镜头。";
+    notice = "AI 创作搭档已绑定当前画布上下文；确认前不会创建场景或镜头。";
     render();
     requestCanvasSafeAreaUpdate();
     requestAnimationFrame(() => document.querySelector(".agent-chat-composer textarea")?.focus());
@@ -1176,6 +1266,26 @@ export function createProductShell(options = {}) {
     if (isNarrowAgentLayout()) writeAgentMobilePreference(agentPreferenceProjectKey || "studio", nextExpanded);
   }
 
+  function isPlanningPanelExpanded() {
+    return Boolean(planningPanelOpen || String(m6SourceText || "").trim());
+  }
+
+  function setPlanningPanelOpen(open) {
+    planningPanelOpen = Boolean(open);
+    writePlanningPanelPreference(currentPlanningPanelPreferenceKey(), planningPanelOpen);
+  }
+
+  function syncPlanningPanelPreference({ force = false } = {}) {
+    const nextKey = currentPlanningPanelPreferenceKey();
+    if (!force && planningPanelPreferenceKey === nextKey) return;
+    planningPanelPreferenceKey = nextKey;
+    planningPanelOpen = readPlanningPanelPreference(nextKey);
+  }
+
+  function currentPlanningPanelPreferenceKey() {
+    return `afs:m6:plan-panel:${snapshot.project?.project_id || "studio"}`;
+  }
+
   function closeResponsiveAgentOverlay() {
     if (isNarrowAgentLayout()) {
       setAgentChatExpanded(false);
@@ -1190,7 +1300,7 @@ export function createProductShell(options = {}) {
 
   function responsiveAgentMediaQuery() {
     return typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia("(max-width: 900px)")
+      ? window.matchMedia("(max-width: 1100px)")
       : null;
   }
 
@@ -1211,6 +1321,31 @@ export function createProductShell(options = {}) {
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
       storeAgentChatWidth(agentChatWidth);
+      render();
+      requestCanvasSafeAreaUpdate();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd, { once: true });
+    window.addEventListener("pointercancel", onEnd, { once: true });
+  }
+
+  function bindPlanResize(event) {
+    if (!event?.pointerId || isNarrowAgentLayout()) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = planningPanelHeight;
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("is-resizing-plan-panel");
+    const onMove = (moveEvent) => {
+      planningPanelHeight = clampPlanningPanelHeight(startHeight - (moveEvent.clientY - startY));
+      document.querySelector(".graph-canvas-status")?.style?.setProperty("--graph-plan-height", `${planningPanelHeight}px`);
+    };
+    const onEnd = () => {
+      document.body.classList.remove("is-resizing-plan-panel");
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      writePlanningPanelHeight(planningPanelHeight);
       render();
       requestCanvasSafeAreaUpdate();
     };
@@ -1692,6 +1827,44 @@ function storeAgentChatWidth(width) {
 
 function clampAgentChatWidth(value) {
   return Math.max(360, Math.min(420, Math.round(Number(value) || 392)));
+}
+
+function readPlanningPanelPreference(key) {
+  try {
+    return window.sessionStorage?.getItem(key) === "open";
+  } catch {
+    return false;
+  }
+}
+
+function writePlanningPanelPreference(key, open) {
+  try {
+    window.sessionStorage?.setItem(key, open ? "open" : "closed");
+  } catch {
+    // Session storage can be unavailable; the current render still carries the state.
+  }
+}
+
+function readPlanningPanelHeight() {
+  let stored = 260;
+  try {
+    stored = Number(window.localStorage?.getItem("afs_m6_plan_panel_height") || stored);
+  } catch {
+    stored = 260;
+  }
+  return clampPlanningPanelHeight(stored);
+}
+
+function writePlanningPanelHeight(height) {
+  try {
+    window.localStorage?.setItem("afs_m6_plan_panel_height", String(clampPlanningPanelHeight(height)));
+  } catch {
+    // Storage can be unavailable; the current session height is already applied.
+  }
+}
+
+function clampPlanningPanelHeight(value) {
+  return Math.max(176, Math.min(420, Math.round(Number(value) || 260)));
 }
 
 function requestCanvasSafeAreaUpdate() {

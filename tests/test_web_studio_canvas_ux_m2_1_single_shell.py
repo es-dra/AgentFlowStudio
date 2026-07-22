@@ -10,6 +10,7 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     bootstrap = (STUDIO_ROOT / "src" / "studio-product-bootstrap.js").read_text(encoding="utf-8")
     shell = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    onboarding = (STUDIO_ROOT / "src" / "studio-canvas-onboarding.js").read_text(encoding="utf-8")
     panel = (STUDIO_ROOT / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
     safe_area = (STUDIO_ROOT / "src" / "canvas-safe-area.js").read_text(encoding="utf-8")
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
@@ -41,11 +42,12 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "afs:agent-chat-submit" in shell
     assert "afs:agent-chat-focus" in shell
 
-    assert "bindCanvasEmptyOnboarding()" in main
-    assert "`/idea ${text}`" in main
-    assert "importScriptFileIntoTextNode(store, node)" in main
-    assert "createEmptyTextNode(\"故事文本\")" in main
-    assert "visibleCanvasCenter()" in main
+    assert 'from "./studio-canvas-onboarding.js"' in main
+    assert "bindCanvasEmptyOnboarding(store)" in main
+    assert "`/idea ${text}`" in onboarding
+    assert "importScriptFileIntoTextNode(store, node)" in onboarding
+    assert 'createEmptyTextNode(store, "故事文本")' in onboarding
+    assert "visibleCanvasCenter()" in onboarding
     assert "afs:canvas-safe-area-changed" in main
 
     assert "agent-resize-handle" in panel
@@ -82,15 +84,15 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert ".studio-context-drawer" in safe_area
 
 
-def test_agent_chat_text_optimization_uses_runtime_script_revision_and_undo() -> None:
+def test_agent_chat_text_optimization_uses_same_node_revision_and_undo() -> None:
     script = r'''
 import {
   agentChatContextKey,
   agentChatContextSnapshot,
   createAgentChatContextStore,
-  executePendingAgentCommandWithRuntime,
+  executePendingAgentCommand,
   submitAgentChatMessage,
-  undoAgentReceiptWithRuntime,
+  undoAgentReceipt,
 } from "./apps/studio/src/agent-chat-lifecycle.js";
 
 const oldDigest = "a".repeat(64);
@@ -128,58 +130,8 @@ const state = {
   ui: {},
 };
 const store = { get: () => state, set: (mutator) => mutator(state) };
-let createPayload = null;
-let selectPayload = null;
-const runtime = {
-  createScriptRevision: async (payload) => {
-    createPayload = payload;
-    return {
-      projection: {
-        schema_version: "afs.script_core_truth.v0.1",
-        project_id: "p1",
-        current_revision_id: "rev_new",
-        source_digest: newDigest,
-        source_length: payload.source_text.length,
-        analysis_state: "analysis_required",
-        current_revision: {
-          revision_id: "rev_new",
-          parent_revision_id: payload.parent_revision_id,
-          source_kind: payload.source_kind,
-          source_digest: newDigest,
-          source_length: payload.source_text.length,
-          analysis_state: "analysis_required",
-        },
-        revision_history: [
-          { revision_id: "rev_old", source_digest: oldDigest },
-          { revision_id: "rev_new", source_digest: newDigest },
-        ],
-        assets: [],
-        asset_counts: { characters: 0, main_scenes: 0, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
-        provider_dispatch_count: 0,
-        remote_dispatch_count: 0,
-      },
-    };
-  },
-  selectScriptRevision: async (revisionId) => {
-    selectPayload = revisionId;
-    return {
-      projection: {
-        schema_version: "afs.script_core_truth.v0.1",
-        project_id: "p1",
-        current_revision_id: "rev_old",
-        source_digest: oldDigest,
-        source_length: 42,
-        analysis_state: "confirmed",
-        current_revision: { revision_id: "rev_old", source_digest: oldDigest, analysis_state: "confirmed" },
-        revision_history: [{ revision_id: "rev_old", source_digest: oldDigest }],
-        assets: [],
-        asset_counts: { characters: 0, main_scenes: 0, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
-        provider_dispatch_count: 0,
-        remote_dispatch_count: 0,
-      },
-    };
-  },
-};
+const originalContent = state.nodes.n1.content;
+const originalNodeCount = state.order.length;
 
 const context = agentChatContextSnapshot({
   project: { project_id: "p1", name: "UX QA" },
@@ -189,8 +141,11 @@ const context = agentChatContextSnapshot({
 });
 const session = createAgentChatContextStore().get(agentChatContextKey(context));
 const preview = submitAgentChatMessage(session, "/optimize-selected-default", context);
-const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
-const undo = await undoAgentReceiptWithRuntime(session, receipt, store, runtime);
+const receipt = executePendingAgentCommand(session, state);
+const nodeCountAfterReceipt = state.order.length;
+const revisionCountAfterReceipt = state.nodes.n1.params.revisions?.length || 0;
+const contentAfterReceipt = state.nodes.n1.content;
+const undo = undoAgentReceipt(session, receipt, state);
 const instructedPreview = submitAgentChatMessage(session, "/optimize-selected 按用户要求压缩节奏并保留结尾", context);
 const visibleRawCommandLeak = session.messages.some((message) => String(message.text || "").includes("/optimize-selected"));
 process.stdout.write(JSON.stringify({
@@ -200,16 +155,15 @@ process.stdout.write(JSON.stringify({
   rawCommandPreserved: preview.command.raw_command_text === "/optimize-selected-default",
   visibleRawCommandLeak,
   providerDispatchCount: preview.command.provider_dispatch_count + receipt.provider_dispatch_count + undo.provider_dispatch_count,
-  parentRevisionId: createPayload.parent_revision_id,
-  sourceKind: createPayload.source_kind,
-  sourceIncludesCoreIntent: createPayload.source_text.includes("核心意图"),
-  optimizationSource: createPayload.provenance.source,
-  optimizationMode: createPayload.provenance.optimization_mode,
+  nodeCountAfterReceipt,
+  nodeIdentityPreserved: receipt.node_id === "n1" && nodeCountAfterReceipt === originalNodeCount,
+  revisionCountAfterReceipt,
+  contentChangedAfterReceipt: contentAfterReceipt !== originalContent,
+  sourceIncludesCoreIntent: preview.command.after_text.includes("核心意图"),
+  optimizationMode: preview.command.optimization_mode,
   receiptStatus: receipt.status,
-  runtimeDomain: receipt.runtime_domain,
-  undoAvailable: receipt.undo_available === false,
-  selectedRevision: selectPayload,
-  restoredRevision: state.production.script_core_truth_projection.current_revision_id,
+  undoAvailable: receipt.undo_available === true,
+  restoredContent: state.nodes.n1.content,
   undoStatus: undo.status,
   instructedStatus: instructedPreview.status,
   instructedTitle: instructedPreview.command.title,
@@ -226,21 +180,20 @@ process.stdout.write(JSON.stringify({
     payload = json.loads(completed.stdout)
     assert payload == {
         "previewStatus": "preview",
-        "commandType": "optimize_script_revision",
+        "commandType": "revise_selected_node",
         "title": "默认优化文本",
         "rawCommandPreserved": True,
         "visibleRawCommandLeak": False,
         "providerDispatchCount": 0,
-        "parentRevisionId": "rev_old",
-        "sourceKind": "script",
+        "nodeCountAfterReceipt": 1,
+        "nodeIdentityPreserved": True,
+        "revisionCountAfterReceipt": 1,
+        "contentChangedAfterReceipt": True,
         "sourceIncludesCoreIntent": True,
-        "optimizationSource": "agent_chat_script_optimization",
         "optimizationMode": "default_local_structure",
         "receiptStatus": "executed",
-        "runtimeDomain": "script_revision",
         "undoAvailable": True,
-        "selectedRevision": "rev_old",
-        "restoredRevision": "rev_old",
+        "restoredContent": "林夏在清晨的修理铺发现一台旧收音机，里面传来十年后的自己留下的求救信息。",
         "undoStatus": "undone",
         "instructedStatus": "preview",
         "instructedTitle": "按要求优化文本",

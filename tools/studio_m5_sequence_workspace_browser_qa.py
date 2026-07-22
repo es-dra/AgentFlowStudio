@@ -221,7 +221,8 @@ def assert_graph_lifecycle(page: Page, base_url: str) -> dict[str, Any]:
 
 
 def assert_planning_import(page: Page, base_url: str) -> dict[str, Any]:
-    page.wait_for_selector(".graph-canvas-status.planning_required")
+    page.wait_for_selector(".graph-canvas-status.planning-required")
+    expect(page.locator(".graph-canvas-status.planning-required")).to_contain_text("可自由开始")
     expect(page.get_by_role("button", name="导入结构化制作方案")).to_be_visible()
     payload = {"name": "typed-film-plan.json", "mimeType": "application/json",
                "buffer": json.dumps(film_candidate(), ensure_ascii=False).encode("utf-8")}

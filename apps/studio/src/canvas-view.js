@@ -120,6 +120,10 @@ function portButton(port) {
   const button = document.createElement("button");
   button.className = `node-port ${port}`;
   button.dataset.port = port;
+  const label = port === "in" ? "在左侧添加上游节点或连接来源" : "在右侧添加下游节点或连接目标";
+  button.type = "button";
+  button.title = label;
+  button.setAttribute("aria-label", label);
   button.innerHTML = icon("plus", 12);
   return button;
 }

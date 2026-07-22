@@ -20,7 +20,7 @@ export function canRunNodeGeneration(node) {
   return canStartGenerationForNode(node);
 }
 
-// Empty-state intents only select a real input path; story planning and text rewrites go through Agent Chat.
+// Empty-state intents only select a real input path; story planning and text rewrites go through AI 创作搭档.
 export function handleNodeIntent(store, node, intent) {
   if (node.type === "text" && intent === "上传完整剧本") {
     importScriptFileIntoTextNode(store, node);

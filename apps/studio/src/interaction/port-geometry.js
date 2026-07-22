@@ -1,7 +1,7 @@
 import { clientToCanvasPoint, screenToWorld } from "../geometry.js";
 import { effectiveHeight } from "../nodes.js";
 
-const PORT_CENTER_OUTSET = 21;
+const PORT_CENTER_OUTSET = 25;
 
 export function nodePortWorldPoint(node, port, viewport) {
   if (!node) return null;

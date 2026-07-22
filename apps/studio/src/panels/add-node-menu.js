@@ -1,10 +1,11 @@
 import { NODE_TYPES, NODE_MENU_ORDER, createNode, connect, downstreamTypesFor, effectiveHeight } from "../nodes.js";
 import { clientToCanvasPoint, screenToWorld, rectsIntersect } from "../geometry.js";
+import { visibleCanvasFrame } from "../canvas-safe-area.js";
 import { showPopover, el } from "../overlay.js";
 import { icon } from "../icons.js";
 import { ACTION_GROUPS, createActionNode } from "../action-registry.js";
 
-const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_director"];
+const QUICK_ACTION_IDS = ["node_text", "node_script", "node_ref", "node_image"];
 
 export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   let closeRef = () => {};
@@ -63,14 +64,14 @@ export function openReferenceMenu(store, runtime, fromNode, anchorEl, options = 
   }
   const refItem = menuItem("link", "参考节点");
   refItem.addEventListener("click", () => {
-    const x = direction === "upstream" ? fromNode.x - NODE_TYPES.text.size.w - 160 : fromNode.x + fromNode.w + 160;
-    const node = spawn(store, { id: "node_reference", type: "text", label: "参考节点" }, x, fromNode.y);
+    const x = direction === "upstream" ? fromNode.x - NODE_TYPES.ref.size.w - 160 : fromNode.x + fromNode.w + 160;
+    const node = spawn(store, { id: "node_ref", type: "ref", label: "参考集" }, x, fromNode.y);
     store.set((s) => {
       const n = s.nodes[node.id];
-      n.title = "参考节点";
-      n.content = `引用：${fromNode.title}`;
-      n.h = 160;
+      n.title = "参考集";
+      n.prompt = `引用：${fromNode.title}`;
       n.params.isReference = true;
+      n.params.referenceIntent = "edge_reference";
     });
     if (direction === "upstream") connect(store, node.id, fromNode.id);
     else connect(store, fromNode.id, node.id);
@@ -144,6 +145,7 @@ function quickTone(action) {
     node_image: "scene",
     node_video: "video",
     node_script: "story",
+    node_ref: "scene",
     node_director: "revision",
   }[action.id] || "story";
 }
@@ -154,13 +156,15 @@ function quickHint(action) {
     node_image: "放参考图",
     node_video: "做片段",
     node_script: "拆脚本",
+    node_ref: "上传参考",
     node_director: "控镜头",
   }[action.id] || "新节点";
 }
 
 function spawn(store, action, wx, wy) {
+  const position = clampNodePositionToVisibleFrame(store, action, wx, wy);
   if (action?.type === "library") {
-    const node = createNode(store, "text", wx, wy);
+    const node = createNode(store, "text", position.x, position.y);
     store.set((s) => {
       const n = s.nodes[node.id];
       n.params.actionId = action.id;
@@ -172,7 +176,7 @@ function spawn(store, action, wx, wy) {
     });
     return node;
   }
-  return createActionNode(store, action, wx, wy);
+  return createActionNode(store, action, position.x, position.y);
 }
 
 function upstreamTypesFor(targetType) {
@@ -180,9 +184,10 @@ function upstreamTypesFor(targetType) {
 }
 
 function openPositionNear(store, action, wx, wy) {
-  const nodeType = action?.type === "library" ? "text" : action?.type || "text";
+  const nodeType = nodeTypeForAction(action);
   const def = NODE_TYPES[nodeType] || NODE_TYPES.text;
   const base = { x: Math.round(wx), y: Math.round(wy), w: def.size.w, h: def.size.h };
+  const visibleBounds = visibleNodeWorldBounds(store.get().viewport, def);
   const existing = Object.values(store.get().nodes || {}).map((node) => ({
     x: node.x - 28,
     y: node.y - 28,
@@ -204,10 +209,48 @@ function openPositionNear(store, action, wx, wy) {
     [0, stepY * 2],
   ];
   for (const [dx, dy] of offsets) {
-    const candidate = { ...base, x: base.x + dx, y: base.y + dy };
+    const candidate = clampRectToBounds({ ...base, x: base.x + dx, y: base.y + dy }, visibleBounds);
     if (!existing.some((rect) => rectsIntersect(candidate, rect))) return candidate;
   }
-  return { ...base, x: base.x + stepX * (existing.length + 1), y: base.y };
+  return clampRectToBounds({ ...base, x: base.x + stepX * (existing.length + 1), y: base.y }, visibleBounds);
+}
+
+function clampNodePositionToVisibleFrame(store, action, wx, wy) {
+  const def = NODE_TYPES[nodeTypeForAction(action)] || NODE_TYPES.text;
+  const rect = clampRectToBounds({ x: Math.round(wx), y: Math.round(wy), w: def.size.w, h: def.size.h }, visibleNodeWorldBounds(store.get().viewport, def));
+  return { x: rect.x, y: rect.y };
+}
+
+function nodeTypeForAction(action) {
+  return action?.type === "library" ? "text" : action?.type || "text";
+}
+
+function visibleNodeWorldBounds(viewport, def) {
+  const frame = visibleCanvasFrame();
+  if (!frame.visible || frame.width < 160 || frame.height < 160) return null;
+  const margin = 24;
+  const left = (frame.safeArea?.left || 0) + margin;
+  const top = (frame.safeArea?.top || 0) + margin;
+  const right = frame.width - (frame.safeArea?.right || 0) - def.size.w - margin;
+  const bottom = frame.height - (frame.safeArea?.bottom || 0) - def.size.h - margin;
+  if (right < left || bottom < top) return null;
+  const topLeft = screenToWorld(viewport, left, top);
+  const bottomRight = screenToWorld(viewport, right, bottom);
+  return {
+    minX: Math.min(topLeft.x, bottomRight.x),
+    maxX: Math.max(topLeft.x, bottomRight.x),
+    minY: Math.min(topLeft.y, bottomRight.y),
+    maxY: Math.max(topLeft.y, bottomRight.y),
+  };
+}
+
+function clampRectToBounds(rect, bounds) {
+  if (!bounds) return rect;
+  return {
+    ...rect,
+    x: Math.round(Math.min(Math.max(rect.x, bounds.minX), bounds.maxX)),
+    y: Math.round(Math.min(Math.max(rect.y, bounds.minY), bounds.maxY)),
+  };
 }
 
 function menuItem(iconName, label, tag, gate) {

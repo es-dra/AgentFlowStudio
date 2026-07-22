@@ -22,6 +22,7 @@ VIEWPORTS = (
     {"width": 430, "height": 932},
     {"width": 390, "height": 844},
 )
+COMPACT_AGENT_MAX_WIDTH = 1100
 CASES = ("dialogue_room", "four_person_action", "sci_fi_chamber")
 CLEAN_CASES = {"dialogue_room", "four_person_action"}
 RECOVERY_CASES = {"sci_fi_chamber"}
@@ -169,8 +170,10 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
     expect(page.locator(".studio-agent-chat")).to_be_visible()
     command_preview_shot = screenshot_dir / f"m6-3-{case_id}-command-preview-{viewport_key}.png"
     page.screenshot(path=str(command_preview_shot), full_page=True)
-    if viewport_width(viewport_key) <= 900:
+    if viewport_width(viewport_key) <= COMPACT_AGENT_MAX_WIDTH:
         page.keyboard.press("Escape")
+        expect(page.locator(".studio-agent-chat.mobile-open")).to_have_count(0)
+        expect(page.locator(".agent-mobile-backdrop")).to_have_count(0)
         expect(page.locator(".media-operations-workspace")).to_be_visible()
 
     page.locator(".cost-recovery-panel").scroll_into_view_if_needed()
@@ -297,7 +300,7 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
     width = viewport_width(viewport_key)
     selected_before = page.locator(".media-panel-head strong").first.inner_text()
     screenshots: dict[str, str] = {}
-    if width > 900:
+    if width > COMPACT_AGENT_MAX_WIDTH:
         expect(page.locator(".studio-agent-chat")).to_be_visible()
         return (
             {
@@ -316,10 +319,10 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
 
     if width <= 760:
         expect(page.locator(".product-mobile-nav")).to_be_visible()
-        page.locator(".product-mobile-nav button").filter(has_text="Agent").first.click()
+        page.locator(".product-mobile-nav button").filter(has_text="搭档").first.click()
     else:
         expect(page.locator(".studio-agent-chat.collapsed")).to_be_visible()
-        page.get_by_role("button", name="展开 Agent Chat").click()
+        page.get_by_role("button", name="展开 AI 创作搭档").click()
 
     expect(page.locator(".studio-agent-chat.mobile-open")).to_be_visible()
     if has_horizontal_document_overflow(page):
@@ -330,6 +333,7 @@ def verify_responsive_agent_chat(page: Any, case_id: str, viewport_key: str, scr
     screenshots[f"{case_id}:{viewport_key}:agent_chat_expanded"] = str(expanded_shot.resolve())
 
     page.keyboard.press("Escape")
+    expect(page.locator(".agent-mobile-backdrop")).to_have_count(0)
     if width <= 760:
         expect(page.locator(".studio-agent-chat")).to_be_hidden()
     else:
@@ -539,7 +543,7 @@ def build_role_matrix(case_results: dict[str, Any], screenshots: dict[str, str])
                 f"{mobile_dialogue}:agent_chat_expanded",
                 f"{mobile_dialogue}:agent_chat_returned",
             ],
-            "task": "在真实手机视口快速播放、看状态/费用/恢复，展开并收起 Agent Chat 后回到当前审片。",
+            "task": "在真实手机视口快速播放、看状态/费用/恢复，展开并收起 AI 创作搭档后回到当前审片。",
         },
         "keyboard_low_vision": {
             "completed": all(bool(item.get("keyboard_focus_sequence")) for item in values),

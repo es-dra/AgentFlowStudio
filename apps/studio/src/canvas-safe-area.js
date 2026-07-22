@@ -59,16 +59,18 @@ function applyOverlayInset(safeArea, rootRect, overlay) {
   const overlapX = Math.min(rootRect.right, rect.right) - Math.max(rootRect.left, rect.left);
   const overlapY = Math.min(rootRect.bottom, rect.bottom) - Math.max(rootRect.top, rect.top);
   if (overlapX <= 0 || overlapY <= 0) return;
-  if (rect.left <= rootRect.left + 24 && rect.width > 80) {
+  const sideOverlay = overlapY >= rootRect.height * 0.45 && rect.width <= rootRect.width * 0.72;
+  const horizontalOverlay = overlapX >= rootRect.width * 0.38 && rect.height <= rootRect.height * 0.72;
+  if (sideOverlay && rect.left <= rootRect.left + 24 && rect.width > 80) {
     safeArea.left = Math.max(safeArea.left, Math.min(rootRect.width - 160, rect.right - rootRect.left));
   }
-  if (rect.right >= rootRect.right - 24 && rect.width > 80) {
+  if (sideOverlay && rect.right >= rootRect.right - 24 && rect.width > 80) {
     safeArea.right = Math.max(safeArea.right, Math.min(rootRect.width - 160, rootRect.right - rect.left));
   }
-  if (rect.top <= rootRect.top + 24 && rect.height > 48) {
+  if (horizontalOverlay && rect.top <= rootRect.top + 24 && rect.height > 48) {
     safeArea.top = Math.max(safeArea.top, Math.min(rootRect.height - 160, rect.bottom - rootRect.top));
   }
-  if (rect.bottom >= rootRect.bottom - 24 && rect.height > 48) {
+  if (horizontalOverlay && rect.bottom >= rootRect.bottom - 24 && rect.height > 48) {
     safeArea.bottom = Math.max(safeArea.bottom, Math.min(rootRect.height - 160, rootRect.bottom - rect.top));
   }
 }
