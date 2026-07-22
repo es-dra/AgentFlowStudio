@@ -5,7 +5,7 @@ import {
   executePendingAgentCommand,
   executePendingAgentCommandWithRuntime,
   recordAgentCommandError,
-  submitAgentChatMessage,
+  submitAgentChatMessageWithRuntime,
   undoAgentReceipt,
   undoAgentReceiptWithRuntime,
 } from "./agent-chat-lifecycle.js";
@@ -25,7 +25,7 @@ export function buildAgentChatPanel({
 } = {}) {
   const aside = el("aside", `studio-agent-chat${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`);
   aside.dataset.contextKey = context?.context_key || "";
-  aside.setAttribute("aria-label", "Agent Chat");
+  aside.setAttribute("aria-label", "AI 创作搭档");
   if (!collapsed) aside.appendChild(resizeHandle(onResizeStart));
   aside.appendChild(panelHeader({ context, collapsed, onToggleCollapse }));
   if (collapsed) return aside;
@@ -33,9 +33,10 @@ export function buildAgentChatPanel({
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
   body.appendChild(messageLog(session));
+  if (session?.conversationRequest) body.appendChild(conversationStatus({ session, context, runtime, onRender }));
   if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, runtime, onRender }));
   body.appendChild(receiptList({ session, store, runtime, onRender }));
-  body.appendChild(composer({ session, context, onOpen, onRender }));
+  body.appendChild(composer({ session, context, runtime, onOpen, onRender }));
   aside.appendChild(body);
   return aside;
 }
@@ -46,13 +47,13 @@ function panelHeader({ context, collapsed, onToggleCollapse }) {
   title.innerHTML = [
     '<span class="agent-mark">AI</span>',
     "<span>",
-    "<strong>Agent Chat</strong>",
+    "<strong>AI 创作搭档</strong>",
     `<small>${escapeHtml(contextLabel(context))}</small>`,
     "</span>",
   ].join("");
   const collapse = el("button", "studio-icon-button");
   collapse.type = "button";
-  collapse.setAttribute("aria-label", collapsed ? "展开 Agent Chat" : "收起 Agent Chat");
+  collapse.setAttribute("aria-label", collapsed ? "展开 AI 创作搭档" : "收起 AI 创作搭档");
   collapse.setAttribute("aria-expanded", String(!collapsed));
   collapse.innerHTML = icon(collapsed ? "panel" : "chevronDown", 15);
   collapse.addEventListener("click", () => onToggleCollapse?.());
@@ -64,10 +65,16 @@ function contextStrip(context) {
   const strip = el("dl", "agent-context-strip");
   for (const [label, value] of [
     ["项目", context?.project_name || "未命名项目"],
-    ["版本", context?.script_revision_id ? "已绑定剧本版本" : "未创建剧本版本"],
+    ["剧本", context?.script_revision_id ? "已有可追溯版本" : "可从任意节点开始"],
     ["节点", context?.selected_node_title || "未选择"],
   ]) {
     strip.append(el("dt", "", label), el("dd", "", value));
+  }
+  if (context?.selected_edge_id) {
+    strip.append(
+      el("dt", "", "连线"),
+      el("dd", "", `${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"} · ${relationLabel(context.selected_edge_relation_type)}`),
+    );
   }
   const counts = context?.counts || {};
   if (context?.media_operations) {
@@ -122,9 +129,12 @@ function commandPreview({ session, store, runtime, onRender }) {
     el("p", "", command.error_message || command.summary || "确认前不会改变画布。"),
   );
   const details = el("dl", "agent-command-details");
-  if (command.node_id || command.target_asset_id || command.target_shot_id || command.target_chunk_id) details.append(el("dt", "", "目标"), el("dd", "", humanCommandTarget(command)));
+  if (command.edge_id || command.node_id || command.target_asset_id || command.target_shot_id || command.target_chunk_id) details.append(el("dt", "", "目标"), el("dd", "", humanCommandTarget(command)));
   if (command.impact?.node_ids?.length) details.append(el("dt", "", "影响"), el("dd", "", `${command.impact.node_ids.length} 个画布节点`));
-  details.append(el("dt", "", "故事板"), el("dd", "", command.impact?.storyboard_write ? "需要确认写入" : "不写入"));
+  if (command.tool_label) details.append(el("dt", "", "工具"), el("dd", "", command.tool_label));
+  if (command.provider_label) details.append(el("dt", "", "能力"), el("dd", "", command.provider_label));
+  if (command.cost_label) details.append(el("dt", "", "费用"), el("dd", "", command.cost_label));
+  details.append(el("dt", "", "故事板"), el("dd", "", command.impact?.storyboard_write ? "确认后同步" : "不写入"));
   preview.appendChild(details);
   if (command.preview_diff) preview.appendChild(diffPreview(command.preview_diff));
   preview.appendChild(evidenceDetails("查看证据/开发详情", [
@@ -138,6 +148,7 @@ function commandPreview({ session, store, runtime, onRender }) {
     ["plan_digest", command.plan_digest],
     ["graph_version", command.graph_version],
     ["graph_digest", command.graph_digest],
+    ["edge_id", command.edge_id],
   ]));
   const actions = el("div", "agent-command-actions");
   if (command.status !== "blocked") {
@@ -207,18 +218,60 @@ function receiptList({ session, store, runtime, onRender }) {
   return wrap;
 }
 
-function composer({ session, context, onOpen, onRender }) {
+function conversationStatus({ session, context, runtime, onRender }) {
+  const state = session.conversationRequest || {};
+  const wrap = el("section", `agent-conversation-status ${state.status || ""}`);
+  const label = state.status === "loading" ? "正在回答" : state.status === "failed" ? "模型不可用" : "对话状态";
+  wrap.append(el("span", "eyebrow", label), el("p", "", state.message || "AI 创作搭档会通过运行服务回答，不会改动画布。"));
+  const actions = el("div", "agent-command-actions");
+  if (state.status === "loading" && typeof state.cancel === "function") {
+    const cancel = el("button", "studio-secondary-button", "取消回答");
+    cancel.type = "button";
+    cancel.addEventListener("click", () => {
+      state.cancel();
+      state.status = "cancelled";
+      state.message = "已取消这次回答；如果服务端已经开始处理，结果不会写入画布。";
+      onRender?.();
+    });
+    actions.appendChild(cancel);
+  }
+  if (["failed", "unavailable", "cancelled"].includes(state.status) && state.lastMessage) {
+    const retry = el("button", "studio-secondary-button", "重试");
+    retry.type = "button";
+    retry.addEventListener("click", () => {
+      submitAgentChatMessageWithRuntime(session, state.lastMessage, context, runtime)
+        .finally(() => onRender?.());
+      onRender?.();
+    });
+    actions.appendChild(retry);
+  }
+  if (actions.childNodes.length) wrap.appendChild(actions);
+  return wrap;
+}
+
+function composer({ session, context, runtime, onOpen, onRender }) {
   const form = el("form", "agent-chat-composer");
   const input = document.createElement("textarea");
   input.rows = 3;
   input.maxLength = 12000;
   input.placeholder = context?.selected_node_id
-    ? "描述你想怎么调整当前节点或镜头"
-    : "输入想法、剧本要求或下一步计划";
-  input.setAttribute("aria-label", "向 Agent Chat 发送消息或命令");
+    ? "可以提问，也可以预览修改当前节点、连线或媒体动作"
+    : "打招呼、提问，或从想法、剧本、参考图、图片、视频开始";
+  input.setAttribute("aria-label", "向 AI 创作搭档发送消息或命令");
+  input.value = session?.draftMessage || "";
+  input.addEventListener("input", () => {
+    session.draftMessage = input.value;
+  });
   bindStableTextInputLifecycle(input, () => {}, {
     onKeyDown: (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      if (event.key !== "Enter" || event.isComposing) return;
+      if (event.shiftKey) return;
+      if (!event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        form.requestSubmit();
+        return;
+      }
+      if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
         form.requestSubmit();
       }
@@ -226,15 +279,30 @@ function composer({ session, context, onOpen, onRender }) {
   });
   const send = el("button", "studio-icon-button");
   send.type = "submit";
-  send.setAttribute("aria-label", "发送到 Agent Chat");
+  send.setAttribute("aria-label", "发送到 AI 创作搭档");
   send.innerHTML = icon("arrowUp", 16);
+  const syncDraft = () => {
+    session.draftMessage = input.value || session.draftMessage || "";
+  };
+  send.addEventListener("pointerdown", syncDraft);
+  send.addEventListener("click", syncDraft);
   form.append(input, send);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const result = submitAgentChatMessage(session, input.value, context);
-    if (result.status !== "empty") input.value = "";
+    const message = input.value || session.draftMessage || "";
+    const run = submitAgentChatMessageWithRuntime(session, message, context, runtime)
+      .then((result) => {
+        if (result.status === "empty") return;
+        onOpen?.();
+      })
+      .finally(() => onRender?.());
+    if (message.trim()) {
+      session.draftMessage = "";
+      input.value = "";
+    }
     onOpen?.();
     onRender?.();
+    return run;
   });
   return form;
 }
@@ -248,7 +316,7 @@ function contextLabel(context) {
 function resizeHandle(onResizeStart) {
   const handle = el("div", "agent-resize-handle");
   handle.setAttribute("role", "separator");
-  handle.setAttribute("aria-label", "调整 Agent Chat 宽度");
+  handle.setAttribute("aria-label", "调整 AI 创作搭档宽度");
   handle.setAttribute("aria-orientation", "vertical");
   handle.addEventListener("pointerdown", (event) => onResizeStart?.(event));
   return handle;
@@ -264,11 +332,23 @@ function planStateLabel(value) {
 }
 
 function humanCommandTarget(command) {
+  if (command.edge_id) return "当前连线";
   if (command.target_chunk_id) return "当前分段";
   if (command.target_shot_id) return "当前镜头";
   if (command.target_asset_id) return "当前资产";
   if (command.node_id) return "当前节点";
   return "当前上下文";
+}
+
+function relationLabel(relation) {
+  return {
+    generation: "生成/派生",
+    reference: "参考",
+    director: "导演控制",
+    fork: "分支",
+    sequence: "叙事顺序",
+    proposed: "待确认建议",
+  }[String(relation || "generation")] || String(relation || "生成/派生").replace(/_/g, " ");
 }
 
 function diffPreview(diff) {

@@ -73,7 +73,7 @@ function isLocalHost(hostname) {
   return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function requestJson(route, { method = "GET", payload = null, meta = null, headers: extraHeaders = null } = {}) {
+async function requestJson(route, { method = "GET", payload = null, meta = null, headers: extraHeaders = null, signal = null } = {}) {
   const requestMeta = buildRequestMeta(route, method, payload, meta);
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
   headers["X-Client-Request-ID"] = requestMeta.client_request_id;
@@ -93,6 +93,7 @@ async function requestJson(route, { method = "GET", payload = null, meta = null,
       method,
       headers,
       body: payload == null ? undefined : JSON.stringify(payload),
+      signal,
     });
   } catch (fetchError) {
     const error = new Error("Runtime request failed: network connection interrupted");
@@ -908,6 +909,13 @@ export function createRuntimeClient(projectId = "") {
     },
     spriteChat(payload) {
       return requestJson(`/projects/${encoded}/sprite/chat`, { method: "POST", payload });
+    },
+    agentChatConversation(payload, options = {}) {
+      return requestJson(`/projects/${encoded}/agent-chat/conversation`, {
+        method: "POST",
+        payload,
+        signal: options?.signal || null,
+      });
     },
   };
 }

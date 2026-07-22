@@ -23,6 +23,12 @@
   opacity: 0.82;
 }
 
+#edge-layer path.edge-hit {
+  stroke: rgba(255, 255, 255, 0.001);
+  stroke-width: 18;
+  pointer-events: stroke;
+}
+
 #edge-layer path.edge-spark {
   stroke: #5ac8fa;
   stroke-width: 1.45;
@@ -36,17 +42,32 @@
 }
 
 #edge-layer path.edge-spark.active { opacity: 0.95; }
+#edge-layer path.edge-spark.selected-path {
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 7px rgba(90, 200, 250, 0.9));
+}
 #edge-layer path.edge-spark.reverse { animation-name: edge-spark-reverse; }
 
 #edge-layer path.director-edge {
   stroke: var(--energy);
-  stroke-dasharray: 4 8;
   filter: drop-shadow(0 0 4px rgba(245, 196, 81, 0.32));
 }
 
 #edge-layer path.reference-edge {
   stroke: #8192a8;
-  stroke-dasharray: 3 7;
+}
+
+#edge-layer path.fork-edge {
+  stroke: #b48cff;
+}
+
+#edge-layer path.sequence-edge {
+  stroke: #68a5ff;
+}
+
+#edge-layer path.proposed-edge {
+  stroke: var(--energy);
+  stroke-dasharray: 6 6;
 }
 
 .edge-label {
@@ -113,9 +134,3 @@
 }
 
 #edge-layer path.rel-dim-edge { opacity: 0.18; }
-
-@media (prefers-reduced-motion: reduce) {
-  #edge-layer path.edge-spark,
-  #edge-layer path.pending,
-  #edge-layer path.just-connected { animation: none !important; }
-}

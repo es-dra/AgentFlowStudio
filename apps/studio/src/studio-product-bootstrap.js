@@ -9,19 +9,15 @@ export function mountStudioDom() {
   const productRoot = document.createElement("div");
   productRoot.id = "product-shell-root";
   app.appendChild(productRoot);
-  const editorMounted = !window.matchMedia("(max-width: 760px)").matches;
-  let editorParking = null;
-  let editorShell = null;
-  if (editorMounted) {
-    editorParking = document.createElement("div");
-    editorParking.id = "studio-canvas-parking";
-    editorParking.hidden = true;
-    editorShell = document.createElement("div");
-    editorShell.id = "studio-editor-shell";
-    editorShell.innerHTML = CANVAS_SHELL_HTML;
-    editorParking.appendChild(editorShell);
-    app.appendChild(editorParking);
-  }
+  const editorMounted = true;
+  const editorParking = document.createElement("div");
+  editorParking.id = "studio-canvas-parking";
+  editorParking.hidden = true;
+  const editorShell = document.createElement("div");
+  editorShell.id = "studio-editor-shell";
+  editorShell.innerHTML = CANVAS_SHELL_HTML;
+  editorParking.appendChild(editorShell);
+  app.appendChild(editorParking);
   const overlay = document.createElement("div");
   overlay.id = "overlay-root";
   app.appendChild(overlay);

@@ -53,6 +53,7 @@ from apps.api.runtime_m6_script_plan_asset_bible import register_runtime_m6_scri
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
+from apps.api.runtime_agent_chat_conversation import register_runtime_agent_chat_conversation_routes
 from apps.api.runtime_adaptive_canvas_v2 import register_runtime_adaptive_canvas_v2_routes
 from apps.api.runtime_audio_routes import register_runtime_audio_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
@@ -416,6 +417,7 @@ def create_runtime_app(
     register_runtime_generation_comparison_routes(app, store)
     register_runtime_accepted_generation_plan_routes(app, store)
     register_runtime_studio_state_routes(app, store, auth)
+    register_runtime_agent_chat_conversation_routes(app, store, auth)
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)
     configure_studio_static(app, studio_root)

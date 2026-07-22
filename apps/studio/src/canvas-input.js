@@ -194,7 +194,7 @@ function handlePointerDown(e, env) {
     e.preventDefault();
     return session;
   }
-  if (e.button !== 0 || isChromeTarget(e)) return null;
+  if (e.button !== 0) return null;
 
   const stackedOutputPort = findPortAtPoint(e) || outputPortFromMagnet(e);
   const portBtn = stackedOutputPort || e.target.closest(".node-port");
@@ -206,6 +206,7 @@ function handlePointerDown(e, env) {
     return session;
   }
   if (portBtn) return null;
+  if (isChromeTarget(e)) return null;
   if (nodeEl) return beginNodeDrag(e, { store, rootEl, nodeEl });
 
   const session = { kind: "marquee", startX: e.clientX, startY: e.clientY, el: null };

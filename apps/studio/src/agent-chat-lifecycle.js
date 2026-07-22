@@ -1,6 +1,8 @@
 import { applyProductionPlanProjection } from "./production-plan-projection.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
+import { conversationalReply } from "./agent-chat-conversation.js";
+import { NODE_TYPES, defaultParams } from "./nodes.js";
 
 const SCHEMA_VERSION = "afs_agent_chat_lifecycle.v0.1";
 const CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1";
@@ -47,6 +49,10 @@ export function agentChatContextSnapshot({
   const productionGraph = state.production?.production_graph_projection || {};
   const selectedCoreAsset = activeNode?.params?.coreAssetTruth || null;
   const selectedPlanEntity = activeNode?.params?.productionPlanTruth || null;
+  const selectedEdgeId = cleanToken(state.selection?.edgeId, 140);
+  const selectedEdge = selectedEdgeId ? state.edges?.[selectedEdgeId] : null;
+  const selectedEdgeFrom = selectedEdge?.from ? nodes[selectedEdge.from] : null;
+  const selectedEdgeTo = selectedEdge?.to ? nodes[selectedEdge.to] : null;
   const scriptRevisionId = cleanToken(scriptTruth.current_revision_id, 140);
   const scriptSourceDigest = cleanToken(scriptTruth.source_digest, 80);
   const planShotCount = Number(productionPlan.shot_count || 0);
@@ -80,6 +86,12 @@ export function agentChatContextSnapshot({
     selected_plan_chunk_id: cleanToken(selectedPlanEntity?.chunk_id, 160),
     selected_plan_entity_plan_id: cleanToken(selectedPlanEntity?.plan_id, 140),
     selected_plan_entity_plan_digest: cleanToken(selectedPlanEntity?.plan_digest, 80),
+    selected_edge_id: selectedEdgeId,
+    selected_edge_relation_type: cleanToken(selectedEdge?.relation_type || selectedEdge?.relationType || "", 80),
+    selected_edge_from_node_id: cleanToken(selectedEdge?.from, 120),
+    selected_edge_to_node_id: cleanToken(selectedEdge?.to, 120),
+    selected_edge_from_title: cleanText(selectedEdgeFrom?.title || selectedEdgeFrom?.label || "", 80),
+    selected_edge_to_title: cleanText(selectedEdgeTo?.title || selectedEdgeTo?.label || "", 80),
     current_shot_node_id: cleanToken(currentShot?.nodeId, 120),
     current_shot_title: cleanText(currentShot?.title || "", 80),
     counts: {
@@ -229,11 +241,74 @@ export function submitAgentChatMessage(session, rawText, context) {
     return { status: command.status, command };
   }
   appendMessage(session, { role: "user", text: displayText || commandText });
+  const answer = conversationalReply(commandText, context);
   appendMessage(session, {
     role: "assistant",
-    text: "已记录到当前上下文。需要改动画布时，请发送可预览命令。",
+    text: answer?.text || "我可以继续讨论创作方向；需要改动画布时会先给出可确认的预览。",
   });
-  return { status: "recorded" };
+  return { status: answer?.status || "answered", conversation: answer };
+}
+
+export async function submitAgentChatMessageWithRuntime(session, rawText, context, runtime = null) {
+  const commandText = cleanSourceText(rawText, 12000);
+  const displayText = cleanText(rawText, 900);
+  if (!commandText) return { status: "empty" };
+  const command = previewAgentCommand(commandText, context);
+  if (command.command_type !== "none") {
+    return submitAgentChatMessage(session, rawText, context);
+  }
+  appendMessage(session, { role: "user", text: displayText || commandText });
+  if (!runtime?.agentChatConversation) {
+    const unavailable = unavailableConversation("runtime_unavailable");
+    session.conversationRequest = {
+      status: "unavailable",
+      message: unavailable.text,
+      lastMessage: commandText,
+    };
+    appendMessage(session, { role: "assistant", text: unavailable.text, tone: "warning" });
+    return { status: "unavailable", conversation: unavailable };
+  }
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  session.conversationRequest = {
+    status: "loading",
+    message: "AI 创作搭档正在通过运行服务结合当前画布回答；这不会改动画布。",
+    lastMessage: commandText,
+    cancel: () => controller?.abort(),
+  };
+  try {
+    const response = await runtime.agentChatConversation({
+      message: commandText,
+      node_id: context?.selected_node_id || "",
+      canvas_summary: agentChatRuntimeSummary(context),
+      provider_service_id: "server_codex",
+      generated_at: new Date().toISOString(),
+    }, { signal: controller?.signal || null });
+    if (response?.mode !== "llm" || response?.provider_calls_started !== true) {
+      const unavailable = unavailableConversation(response?.safe_manifest?.fallback_reason || response?.mode || "llm_unavailable");
+      session.conversationRequest = {
+        status: "unavailable",
+        message: unavailable.text,
+        lastMessage: commandText,
+      };
+      appendMessage(session, { role: "assistant", text: unavailable.text, tone: "warning" });
+      return { status: "unavailable", conversation: unavailable, response };
+    }
+    const answer = runtimeConversationAnswer(response);
+    session.conversationRequest = null;
+    session.lastConversation = answer;
+    appendMessage(session, { role: "assistant", text: answer.text });
+    return { status: answer.status, conversation: answer, response };
+  } catch (error) {
+    const aborted = error?.name === "AbortError";
+    const failure = unavailableConversation(aborted ? "cancelled" : "runtime_request_failed");
+    session.conversationRequest = {
+      status: aborted ? "cancelled" : "failed",
+      message: failure.text,
+      lastMessage: commandText,
+    };
+    appendMessage(session, { role: "assistant", text: failure.text, tone: aborted ? "warning" : "error" });
+    return { status: session.conversationRequest.status, conversation: failure, error };
+  }
 }
 
 export function cancelAgentCommand(session) {
@@ -386,7 +461,7 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
 function productionGraphAgentReceipt(command, runtimeReceipt = {}) {
   const actionSummaries = {
     confirm_candidate: "可信制作方案已建立为唯一制作图版本；画布与故事板将同步刷新。",
-    confirm_m6_script_plan_asset_bible: "M6剧本、动态拆镜与资产Bible已写入同一制作图；画布、故事板与Agent Chat将同步消费。",
+    confirm_m6_script_plan_asset_bible: "M6剧本、动态拆镜与资产Bible已写入同一制作图；画布、故事板与AI 创作搭档将同步消费。",
     mutate: "局部修改已确认；仅证据关联的下游对象进入待处理，未关联产物继续保留。",
     select_candidate: "候选版本已选定并写入制作图版本记录。",
     review_decision: command.payload?.state === "approved" ? "专业审核已通过并写入制作图。" : "专业审核已退回，原候选与证据仍保留。",
@@ -586,6 +661,7 @@ function emptySession(contextKey) {
     ],
     pendingCommand: null,
     receipts: [],
+    draftMessage: "",
   };
 }
 
@@ -638,6 +714,28 @@ function previewAgentCommand(message, context = {}) {
       instruction: optimizeInstruction,
     });
   }
+
+  const forkInstruction = matchCommand(message, [
+    /^\/fork-selected(?:\s+(.+))?$/i,
+    /^创建分支版本(?:[:：]\s*(.+))?$/i,
+    /^派生为新节点(?:[:：]\s*(.+))?$/i,
+  ]);
+  if (/^\/fork-selected$/i.test(message) || /^创建分支版本$/i.test(message) || /^派生为新节点$/i.test(message) || forkInstruction) {
+    return forkSelectedNodeCommand(context, forkInstruction || "从当前节点显式派生一个分支版本。");
+  }
+
+  const createNodeIntent = nodeCreationIntent(message);
+  if (createNodeIntent) return createCanvasNodeCommand(context, createNodeIntent);
+
+  const relationIntent = edgeRelationIntent(message);
+  if (relationIntent) return edgeRelationCommand(context, relationIntent);
+
+  if (/^\/delete-selected-edge$/i.test(message) || /^删除(?:当前|选中)?连线$/i.test(message)) {
+    return deleteSelectedEdgeCommand(context);
+  }
+
+  const generationIntent = generationPreviewIntent(message);
+  if (generationIntent) return generationPreviewCommand(context, generationIntent);
 
   if (/^\/refresh-script-truth$/i.test(message) || /^刷新(?:剧本)?事实$/i.test(message)) {
     return runtimeCommand({
@@ -920,29 +1018,31 @@ function scriptRevisionCommand({ context, sourceKind, sourceText, title, summary
 
 function scriptOptimizationCommand({ context, mode, instruction }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "故事板是只读投影。请切回画布后再优化文本。", context);
+    return blockedCommand("revise_selected_node", "优化当前节点", "故事板是只读投影。请切回画布后再优化文本。", context);
   }
   if (!["text", "script"].includes(context.selected_node_type)) {
-    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "请先选择一个文本或脚本节点。", context);
+    return blockedCommand("revise_selected_node", "优化当前节点", "请先选择一个文本或脚本节点。", context);
   }
   const sourceText = cleanSourceText(context.selected_node_text, 12000);
   if (!sourceText) {
-    return blockedCommand("optimize_script_revision", "优化文本为剧本版本", "当前文本节点还没有内容。", context);
+    return blockedCommand("revise_selected_node", "优化当前节点", "当前文本节点还没有内容。", context);
   }
   const optimized = optimizedScriptDraft(sourceText, instruction);
   return {
     schema_version: SCHEMA_VERSION,
     command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    command_type: "optimize_script_revision",
-    execution_mode: "runtime",
+    command_type: "revise_selected_node",
+    execution_mode: "local",
     status: "preview",
     title: mode === "default" ? "默认优化文本" : "按要求优化文本",
-    summary: "生成可审阅的剧本修订草案；确认后写入同一事实源，故事板不反写。",
+    summary: "生成可审阅的节点内修订草案；确认后保留同一节点身份和修订历史，不新建剧本版本节点。",
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     revision_id: cleanToken(context.script_revision_id, 140),
+    node_id: cleanToken(context.selected_node_id, 120),
     source_kind: "script",
-    source_text: optimized,
+    source_text: sourceText,
+    after_text: optimized,
     before_text: sourceText,
     parent_revision_id: cleanToken(context.script_revision_id, 140) || null,
     optimization_mode: mode === "default" ? "default_local_structure" : "instructed_local_structure",
@@ -954,6 +1054,172 @@ function scriptOptimizationCommand({ context, mode, instruction }) {
       storyboard_write: false,
     },
     requires_confirmation: true,
+    tool_label: "本地节点修订",
+    cost_label: "不产生费用",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function createCanvasNodeCommand(context, intent) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("create_canvas_node", "创建画布节点", "故事板是只读投影。请切回画布后再创建节点。", context);
+  }
+  const def = NODE_TYPES[intent.type] || NODE_TYPES.text;
+  const title = cleanText(intent.title || `${def.label}节点`, 80);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "create_canvas_node",
+    execution_mode: "local",
+    status: "preview",
+    title: `创建${def.label}`,
+    summary: context.selected_node_id
+      ? `确认后在当前节点${intent.direction === "upstream" ? "前面" : "后面"}创建「${title}」，并建立一条${relationTypeLabel(intent.relation_type)}连线。`
+      : `确认后在当前画布创建「${title}」，不会补造上游剧本或分镜。`,
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    node_id: cleanToken(context.selected_node_id, 120),
+    create_node: {
+      type: intent.type,
+      title,
+      prompt: cleanText(intent.prompt || "", 500),
+      relation_type: intent.relation_type,
+      direction: intent.direction || "downstream",
+    },
+    impact: {
+      node_ids: context.selected_node_id ? [context.selected_node_id] : [],
+      relation: intent.relation_type || "generation",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    tool_label: "画布本地操作",
+    cost_label: "不产生费用",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function forkSelectedNodeCommand(context, instruction) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("fork_selected_node", "创建分支版本", "故事板是只读投影。请切回画布后再创建分支。", context);
+  }
+  if (!context.selected_node_id) return blockedCommand("fork_selected_node", "创建分支版本", "请先选择要派生的节点。", context);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "fork_selected_node",
+    execution_mode: "local",
+    status: "preview",
+    title: "创建分支版本",
+    summary: "确认后才会从当前节点派生一个新节点；普通优化仍保留在原节点修订历史中。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    node_id: cleanToken(context.selected_node_id, 120),
+    fork_instruction: cleanText(instruction, 500),
+    impact: {
+      node_ids: [context.selected_node_id],
+      relation: "fork",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    tool_label: "画布本地操作",
+    cost_label: "不产生费用",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function edgeRelationCommand(context, intent) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("change_edge_relation", "调整连线关系", "故事板是只读投影。请切回画布后再调整连线。", context);
+  }
+  const edgeId = cleanToken(context.selected_edge_id, 140);
+  if (!edgeId) return blockedCommand("change_edge_relation", "调整连线关系", "请先点选一条连线。", context);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "change_edge_relation",
+    execution_mode: "local",
+    status: "preview",
+    title: "调整连线关系",
+    summary: `确认后把当前连线标记为${relationTypeLabel(intent.relation_type)}；节点内容不变。`,
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    edge_id: edgeId,
+    relation_type: intent.relation_type,
+    impact: {
+      node_ids: [context.selected_edge_from_node_id, context.selected_edge_to_node_id].filter(Boolean),
+      relation: "edge_relation_update",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    tool_label: "画布本地操作",
+    cost_label: "不产生费用",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function deleteSelectedEdgeCommand(context) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("delete_selected_edge", "删除当前连线", "故事板是只读投影。请切回画布后再删除连线。", context);
+  }
+  const edgeId = cleanToken(context.selected_edge_id, 140);
+  if (!edgeId) return blockedCommand("delete_selected_edge", "删除当前连线", "请先点选一条连线。", context);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "delete_selected_edge",
+    execution_mode: "local",
+    status: "preview",
+    title: "删除当前连线",
+    summary: "确认后只删除这条关系，两个节点都会保留；可以撤销。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    edge_id: edgeId,
+    impact: {
+      node_ids: [context.selected_edge_from_node_id, context.selected_edge_to_node_id].filter(Boolean),
+      relation: "edge_delete",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    tool_label: "画布本地操作",
+    cost_label: "不产生费用",
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+  };
+}
+
+function generationPreviewCommand(context, intent) {
+  if (context?.section === "storyboard_read_only") {
+    return blockedCommand("preview_generation_from_selected", "预览生成命令", "故事板是只读投影。请回到画布后再预览生成命令。", context);
+  }
+  if (!context.selected_node_id) return blockedCommand("preview_generation_from_selected", "预览生成命令", "请先选择一个镜头、图片、关键帧或视频节点。", context);
+  return {
+    schema_version: SCHEMA_VERSION,
+    command_id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_type: "preview_generation_from_selected",
+    execution_mode: "local",
+    status: "preview",
+    title: intent.kind === "video" ? "预览视频生成" : "预览图片生成",
+    summary: intent.kind === "video"
+      ? "确认后只记录当前节点的视频生成意图预览；Provider 关闭时不会提交视频任务。"
+      : "确认后只记录当前节点的图片生成意图预览；Provider 关闭时不会提交图片任务。",
+    context_key: agentChatContextKey(context),
+    project_id: cleanToken(context.project_id, 120),
+    node_id: cleanToken(context.selected_node_id, 120),
+    generation_kind: intent.kind,
+    generation_instruction: cleanText(intent.instruction, 500),
+    impact: {
+      node_ids: [context.selected_node_id],
+      relation: "generation_intent_preview",
+      storyboard_write: false,
+    },
+    requires_confirmation: true,
+    provider_label: intent.kind === "video" ? "视频 Provider 当前按 gate 关闭" : "图片 Provider 当前按 gate 关闭",
+    tool_label: "生成命令预览",
+    cost_label: "本次不扣费；真实生成前需单独确认",
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
@@ -994,6 +1260,81 @@ function scriptDiffSummary(before, after) {
 function trimSentence(value, limit) {
   const text = cleanSourceText(value, limit + 80).replace(/\s+/g, " ").trim();
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function nodeCreationIntent(message) {
+  const direct = message.match(/^\/create-node\s+([a-z_]+)(?:\s+(.+))?$/i);
+  if (direct) return nodeIntentFromType(direct[1], direct[2]);
+  const createMatch = message.match(/^(?:创建|新增|添加)(.+?)(?:节点|卡|对象)?(?:[:：]\s*(.+))?$/);
+  if (!createMatch) return null;
+  const raw = createMatch[1] || "";
+  const title = createMatch[2] || "";
+  if (/角色/.test(raw)) return nodeIntentFromType("character", title || "角色设定");
+  if (/场景空间|地点|空间|location/i.test(raw)) return nodeIntentFromType("location", title || "场景空间");
+  if (/道具|prop/i.test(raw)) return nodeIntentFromType("prop", title || "道具设定");
+  if (/参考|ReferenceSet|参考图|素材/.test(raw)) return nodeIntentFromType("ref", title || "参考集");
+  if (/图片|关键帧|image|keyframe/i.test(raw)) return nodeIntentFromType("image", title || "图片 / 关键帧");
+  if (/视频|video/i.test(raw)) return nodeIntentFromType("video", title || "视频片段");
+  if (/音频|audio/i.test(raw)) return nodeIntentFromType("audio", title || "音频");
+  if (/镜头|shot/i.test(raw)) return nodeIntentFromType("shot", title || "镜头");
+  if (/场景|场|scene/i.test(raw)) return nodeIntentFromType("scene", title || "场景");
+  if (/序列|段落|sequence/i.test(raw)) return nodeIntentFromType("sequence", title || "段落");
+  if (/剧本|脚本|script/i.test(raw)) return nodeIntentFromType("script", title || "剧本");
+  if (/想法|idea|文本|text/i.test(raw)) return nodeIntentFromType("text", title || "文本");
+  return null;
+}
+
+function nodeIntentFromType(type, title = "") {
+  const normalized = ({
+    keyframe: "image",
+    reference: "ref",
+    referenceset: "ref",
+    location: "location",
+    scene_location: "location",
+  })[String(type || "").toLowerCase()] || String(type || "text").toLowerCase();
+  const safeType = NODE_TYPES[normalized] ? normalized : "text";
+  return {
+    type: safeType,
+    title: cleanText(title, 80) || (NODE_TYPES[safeType]?.label || "节点"),
+    prompt: "",
+    direction: "downstream",
+    relation_type: ["ref", "character", "location", "prop"].includes(safeType) ? "reference" : "generation",
+  };
+}
+
+function edgeRelationIntent(message) {
+  const match = message.match(/(?:把|将)?(?:这条|当前|选中)?(?:连线|关系|边).*(?:改成|改为|设为|设置为)\s*(参考|生成|派生|分支|导演|顺序|待确认|reference|generation|fork|director|sequence|proposed)/i);
+  if (!match) return null;
+  return { relation_type: relationTypeFromText(match[1]) };
+}
+
+function generationPreviewIntent(message) {
+  const image = message.match(/^(?:预览)?(?:生成|制作)(?:一张)?(?:图片|关键帧|image|keyframe)(?:[:：]\s*(.+))?$/i);
+  if (image) return { kind: "image", instruction: image[1] || "基于当前节点上下文生成图片" };
+  const video = message.match(/^(?:预览)?(?:生成|制作)(?:一段)?(?:视频|video)(?:[:：]\s*(.+))?$/i);
+  if (video) return { kind: "video", instruction: video[1] || "基于当前节点上下文生成视频" };
+  return null;
+}
+
+function relationTypeFromText(text) {
+  const value = String(text || "").trim().toLowerCase();
+  if (/参考|reference/.test(value)) return "reference";
+  if (/分支|派生|fork/.test(value)) return "fork";
+  if (/导演|director/.test(value)) return "director";
+  if (/顺序|sequence/.test(value)) return "sequence";
+  if (/待确认|建议|proposed/.test(value)) return "proposed";
+  return "generation";
+}
+
+function relationTypeLabel(value) {
+  return {
+    generation: "生成/派生",
+    reference: "参考",
+    director: "导演控制",
+    fork: "分支",
+    sequence: "叙事顺序",
+    proposed: "待确认建议",
+  }[value] || cleanText(value, 40);
 }
 
 function runtimeCommand({ context, commandType, title, summary, requiresScriptRevision = true }) {
@@ -1306,6 +1647,9 @@ function blockedCommand(commandType, title, errorMessage, context) {
 }
 
 function executeAgentCommand(command, state) {
+  if (command.command_type === "create_canvas_node") return executeCreateCanvasNode(command, state);
+  if (command.command_type === "change_edge_relation") return executeChangeEdgeRelation(command, state);
+  if (command.command_type === "delete_selected_edge") return executeDeleteSelectedEdge(command, state);
   const node = state?.nodes?.[command.node_id];
   if (!node) throw new Error("selected node no longer exists");
   const before = snapshotNode(node);
@@ -1322,6 +1666,21 @@ function executeAgentCommand(command, state) {
     node.params = node.params || {};
     node.params.agentRecoveredFrom = before.status || "unknown";
     node.status = "draft";
+  } else if (command.command_type === "revise_selected_node") {
+    applySameNodeRevision(node, command);
+  } else if (command.command_type === "fork_selected_node") {
+    return executeForkSelectedNode(command, state, node, before);
+  } else if (command.command_type === "preview_generation_from_selected") {
+    node.params = node.params || {};
+    node.params.generationIntentPreview = {
+      schema_version: "afs.generation_intent_preview.v0.1",
+      kind: command.generation_kind,
+      instruction: command.generation_instruction,
+      provider_state: "provider_gate_closed_preview_only",
+      cost_label: command.cost_label,
+      command_id: command.command_id,
+      updated_at: new Date().toISOString(),
+    };
   } else {
     throw new Error("unsupported agent command");
   }
@@ -1337,7 +1696,7 @@ function executeAgentCommand(command, state) {
     project_id: command.project_id,
     revision_id: command.revision_id,
     node_id: command.node_id,
-    summary: `${command.title}已执行，影响范围：当前节点。`,
+    summary: localNodeReceiptSummary(command),
     before,
     after,
     undo_available: true,
@@ -1345,6 +1704,206 @@ function executeAgentCommand(command, state) {
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
+}
+
+function localNodeReceiptSummary(command) {
+  if (command.command_type === "revise_selected_node") return "当前节点已新增一个可撤销修订；没有创建新节点。";
+  if (command.command_type === "preview_generation_from_selected") return "生成意图预览已记录；Provider 未启动，也没有产生费用。";
+  return `${command.title}已执行，影响范围：当前节点。`;
+}
+
+function executeCreateCanvasNode(command, state) {
+  const spec = command.create_node || {};
+  const def = NODE_TYPES[spec.type] || NODE_TYPES.text;
+  const id = nextStateId(state, "node");
+  const anchor = state.nodes?.[command.node_id] || null;
+  const position = nodePositionForCreate(state, anchor, def, spec.direction);
+  const created = {
+    id,
+    type: spec.type || "text",
+    title: cleanText(spec.title || `${def.label}节点`, 80),
+    x: position.x,
+    y: position.y,
+    w: def.size.w,
+    h: def.size.h,
+    prompt: cleanText(spec.prompt || "", 1000),
+    params: defaultParams(spec.type || "text"),
+    content: "",
+    status: "empty",
+    result: null,
+    groupId: null,
+    collapsed: false,
+  };
+  state.nodes[id] = created;
+  state.order = [...(state.order || []), id];
+  const createdEdgeIds = [];
+  if (anchor?.id) {
+    const from = spec.direction === "upstream" ? id : anchor.id;
+    const to = spec.direction === "upstream" ? anchor.id : id;
+    const edgeId = uniqueEdgeId(state, from, to);
+    state.edges[edgeId] = { id: edgeId, from, to, relation_type: spec.relation_type || "generation" };
+    createdEdgeIds.push(edgeId);
+    state.ui = state.ui || {};
+    state.ui.lastConnectedEdgeId = edgeId;
+  }
+  state.selection = { nodeIds: [id], edgeId: null };
+  return commandReceipt(command, {
+    node_id: id,
+    summary: `已创建「${created.title}」；${createdEdgeIds.length ? "已建立声明关系，" : ""}未补造上游事实。`,
+    created_node_id: id,
+    created_edge_ids: createdEdgeIds,
+    after: snapshotNode(created),
+  });
+}
+
+function executeForkSelectedNode(command, state, source, before) {
+  const id = nextStateId(state, "node");
+  const clone = safeJsonClone(source);
+  clone.id = id;
+  clone.title = `${cleanText(source.title, 70) || "节点"} 分支`;
+  clone.x = Math.round(Number(source.x || 0) + Math.max(Number(source.w || 280) + 160, 380));
+  clone.y = Math.round(Number(source.y || 0) + 28);
+  clone.status = source.status === "empty" ? "draft" : source.status;
+  clone.params = {
+    ...(clone.params || {}),
+    forkedFromNodeId: source.id,
+    forkInstruction: cleanText(command.fork_instruction, 500),
+    forkedAt: new Date().toISOString(),
+  };
+  state.nodes[id] = clone;
+  state.order = [...(state.order || []), id];
+  const edgeId = uniqueEdgeId(state, source.id, id);
+  state.edges[edgeId] = { id: edgeId, from: source.id, to: id, relation_type: "fork" };
+  state.selection = { nodeIds: [id], edgeId: null };
+  return commandReceipt(command, {
+    node_id: id,
+    before,
+    after: snapshotNode(clone),
+    summary: `已显式派生「${clone.title}」；原节点保持不变。`,
+    created_node_id: id,
+    created_edge_ids: [edgeId],
+  });
+}
+
+function executeChangeEdgeRelation(command, state) {
+  const edge = state?.edges?.[command.edge_id];
+  if (!edge) throw new Error("selected edge no longer exists");
+  const before = safeJsonClone(edge);
+  edge.relation_type = relationTypeFromText(command.relation_type);
+  state.selection = { nodeIds: [], edgeId: edge.id };
+  return commandReceipt(command, {
+    edge_id: edge.id,
+    edge_before: before,
+    edge_after: safeJsonClone(edge),
+    summary: `当前连线已改为${relationTypeLabel(edge.relation_type)}关系。`,
+  });
+}
+
+function executeDeleteSelectedEdge(command, state) {
+  const edge = state?.edges?.[command.edge_id];
+  if (!edge) throw new Error("selected edge no longer exists");
+  const before = safeJsonClone(edge);
+  delete state.edges[command.edge_id];
+  state.selection = { nodeIds: [], edgeId: null };
+  return commandReceipt(command, {
+    edge_id: command.edge_id,
+    edge_before: before,
+    edge_after: null,
+    summary: "当前连线已删除；两个节点仍保留。",
+  });
+}
+
+function applySameNodeRevision(node, command) {
+  const beforeText = cleanSourceText(command.before_text || node.content || node.prompt || "", 12000);
+  const afterText = cleanSourceText(command.after_text || command.source_text || "", 12000);
+  node.params = node.params || {};
+  const revisions = Array.isArray(node.params.revisions) ? node.params.revisions : [];
+  const revisionId = `node_revision_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  node.params.revisions = [...revisions, {
+    schema_version: "afs.node_revision.v0.1",
+    revision_id: revisionId,
+    source: "ai_creation_partner_preview",
+    instruction: cleanText(command.optimization_instruction, 500),
+    mode: cleanToken(command.optimization_mode, 80),
+    before_text: beforeText,
+    after_text: afterText,
+    created_at: new Date().toISOString(),
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+  }].slice(-12);
+  node.params.currentRevisionId = revisionId;
+  node.params.pendingRevisionPreview = null;
+  node.content = afterText;
+  node.prompt = afterText;
+  node.status = afterText ? "draft" : "empty";
+}
+
+function commandReceipt(command, patch = {}) {
+  return {
+    schema_version: SCHEMA_VERSION,
+    receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    command_id: command.command_id,
+    command_type: command.command_type,
+    status: "executed",
+    executed_at: new Date().toISOString(),
+    context_key: command.context_key,
+    project_id: command.project_id,
+    revision_id: command.revision_id,
+    node_id: command.node_id,
+    summary: patch.summary || `${command.title}已执行。`,
+    before: patch.before,
+    after: patch.after,
+    undo_available: true,
+    storyboard_write: false,
+    remote_dispatch_count: 0,
+    provider_dispatch_count: 0,
+    ...patch,
+  };
+}
+
+function nextStateId(state, prefix) {
+  state.meta = state.meta || {};
+  state.meta.seq = Number(state.meta.seq || 1) + 1;
+  return `${prefix}_${state.meta.seq}`;
+}
+
+function nodePositionForCreate(state, anchor, def, direction = "downstream") {
+  const base = anchor
+    ? {
+        x: Number(anchor.x || 0) + (direction === "upstream" ? -(def.size.w + 160) : Number(anchor.w || 280) + 160),
+        y: Number(anchor.y || 0),
+      }
+    : {
+        x: Math.round((260 - Number(state.viewport?.x || 0)) / Number(state.viewport?.scale || 1)),
+        y: Math.round((190 - Number(state.viewport?.y || 0)) / Number(state.viewport?.scale || 1)),
+      };
+  return openPositionForState(state, { ...base, w: def.size.w, h: def.size.h });
+}
+
+function openPositionForState(state, base) {
+  const existing = Object.values(state.nodes || {}).map((node) => ({
+    x: Number(node.x || 0) - 28,
+    y: Number(node.y || 0) - 28,
+    w: Number(node.w || 280) + 56,
+    h: Number(node.h || 240) + 56,
+  }));
+  const stepX = Math.max(Number(base.w || 280) + 80, 360);
+  const stepY = Math.max(Number(base.h || 240) + 80, 320);
+  for (const [dx, dy] of [[0, 0], [stepX, 0], [0, stepY], [stepX, stepY], [0, -stepY], [-stepX, 0]]) {
+    const candidate = { ...base, x: Math.round(base.x + dx), y: Math.round(base.y + dy) };
+    if (!existing.some((rect) => rectsIntersectLocal(candidate, rect))) return { x: candidate.x, y: candidate.y };
+  }
+  return { x: Math.round(base.x + stepX * (existing.length + 1)), y: Math.round(base.y) };
+}
+
+function rectsIntersectLocal(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function uniqueEdgeId(state, fromId, toId) {
+  const base = `edge_${fromId}__${toId}`;
+  if (!state.edges?.[base]) return base;
+  return `${base}_${Date.now().toString(36)}`;
 }
 
 function runtimeCoreAssetCommandPayload(command) {
@@ -1531,10 +2090,6 @@ function productionPlanReceiptSummary(command, response) {
 }
 
 function runtimeReceiptSummary(command, response) {
-  if (command.command_type === "optimize_script_revision") {
-    const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
-    return `优化后的剧本版本已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
-  }
   if (command.command_type === "create_script_revision") {
     const state = response?.analysis_state || response?.projection?.analysis_state || "analysis_required";
     return `剧本版本已创建；当前分析状态：${scriptAnalysisStateLabel(state)}。`;
@@ -1587,11 +2142,16 @@ function userCommandDisplayText(command, fallbackText) {
   if (type === "create_script_revision") {
     return command.source_kind === "idea" ? "提交创作想法" : "提交剧本文本";
   }
-  if (type === "optimize_script_revision") {
+  if (type === "revise_selected_node") {
     return command.optimization_mode === "instructed_local_structure"
       ? `按要求优化当前文本：${cleanText(command.optimization_instruction, 140)}`
       : "默认优化当前文本";
   }
+  if (type === "fork_selected_node") return "创建分支版本";
+  if (type === "create_canvas_node") return command.title || "创建画布节点";
+  if (type === "change_edge_relation") return "调整连线关系";
+  if (type === "delete_selected_edge") return "删除当前连线";
+  if (type === "preview_generation_from_selected") return command.title || "预览生成命令";
   if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
   if (type === "request_story_plan_candidate") return "自动拆分分镜";
   if (type === "build_m3_context_pack") return "构建精准上下文包";
@@ -1622,9 +2182,62 @@ function scriptAnalysisStateLabel(value) {
 }
 
 function applyUndo(receipt, state) {
+  if (receipt?.created_node_id) {
+    delete state.nodes?.[receipt.created_node_id];
+    state.order = (state.order || []).filter((id) => id !== receipt.created_node_id);
+    for (const edgeId of receipt.created_edge_ids || []) delete state.edges?.[edgeId];
+    state.selection = receipt.node_id && state.nodes?.[receipt.node_id]
+      ? { nodeIds: [receipt.node_id], edgeId: null }
+      : { nodeIds: [], edgeId: null };
+    return undoReceipt(receipt, "已撤销新节点，画布回到创建前。");
+  }
+  if (receipt?.edge_before || receipt?.edge_id) {
+    if (receipt.edge_before) state.edges[receipt.edge_before.id] = safeJsonClone(receipt.edge_before);
+    else if (receipt.edge_id) delete state.edges[receipt.edge_id];
+    state.selection = receipt.edge_before ? { nodeIds: [], edgeId: receipt.edge_before.id } : { nodeIds: [], edgeId: null };
+    return undoReceipt(receipt, "已撤销连线变更。");
+  }
   const node = state?.nodes?.[receipt.node_id];
   if (!node) throw new Error("selected node no longer exists");
   restoreNode(node, receipt.before || {});
+  return undoReceipt(receipt, "上一条 AI 创作搭档命令已撤销，画布回到执行前状态。");
+}
+
+function snapshotNode(node) {
+  return {
+    id: cleanToken(node?.id, 120),
+    type: cleanToken(node?.type, 40),
+    title: cleanText(node?.title, 120),
+    status: cleanToken(node?.status, 40),
+    content: cleanSourceText(node?.content || "", 200000),
+    prompt: cleanSourceText(node?.prompt || "", 200000),
+    result: cleanSourceText(node?.result || "", 200000),
+    previewUrl: cleanText(node?.previewUrl || "", 500),
+    x: Number(node?.x || 0),
+    y: Number(node?.y || 0),
+    w: Number(node?.w || 0),
+    h: Number(node?.h || 0),
+    collapsed: Boolean(node?.collapsed),
+    params: safeJsonClone(node?.params || {}),
+  };
+}
+
+function restoreNode(node, snapshot) {
+  if (snapshot.type) node.type = cleanToken(snapshot.type, 40);
+  node.title = cleanText(snapshot.title, 120);
+  node.status = cleanToken(snapshot.status, 40) || "draft";
+  node.content = cleanSourceText(snapshot.content || "", 200000);
+  node.prompt = cleanSourceText(snapshot.prompt || "", 200000);
+  node.result = cleanSourceText(snapshot.result || "", 200000) || null;
+  if (snapshot.previewUrl) node.previewUrl = cleanText(snapshot.previewUrl, 500);
+  else delete node.previewUrl;
+  if (Number(snapshot.w)) node.w = Number(snapshot.w);
+  if (Number(snapshot.h)) node.h = Number(snapshot.h);
+  node.collapsed = Boolean(snapshot.collapsed);
+  node.params = safeJsonClone(snapshot.params || {});
+}
+
+function undoReceipt(receipt, summary) {
   return {
     schema_version: SCHEMA_VERSION,
     receipt_id: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1636,7 +2249,8 @@ function applyUndo(receipt, state) {
     project_id: receipt.project_id,
     revision_id: receipt.revision_id,
     node_id: receipt.node_id,
-    summary: "上一条 Agent 命令已撤销，画布回到执行前状态。",
+    edge_id: receipt.edge_id,
+    summary,
     before: receipt.after,
     after: receipt.before,
     undo_available: false,
@@ -1644,20 +2258,6 @@ function applyUndo(receipt, state) {
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
-}
-
-function snapshotNode(node) {
-  return {
-    title: cleanText(node?.title, 120),
-    status: cleanToken(node?.status, 40),
-    params: safeJsonClone(node?.params || {}),
-  };
-}
-
-function restoreNode(node, snapshot) {
-  node.title = cleanText(snapshot.title, 120);
-  node.status = cleanToken(snapshot.status, 40) || "draft";
-  node.params = safeJsonClone(snapshot.params || {});
 }
 
 function recordReceipt(session, receipt) {
@@ -1671,6 +2271,53 @@ function appendMessage(session, message) {
     tone: cleanToken(message.tone, 24),
     created_at: new Date().toISOString(),
   }].slice(-MESSAGE_LIMIT);
+}
+
+function runtimeConversationAnswer(response) {
+  return {
+    status: "answered",
+    text: cleanText(response?.reply || "我已结合当前画布回答。", 900),
+    source: "runtime_llm",
+    provider_dispatch_count: 1,
+    remote_dispatch_count: 1,
+    request_id: cleanToken(response?.provider_lineage?.request_id, 180),
+    latency_ms: Number(response?.latency_ms || 0),
+    cost_usd: Number(response?.cost_usd || 0),
+    graph_mutation: {
+      mutated: response?.graph_mutation?.mutated === true,
+      before_digest: cleanToken(response?.graph_mutation?.before_digest, 80),
+      after_digest: cleanToken(response?.graph_mutation?.after_digest, 80),
+    },
+  };
+}
+
+function unavailableConversation(reason) {
+  return {
+    status: "unavailable",
+    text: reason === "cancelled"
+      ? "已取消这次回答；画布事实没有改变。"
+      : "AI 模型当前不可用，我不会用本地固定回答冒充理解；请稍后重试，或先用画布按钮创建节点和预览命令。",
+    source: "runtime_llm_unavailable",
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+    reason: cleanToken(reason, 80),
+  };
+}
+
+function agentChatRuntimeSummary(context = {}) {
+  const counts = context?.counts || {};
+  return {
+    nodes: Number(counts.nodes || 0),
+    edges: Number(counts.edges || 0),
+    assets: Number(counts.assets || 0),
+    selected_node_type: cleanToken(context?.selected_node_type, 40),
+    selected_node_status: cleanToken(context?.selected_node_status, 40),
+    selected_node_title: cleanText(context?.selected_node_title, 120),
+    selected_edge_relation_type: cleanToken(context?.selected_edge_relation_type, 80),
+    selected_edge_from_title: cleanText(context?.selected_edge_from_title, 120),
+    selected_edge_to_title: cleanText(context?.selected_edge_to_title, 120),
+    section: cleanToken(context?.section, 80),
+  };
 }
 
 function isProductionPlanRuntimeCommand(commandType) {

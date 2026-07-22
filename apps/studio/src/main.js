@@ -4,6 +4,7 @@ import { checkingRuntimeSurfaceStatus, initialRuntimeSurfaceStatus, loadRuntimeS
 import { renderCanvas } from "./canvas-view.js";
 import { bindCanvasInput } from "./canvas-input.js";
 import { bindCanvasContextMenu } from "./canvas-context-menu.js";
+import { bindCanvasReferenceEntry } from "./canvas-reference-entry.js";
 import { renderPromptBar } from "./prompt-bar.js";
 import { renderDrawer } from "./panels/drawer.js";
 import { renderInspectorPanel } from "./panels/inspector-panel.js";
@@ -30,11 +31,10 @@ import { openDomainCrewPanel } from "./panels/domain-crew-panel.js";
 import { openExternalVideoDemoPanel } from "./external-video-demo.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 import { applyProductionPlanProjection } from "./production-plan-projection.js";
-import { fitVisibleCanvasViewport, visibleCanvasCenter } from "./canvas-safe-area.js";
-import { createNode } from "./nodes.js";
-import { importScriptFileIntoTextNode } from "./script-breakdown.js";
+import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
 import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCardDraft } from "./studio-runtime-events.js";
 import { createProjectReadyHandler, hydrateStartupProject } from "./studio-startup-project.js";
+import { bindCanvasEmptyOnboarding } from "./studio-canvas-onboarding.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -72,9 +72,10 @@ async function bootstrap() {
   projectController.rememberStartupProject(runtime.projectId);
   if (editorMounted) {
     renderDock(store, runtimeRef);
-    bindCanvasEmptyOnboarding();
+    bindCanvasEmptyOnboarding(store);
     bindCanvasInput(store, runtimeRef);
     bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
+    bindCanvasReferenceEntry({ store, runtime: runtimeRef });
     bindStudioKeyboard({ store, runtime: runtimeRef });
   }
   bindQualityFeedback();
@@ -229,7 +230,7 @@ function renderAll(state, meta = {}) {
   syncDomainCrewContext();
   productShell?.updateStudioState(state, { render: shouldRenderProductShell(meta) });
   if (!editorMounted) return;
-  bindCanvasEmptyOnboarding();
+  bindCanvasEmptyOnboarding(store);
   if (document.getElementById("topbar")) {
     renderTopbar({
       state,
@@ -259,9 +260,10 @@ function renderAll(state, meta = {}) {
 }
 
 function shouldRenderProductShell(meta = {}) {
-  if (isCanvasTextEditingActive()) return false;
   if (meta.full) return true;
   const scopes = Array.isArray(meta.renderScopes) ? meta.renderScopes : [];
+  if (scopes.includes("selection-context")) return true;
+  if (isCanvasTextEditingActive()) return false;
   if (!scopes.length) return true;
   const shellSafeScopes = new Set(["canvas-local-edit", "save-status"]);
   return !scopes.every((scope) => shellSafeScopes.has(scope));
@@ -326,53 +328,6 @@ function renderStarters() {
   }
 }
 
-function bindCanvasEmptyOnboarding() {
-  const form = document.querySelector(".canvas-empty-onboarding");
-  if (!form || form.dataset.bound) return;
-  form.dataset.bound = "1";
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const input = form.querySelector('[data-empty-action="idea-text"]');
-    const text = String(input?.value || "").trim();
-    if (!text) {
-      input?.focus();
-      return;
-    }
-    window.dispatchEvent(new CustomEvent("afs:agent-chat-submit", { detail: { message: `/idea ${text}` } }));
-  });
-  form.querySelector('[data-empty-action="import-script"]')?.addEventListener("click", () => {
-    const node = createEmptyTextNode("剧本文本");
-    importScriptFileIntoTextNode(store, node);
-  });
-  form.querySelector('[data-empty-action="blank-node"]')?.addEventListener("click", () => {
-    createEmptyTextNode("故事文本");
-  });
-}
-
-function createEmptyTextNode(title) {
-  const point = canvasCenterWorldPoint();
-  const node = createNode(store, "text", point.x - 150, point.y - 120);
-  store.set((state) => {
-    const target = state.nodes[node.id];
-    if (!target) return;
-    target.title = title;
-    target.status = "empty";
-    target.content = "";
-    target.prompt = "";
-    state.selection = { nodeIds: [node.id], edgeId: null };
-  });
-  return store.get().nodes[node.id] || node;
-}
-
-function canvasCenterWorldPoint() {
-  const viewport = store.get().viewport || { x: 0, y: 0, scale: 1 };
-  const center = visibleCanvasCenter();
-  const scale = Number(viewport.scale || 1) || 1;
-  return {
-    x: Math.round(((center.x || 450) - Number(viewport.x || 0)) / scale),
-    y: Math.round(((center.y || 310) - Number(viewport.y || 0)) / scale),
-  };
-}
 async function launchStarter(id) {
   if (!hasActiveProject()) {
     const created = await promptCreateProjectBeforeStarter();

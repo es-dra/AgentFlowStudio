@@ -12,7 +12,10 @@ export function bindEdgeActionButton(item, edge, store) {
   });
   item.addEventListener("click", (event) => {
     const edgeId = item.dataset.edgeId || edge.id;
-    if (!event.target.closest?.(".edge-disconnect-button")) return;
+    if (!event.target.closest?.(".edge-disconnect-button")) {
+      selectEdge(store, edgeId);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     disconnectEdge(store, edgeId);
@@ -23,7 +26,7 @@ export function selectEdge(store, edgeId) {
   if (!edgeId || !store.get().edges?.[edgeId]) return;
   store.set((state) => {
     state.selection = { nodeIds: [], edgeId };
-  }, { history: false, persist: false });
+  }, { history: false, persist: false, renderScope: "selection-context" });
 }
 
 export function disconnectEdge(store, edgeId) {

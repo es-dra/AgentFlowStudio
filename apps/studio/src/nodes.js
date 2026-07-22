@@ -11,8 +11,82 @@ export const NODE_TYPES = {
       { icon: "pencil", label: "自己编写内容" },
       { icon: "upload", label: "上传完整剧本" },
     ],
-    downstream: ["text", "image", "video", "director", "script", "ref"],
+    downstream: ["text", "script", "sequence", "scene", "shot", "character", "location", "prop", "ref", "image", "video", "director"],
     size: { w: 280, h: 280 },
+  },
+  sequence: {
+    label: "段落",
+    icon: "layers",
+    intents: [
+      { icon: "script", label: "组织场景" },
+      { icon: "camera", label: "派生镜头" },
+    ],
+    downstream: ["scene", "shot", "script", "director", "ref", "image", "video"],
+    size: { w: 280, h: 250 },
+  },
+  scene: {
+    label: "场景",
+    icon: "script",
+    intents: [
+      { icon: "camera", label: "拆成镜头" },
+      { icon: "image", label: "连接场景参考" },
+    ],
+    downstream: ["shot", "location", "character", "prop", "ref", "director", "image", "video"],
+    size: { w: 280, h: 250 },
+  },
+  shot: {
+    label: "镜头",
+    icon: "camera",
+    intents: [
+      { icon: "image", label: "预览关键帧" },
+      { icon: "video", label: "预览视频" },
+    ],
+    downstream: ["image", "video", "audio", "director", "ref"],
+    size: { w: 280, h: 260 },
+  },
+  character: {
+    label: "角色",
+    icon: "user",
+    upload: true,
+    intents: [
+      { icon: "upload", label: "上传角色参考" },
+      { icon: "bookmark", label: "锁定服装特征" },
+    ],
+    downstream: ["scene", "shot", "ref", "image", "video"],
+    size: { w: 280, h: 250 },
+  },
+  location: {
+    label: "场景空间",
+    icon: "image",
+    upload: true,
+    intents: [
+      { icon: "upload", label: "上传空间参考" },
+      { icon: "camera", label: "绑定镜头" },
+    ],
+    downstream: ["scene", "shot", "ref", "image", "video"],
+    size: { w: 280, h: 250 },
+  },
+  prop: {
+    label: "道具",
+    icon: "bookmark",
+    upload: true,
+    intents: [
+      { icon: "upload", label: "上传道具参考" },
+      { icon: "link", label: "连接使用镜头" },
+    ],
+    downstream: ["scene", "shot", "ref", "image", "video"],
+    size: { w: 280, h: 250 },
+  },
+  ref: {
+    label: "参考集",
+    icon: "link",
+    upload: true,
+    intents: [
+      { icon: "upload", label: "上传参考图" },
+      { icon: "link", label: "连接到目标" },
+    ],
+    downstream: ["text", "script", "sequence", "scene", "shot", "character", "location", "prop", "image", "video"],
+    size: { w: 280, h: 250 },
   },
   image: {
     label: "图片",
@@ -22,7 +96,7 @@ export const NODE_TYPES = {
       { icon: "upload", label: "图生图" },
       { icon: "hd", label: "图片高清" },
     ],
-    downstream: ["text", "image", "video", "director", "script", "ref"],
+    downstream: ["text", "script", "shot", "character", "location", "prop", "ref", "image", "video", "director"],
     size: { w: 280, h: 280 },
   },
   video: {
@@ -33,7 +107,7 @@ export const NODE_TYPES = {
       { icon: "frames", label: "首尾帧生成视频" },
       { icon: "sparkle1", label: "首帧生成视频" },
     ],
-    downstream: ["text", "video", "video_merge", "audio", "script", "ref"],
+    downstream: ["text", "shot", "video", "video_merge", "audio", "script", "ref"],
     size: { w: 280, h: 280 },
   },
   video_merge: {
@@ -49,7 +123,7 @@ export const NODE_TYPES = {
     tag: "NEW",
     icon: "layers",
     intents: [],
-    downstream: ["image", "video", "ref"],
+    downstream: ["shot", "image", "video", "ref"],
     size: { w: 280, h: 280 },
   },
   audio: {
@@ -70,7 +144,7 @@ export const NODE_TYPES = {
       { icon: "sparkles", label: "识别资产" },
       { icon: "image", label: "生成关键帧层" },
     ],
-    downstream: ["text", "image", "video", "director", "ref"],
+    downstream: ["text", "sequence", "scene", "shot", "character", "location", "prop", "image", "video", "director", "ref"],
     size: { w: 280, h: 280 },
   },
   library: {
@@ -88,7 +162,7 @@ export const RESOURCE_ENTRIES = [
   { id: "from_history", icon: "clock", label: "从生成历史选择" },
 ];
 
-export const NODE_MENU_ORDER = ["text", "image", "video", "video_merge", "director", "audio", "script", "library"];
+export const NODE_MENU_ORDER = ["text", "script", "sequence", "scene", "shot", "character", "location", "prop", "ref", "image", "video", "video_merge", "director", "audio", "library"];
 
 export const COLLAPSED_HEIGHT = 48;
 
@@ -129,6 +203,9 @@ export function createNode(store, type, wx, wy) {
 
 export function defaultParams(type) {
   const base = { model: defaultModel(type)?.id || null, attachments: [], styleRef: null, isReference: false };
+  if (["character", "location", "prop", "ref"].includes(type)) {
+    return { ...base, referenceIntent: type, isReference: true };
+  }
   if (type === "image") return { ...base, spec: defaultImageSpec(), camera: null };
   if (type === "video" || type === "video_merge") return { ...base, spec: defaultVideoSpec(), motion: null, effect: null };
   return base;
@@ -207,7 +284,8 @@ function relationTypeFor(state, fromId, toId) {
   const from = state.nodes[fromId];
   const to = state.nodes[toId];
   if (from?.type === "director") return "director";
-  if (from?.params?.isReference || to?.params?.isReference) return "reference";
+  if (from?.type === "sequence" || to?.type === "sequence" || from?.type === "scene" || to?.type === "scene") return "sequence";
+  if (from?.params?.isReference || to?.params?.isReference || ["character", "location", "prop", "ref"].includes(from?.type) || ["character", "location", "prop", "ref"].includes(to?.type)) return "reference";
   return "generation";
 }
 
@@ -241,6 +319,13 @@ export function relationSets(state) {
 
 export function promptPlaceholder(type, mode) {
   if (type === "text") return "写下你想讲的故事、场景或角色设定。例如：一个来自未来的机器人，在城市屋顶看星星…";
+  if (type === "sequence") return "描述这一段的叙事功能、节奏、关键转折和包含的场景。";
+  if (type === "scene") return "描述场景时间、地点、角色调度、动作和对白。";
+  if (type === "shot") return "描述镜头目的、景别、机位、运动、声音、转场和时长。";
+  if (type === "character") return "描述角色外观、服装、年龄比例、标志特征和禁止变化项，也可以上传参考图。";
+  if (type === "location") return "描述空间结构、时间、光线、季节、连续性和不可改变的布置。";
+  if (type === "prop") return "描述道具外观、材质、比例、使用方式、特写和连续性约束。";
+  if (type === "ref") return "上传或粘贴参考图，并说明它约束的是角色、场景、风格、道具还是镜头。";
   if (type === "image") return "可直接文字生图，或上传图片输入文字指令对图片进行编辑，如：将背景改为雪夜";
   if (type === "video") return mode === "文生视频" ? "描述你想要生成的画面内容，@引用素材" : `已选 ${mode || "参考"} 模式，描述画面内容，@引用素材`;
   if (type === "script") return "描述剧情或添加角色参考、视频参考等，为你生成分镜脚本";

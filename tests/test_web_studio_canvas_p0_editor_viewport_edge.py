@@ -28,6 +28,7 @@ def test_p0_static_contract_restores_split_entry_without_legacy_breakdown() -> N
     stable_input = (STUDIO_ROOT / "src" / "stable-text-input.js").read_text(encoding="utf-8")
     edges = (STUDIO_ROOT / "src" / "canvas-edges.js").read_text(encoding="utf-8")
     edge_css = (STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8")
+    edge_motion_css = (STUDIO_ROOT / "styles" / "canvas-edge-motion.css").read_text(encoding="utf-8")
 
     assert "renderScopes" in store_notify
     assert "mergeNotifyMeta" in store
@@ -58,7 +59,7 @@ def test_p0_static_contract_restores_split_entry_without_legacy_breakdown() -> N
     assert "edgeLifecycleState" in edges
     assert "edge-failed" in edge_css
     assert "edge-paused" in edge_css
-    assert "prefers-reduced-motion: reduce" in edge_css
+    assert "prefers-reduced-motion: reduce" in edge_motion_css
 
 
 def test_p0_store_notifies_canvas_local_edit_scope_without_full_shell_render() -> None:
