@@ -133,7 +133,7 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
                 results[f"graph-{key}"] = assert_graph_workspace(page)
                 screenshots[f"graph-{key}"] = str((screenshot_dir / f"graph-{key}.png").resolve()); page.screenshot(path=screenshots[f"graph-{key}"], full_page=True)
                 if viewport["width"] == 1440:
-                    page.get_by_role("button", name="打开项目导航").click()
+                    open_project_details(page)
                     screenshots["production-details-1440x900"] = str((screenshot_dir / "production-details-1440x900.png").resolve())
                     page.screenshot(path=screenshots["production-details-1440x900"], full_page=True)
                     page.keyboard.press("Escape")
@@ -178,7 +178,7 @@ def assert_graph_workspace(page: Page) -> dict[str, Any]:
     if page.locator('[data-edge-id^="production_graph_edge_"] path.edge-flow').count() < 1: raise AssertionError("graph dependency edges are not rendered")
     text = page.locator("body").inner_text()
     if any(token in text for token in ("schema_version", "graph_digest", "browser-character-1", "m5-sequence-layout")): raise AssertionError("raw graph details leaked")
-    page.get_by_role("button", name="打开项目导航").click()
+    open_project_details(page)
     expect(page.locator(".graph-production-summary")).to_contain_text("序列")
     expect(page.locator(".graph-production-summary")).to_contain_text("制作任务")
     expect(page.locator(".graph-production-summary")).to_contain_text("交付清单")
@@ -255,8 +255,19 @@ def assert_projection_pruned_on_user_save(page: Page, base_url: str) -> bool:
     return True
 
 
+def open_project_details(page: Page) -> None:
+    if page.locator("#studio-context-drawer").count():
+        return
+    trigger = page.locator(".studio-project-button")
+    expect(trigger).to_be_visible()
+    trigger.click()
+    expect(page.locator(".studio-project-menu")).to_be_visible()
+    page.get_by_role("button", name="项目设置").click()
+    expect(page.locator("#studio-context-drawer")).to_be_visible()
+
+
 def run_drawer_action(page: Page, label: str) -> None:
-    if page.locator("#studio-context-drawer").count() == 0: page.get_by_role("button", name="打开项目导航").click()
+    if page.locator("#studio-context-drawer").count() == 0: open_project_details(page)
     page.get_by_role("button", name=label).click(); expect(page.locator(".agent-command-preview")).to_be_visible()
     page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
     page.wait_for_function("!document.querySelector('.agent-command-preview')")

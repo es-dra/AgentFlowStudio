@@ -106,15 +106,20 @@
 
 .node.embedded-task-running::after {
   position: absolute;
-  inset: -4px;
+  inset: -3px;
   z-index: 3;
-  border-radius: 14px;
+  border-radius: calc(var(--radius-card) + 3px);
   padding: 2px;
   background:
-    conic-gradient(from 0deg, rgba(73, 224, 235, 0), rgba(73, 224, 235, .95), rgba(31, 153, 185, .25), rgba(73, 224, 235, 0));
+    conic-gradient(from var(--embedded-task-angle),
+      rgba(73, 224, 235, 0) 0deg,
+      rgba(73, 224, 235, .12) 210deg,
+      rgba(85, 236, 255, .96) 300deg,
+      rgba(73, 224, 235, 0) 360deg);
   content: "";
   pointer-events: none;
-  animation: embeddedTaskPerimeterRotate 1.05s linear infinite;
+  animation: embeddedTaskPerimeterSweep 1.35s linear infinite;
+  transform: none;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -130,14 +135,20 @@
   color: var(--port-out);
 }
 
-@keyframes embeddedTaskPerimeterRotate {
-  to { transform: rotate(360deg); }
+@property --embedded-task-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes embeddedTaskPerimeterSweep {
+  to { --embedded-task-angle: 360deg; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .node.embedded-task-running::after {
     animation: none;
-    background: rgba(73, 224, 235, .88);
+    background: rgba(73, 224, 235, .78);
   }
 }
 

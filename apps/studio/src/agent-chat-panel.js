@@ -228,7 +228,7 @@ function currentTaskReview({ store, runtime, onRender }) {
   header.append(
     el("span", "eyebrow", "当前任务"),
     el("strong", "", currentTaskTitle(action)),
-    el("small", "", `${taskStateLabel(task)} · ${taskPhaseLabel(task.phase || action.status || "queued")}`),
+    el("small", "", taskStatePhaseSummary(task, action)),
   );
   wrap.appendChild(header);
   wrap.appendChild(taskPhaseList(task, action));
@@ -375,11 +375,21 @@ function taskPhaseList(task, action) {
   const phases = Array.isArray(task?.completed_phases) ? task.completed_phases : [];
   const current = task?.phase || action?.status || "";
   const line = el("ol", "agent-task-phases");
-  for (const phase of [...phases, current].filter(Boolean).slice(-5)) {
+  const ordered = [];
+  for (const phase of [...phases, current].filter(Boolean)) {
+    if (!ordered.includes(phase)) ordered.push(phase);
+  }
+  for (const phase of ordered.slice(-5)) {
     const item = el("li", phase === current ? "current" : "", taskPhaseLabel(phase));
     line.appendChild(item);
   }
   return line;
+}
+
+function taskStatePhaseSummary(task, action) {
+  const stateLabel = taskStateLabel(task);
+  const phaseLabel = taskPhaseLabel(task?.phase || action?.status || "queued");
+  return stateLabel === phaseLabel ? stateLabel : `${stateLabel} · ${phaseLabel}`;
 }
 
 function currentTaskEvidence(action) {

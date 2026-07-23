@@ -486,7 +486,7 @@ def start_action(page: Page, project_id: str, action_type: str) -> dict[str, Any
         raise AssertionError(f"{action_type} feedback exceeded 150ms: {feedback_ms}ms")
     if not all([visual.get("classRunning"), visual.get("busyButton"), visual.get("sidebarRunning")]):
         raise AssertionError(f"{action_type} running visual incomplete: {visual}")
-    if "embeddedTaskPerimeterRotate" not in str(visual.get("animationName")) and visual.get("animationName") != "none":
+    if "embeddedTaskPerimeterSweep" not in str(visual.get("animationName")) and visual.get("animationName") != "none":
         raise AssertionError(f"{action_type} missing perimeter animation: {visual}")
     return {"feedback_ms": feedback_ms, "running_visual": True, "visual": visual}
 

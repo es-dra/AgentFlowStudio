@@ -31,8 +31,10 @@ def test_m6_7_split_label_and_node_running_feedback_contract() -> None:
     assert "分镜任务生成中" in canvas
 
     assert ".node.embedded-task-running::after" in node_css
-    assert "@keyframes embeddedTaskPerimeterRotate" in node_css
+    assert "@keyframes embeddedTaskPerimeterSweep" in node_css
+    assert "--embedded-task-angle" in node_css
     assert "conic-gradient" in node_css
+    assert "transform: rotate" not in node_css
     assert "prefers-reduced-motion: reduce" in node_css
 
 
@@ -72,13 +74,49 @@ def test_m6_7_product_shell_project_account_menu_contract() -> None:
     assert "grid-template-columns: minmax(0, 1fr) auto" in css
     assert ".studio-header-actions .studio-account-context" in css
     assert ".studio-account-menu" in css and "position: fixed" in css
+    assert "--z-shell-header: 90" in css
+    assert "z-index: 96" in css
 
     open_task_handler = shell.split('window.addEventListener("afs:agent-chat-open-task"', 1)[1].split("});", 1)[0]
     assert "setAgentChatExpanded(true)" in open_task_handler
-    assert "右侧任务区查看进度" in open_task_handler
+    assert "当前节点任务已开始" not in open_task_handler
     finished_task_handler = shell.split('window.addEventListener("afs:embedded-creative-task-finished"', 1)[1].split("});", 1)[0]
     assert "isNarrowAgentLayout()" in finished_task_handler
     assert "closeResponsiveAgentOverlay()" in finished_task_handler
     assert 'dispatchBrowserEvent("afs:embedded-creative-task-finished"' in embedded
     assert 'status: "cancelled"' in embedded
     assert 'status: "applied"' in embedded
+
+
+def test_m6_7_1_visual_correction_contract() -> None:
+    shell = _read("apps/studio/src/product-shell.js")
+    main = _read("apps/studio/src/main.js")
+    embedded = _read("apps/studio/src/embedded-creative-actions.js")
+    panel = _read("apps/studio/src/agent-chat-panel.js")
+    node_css = _read("apps/studio/styles/canvas-node-text.css")
+    css = _read("apps/studio/styles/product-shell.css")
+
+    assert "shotCandidateLayout" in embedded
+    assert "layout_role: \"scene_lane\"" in embedded
+    assert "layout_role: \"shot_grid_item\"" in embedded
+    assert "frameCandidateSubgraph" in embedded
+    assert "__afsSuppressNextSafeAreaFit" in embedded
+    assert "nodesBounds" in embedded
+    assert "layout_column" in embedded and "layout_row" in embedded
+
+    assert "__afsSuppressNextSafeAreaFit" in main
+    assert "fitCanvasProjection(state)" in main
+
+    assert "hasCanvasContent()" in shell
+    assert "existingCanvas ? planningPanelOpen : isPlanningPanelExpanded()" in shell
+    assert "planning-required ${existingCanvas ? \"contextual\" : \"empty-entry\"}" in shell
+    assert ".graph-canvas-status.planning-required.contextual" in css
+    assert "notice = \"当前节点任务已开始" not in shell
+
+    assert "taskStatePhaseSummary" in panel
+    assert "ordered.includes(phase)" in panel
+
+    assert "embeddedTaskPerimeterSweep" in node_css
+    assert "embeddedTaskPerimeterRotate" not in node_css
+    assert "transform: none" in node_css
+    assert "inset: -3px" in node_css

@@ -7,6 +7,8 @@ import {
   nodeVersion,
   shotPlanSummary,
 } from "./creative-task-contract.js";
+import { visibleCanvasFrame } from "./canvas-safe-area.js";
+import { clampScale, nodesBounds } from "./geometry.js";
 import { defaultParams } from "./nodes.js";
 
 const ACTION_MODES = {
@@ -179,6 +181,7 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
         applied_at: new Date().toISOString(),
       };
       state.selection = { nodeIds: [subgraph.sequence_node_id], edgeId: null };
+      frameCandidateSubgraph(state, subgraph.created_node_ids);
       applied = true;
       return;
     }
@@ -240,10 +243,13 @@ function resultReadyMessage(actionType, preview) {
 function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionId, action) {
   const summary = shotPlanSummary(shotPlan);
   const candidateId = `shot_candidate_${Date.now().toString(36)}`;
+  const layout = shotCandidateLayout(sourceNode, shotPlan);
   const sequenceNode = candidateNode(state, "sequence", {
     title: `分镜序列候选 · ${summary.shot_count} 镜头`,
-    x: Number(sourceNode.x || 0) + Number(sourceNode.w || 280) + 180,
-    y: Number(sourceNode.y || 0),
+    x: layout.sequence.x,
+    y: layout.sequence.y,
+    w: layout.sequence.w,
+    h: layout.sequence.h,
     content: `动态分镜候选：${summary.scene_count} 场，${summary.shot_count} 镜头，约 ${Math.round(summary.estimated_duration_sec)} 秒。`,
     status: "draft",
     params: {
@@ -256,16 +262,21 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
       scene_count: summary.scene_count,
       estimated_duration_sec: summary.estimated_duration_sec,
       promotion_state: "candidate_preview",
+      layout_role: "sequence_group_anchor",
     },
+    groupId: candidateId,
   });
   const createdNodes = [sequenceNode.id];
   const createdEdges = [upsertEdge(state, sourceNode.id, sequenceNode.id, "proposed")].filter(Boolean);
   const visibleScenes = [];
   (shotPlan.scenes || []).forEach((scene, sceneIndex) => {
+    const sceneLayout = layout.scene(sceneIndex, scene);
     const sceneNode = candidateNode(state, "scene", {
       title: scene.title || `场景 ${sceneIndex + 1}`,
-      x: sequenceNode.x + Number(sequenceNode.w || 280) + 160,
-      y: sequenceNode.y + sceneIndex * 340,
+      x: sceneLayout.x,
+      y: sceneLayout.y,
+      w: sceneLayout.w,
+      h: sceneLayout.h,
       content: scene.purpose || "",
       status: "draft",
       params: {
@@ -275,16 +286,21 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
         source_revision_id: revisionId,
         scene_index: sceneIndex,
         purpose: scene.purpose || "",
+        layout_role: "scene_lane",
       },
+      groupId: candidateId,
     });
     createdNodes.push(sceneNode.id);
     createdEdges.push(upsertEdge(state, sequenceNode.id, sceneNode.id, "sequence"));
     const visibleShots = [];
     (scene.shots || []).forEach((shot, shotIndex) => {
+      const shotLayout = layout.shot(sceneIndex, shotIndex, scene);
       const shotNode = candidateNode(state, "shot", {
         title: shot.title || `镜头 ${shotIndex + 1}`,
-        x: sceneNode.x + Number(sceneNode.w || 280) + 140,
-        y: sceneNode.y + shotIndex * 190,
+        x: shotLayout.x,
+        y: shotLayout.y,
+        w: shotLayout.w,
+        h: shotLayout.h,
         content: shotContent(shot),
         status: "draft",
         params: {
@@ -302,7 +318,11 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
           sound: shot.sound || "",
           transition: shot.transition || "",
           narrative_purpose: shot.narrative_purpose || "",
+          layout_role: "shot_grid_item",
+          layout_column: shotLayout.column,
+          layout_row: shotLayout.row,
         },
+        groupId: candidateId,
       });
       createdNodes.push(shotNode.id);
       createdEdges.push(upsertEdge(state, sceneNode.id, shotNode.id, "sequence"));
@@ -331,6 +351,119 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
   };
 }
 
+function shotCandidateLayout(sourceNode, shotPlan) {
+  const narrow = typeof window !== "undefined" && Number(window.innerWidth || 0) <= 560;
+  const sourceX = Number(sourceNode.x || 0);
+  const sourceY = Number(sourceNode.y || 0);
+  const sourceW = Number(sourceNode.w || 300);
+  const sourceH = Number(sourceNode.h || 260);
+  const sequenceW = narrow ? 292 : 260;
+  const sequenceH = narrow ? 168 : 164;
+  const sceneW = narrow ? 270 : 236;
+  const sceneH = narrow ? 154 : 160;
+  const sceneGap = narrow ? 92 : 80;
+  const shotGridGap = narrow ? 0 : 64;
+  const shotW = narrow ? 236 : 236;
+  const shotH = narrow ? 178 : 176;
+  const columns = narrow ? 2 : 3;
+  const colGap = narrow ? 26 : 24;
+  const rowGap = narrow ? 24 : 24;
+  const sequence = narrow
+    ? { x: sourceX + 20, y: sourceY + sourceH + 140, w: sequenceW, h: sequenceH }
+    : { x: sourceX + sourceW + 150, y: sourceY, w: sequenceW, h: sequenceH };
+
+  function rowsFor(scene) {
+    return Math.max(1, Math.ceil((scene?.shots?.length || 1) / columns));
+  }
+
+  function laneHeight(scene) {
+    return Math.max(300, rowsFor(scene) * shotH + Math.max(0, rowsFor(scene) - 1) * rowGap + 88);
+  }
+
+  function sceneOrigin(sceneIndex, scene) {
+    if (narrow) {
+      const previousHeight = (shotPlan.scenes || [])
+        .slice(0, sceneIndex)
+        .reduce((total, item) => total + laneHeight(item) + 72, 0);
+      return {
+        x: sequence.x + 36,
+        y: sequence.y + sequence.h + sceneGap + previousHeight,
+      };
+    }
+    const previousHeight = (shotPlan.scenes || [])
+      .slice(0, sceneIndex)
+      .reduce((total, item) => total + laneHeight(item) + 58, 0);
+    return {
+      x: sequence.x + sequence.w + sceneGap,
+      y: sequence.y + previousHeight,
+    };
+  }
+
+  return {
+    sequence,
+    scene(sceneIndex, scene) {
+      const origin = sceneOrigin(sceneIndex, scene);
+      return {
+        x: origin.x,
+        y: origin.y,
+        w: sceneW,
+        h: sceneH,
+      };
+    },
+    shot(sceneIndex, shotIndex, scene) {
+      const origin = sceneOrigin(sceneIndex, scene);
+      const gridX = narrow ? sequence.x : origin.x + sceneW + shotGridGap;
+      const gridY = origin.y + (narrow ? 190 : 0);
+      const column = shotIndex % columns;
+      const row = Math.floor(shotIndex / columns);
+      return {
+        x: gridX + column * (shotW + colGap),
+        y: gridY + row * (shotH + rowGap),
+        w: shotW,
+        h: shotH,
+        column,
+        row,
+      };
+    },
+  };
+}
+
+function frameCandidateSubgraph(state, nodeIds) {
+  if (typeof document === "undefined") return;
+  const nodes = {};
+  for (const id of nodeIds || []) {
+    if (state.nodes?.[id]) nodes[id] = state.nodes[id];
+  }
+  const bounds = nodesBounds(nodes);
+  const frame = visibleCanvasFrame();
+  if (!bounds || !frame.visible || frame.width < 160 || frame.height < 160) return;
+  const narrow = typeof window !== "undefined" && Number(window.innerWidth || 0) <= 560;
+  const floor = narrow ? 0.58 : 0.72;
+  const preferred = narrow ? 0.68 : 0.78;
+  const left = Math.max(0, Number(frame.safeArea?.left || 0));
+  const right = Math.max(0, Number(frame.safeArea?.right || 0));
+  const top = Math.max(0, Number(frame.safeArea?.top || 0));
+  const bottom = Math.max(0, Number(frame.safeArea?.bottom || 0));
+  const availableW = Math.max(160, frame.width - left - right);
+  const availableH = Math.max(160, frame.height - top - bottom);
+  const boundsW = Math.max(1, bounds.maxX - bounds.minX);
+  const boundsH = Math.max(1, bounds.maxY - bounds.minY);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const fitScale = clampScale(Math.min((availableW - 88) / boundsW, (availableH - 88) / boundsH, 1));
+  const targetScale = clampScale(Math.min(preferred, Math.max(fitScale, floor)));
+  const contentH = boundsH * targetScale;
+  const y = narrow && contentH > availableH - 48
+    ? top + 24 - bounds.minY * targetScale
+    : top + availableH / 2 - centerY * targetScale;
+  state.viewport = {
+    scale: targetScale,
+    x: left + availableW / 2 - centerX * targetScale,
+    y,
+  };
+  if (typeof window !== "undefined") window.__afsSuppressNextSafeAreaFit = true;
+}
+
 function candidateNode(state, type, spec) {
   const id = nextStateId(state, "node");
   const defaults = defaultParams(type);
@@ -340,14 +473,14 @@ function candidateNode(state, type, spec) {
     title: spec.title,
     x: Math.round(Number(spec.x || 0)),
     y: Math.round(Number(spec.y || 0)),
-    w: 300,
-    h: type === "sequence" ? 230 : type === "shot" ? 250 : 240,
+    w: Math.round(Number(spec.w || 300)),
+    h: Math.round(Number(spec.h || (type === "sequence" ? 230 : type === "shot" ? 250 : 240))),
     prompt: spec.content || "",
     content: spec.content || "",
     params: { ...defaults, ...(spec.params || {}) },
     status: spec.status || "draft",
     result: null,
-    groupId: null,
+    groupId: spec.groupId || null,
     collapsed: false,
   };
   state.nodes[id] = node;
