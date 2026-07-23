@@ -201,6 +201,9 @@ def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp
     assert payload["provider_calls_started"] is True
     assert payload["provider_lineage"]["provider_calls_started"] is True
     assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
+    assert payload["safe_manifest"]["validation_error_category"] == "screenplay_candidate_missing"
+    assert payload["provider_lineage"]["validation_error_category"] == "screenplay_candidate_missing"
+    assert payload["creative_task"]["error_detail"] == "screenplay_candidate_missing"
     assert payload["safe_manifest"]["provider_calls_started"] is True
     assert payload["safe_manifest"]["provider_dispatch_count"] == 2
     assert payload["safe_manifest"]["repair_attempted"] is True
@@ -268,6 +271,79 @@ def test_embedded_script_revision_rejects_dangling_character_cue(tmp_path, monke
     assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
     assert payload["creative_task"]["error_owner"] == "provider_output_validation"
     assert len(calls) == 2
+
+
+def test_embedded_script_revision_normalizes_speaker_prefixed_dialogue_blocks(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append(request)
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "script_revision",
+                    "mode": "professional_expansion",
+                    "revised_text": "模型返回的可读投影会被 typed screenplay candidate 覆盖。",
+                    "change_summary": ["保留棚内争执", "把中文人物冒号对白规范为剧本块"],
+                    "rationale": "真实模型常以人物冒号 shorthand 返回中文对白，应用层应规范化为专业剧本块而不是误判失败。",
+                    "unresolved_decisions": [],
+                    "quality_flags": ["provider_structured_preview"],
+                    "screenplay_candidate": {
+                        "title": "停电十分钟",
+                        "version_label": "v1",
+                        "logline": "导演与制片人在旧摄影棚停电后围绕继续拍摄发生正面冲突。",
+                        "characters": [
+                            {
+                                "name": "林澈",
+                                "goal": "证明必须拍完最后一条",
+                                "conflict": "停电和预算压力让他失去控制权",
+                                "change": "从强撑转为承认需要边界",
+                            },
+                            {
+                                "name": "许岚",
+                                "goal": "守住预算和现场安全",
+                                "conflict": "导演的执念可能拖垮团队",
+                                "change": "从阻止转为提出可执行条件",
+                            },
+                        ],
+                        "scenes": [{
+                            "heading": "内景 - 旧摄影棚 - 夜",
+                            "space_type": "内景",
+                            "location": "旧摄影棚",
+                            "time_of_day": "夜",
+                            "purpose": "通过停电后的争执建立两人的目标、冲突和信任裂缝",
+                            "blocks": [
+                                {"type": "action", "text": "应急灯把布景切成几块冷色阴影，监视器黑屏后仍有电流声。"},
+                                {"type": "dialogue", "text": "林澈：不是机器坏了，是它不想让我们拍完。"},
+                                {"type": "dialogue", "text": "许岚：再等十分钟，我们就赔不起了。"},
+                                {"type": "action", "text": "林澈扶住镜头，许岚把预算表压在场记板上，两人都没有退开。"},
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-action-speaker-prefix-normalized"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(source_text="林澈和许岚在停电摄影棚争执是否继续拍。"),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "llm"
+    blocks = payload["preview"]["screenplay_candidate"]["scenes"][0]["blocks"]
+    assert [block["type"] for block in blocks] == ["action", "character", "dialogue", "character", "dialogue", "action"]
+    assert blocks[1]["text"] == "林澈"
+    assert blocks[2]["text"] == "不是机器坏了，是它不想让我们拍完。"
+    assert payload["provider_lineage"]["provider_dispatch_count"] == 1
+    assert len(calls) == 1
 
 
 def test_embedded_script_revision_repairs_invalid_structured_output_with_provider_retry(tmp_path, monkeypatch) -> None:

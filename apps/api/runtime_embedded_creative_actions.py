@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -54,6 +55,19 @@ PROMPT_LEAK_FRAGMENTS = (
     "authorization",
     "cookie",
 )
+SPEAKER_DIALOGUE_RE = re.compile(r"^([A-Za-z0-9_\-\u4e00-\u9fff·（）()《》]{1,24})[：:]\s*(.{2,})$")
+NON_SPEAKER_LABELS = {
+    "场景",
+    "动作",
+    "对白",
+    "转场",
+    "镜头",
+    "地点",
+    "时间",
+    "目的",
+    "旁注",
+    "说明",
+}
 
 
 class EmbeddedCreativeActionRequest(BaseModel):
@@ -209,7 +223,8 @@ def _preview_creative_action(
         )
     except (ModelConfigError, ModelGatewayError):
         return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="llm_not_ready")
-    except ValueError:
+    except ValueError as exc:
+        validation_error_category = _safe_validation_reason(str(exc))
         return _unavailable_preview(
             project_id,
             request,
@@ -222,6 +237,7 @@ def _preview_creative_action(
             repair_attempted=True,
             completed_phases=["queued", "context", "dispatching", "validating"],
             error_owner="provider_output_validation",
+            validation_error_category=validation_error_category,
         )
     lineage = {
         "service_id": SERVER_CODEX_SERVICE_ID,
@@ -281,7 +297,7 @@ def _dispatch_creative_action_preview(
             structured_output_contract_id=EMBEDDED_CREATIVE_CONTRACT_ID,
             structured_output_schema=schema,
             structured_output_schema_digest=schema_digest,
-            timeout_sec=120.0,
+            timeout_sec=300.0,
         ),
     )
     return result if isinstance(result, dict) else {}
@@ -496,6 +512,8 @@ def _creative_action_prompt(
             "如果动作是 script_revision，必须输出 screenplay_candidate：片名/版本/logline、角色目标冲突变化、按场排序的场景标题、地点、时间、动作、人物名、对白、转场；不要只写散文故事。",
             "screenplay_candidate.scenes[].space_type 必须是 内景、外景、INT. 或 EXT.；heading 必须以 内景 -、外景 -、INT. 或 EXT. 开头，禁止“内景/外景待定”、数字标题或散文小标题。",
             "每个场景标题必须包含空间类型、地点、时间三段，例如“内景 - 旧摄影棚 - 夜”；人物名提示后必须在同一场景内接对白，可夹一个括号提示，禁止悬空人物名。",
+            "blocks 必须使用专业剧本块流：action 可独立；character 必须立刻接 dialogue；parenthetical 只能夹在 character 与 dialogue 中间；不要把“人物：对白”合写成单个散文段。",
+            "如果原文已有对白，请保留并扩写为明确的 character/dialogue 块，不能省略人物说话关系。",
             "revised_text 只是 screenplay_candidate 的可读投影；镜头和摄影语言只在 shot_breakdown 里使用，不要混进文学剧本文本。",
             "如果动作是 shot_breakdown，只输出可审查分镜候选，不创建图片、不生成关键帧。",
             "不要输出内部路径、端口、provider raw、密钥、请求头、schema 名称或调度细节。",
@@ -527,6 +545,8 @@ def _creative_action_repair_prompt(
             "上一轮真实模型输出未通过 AFS 结构验证，本轮是一次有界的 provider-backed 修复重试。",
             f"验证失败类别：{_safe_text(repair_reason, 220)}",
             "不要复述错误；请基于同一原文重新生成完整、可审查、符合 closed JSON schema 的结果。",
+            "尤其检查 screenplay_candidate.scenes[].blocks：每个 character 后必须紧跟 dialogue；如果需要括号提示，顺序只能是 character、parenthetical、dialogue。",
+            "每个 dialogue 必须有清楚说话人；不要只写“林澈：……”这种合写行，除非结构里同时提供独立 character 与 dialogue 块。",
             "仍然禁止本地模板、固定镜头数、散文冒充专业剧本、图片/视频生成和画布写入。",
         ]
     )
@@ -582,25 +602,16 @@ def _safe_screenplay_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         }
         if all(character.values()):
             characters.append(character)
+    character_names = {item["name"] for item in characters if item.get("name")}
     scenes = []
     has_dialogue = False
     has_action = False
     for scene in candidate.get("scenes") or []:
         if not isinstance(scene, dict):
             continue
-        blocks = []
-        for block in scene.get("blocks") or []:
-            if not isinstance(block, dict):
-                continue
-            block_type = _safe_token(block.get("type"), 32)
-            text = _safe_text(block.get("text"), 600)
-            if block_type not in {"action", "character", "dialogue", "parenthetical", "transition"} or not text:
-                continue
-            if block_type == "dialogue":
-                has_dialogue = True
-            if block_type == "action":
-                has_action = True
-            blocks.append({"type": block_type, "text": text})
+        blocks = _safe_screenplay_blocks(scene.get("blocks") or [], character_names=character_names)
+        has_dialogue = has_dialogue or any(block.get("type") == "dialogue" for block in blocks)
+        has_action = has_action or any(block.get("type") == "action" for block in blocks)
         if not _valid_screenplay_block_flow(blocks):
             continue
         location = _safe_text(scene.get("location"), 120)
@@ -628,6 +639,107 @@ def _safe_screenplay_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "characters": characters[:12],
         "scenes": scenes[:12],
     }
+
+
+def _safe_screenplay_blocks(raw_blocks: Any, *, character_names: set[str]) -> list[dict[str, str]]:
+    blocks: list[dict[str, str]] = []
+    for block in raw_blocks or []:
+        if not isinstance(block, dict):
+            continue
+        block_type = _safe_token(block.get("type"), 32)
+        text = _safe_text(block.get("text"), 600)
+        if block_type not in {"action", "character", "dialogue", "parenthetical", "transition"} or not text:
+            continue
+        if block_type == "action":
+            blocks.extend(_split_action_block_with_dialogue_lines(text, character_names=character_names))
+            continue
+        if block_type == "character":
+            split = _speaker_prefixed_dialogue(text, character_names=character_names)
+            if split:
+                speaker, dialogue = split
+                blocks.extend([{"type": "character", "text": speaker}, {"type": "dialogue", "text": dialogue}])
+            else:
+                blocks.append({"type": block_type, "text": text})
+            continue
+        if block_type == "dialogue" and not _blocks_expect_dialogue(blocks):
+            split = _speaker_prefixed_dialogue(text, character_names=character_names)
+            if split:
+                speaker, dialogue = split
+                blocks.extend([{"type": "character", "text": speaker}, {"type": "dialogue", "text": dialogue}])
+                continue
+        if block_type == "dialogue" and _blocks_expect_dialogue(blocks):
+            split = _speaker_prefixed_dialogue(text, character_names=character_names)
+            if split:
+                blocks.append({"type": "dialogue", "text": split[1]})
+                continue
+        blocks.append({"type": block_type, "text": text})
+    return blocks
+
+
+def _split_action_block_with_dialogue_lines(text: str, *, character_names: set[str]) -> list[dict[str, str]]:
+    lines = [_safe_text(line, 600) for line in text.splitlines()]
+    pieces: list[dict[str, str]] = []
+    pending_action: list[str] = []
+    saw_dialogue_line = False
+    for line in lines:
+        if not line:
+            continue
+        split = _speaker_prefixed_dialogue(line, character_names=character_names, require_known=True)
+        if not split:
+            pending_action.append(line)
+            continue
+        saw_dialogue_line = True
+        if pending_action:
+            pieces.append({"type": "action", "text": "\n".join(pending_action)})
+            pending_action = []
+        speaker, dialogue = split
+        pieces.extend([{"type": "character", "text": speaker}, {"type": "dialogue", "text": dialogue}])
+    if pending_action:
+        pieces.append({"type": "action", "text": "\n".join(pending_action)})
+    return pieces if saw_dialogue_line else [{"type": "action", "text": text}]
+
+
+def _speaker_prefixed_dialogue(
+    text: str,
+    *,
+    character_names: set[str],
+    require_known: bool = False,
+) -> tuple[str, str] | None:
+    match = SPEAKER_DIALOGUE_RE.match(_safe_text(text, 600))
+    if not match:
+        return None
+    speaker = _safe_text(match.group(1), 80).strip("（）()《》")
+    dialogue = _safe_text(match.group(2), 600)
+    if not speaker or not dialogue:
+        return None
+    if not _looks_like_screenplay_speaker(speaker, character_names=character_names, require_known=require_known):
+        return None
+    return speaker, dialogue
+
+
+def _looks_like_screenplay_speaker(speaker: str, *, character_names: set[str], require_known: bool) -> bool:
+    if speaker in character_names:
+        return True
+    if speaker in {"旁白", "画外音", "广播声"}:
+        return True
+    if require_known:
+        return False
+    if speaker in NON_SPEAKER_LABELS:
+        return False
+    if any(char.isspace() for char in speaker):
+        return False
+    return 1 <= len(speaker) <= 12
+
+
+def _blocks_expect_dialogue(blocks: list[dict[str, str]]) -> bool:
+    for block in reversed(blocks):
+        block_type = block.get("type")
+        if block_type == "character":
+            return True
+        if block_type == "parenthetical":
+            continue
+        return False
+    return False
 
 
 def _safe_space_type(value: Any) -> str:
@@ -688,6 +800,24 @@ def _valid_screenplay_block_flow(blocks: list[dict[str, str]]) -> bool:
         else:
             return False
     return not expecting_dialogue
+
+
+def _safe_validation_reason(reason: str) -> str:
+    text = _safe_text(reason, 220).lower()
+    categories = (
+        ("structured output is not an object", "structured_output_not_object"),
+        ("revised text is empty or unchanged", "revised_text_empty_or_unchanged"),
+        ("preview is not reviewable", "preview_not_reviewable"),
+        ("shot plan is missing", "shot_plan_missing"),
+        ("shot plan has no shots", "shot_plan_empty"),
+        ("screenplay candidate is missing", "screenplay_candidate_missing"),
+        ("lacks professional scene/action structure", "screenplay_structure_invalid"),
+        ("lacks dialogue", "screenplay_dialogue_missing"),
+    )
+    for marker, category in categories:
+        if marker in text:
+            return category
+    return "validation_failed"
 
 
 def _screenplay_text_projection(candidate: dict[str, Any]) -> str:
@@ -774,6 +904,7 @@ def _unavailable_preview(
     repair_attempted: bool = False,
     completed_phases: list[str] | None = None,
     error_owner: str = "llm_provider",
+    validation_error_category: str = "",
 ) -> dict[str, Any]:
     rationale = {
         "unsafe_or_invalid_llm_preview": "真实文本模型已返回，但结果没有通过专业剧本/分镜结构校验；当前节点保持不变。",
@@ -789,7 +920,10 @@ def _unavailable_preview(
         "change_summary": [],
         "rationale": rationale,
         "unresolved_decisions": ["稍后重试，或先手工编辑当前节点。"],
-        "quality_flags": ["fail_closed_no_canvas_mutation"],
+        "quality_flags": [
+            "fail_closed_no_canvas_mutation",
+            *([f"validation_{validation_error_category}"] if validation_error_category else []),
+        ],
     }
     lineage = {
         "service_id": SERVER_CODEX_SERVICE_ID if provider_calls_started else "",
@@ -803,6 +937,8 @@ def _unavailable_preview(
         "provider_raw_response_stored": False,
         "external_paid_cost_usd": 0,
     }
+    if validation_error_category:
+        lineage["validation_error_category"] = validation_error_category
     return {
         "mode": "unavailable",
         "target": target,
@@ -816,6 +952,7 @@ def _unavailable_preview(
             completed_phases=completed_phases or ["queued", "context"],
             error_owner=error_owner,
             error_category=reason,
+            error_detail=validation_error_category,
         ),
         "provider_gate": gate,
         "provider_calls_started": provider_calls_started,
@@ -829,6 +966,7 @@ def _unavailable_preview(
             fallback_reason=reason,
             lineage=lineage,
             provider_calls_started=provider_calls_started,
+            validation_error_category=validation_error_category,
         ),
     }
 
@@ -853,6 +991,7 @@ def _creative_task(
     completed_phases: list[str],
     error_owner: str = "",
     error_category: str = "",
+    error_detail: str = "",
 ) -> dict[str, Any]:
     task = {
         "schema_version": "afs.creative_task.v0.1",
@@ -870,6 +1009,7 @@ def _creative_task(
         "result_scope": "same_node_revision" if request.action_type == "script_revision" else "candidate_storyboard_subgraph",
         "error_owner": error_owner,
         "error_category": error_category,
+        "error_detail": _safe_token(error_detail, 120),
     }
     reject_unsafe_payload(task)
     return task
@@ -885,6 +1025,7 @@ def _safe_manifest(
     fallback_reason: str = "",
     lineage: dict[str, Any] | None = None,
     provider_calls_started: bool | None = None,
+    validation_error_category: str = "",
 ) -> dict[str, Any]:
     started = mode == "llm" if provider_calls_started is None else bool(provider_calls_started)
     manifest = {
@@ -899,6 +1040,7 @@ def _safe_manifest(
         "provider_lineage": lineage or {},
         "provider_dispatch_count": int((lineage or {}).get("provider_dispatch_count") or (1 if started else 0)),
         "repair_attempted": bool((lineage or {}).get("repair_attempted")),
+        "validation_error_category": _safe_token(validation_error_category, 120),
         "provider_raw_response_stored": False,
         "credentialed_urls_returned_by_api": False,
         "local_paths_returned_by_api": False,
