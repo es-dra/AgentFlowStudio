@@ -157,6 +157,8 @@ def shot_plan(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> di
         "title": text(value.get("title"), "", 180),
         "total_shots": int(max(0, min(9999, number(value.get("total_shots") or total_shots, total_shots)))),
         "estimated_duration_sec": max(0, min(86_400, number(value.get("estimated_duration_sec"), 0))),
+        "provider_estimated_duration_sec": max(0, min(86_400, number(value.get("provider_estimated_duration_sec"), 0))),
+        "duration_source": _duration_source(value.get("duration_source"), text=text),
         "confirmed_at": text(value.get("confirmed_at"), "", 80),
         "scenes": [item for item in scenes if item],
     })
@@ -179,6 +181,8 @@ def shot_candidate_subgraph(value: Any, *, text: TextSanitizer, number: NumberSa
         "scene_count": int(max(0, min(9999, number(value.get("scene_count"), 0)))),
         "shot_count": int(max(0, min(9999, number(value.get("shot_count"), 0)))),
         "estimated_duration_sec": max(0, min(86_400, number(value.get("estimated_duration_sec"), 0))),
+        "provider_estimated_duration_sec": max(0, min(86_400, number(value.get("provider_estimated_duration_sec"), 0))),
+        "duration_source": _duration_source(value.get("duration_source"), text=text),
         "created_node_ids": _text_list(value.get("created_node_ids"), text=text, max_items=240, max_length=160, safe=True),
         "created_edge_ids": _text_list(value.get("created_edge_ids"), text=text, max_items=240, max_length=220, safe=True),
         "shot_plan": shot_plan(value.get("shot_plan"), text=text, number=number),
@@ -268,6 +272,11 @@ def _items(value: Any, limit: int) -> list[dict[str, Any]]:
 def _text_list(value: Any, *, text: TextSanitizer, max_items: int, max_length: int, safe: bool = False) -> list[str]:
     result = [text(item, "", max_length) for item in (value if isinstance(value, list) else [])[:max_items]]
     return [safe_id(item) if safe else item for item in result if item]
+
+
+def _duration_source(value: Any, *, text: TextSanitizer) -> str:
+    source = text(value, "", 80)
+    return source if source in {"per_shot_sum", "provider_estimate"} else ""
 
 
 def _compact(value: dict[str, Any]) -> dict[str, Any]:

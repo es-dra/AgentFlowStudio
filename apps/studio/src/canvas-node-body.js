@@ -232,7 +232,7 @@ function compactCreativeTaskResult(action) {
     wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.character_count} 角色 · ${summary.dialogue_blocks} 段对白`));
   } else if (preview.shot_plan) {
     const summary = shotPlanSummary(preview.shot_plan);
-    wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 约 ${Math.round(summary.estimated_duration_sec)} 秒`));
+    wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 总时长约 ${Math.round(summary.estimated_duration_sec)} 秒`));
   }
   wrap.appendChild(textBlock("embedded-creative-compact-line", "完整预览、差异、应用和取消在右侧 AI 创作搭档中审阅。"));
   return wrap;
@@ -276,7 +276,8 @@ function shotPlanPreview(plan) {
   box.className = "embedded-shot-plan";
   box.open = true;
   const summary = document.createElement("summary");
-  summary.textContent = `分镜草案：${Number(plan.total_shots || 0)} 镜头 · 约 ${Math.round(Number(plan.estimated_duration_sec || 0))} 秒`;
+  const planSummary = shotPlanSummary(plan);
+  summary.textContent = `分镜草案：${planSummary.shot_count} 镜头 · 总时长约 ${Math.round(planSummary.estimated_duration_sec)} 秒`;
   box.appendChild(summary);
   const scenes = document.createElement("div");
   scenes.className = "embedded-shot-plan-scenes";

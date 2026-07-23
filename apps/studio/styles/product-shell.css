@@ -370,6 +370,7 @@
 .storyboard-content { min-height: 0; padding: 18px 16px 22px; overflow: auto; }
 .storyboard-heading { justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .storyboard-heading h1 { margin: 3px 0 0; font-size: 22px; letter-spacing: -.02em; }
+.storyboard-total-summary { margin: 5px 0 0; color: var(--product-muted); font-size: 12px; line-height: 1.35; }
 .storyboard-duration { color: var(--product-muted); font-size: 12px; }
 .storyboard-shot-grid { display: grid; grid-template-columns: repeat(3, minmax(170px, 1fr)); gap: 10px; align-items: stretch; }
 .storyboard-content.is-sparse { display: grid; grid-template-rows: auto minmax(0, 1fr); }
@@ -934,6 +935,8 @@
 .agent-message-role { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 6px; background: #174969; color: #d9f8ff; font-size: 9px; font-weight: 800; }
 .agent-message p { min-width: 0; margin: 0; border-radius: 6px; padding: 10px; background: var(--product-surface); color: #d3e0e6; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .agent-message.error p { border: 1px solid rgba(241, 108, 112, .32); background: rgba(241, 108, 112, .08); color: #ffcbcd; }
+.agent-message.warning p { border: 1px solid rgba(241, 177, 80, .32); background: rgba(241, 177, 80, .08); color: #ffe0b7; }
+.agent-message.success p { border: 1px solid rgba(92, 198, 144, .32); background: rgba(92, 198, 144, .08); color: #c8f2d9; }
 .agent-command-preview,
 .agent-receipts { display: grid; gap: 8px; border-top: 1px solid var(--product-line); padding-top: 10px; }
 .agent-receipts summary { color: var(--product-muted); cursor: pointer; font-size: 11px; }

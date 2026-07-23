@@ -4,6 +4,7 @@ import { findNextProductionTarget, productContextKey } from "./product-shell-con
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
 import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
+import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -857,11 +858,12 @@ export function createProductShell(options = {}) {
     const sparse = scene.shots.length <= 2;
     sectionEl.classList.toggle("is-sparse", sparse);
     const heading = node("div", "storyboard-heading");
+    const totals = storyboardTotalSummary();
     heading.append(
-      node("div", "", `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`),
+      node("div", "", `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1><p class="storyboard-total-summary">${totals.scene_count} 场景 · ${totals.shot_count} 镜头 · 总时长约 ${Math.round(totals.duration_sec)} 秒</p>`),
       node("span", "storyboard-duration", `${scene.shots.length} 镜头 · ${scene.duration}`),
     );
-    heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1>`;
+    heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1><p class="storyboard-total-summary">${totals.scene_count} 场景 · ${totals.shot_count} 镜头 · 总时长约 ${Math.round(totals.duration_sec)} 秒</p>`;
     sectionEl.appendChild(heading);
     const grid = node("div", "storyboard-shot-grid");
     grid.classList.toggle("is-sparse", sparse);
@@ -1759,6 +1761,15 @@ export function createProductShell(options = {}) {
   function sceneModel() {
     if (mediaOperationsReady()) return mediaSceneModel();
     if (graphWorkspaceReady()) return graphSceneModel();
+    const legacyApplied = legacyAppliedStoryboardProjection(snapshot.studioState || {});
+    if (legacyApplied.status === "ready") {
+      const sceneIndex = Math.min(selection.sceneIndex, legacyApplied.scenes.length - 1);
+      selection = {
+        sceneIndex,
+        shotIndex: Math.min(selection.shotIndex, legacyApplied.scenes[sceneIndex].shots.length - 1),
+      };
+      return legacyApplied.scenes;
+    }
     const shots = shotModel();
     if (!shots.length) {
       selection = { sceneIndex: 0, shotIndex: 0 };
@@ -1788,6 +1799,8 @@ export function createProductShell(options = {}) {
     if (mediaOperationsReady()) return mediaShotModel();
     if (graphWorkspaceReady()) return graphShotModel();
     const state = snapshot.studioState || {};
+    const legacyApplied = legacyAppliedStoryboardProjection(state);
+    if (legacyApplied.status === "ready") return legacyApplied.shots;
     const planShots = state.production?.dynamic_production_plan_projection?.storyboard_shots || [];
     if (Array.isArray(planShots) && planShots.length) {
       return planShots
@@ -1898,6 +1911,12 @@ export function createProductShell(options = {}) {
   function currentShot() { return currentScene().shots[selection.shotIndex] || emptyShot(); }
   function hasStoryFacts() { return shotModel().length > 0; }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
+  function storyboardTotalSummary() {
+    const scenes = sceneModel();
+    const shotCount = scenes.reduce((sum, scene) => sum + scene.shots.length, 0);
+    const durationSec = scenes.reduce((sum, scene) => sum + scene.shots.reduce((shotSum, shot) => shotSum + Number.parseFloat(shot.duration || 0), 0), 0);
+    return { scene_count: scenes.length, shot_count: shotCount, duration_sec: durationSec };
+  }
   function totalReadyShots() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => shot.state === "ready").length; }
   function completionPercent() { return totalShots() ? Math.round((totalReadyShots() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
