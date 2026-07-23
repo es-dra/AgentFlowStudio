@@ -49,7 +49,8 @@ SAFE_NODE_PARAM_KEYS = (
     "embeddedCreativeAction", "revisions", "currentRevisionId", "lastEmbeddedCreativeActionSummary",
     "shotPlanDraft",
     "candidate_id", "source_node_id", "source_revision_id", "source_sequence_node_id", "source_scene_node_id",
-    "creative_task_id", "shot_count", "scene_count", "estimated_duration_sec", "promotion_state",
+    "creative_task_id", "shot_count", "scene_count", "estimated_duration_sec", "provider_estimated_duration_sec",
+    "duration_source", "promotion_state",
     "layout_role", "scene_index", "shot_index", "purpose", "duration_sec", "shot_size", "camera_angle",
     "movement", "blocking", "sound", "transition", "narrative_purpose", "layout_column", "layout_row",
 )
@@ -177,8 +178,11 @@ def _sanitize_param(
         return text(value, "", 1000)
     if key in {"shot_count", "scene_count", "scene_index", "shot_index", "layout_column", "layout_row"}:
         return int(max(0, min(9999, number(value, 0))))
-    if key in {"estimated_duration_sec", "duration_sec"}:
+    if key in {"estimated_duration_sec", "provider_estimated_duration_sec", "duration_sec"}:
         return max(0, min(86_400, number(value, 0)))
+    if key == "duration_source":
+        source = text(value, "", 80)
+        return source if source in {"per_shot_sum", "provider_estimate"} else ""
     if key == "scriptExpansionSourceIdea":
         return text(value, "", 600)
     if key == "lastOptimizedPromptPlain":

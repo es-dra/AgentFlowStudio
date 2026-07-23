@@ -1,6 +1,8 @@
 import { icon } from "./icons.js";
 import { el } from "./overlay.js";
 import {
+  AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+  EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
   cancelAgentCommand,
   executePendingAgentCommand,
   executePendingAgentCommandWithRuntime,
@@ -18,6 +20,7 @@ import {
   startEmbeddedCreativeAction,
 } from "./embedded-creative-actions.js";
 import {
+  appliedCreativeActionReceiptText,
   creativeActionFailureInfo,
   screenplayCandidateSummary,
   shotPlanSummary,
@@ -155,30 +158,82 @@ function messageLog(session) {
   return log;
 }
 
-function syncEmbeddedCreativeAssistantMessages(session, state) {
+export function syncEmbeddedCreativeAssistantMessages(session, state) {
   if (!session) return;
-  const node = selectedCanvasNode(state || {});
-  const action = node?.params?.embeddedCreativeAction;
-  if (!node || !action || action.status !== "unavailable") return;
+  const selectedNode = selectedCanvasNode(state || {});
+  const selectedAction = selectedNode?.params?.embeddedCreativeAction;
+  const terminal = selectedAction && ["unavailable", "applied", "cancelled"].includes(selectedAction.status)
+    ? { node: selectedNode, action: selectedAction }
+    : latestTerminalEmbeddedCreativeAction(state || {});
+  const node = terminal?.node;
+  const action = terminal?.action;
+  if (!node || !action) return;
   const taskId = action.action_id || action.creative_task?.task_id || "";
-  const syncKey = `embedded-terminal:${taskId}:unavailable:${action.error_category || ""}`;
-  if (session.__embeddedCreativeOutcomeKey === syncKey) return;
-  const failure = creativeActionFailureInfo(action);
-  const text = `${currentTaskTitle(action)}未完成：${failure.label}。${failure.preserved_state} ${failure.next_action}`;
-  const messages = Array.isArray(session.messages) ? [...session.messages] : [];
-  const index = findLastMessageIndex(messages, (message) => (
-    message.role === "assistant"
-    && /打开(分镜拆解|剧本化修订)任务/.test(String(message.text || ""))
-    && /结果会在当前任务区审阅/.test(String(message.text || ""))
-  ));
-  const replacement = { role: "assistant", tone: "warning", text };
-  if (index >= 0) {
+  const syncKey = `embedded-terminal:${taskId}:${action.status}:${action.applied_revision_id || action.error_category || action.cancelled_at || ""}`;
+  const outcome = terminalOutcomeMessage(action);
+  const sourceMessages = Array.isArray(session.messages) ? [...session.messages] : [];
+  const messages = sourceMessages.filter((message) => !isCommandPreviewStartupPlaceholder(message, session));
+  const startupPlaceholderRemoved = messages.length !== sourceMessages.length;
+  const existingTerminalIndex = findLastMessageIndex(messages, (message) => message.embedded_terminal_key === syncKey);
+  const index = findLastMessageIndex(messages, (message) => isMatchingEmbeddedTaskOpenPlaceholder(message, node, action));
+  if (session.__embeddedCreativeOutcomeKey === syncKey && !startupPlaceholderRemoved && existingTerminalIndex >= 0) return;
+  const replacement = {
+    role: "assistant",
+    tone: outcome.tone,
+    text: outcome.text,
+    embedded_terminal_key: syncKey,
+    embedded_node_id: node.id,
+    embedded_action_id: action.action_id || "",
+    embedded_action_type: action.action_type || "",
+  };
+  if (existingTerminalIndex >= 0) {
+    messages[existingTerminalIndex] = replacement;
+  } else if (index >= 0) {
     messages[index] = replacement;
   } else {
     messages.push(replacement);
   }
   session.messages = messages.slice(-28);
   session.__embeddedCreativeOutcomeKey = syncKey;
+}
+
+function latestTerminalEmbeddedCreativeAction(state) {
+  return Object.values(state?.nodes || {})
+    .map((node) => ({ node, action: node?.params?.embeddedCreativeAction || null }))
+    .filter(({ action }) => action && ["unavailable", "applied", "cancelled"].includes(action.status))
+    .sort((left, right) => actionTimestamp(right.action) - actionTimestamp(left.action))[0] || null;
+}
+
+function terminalOutcomeMessage(action) {
+  if (action.status === "applied") {
+    return { tone: "success", text: appliedCreativeActionReceiptText(action) };
+  }
+  if (action.status === "cancelled") {
+    return { tone: "", text: `${currentTaskTitle(action)}已取消：当前节点和 ProductionGraph 未改变。` };
+  }
+  const failure = creativeActionFailureInfo(action);
+  return {
+    tone: "warning",
+    text: `${currentTaskTitle(action)}未完成：${failure.label}。${failure.preserved_state} ${failure.next_action}`,
+  };
+}
+
+function actionTimestamp(action) {
+  const parsed = Date.parse(action?.applied_at || action?.completed_at || action?.cancelled_at || action?.requested_at || "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isCommandPreviewStartupPlaceholder(message, session) {
+  return message?.role === "assistant"
+    && message.placeholder_id === AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID
+    && (!message.context_key || !session?.context_key || message.context_key === session.context_key);
+}
+
+function isMatchingEmbeddedTaskOpenPlaceholder(message, node, action) {
+  return message?.role === "assistant"
+    && message.placeholder_id === EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID
+    && message.embedded_node_id === node.id
+    && message.embedded_action_type === action.action_type;
 }
 
 function findLastMessageIndex(messages, predicate) {
@@ -256,7 +311,16 @@ async function executeEmbeddedCreativeCommand({ session, store, runtime, command
   const node = store?.get?.()?.nodes?.[command.node_id];
   if (!node) throw new Error("selected node no longer exists");
   session.pendingCommand = null;
-  pushAssistantMessage(session, `已在「${node.title || "当前节点"}」打开${command.action_type === "shot_breakdown" ? "分镜拆解" : "剧本化修订"}任务；结果会在当前任务区审阅，确认前不改动画布。`);
+  pushAssistantMessage(
+    session,
+    `已在「${node.title || "当前节点"}」打开${command.action_type === "shot_breakdown" ? "分镜拆解" : "剧本化修订"}任务；结果会在当前任务区审阅，确认前不改动画布。`,
+    {
+      placeholder_id: EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
+      embedded_node_id: node.id,
+      embedded_action_type: command.action_type,
+      embedded_mode: command.mode || "",
+    },
+  );
   await startEmbeddedCreativeAction(store, runtime, node, command.action_type, { mode: command.mode });
   return null;
 }
@@ -404,7 +468,7 @@ function screenplayCandidateView(candidate) {
 function shotPlanReview(plan) {
   const summary = shotPlanSummary(plan);
   const wrap = el("div", "agent-shot-plan-review");
-  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 约 ${Math.round(summary.estimated_duration_sec)} 秒。应用后会创建可见候选分镜子图，确认前不写成最终制作事实。`));
+  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 总时长约 ${Math.round(summary.estimated_duration_sec)} 秒。应用后会创建可见候选分镜子图，确认前不写成最终制作事实。`));
   const details = el("details", "agent-shot-plan-candidate");
   details.open = true;
   details.appendChild(el("summary", "", "分镜候选结构"));
@@ -424,8 +488,9 @@ function shotPlanReview(plan) {
 }
 
 function appliedSubgraphSummary(subgraph) {
+  const summary = shotPlanSummary(subgraph?.shot_plan || {});
   return simpleList("已创建候选子图", [
-    `${Number(subgraph.scene_count || 0)} 场 · ${Number(subgraph.shot_count || 0)} 镜头`,
+    `${Number(subgraph.scene_count || 0)} 场 · ${Number(subgraph.shot_count || 0)} 镜头 · 总时长约 ${Math.round(summary.estimated_duration_sec || subgraph.estimated_duration_sec || 0)} 秒`,
     `新增节点 ${Number(subgraph.created_node_ids?.length || 0)} 个，连线 ${Number(subgraph.created_edge_ids?.length || 0)} 条`,
   ]);
 }
@@ -509,9 +574,9 @@ function excerpt(value, limit) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text || "空";
 }
 
-function pushAssistantMessage(session, text) {
+function pushAssistantMessage(session, text, metadata = {}) {
   const messages = Array.isArray(session.messages) ? session.messages : [];
-  messages.push({ role: "assistant", text });
+  messages.push({ role: "assistant", text, ...metadata });
   session.messages = messages.slice(-28);
 }
 

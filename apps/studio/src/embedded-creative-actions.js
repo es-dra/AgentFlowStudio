@@ -1,5 +1,6 @@
 import { agentChatContextSnapshot } from "./agent-chat-lifecycle.js";
 import {
+  appliedCreativeActionReceiptText,
   completeCreativeTask,
   createLocalCreativeTask,
   failCreativeTask,
@@ -208,13 +209,17 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
     if (action.action_type === "shot_breakdown" && preview.shot_plan) {
       const subgraph = materializeShotCandidateSubgraph(state, node, preview.shot_plan, revisionId, action);
       node.params.shotPlanDraft = subgraph.shot_plan;
-      node.params.embeddedCreativeAction = {
+      const appliedAction = {
         ...action,
+        action_type: "shot_breakdown",
+        applied_subgraph: subgraph,
+      };
+      node.params.embeddedCreativeAction = {
+        ...appliedAction,
         status: "applied",
-        message: `分镜候选已成为可见子图：${subgraph.scene_count} 场 · ${subgraph.shot_count} 镜头。`,
+        message: appliedCreativeActionReceiptText(appliedAction),
         creative_task: completeCreativeTask(action.creative_task, "applied", "applied"),
         applied_revision_id: revisionId,
-        applied_subgraph: subgraph,
         applied_at: new Date().toISOString(),
       };
       const focusNodeId = isNarrowViewport() && subgraph.first_shot_node_id
@@ -242,9 +247,12 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
     applied = true;
   });
   if (applied) {
-    dispatchBrowserEvent("afs:embedded-creative-task-finished", {
+    const finish = () => dispatchBrowserEvent("afs:embedded-creative-task-finished", {
       detail: { node_id: nodeId, status: "applied" },
     });
+    const flush = store.flushRuntimeSave?.();
+    if (flush && typeof flush.finally === "function") void flush.finally(finish);
+    else finish();
   }
 }
 
@@ -365,7 +373,7 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
     y: layout.sequence.y,
     w: layout.sequence.w,
     h: layout.sequence.h,
-    content: `动态分镜候选：${summary.scene_count} 场，${summary.shot_count} 镜头，约 ${Math.round(summary.estimated_duration_sec)} 秒。`,
+    content: `动态分镜候选：${summary.scene_count} 场，${summary.shot_count} 镜头，总时长约 ${Math.round(summary.estimated_duration_sec)} 秒。`,
     status: "draft",
     params: {
       candidate_id: candidateId,
@@ -376,6 +384,8 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
       shot_count: summary.shot_count,
       scene_count: summary.scene_count,
       estimated_duration_sec: summary.estimated_duration_sec,
+      provider_estimated_duration_sec: summary.provider_estimated_duration_sec,
+      duration_source: summary.duration_source,
       promotion_state: "candidate_preview",
       layout_role: "sequence_group_anchor",
     },
@@ -462,6 +472,9 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
     created_edge_ids: createdEdges.filter(Boolean),
     shot_plan: {
       ...shotPlan,
+      estimated_duration_sec: summary.estimated_duration_sec,
+      provider_estimated_duration_sec: summary.provider_estimated_duration_sec,
+      duration_source: summary.duration_source,
       source_revision_id: revisionId,
       candidate_id: candidateId,
       scenes: visibleScenes,

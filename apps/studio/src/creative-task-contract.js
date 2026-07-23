@@ -124,12 +124,48 @@ export function screenplayCandidateSummary(candidate) {
 
 export function shotPlanSummary(plan) {
   const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
-  const shots = scenes.reduce((sum, scene) => sum + (Array.isArray(scene.shots) ? scene.shots.length : 0), 0);
+  const shotItems = shotPlanShotItems(plan);
+  const shots = shotItems.length || Number(plan?.total_shots || 0);
+  const validDurations = shotItems.map((shot) => normalizedDurationSeconds(shot?.duration_sec));
+  const hasCanonicalShotDurations = validDurations.length > 0 && validDurations.every((value) => value !== null);
+  const shotDurationSum = hasCanonicalShotDurations
+    ? validDurations.reduce((sum, value) => sum + value, 0)
+    : 0;
+  const providerEstimate = normalizedDurationSeconds(plan?.estimated_duration_sec);
+  const visibleDuration = hasCanonicalShotDurations
+    ? shotDurationSum
+    : providerEstimate ?? 0;
   return {
     scene_count: scenes.length,
-    shot_count: shots || Number(plan?.total_shots || 0),
-    estimated_duration_sec: Number(plan?.estimated_duration_sec || 0),
+    shot_count: shots,
+    estimated_duration_sec: visibleDuration,
+    shot_duration_sec_sum: shotDurationSum,
+    provider_estimated_duration_sec: providerEstimate ?? 0,
+    duration_source: hasCanonicalShotDurations ? "per_shot_sum" : "provider_estimate",
   };
+}
+
+export function shotPlanShotItems(plan) {
+  const scenes = Array.isArray(plan?.scenes) ? plan.scenes : [];
+  return scenes.flatMap((scene) => Array.isArray(scene?.shots) ? scene.shots : []);
+}
+
+export function normalizedDurationSeconds(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+export function appliedCreativeActionReceiptText(action = {}) {
+  if (action.action_type === "shot_breakdown") {
+    const subgraph = action.applied_subgraph || {};
+    const plan = subgraph.shot_plan || action.preview?.shot_plan || {};
+    const summary = shotPlanSummary(plan);
+    const sceneCount = summary.scene_count || Number(subgraph.scene_count || 0);
+    const shotCount = summary.shot_count || Number(subgraph.shot_count || 0);
+    const duration = Math.round(summary.estimated_duration_sec || Number(subgraph.estimated_duration_sec || 0));
+    return `动态分镜已应用：${sceneCount} 场 · ${shotCount} 镜头 · 总时长约 ${duration} 秒。已写入可重载候选分镜子图，请到「故事板」审阅。`;
+  }
+  return "节点内修订已应用到当前节点；保存后重载会恢复该版本。";
 }
 
 export function creativeActionFailureInfo(action = {}) {

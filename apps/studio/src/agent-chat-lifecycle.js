@@ -11,6 +11,8 @@ const PRODUCTION_PLAN_COMMAND_SCHEMA_VERSION = "afs.production_plan_command.v0.1
 const M3_CONTEXT_COMMAND_SCHEMA_VERSION = "afs.m3_context_command.v0.1";
 const MESSAGE_LIMIT = 28;
 const RECEIPT_LIMIT = 12;
+export const AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID = "agent_command_preview_default_v1";
+export const EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID = "embedded_creative_task_open_v1";
 
 export function createAgentChatContextStore() {
   const contexts = new Map();
@@ -692,6 +694,8 @@ function emptySession(contextKey) {
       {
         role: "assistant",
         text: "我会基于当前画布上下文生成命令预览；确认前不改变事实。",
+        placeholder_id: AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+        context_key: contextKey,
       },
     ],
     pendingCommand: null,
