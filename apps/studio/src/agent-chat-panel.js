@@ -18,6 +18,7 @@ import {
   startEmbeddedCreativeAction,
 } from "./embedded-creative-actions.js";
 import {
+  creativeActionFailureInfo,
   screenplayCandidateSummary,
   shotPlanSummary,
   taskPhaseLabel,
@@ -45,6 +46,7 @@ export function buildAgentChatPanel({
 
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
+  syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
   const taskReview = currentTaskReview({ store, runtime, onRender });
   if (taskReview) body.appendChild(taskReview);
   body.appendChild(messageLog(session));
@@ -79,7 +81,8 @@ function panelHeader({ context, collapsed, onToggleCollapse }) {
 function contextStrip(context) {
   const strip = el("section", "agent-context-strip");
   strip.appendChild(el("span", "agent-context-chip", context?.selected_node_title ? `当前：${context.selected_node_title}` : "当前：画布"));
-  strip.appendChild(el("span", "agent-context-chip", context?.script_revision_id ? "剧本可追溯" : "可从任意节点开始"));
+  const screenplay = context?.selected_screenplay_summary || {};
+  strip.appendChild(el("span", "agent-context-chip", context?.script_revision_id || screenplay.revision_id ? "剧本可追溯" : "可从任意节点开始"));
   if (context?.selected_edge_id) {
     strip.appendChild(
       el("span", "agent-context-chip", `连线：${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"}`),
@@ -93,6 +96,9 @@ function contextStrip(context) {
     strip.appendChild(el("span", "agent-context-chip", `估算 $${Number(media.estimated_cost_usd || 0).toFixed(2)}`));
   } else {
     strip.appendChild(el("span", "agent-context-chip", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
+  }
+  if (screenplay.scene_count) {
+    strip.appendChild(el("span", "agent-context-chip", `节点剧本：${Number(screenplay.scene_count || 0)} 场 · ${Number(screenplay.character_count || 0)} 角色 · ${Number(screenplay.dialogue_blocks || 0)} 对白`));
   }
   strip.appendChild(contextDetails(context));
   return strip;
@@ -108,6 +114,13 @@ function contextDetails(context) {
     ["画布", `${Number(context?.counts?.nodes || 0)} 节点 · ${Number(context?.counts?.scenes || 0)} 场景 · ${Number(context?.counts?.shots || 0)} 镜头`],
   ]) {
     list.append(el("dt", "", label), el("dd", "", value));
+  }
+  if (context?.selected_screenplay_summary?.scene_count) {
+    const summary = context.selected_screenplay_summary;
+    list.append(
+      el("dt", "", "节点剧本"),
+      el("dd", "", `${Number(summary.scene_count || 0)} 场 · ${Number(summary.character_count || 0)} 角色 · ${Number(summary.dialogue_blocks || 0)} 对白 · 版本 ${summary.revision_id || "未命名"}`),
+    );
   }
   if (context?.media_operations) {
     list.append(el("dt", "", "计划"), el("dd", "", "从已确认脚本、分镜和资产 Bible 只读投影"));
@@ -140,6 +153,39 @@ function messageLog(session) {
     log.appendChild(item);
   }
   return log;
+}
+
+function syncEmbeddedCreativeAssistantMessages(session, state) {
+  if (!session) return;
+  const node = selectedCanvasNode(state || {});
+  const action = node?.params?.embeddedCreativeAction;
+  if (!node || !action || action.status !== "unavailable") return;
+  const taskId = action.action_id || action.creative_task?.task_id || "";
+  const syncKey = `embedded-terminal:${taskId}:unavailable:${action.error_category || ""}`;
+  if (session.__embeddedCreativeOutcomeKey === syncKey) return;
+  const failure = creativeActionFailureInfo(action);
+  const text = `${currentTaskTitle(action)}未完成：${failure.label}。${failure.preserved_state} ${failure.next_action}`;
+  const messages = Array.isArray(session.messages) ? [...session.messages] : [];
+  const index = findLastMessageIndex(messages, (message) => (
+    message.role === "assistant"
+    && /打开(分镜拆解|剧本化修订)任务/.test(String(message.text || ""))
+    && /结果会在当前任务区审阅/.test(String(message.text || ""))
+  ));
+  const replacement = { role: "assistant", tone: "warning", text };
+  if (index >= 0) {
+    messages[index] = replacement;
+  } else {
+    messages.push(replacement);
+  }
+  session.messages = messages.slice(-28);
+  session.__embeddedCreativeOutcomeKey = syncKey;
+}
+
+function findLastMessageIndex(messages, predicate) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (predicate(messages[index])) return index;
+  }
+  return -1;
 }
 
 function commandPreview({ session, store, runtime, onRender }) {
@@ -224,6 +270,8 @@ function currentTaskReview({ store, runtime, onRender }) {
   const wrap = el("section", `agent-current-task-review ${action.status || "idle"}`);
   wrap.dataset.nodeId = node.id;
   wrap.dataset.creativeAction = action.action_type || "script_revision";
+  wrap.setAttribute("role", "status");
+  wrap.setAttribute("aria-live", action.status === "unavailable" ? "assertive" : "polite");
   const header = el("header", "agent-current-task-head");
   header.append(
     el("span", "eyebrow", "当前任务"),
@@ -237,7 +285,7 @@ function currentTaskReview({ store, runtime, onRender }) {
   } else if (action.status === "preview") {
     wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action.preview?.shot_plan) : screenplayReview(action, store, node));
   } else if (action.status === "unavailable") {
-    wrap.appendChild(el("p", "agent-current-task-error", action.message || action.error || "任务失败；当前节点没有改变。"));
+    wrap.appendChild(failureReview(action));
   } else if (action.status === "applied") {
     wrap.appendChild(el("p", "agent-current-task-copy", action.message || "结果已应用；可以使用画布撤销恢复。"));
     if (action.applied_subgraph) wrap.appendChild(appliedSubgraphSummary(action.applied_subgraph));
@@ -261,7 +309,7 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
     }));
   }
   if (["preview", "unavailable"].includes(action.status)) {
-    row.appendChild(taskButton("重新生成", "studio-secondary-button", () => {
+    row.appendChild(taskButton("重新预览", "studio-secondary-button", () => {
       void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], action.action_type, { mode: action.mode })
         .finally(() => onRender?.());
       onRender?.();
@@ -280,6 +328,17 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
     }));
   }
   return row;
+}
+
+function failureReview(action) {
+  const failure = creativeActionFailureInfo(action);
+  const wrap = el("section", "agent-current-task-failure");
+  wrap.appendChild(el("p", "agent-current-task-error", `${failure.label}：${failure.detail || action.message || "任务未完成。"}`));
+  wrap.appendChild(simpleList("恢复状态", [
+    failure.preserved_state,
+    failure.next_action,
+  ]));
+  return wrap;
 }
 
 function screenplayReview(action, store, node) {
@@ -401,8 +460,11 @@ function currentTaskEvidence(action) {
     ["request_id", lineage.request_id],
     ["model_surface", lineage.model_surface],
     ["schema_digest", lineage.structured_output_schema_digest],
+    ["dispatch_count", lineage.provider_dispatch_count ? Number(lineage.provider_dispatch_count) : ""],
+    ["error_category", action.error_category || action.creative_task?.error_category],
     ["latency_ms", action.latency_ms ? Math.round(Number(action.latency_ms)) : ""],
     ["cost_usd", `$${Number(action.cost_usd || 0).toFixed(4)}`],
+    ["graph_mutated", action.graph_mutation?.mutated === true ? "true" : action.graph_mutation ? "false" : ""],
   ]);
 }
 

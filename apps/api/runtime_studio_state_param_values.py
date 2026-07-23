@@ -291,6 +291,6 @@ def asset_type(value: Any) -> str:
 
 __all__ = (
     "asset_card_revision", "asset_card_draft", "asset_exclusions", "asset_refs", "keyframe_layer",
-    "keyframe_constraints", "node_reference_stack", "safe_object", "storyboard_breakdown", "structured_shot", "text_list",
-    "uploads", "visual_assets", "warnings",
+    "keyframe_constraints", "node_reference_stack", "safe_object", "storyboard_breakdown", "structured_shot",
+    "text_list", "uploads", "visual_assets", "warnings",
 )

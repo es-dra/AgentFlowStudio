@@ -8,7 +8,7 @@ import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
-import { screenplayCandidateSummary, shotPlanSummary, taskPhaseLabel, taskStateLabel } from "./creative-task-contract.js";
+import { creativeActionFailureInfo, screenplayCandidateSummary, shotPlanSummary, taskPhaseLabel, taskStateLabel } from "./creative-task-contract.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -177,6 +177,8 @@ function embeddedCreativeActionPanel(node) {
   const panel = document.createElement("section");
   panel.className = `embedded-creative-action ${action.status || "idle"}`;
   panel.dataset.creativeAction = action.action_type || "script_revision";
+  panel.setAttribute("role", "status");
+  panel.setAttribute("aria-live", action.status === "unavailable" ? "assertive" : "polite");
   const title = action.action_type === "shot_breakdown" ? "节点内分镜预览" : "节点内优化预览";
   const head = document.createElement("header");
   head.className = "embedded-creative-head";
@@ -188,11 +190,18 @@ function embeddedCreativeActionPanel(node) {
   panel.appendChild(head);
   const message = document.createElement("p");
   message.className = "embedded-creative-message";
-  message.textContent = action.message || "等待 AI 预览。";
-  panel.appendChild(message);
+  if (action.status === "unavailable") {
+    const failure = creativeActionFailureInfo(action);
+    message.textContent = `${failure.label}：${failure.preserved_state}`;
+    panel.appendChild(message);
+    panel.appendChild(textBlock("embedded-creative-compact-line", failure.next_action));
+  } else {
+    message.textContent = action.message || "等待 AI 预览。";
+    panel.appendChild(message);
+  }
   if (action.status === "running") panel.appendChild(progressStrip("正在生成可审查预览"));
   if (action.status === "needs_input") panel.appendChild(actionButtons(action, { clear: true }));
-  if (action.status === "unavailable") panel.appendChild(actionButtons(action, { retry: true, clear: true }));
+  if (action.status === "unavailable") panel.appendChild(actionButtons(action, { clear: true, reviewHintText: "请在 AI 创作搭档中重新预览。" }));
   if (action.status === "preview") {
     panel.appendChild(compactCreativeTaskResult(action));
     panel.appendChild(actionButtons(action, { cancel: true, retry: true, reviewHint: true }));
@@ -323,9 +332,9 @@ function actionButtons(action, flags = {}) {
     row.appendChild(retry);
   }
   if (flags.clear) row.appendChild(actionButton("embedded-creative-clear", "收起", "studio-text-button"));
-  if (flags.reviewHint) {
+  if (flags.reviewHint || flags.reviewHintText) {
     const hint = document.createElement("small");
-    hint.textContent = "请在右侧审阅后应用。";
+    hint.textContent = flags.reviewHintText || "请在右侧审阅后应用。";
     row.appendChild(hint);
   }
   if (flags.undoHint) {

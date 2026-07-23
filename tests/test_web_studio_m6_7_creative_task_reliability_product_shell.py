@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 
@@ -121,6 +122,73 @@ def test_m6_7_1_visual_correction_contract() -> None:
     assert "embeddedTaskPerimeterRotate" not in node_css
     assert "transform: none" in node_css
     assert "inset: -3px" in node_css
+
+
+def test_m6_7_3_embedded_creative_failure_recovery_contract() -> None:
+    embedded = _read("apps/studio/src/embedded-creative-actions.js")
+    panel = _read("apps/studio/src/agent-chat-panel.js")
+    body = _read("apps/studio/src/canvas-node-body.js")
+    lifecycle = _read("apps/studio/src/agent-chat-lifecycle.js")
+    task_contract = _read("apps/studio/src/creative-task-contract.js")
+
+    assert "failureFromPreviewResponse" in embedded
+    assert "normalizeFailurePayload" in embedded
+    assert "action.provider_lineage = { provider_calls_started: false }" not in embedded
+    assert "provider_dispatch_count" in embedded
+    assert "stale_node_version" in embedded
+
+    assert "syncEmbeddedCreativeAssistantMessages" in panel
+    assert "结果会在当前任务区审阅" in panel
+    assert "重新预览" in panel
+    assert "重新生成" not in panel.split("function currentTaskActions", 1)[1].split("function screenplayReview", 1)[0]
+    assert "creativeActionFailureInfo(action)" in panel
+    assert "aria-live" in panel and 'role", "status"' in panel
+
+    unavailable_panel = body.split('if (action.status === "unavailable")', 1)[1].split('if (action.status === "preview")', 1)[0]
+    assert "creativeActionFailureInfo(action)" in unavailable_panel
+    assert "请在 AI 创作搭档中重新预览。" in unavailable_panel
+    assert "retry: true" not in unavailable_panel
+
+    assert "selected_screenplay_summary" in lifecycle
+    assert "screenplaySummaryForNode" in lifecycle
+    assert "isSceneContextNode" in lifecycle
+    assert "m6_6_scene_candidate" in lifecycle
+    assert "m6_6_shot_candidate" in lifecycle
+    assert "creativeActionFailureInfo" in task_contract
+    assert "error_detail" in task_contract
+
+
+def test_m6_7_3_creative_task_failure_info_is_safe_and_actionable() -> None:
+    script = """
+      import assert from "node:assert/strict";
+      import { creativeActionFailureInfo, failCreativeTask, normalizeCreativeTask } from "./apps/studio/src/creative-task-contract.js";
+
+      const base = normalizeCreativeTask({
+        task_id: "task_1",
+        node_id: "story_text",
+        node_version: "story_text:text:42:node_revision_1",
+        action_type: "shot_breakdown",
+        state: "running",
+        phase: "dispatching"
+      });
+      const failed = failCreativeTask(base, "provider_output_validation", {
+        error_owner: "provider_output_validation",
+        error_detail: "schema failed at /opt/private/raw-response.json"
+      });
+      const info = creativeActionFailureInfo({
+        action_type: "shot_breakdown",
+        creative_task: failed,
+        graph_mutation: { mutated: false, scope: "preview_only" }
+      });
+
+      assert.equal(failed.error_category, "provider_output_validation");
+      assert.equal(failed.error_owner, "provider_output_validation");
+      assert.match(failed.error_detail, /<local-path-redacted>/);
+      assert.equal(info.label, "AI 输出结构未通过校验");
+      assert.match(info.preserved_state, /ProductionGraph 未改变/);
+      assert.match(info.next_action, /重新预览分镜/);
+    """
+    subprocess.run(["node", "--input-type=module", "-e", script], cwd=ROOT, check=True)
 
 
 def test_m6_7_2_readable_shot_graph_and_nonempty_shell_contract() -> None:

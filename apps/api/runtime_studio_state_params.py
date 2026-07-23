@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from apps.api import runtime_studio_state_embedded_creative as embedded_creative
 from apps.api import runtime_studio_state_param_values as param_values
 from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS, sanitize_generation_param
 from apps.api.runtime_studio_state_context import sanitize_context_bundle
@@ -45,6 +46,12 @@ SAFE_NODE_PARAM_KEYS = (
     "lastGenerationBridgeArtifactId",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
     "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
+    "embeddedCreativeAction", "revisions", "currentRevisionId", "lastEmbeddedCreativeActionSummary",
+    "shotPlanDraft",
+    "candidate_id", "source_node_id", "source_revision_id", "source_sequence_node_id", "source_scene_node_id",
+    "creative_task_id", "shot_count", "scene_count", "estimated_duration_sec", "promotion_state",
+    "layout_role", "scene_index", "shot_index", "purpose", "duration_sec", "shot_size", "camera_angle",
+    "movement", "blocking", "sound", "transition", "narrative_purpose", "layout_column", "layout_row",
 )
 
 
@@ -116,6 +123,14 @@ def _sanitize_param(
         return param_values.safe_object(value, text=text, number=number, max_items=32)
     if key == "storyboardBreakdown":
         return param_values.storyboard_breakdown(value, text=text, number=number)
+    if key == "embeddedCreativeAction":
+        return embedded_creative.embedded_creative_action(value, text=text, number=number)
+    if key == "revisions":
+        return embedded_creative.embedded_creative_revisions(value, text=text, number=number)
+    if key == "lastEmbeddedCreativeActionSummary":
+        return embedded_creative.last_embedded_creative_action_summary(value, text=text, number=number)
+    if key == "shotPlanDraft":
+        return embedded_creative.shot_plan_draft(value, text=text, number=number)
     if key in {"assetAutoBindingGraph", "asset_auto_binding_graph"}:
         return param_values.asset_auto_binding_graph(value, text=text, number=number)
     if key in {"nodeReferenceStack", "node_reference_stack"}:
@@ -153,8 +168,17 @@ def _sanitize_param(
         return int(max(0, min(9999, number(value, 0))))
     if key == "directorDraft":
         return param_values.safe_object(value, text=text, number=number, max_items=12)
-    if key in {"nodeRole", "sourceTextNodeId", "directorRef"}:
+    if key in {
+        "nodeRole", "sourceTextNodeId", "directorRef", "candidate_id", "source_node_id", "source_revision_id",
+        "source_sequence_node_id", "source_scene_node_id", "creative_task_id", "promotion_state", "layout_role",
+    }:
         return text(value, "", 120)
+    if key in {"purpose", "shot_size", "camera_angle", "movement", "blocking", "sound", "transition", "narrative_purpose"}:
+        return text(value, "", 1000)
+    if key in {"shot_count", "scene_count", "scene_index", "shot_index", "layout_column", "layout_row"}:
+        return int(max(0, min(9999, number(value, 0))))
+    if key in {"estimated_duration_sec", "duration_sec"}:
+        return max(0, min(86_400, number(value, 0)))
     if key == "scriptExpansionSourceIdea":
         return text(value, "", 600)
     if key == "lastOptimizedPromptPlain":
