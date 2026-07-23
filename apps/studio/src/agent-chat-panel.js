@@ -1,6 +1,8 @@
 import { icon } from "./icons.js";
 import { el } from "./overlay.js";
 import {
+  AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+  EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
   cancelAgentCommand,
   executePendingAgentCommand,
   executePendingAgentCommandWithRuntime,
@@ -168,16 +170,25 @@ export function syncEmbeddedCreativeAssistantMessages(session, state) {
   if (!node || !action) return;
   const taskId = action.action_id || action.creative_task?.task_id || "";
   const syncKey = `embedded-terminal:${taskId}:${action.status}:${action.applied_revision_id || action.error_category || action.cancelled_at || ""}`;
-  if (session.__embeddedCreativeOutcomeKey === syncKey) return;
   const outcome = terminalOutcomeMessage(action);
-  const messages = Array.isArray(session.messages) ? [...session.messages] : [];
-  const index = findLastMessageIndex(messages, (message) => (
-    message.role === "assistant"
-    && /打开(分镜拆解|剧本化修订)任务/.test(String(message.text || ""))
-    && /结果会在当前任务区审阅/.test(String(message.text || ""))
-  ));
-  const replacement = { role: "assistant", tone: outcome.tone, text: outcome.text };
-  if (index >= 0) {
+  const sourceMessages = Array.isArray(session.messages) ? [...session.messages] : [];
+  const messages = sourceMessages.filter((message) => !isCommandPreviewStartupPlaceholder(message, session));
+  const startupPlaceholderRemoved = messages.length !== sourceMessages.length;
+  const existingTerminalIndex = findLastMessageIndex(messages, (message) => message.embedded_terminal_key === syncKey);
+  const index = findLastMessageIndex(messages, (message) => isMatchingEmbeddedTaskOpenPlaceholder(message, node, action));
+  if (session.__embeddedCreativeOutcomeKey === syncKey && !startupPlaceholderRemoved && existingTerminalIndex >= 0) return;
+  const replacement = {
+    role: "assistant",
+    tone: outcome.tone,
+    text: outcome.text,
+    embedded_terminal_key: syncKey,
+    embedded_node_id: node.id,
+    embedded_action_id: action.action_id || "",
+    embedded_action_type: action.action_type || "",
+  };
+  if (existingTerminalIndex >= 0) {
+    messages[existingTerminalIndex] = replacement;
+  } else if (index >= 0) {
     messages[index] = replacement;
   } else {
     messages.push(replacement);
@@ -210,6 +221,19 @@ function terminalOutcomeMessage(action) {
 function actionTimestamp(action) {
   const parsed = Date.parse(action?.applied_at || action?.completed_at || action?.cancelled_at || action?.requested_at || "");
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isCommandPreviewStartupPlaceholder(message, session) {
+  return message?.role === "assistant"
+    && message.placeholder_id === AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID
+    && (!message.context_key || !session?.context_key || message.context_key === session.context_key);
+}
+
+function isMatchingEmbeddedTaskOpenPlaceholder(message, node, action) {
+  return message?.role === "assistant"
+    && message.placeholder_id === EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID
+    && message.embedded_node_id === node.id
+    && message.embedded_action_type === action.action_type;
 }
 
 function findLastMessageIndex(messages, predicate) {
@@ -287,7 +311,16 @@ async function executeEmbeddedCreativeCommand({ session, store, runtime, command
   const node = store?.get?.()?.nodes?.[command.node_id];
   if (!node) throw new Error("selected node no longer exists");
   session.pendingCommand = null;
-  pushAssistantMessage(session, `已在「${node.title || "当前节点"}」打开${command.action_type === "shot_breakdown" ? "分镜拆解" : "剧本化修订"}任务；结果会在当前任务区审阅，确认前不改动画布。`);
+  pushAssistantMessage(
+    session,
+    `已在「${node.title || "当前节点"}」打开${command.action_type === "shot_breakdown" ? "分镜拆解" : "剧本化修订"}任务；结果会在当前任务区审阅，确认前不改动画布。`,
+    {
+      placeholder_id: EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
+      embedded_node_id: node.id,
+      embedded_action_type: command.action_type,
+      embedded_mode: command.mode || "",
+    },
+  );
   await startEmbeddedCreativeAction(store, runtime, node, command.action_type, { mode: command.mode });
   return null;
 }
@@ -541,9 +574,9 @@ function excerpt(value, limit) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text || "空";
 }
 
-function pushAssistantMessage(session, text) {
+function pushAssistantMessage(session, text, metadata = {}) {
   const messages = Array.isArray(session.messages) ? session.messages : [];
-  messages.push({ role: "assistant", text });
+  messages.push({ role: "assistant", text, ...metadata });
   session.messages = messages.slice(-28);
 }
 

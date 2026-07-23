@@ -266,30 +266,59 @@ def test_applied_terminal_assistant_receipt_replaces_optimistic_message_and_reco
         STATE_BUILDER
         + r'''
 import assert from "node:assert/strict";
+import {
+  AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+  EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
+} from "./apps/studio/src/agent-chat-lifecycle.js";
 import { syncEmbeddedCreativeAssistantMessages } from "./apps/studio/src/agent-chat-panel.js";
 
 const state = appliedState();
 const session = {
-  messages: [{ role: "assistant", text: "已在「故事文本」打开分镜拆解任务；结果会在当前任务区审阅，确认前不改动画布。" }],
+  context_key: "m6731:canvas:agent-chat",
+  messages: [
+    {
+      role: "assistant",
+      text: "我会基于当前画布上下文生成命令预览；确认前不改变事实。",
+      placeholder_id: AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+      context_key: "m6731:canvas:agent-chat",
+    },
+    { role: "user", text: "保留这个用户问题。" },
+    {
+      role: "assistant",
+      text: "已在「故事文本」打开分镜拆解任务；结果会在当前任务区审阅，确认前不改动画布。",
+      placeholder_id: EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID,
+      embedded_node_id: "story",
+      embedded_action_type: "shot_breakdown",
+    },
+    { role: "assistant", text: "保留这个无关回复。" },
+  ],
 };
 syncEmbeddedCreativeAssistantMessages(session, state);
-assert.equal(session.messages.length, 1);
-assert.equal(session.messages[0].tone, "success");
-assert.match(session.messages[0].text, /动态分镜已应用/);
-assert.match(session.messages[0].text, /17 镜头/);
-assert.match(session.messages[0].text, /161 秒/);
-assert.match(session.messages[0].text, /故事板/);
-assert.ok(!session.messages[0].text.includes("结果会在当前任务区审阅"));
+const terminalReceipts = session.messages.filter((message) => message.embedded_terminal_key);
+assert.equal(session.messages.length, 3);
+assert.equal(terminalReceipts.length, 1);
+assert.equal(terminalReceipts[0].tone, "success");
+assert.match(terminalReceipts[0].text, /动态分镜已应用/);
+assert.match(terminalReceipts[0].text, /17 镜头/);
+assert.match(terminalReceipts[0].text, /161 秒/);
+assert.match(terminalReceipts[0].text, /故事板/);
+assert.ok(!session.messages.some((message) => message.placeholder_id === AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID));
+assert.ok(!session.messages.some((message) => message.placeholder_id === EMBEDDED_CREATIVE_TASK_OPEN_PLACEHOLDER_ID));
+assert.ok(!session.messages.some((message) => String(message.text || "").includes("结果会在当前任务区审阅")));
+assert.ok(!session.messages.some((message) => String(message.text || "").includes("我会基于当前画布上下文生成命令预览")));
+assert.ok(session.messages.some((message) => message.text === "保留这个用户问题。"));
+assert.ok(session.messages.some((message) => message.text === "保留这个无关回复。"));
 
 const restoredSession = { messages: [] };
 syncEmbeddedCreativeAssistantMessages(restoredSession, state);
 assert.equal(restoredSession.messages.length, 1);
 assert.match(restoredSession.messages[0].text, /可重载候选分镜子图/);
-process.stdout.write(JSON.stringify({ message: session.messages[0], restored: restoredSession.messages[0] }));
+process.stdout.write(JSON.stringify({ messages: session.messages, terminal: terminalReceipts[0], restored: restoredSession.messages[0] }));
 '''
     )
-    assert payload["message"]["tone"] == "success"
-    assert "结果会在当前任务区审阅" not in payload["message"]["text"]
+    assert payload["terminal"]["tone"] == "success"
+    assert "结果会在当前任务区审阅" not in payload["terminal"]["text"]
+    assert len(payload["messages"]) == 3
 
 
 def test_apply_is_idempotent_and_persists_canonical_duration_and_lineage() -> None:
