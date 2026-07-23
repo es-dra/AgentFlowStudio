@@ -187,25 +187,42 @@ def _preview_creative_action(
     schema_digest = structured_output_schema_digest(schema)
     try:
         registry = load_provider_registry()
-        provider_result = registry.dispatch(
-            "llm",
-            SERVER_CODEX_SERVICE_ID,
-            ProviderDispatchRequest(
-                prompt=_creative_action_prompt(project_id, request, graph_before, schema_digest),
-                output_dir=output_dir,
-                task_type=f"embedded_{request.action_type}",
-                structured_output_contract_id=EMBEDDED_CREATIVE_CONTRACT_ID,
-                structured_output_schema=schema,
-                structured_output_schema_digest=schema_digest,
-                timeout_sec=120.0,
-            ),
+        provider_result = _dispatch_creative_action_preview(
+            registry,
+            project_id,
+            request,
+            output_dir,
+            graph_before,
+            schema,
+            schema_digest,
+            repair_reason="",
         )
-        structured = provider_result.get("structured_output") if isinstance(provider_result, dict) else None
-        preview = _validate_preview_payload(request, structured or {})
+        preview, dispatch_count, repair_attempted = _validate_or_repair_preview(
+            registry,
+            project_id,
+            request,
+            output_dir,
+            graph_before,
+            schema,
+            schema_digest,
+            provider_result,
+        )
     except (ModelConfigError, ModelGatewayError):
         return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="llm_not_ready")
     except ValueError:
-        return _unavailable_preview(project_id, request, gate, target, task_id=task_id, reason="unsafe_or_invalid_llm_preview")
+        return _unavailable_preview(
+            project_id,
+            request,
+            gate,
+            target,
+            task_id=task_id,
+            reason="unsafe_or_invalid_llm_preview",
+            provider_calls_started=True,
+            provider_dispatch_count=2,
+            repair_attempted=True,
+            completed_phases=["queued", "context", "dispatching", "validating"],
+            error_owner="provider_output_validation",
+        )
     lineage = {
         "service_id": SERVER_CODEX_SERVICE_ID,
         "provider": "codex_local",
@@ -214,6 +231,8 @@ def _preview_creative_action(
         "structured_output_contract_id": EMBEDDED_CREATIVE_CONTRACT_ID,
         "structured_output_schema_digest": schema_digest,
         "provider_calls_started": True,
+        "provider_dispatch_count": dispatch_count,
+        "repair_attempted": repair_attempted,
         "provider_raw_response_stored": False,
         "external_paid_cost_usd": 0,
     }
@@ -234,6 +253,66 @@ def _preview_creative_action(
         "provider_lineage": lineage,
         "safe_manifest": _safe_manifest(project_id, request, gate, target, mode="llm", lineage=lineage),
     }
+
+
+def _dispatch_creative_action_preview(
+    registry: Any,
+    project_id: str,
+    request: EmbeddedCreativeActionRequest,
+    output_dir: Path,
+    graph_before: dict[str, Any],
+    schema: dict[str, Any],
+    schema_digest: str,
+    *,
+    repair_reason: str,
+) -> dict[str, Any]:
+    prompt = (
+        _creative_action_repair_prompt(project_id, request, graph_before, schema_digest, repair_reason)
+        if repair_reason
+        else _creative_action_prompt(project_id, request, graph_before, schema_digest)
+    )
+    result = registry.dispatch(
+        "llm",
+        SERVER_CODEX_SERVICE_ID,
+        ProviderDispatchRequest(
+            prompt=prompt,
+            output_dir=output_dir,
+            task_type=f"embedded_{request.action_type}{'_repair' if repair_reason else ''}",
+            structured_output_contract_id=EMBEDDED_CREATIVE_CONTRACT_ID,
+            structured_output_schema=schema,
+            structured_output_schema_digest=schema_digest,
+            timeout_sec=120.0,
+        ),
+    )
+    return result if isinstance(result, dict) else {}
+
+
+def _validate_or_repair_preview(
+    registry: Any,
+    project_id: str,
+    request: EmbeddedCreativeActionRequest,
+    output_dir: Path,
+    graph_before: dict[str, Any],
+    schema: dict[str, Any],
+    schema_digest: str,
+    provider_result: dict[str, Any],
+) -> tuple[dict[str, Any], int, bool]:
+    structured = provider_result.get("structured_output") if isinstance(provider_result, dict) else None
+    try:
+        return _validate_preview_payload(request, structured or {}), 1, False
+    except ValueError as validation_error:
+        repair_result = _dispatch_creative_action_preview(
+            registry,
+            project_id,
+            request,
+            output_dir,
+            graph_before,
+            schema,
+            schema_digest,
+            repair_reason=str(validation_error),
+        )
+        repair_structured = repair_result.get("structured_output") if isinstance(repair_result, dict) else None
+        return _validate_preview_payload(request, repair_structured or {}), 2, True
 
 
 def _creative_action_output_schema(action_type: str) -> dict[str, Any]:
@@ -430,6 +509,25 @@ def _creative_action_prompt(
             f"Closed schema digest: {schema_digest}",
             "原文如下：",
             request.source_text,
+        ]
+    )
+
+
+def _creative_action_repair_prompt(
+    project_id: str,
+    request: EmbeddedCreativeActionRequest,
+    graph_before: dict[str, Any],
+    schema_digest: str,
+    repair_reason: str,
+) -> str:
+    return "\n".join(
+        [
+            _creative_action_prompt(project_id, request, graph_before, schema_digest),
+            "",
+            "上一轮真实模型输出未通过 AFS 结构验证，本轮是一次有界的 provider-backed 修复重试。",
+            f"验证失败类别：{_safe_text(repair_reason, 220)}",
+            "不要复述错误；请基于同一原文重新生成完整、可审查、符合 closed JSON schema 的结果。",
+            "仍然禁止本地模板、固定镜头数、散文冒充专业剧本、图片/视频生成和画布写入。",
         ]
     )
 
@@ -671,16 +769,39 @@ def _unavailable_preview(
     *,
     task_id: str,
     reason: str,
+    provider_calls_started: bool = False,
+    provider_dispatch_count: int = 0,
+    repair_attempted: bool = False,
+    completed_phases: list[str] | None = None,
+    error_owner: str = "llm_provider",
 ) -> dict[str, Any]:
+    rationale = {
+        "unsafe_or_invalid_llm_preview": "真实文本模型已返回，但结果没有通过专业剧本/分镜结构校验；当前节点保持不变。",
+        "llm_not_ready": "AI 模型当前不可用；不会使用本地模板冒充专业改写。",
+        "remote_llm_gate_closed": "文本模型开关未打开；不会使用本地模板冒充专业改写。",
+        "unsafe_source_text": "当前节点包含不安全的内部路径或凭据样式文本；请移除后重试。",
+    }.get(reason, "AI 模型当前不可用；不会使用本地模板冒充专业改写。")
     preview = {
         "preview_id": f"blocked_{int(time.time() * 1000)}",
         "action_type": request.action_type,
         "mode": request.mode,
         "revised_text": "",
         "change_summary": [],
-        "rationale": "AI 模型当前不可用；不会使用本地模板冒充专业改写。",
+        "rationale": rationale,
         "unresolved_decisions": ["稍后重试，或先手工编辑当前节点。"],
         "quality_flags": ["fail_closed_no_canvas_mutation"],
+    }
+    lineage = {
+        "service_id": SERVER_CODEX_SERVICE_ID if provider_calls_started else "",
+        "provider": "codex_local" if provider_calls_started else "",
+        "model_surface": "server-codex-login" if provider_calls_started else "",
+        "request_id": f"embedded_action_{project_id}_{int(time.time() * 1000)}" if provider_calls_started else "",
+        "structured_output_contract_id": EMBEDDED_CREATIVE_CONTRACT_ID,
+        "provider_calls_started": provider_calls_started,
+        "provider_dispatch_count": int(provider_dispatch_count or (1 if provider_calls_started else 0)),
+        "repair_attempted": bool(repair_attempted),
+        "provider_raw_response_stored": False,
+        "external_paid_cost_usd": 0,
     }
     return {
         "mode": "unavailable",
@@ -692,13 +813,23 @@ def _unavailable_preview(
             request,
             state="failed",
             phase="failed",
-            completed_phases=["queued", "context"],
-            error_owner="llm_provider",
+            completed_phases=completed_phases or ["queued", "context"],
+            error_owner=error_owner,
             error_category=reason,
         ),
         "provider_gate": gate,
-        "provider_calls_started": False,
-        "safe_manifest": _safe_manifest(project_id, request, gate, target, mode="unavailable", fallback_reason=reason),
+        "provider_calls_started": provider_calls_started,
+        "provider_lineage": lineage,
+        "safe_manifest": _safe_manifest(
+            project_id,
+            request,
+            gate,
+            target,
+            mode="unavailable",
+            fallback_reason=reason,
+            lineage=lineage,
+            provider_calls_started=provider_calls_started,
+        ),
     }
 
 
@@ -753,7 +884,9 @@ def _safe_manifest(
     mode: str,
     fallback_reason: str = "",
     lineage: dict[str, Any] | None = None,
+    provider_calls_started: bool | None = None,
 ) -> dict[str, Any]:
+    started = mode == "llm" if provider_calls_started is None else bool(provider_calls_started)
     manifest = {
         "schema_version": "afs_embedded_creative_action_safe_manifest.v0.1",
         "project_id": project_id,
@@ -762,8 +895,10 @@ def _safe_manifest(
         "provider_service_id": request.provider_service_id,
         "provider_gate": gate,
         "fallback_reason": fallback_reason,
-        "provider_calls_started": mode == "llm",
+        "provider_calls_started": started,
         "provider_lineage": lineage or {},
+        "provider_dispatch_count": int((lineage or {}).get("provider_dispatch_count") or (1 if started else 0)),
+        "repair_attempted": bool((lineage or {}).get("repair_attempted")),
         "provider_raw_response_stored": False,
         "credentialed_urls_returned_by_api": False,
         "local_paths_returned_by_api": False,

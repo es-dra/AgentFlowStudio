@@ -757,7 +757,7 @@ function previewAgentCommand(message, context = {}) {
     });
   }
 
-  if (/^\/plan-selected-script-shots$/i.test(message) || /^自动拆分分镜$/i.test(message) || /^自动分镜$/i.test(message)) {
+  if (/^\/plan-selected-script-shots$/i.test(message) || /^拆分分镜$/i.test(message) || /^自动分镜$/i.test(message)) {
     return storyPlanRequestCommand(context);
   }
 
@@ -1400,7 +1400,7 @@ function storyPlanRequestCommand(context) {
     context,
     actionType: "shot_breakdown",
     mode: "dynamic_shot_breakdown",
-    title: "自动拆分分镜",
+    title: "拆分分镜",
     summary: "确认后在当前节点打开真实 LLM 分镜任务；预览完成后可见候选分镜子图，应用前不写最终制作事实。",
   });
 }
@@ -2070,7 +2070,7 @@ function coreAssetUndoSummary(receipt) {
 
 function productionPlanCommandLabel(commandType) {
   return ({
-    request_story_plan_candidate: "自动拆分分镜",
+    request_story_plan_candidate: "拆分分镜",
     submit_story_plan_candidate: "确认动态制作计划",
     refresh_production_plan: "刷新制作计划事实",
     edit_shot_duration: "镜头时长调整",
@@ -2113,7 +2113,7 @@ function userCommandDisplayText(command, fallbackText) {
   if (type === "preview_generation_from_selected") return command.title || "预览生成命令";
   if (type === "start_embedded_creative_action") return command.title || "启动节点内 AI 动作";
   if (type === "submit_story_plan_candidate") return "提交动态制作计划候选";
-  if (type === "request_story_plan_candidate") return "自动拆分分镜";
+  if (type === "request_story_plan_candidate") return "拆分分镜";
   if (type === "build_m3_context_pack") return "构建精准上下文包";
   if (type === "refresh_script_truth") return "刷新剧本与资产事实";
   if (type === "refresh_production_plan") return "刷新制作计划事实";

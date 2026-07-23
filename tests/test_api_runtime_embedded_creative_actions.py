@@ -142,6 +142,10 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     assert payload["provider_lineage"]["service_id"] == "server_codex"
     assert payload["provider_lineage"]["provider"] == "codex_local"
     assert payload["provider_lineage"]["structured_output_contract_id"] == "afs.runtime.embedded_creative_action.v0.2"
+    assert payload["provider_lineage"]["provider_dispatch_count"] == 1
+    assert payload["provider_lineage"]["repair_attempted"] is False
+    assert payload["safe_manifest"]["provider_dispatch_count"] == 1
+    assert payload["safe_manifest"]["repair_attempted"] is False
     assert payload["preview"]["revised_text"].startswith("《花果山误会》")
     assert "外景 - 花果山果林 - 傍晚" in payload["preview"]["revised_text"]
     assert payload["preview"]["screenplay_candidate"]["scenes"][0]["heading"].startswith("外景")
@@ -162,8 +166,11 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
 
 
 def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp_path, monkeypatch) -> None:
+    calls = []
+
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
+            calls.append(request)
             return {
                 "provider_calls_started": True,
                 "structured_output": {
@@ -191,14 +198,24 @@ def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["mode"] == "unavailable"
-    assert payload["provider_calls_started"] is False
+    assert payload["provider_calls_started"] is True
+    assert payload["provider_lineage"]["provider_calls_started"] is True
     assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
+    assert payload["safe_manifest"]["provider_calls_started"] is True
+    assert payload["safe_manifest"]["provider_dispatch_count"] == 2
+    assert payload["safe_manifest"]["repair_attempted"] is True
     assert payload["creative_task"]["error_category"] == "unsafe_or_invalid_llm_preview"
+    assert payload["creative_task"]["error_owner"] == "provider_output_validation"
+    assert len(calls) == 2
+    assert "provider-backed 修复重试" in calls[1].prompt
 
 
 def test_embedded_script_revision_rejects_dangling_character_cue(tmp_path, monkeypatch) -> None:
+    calls = []
+
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
+            calls.append(request)
             return {
                 "provider_calls_started": True,
                 "structured_output": {
@@ -247,8 +264,90 @@ def test_embedded_script_revision_rejects_dangling_character_cue(tmp_path, monke
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["mode"] == "unavailable"
-    assert payload["provider_calls_started"] is False
+    assert payload["provider_calls_started"] is True
     assert payload["safe_manifest"]["fallback_reason"] == "unsafe_or_invalid_llm_preview"
+    assert payload["creative_task"]["error_owner"] == "provider_output_validation"
+    assert len(calls) == 2
+
+
+def test_embedded_script_revision_repairs_invalid_structured_output_with_provider_retry(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append(request)
+            if len(calls) == 1:
+                return {
+                    "provider_calls_started": True,
+                    "structured_output": {
+                        "action_type": "script_revision",
+                        "mode": "professional_expansion",
+                        "revised_text": "孙悟空和猪八戒发生误会，然后一起发现妖怪线索。",
+                        "change_summary": ["散文扩写", "缺少剧本候选"],
+                        "rationale": "第一轮故意缺少专业剧本结构。",
+                        "unresolved_decisions": [],
+                        "quality_flags": ["needs_repair"],
+                    },
+                }
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "script_revision",
+                    "mode": "professional_expansion",
+                    "revised_text": "修复后把短想法转换成有标题、人物目标、场景动作和对白的专业剧本预览，仍保持当前节点身份。",
+                    "change_summary": ["补齐专业剧本结构", "保留同一节点预览"],
+                    "rationale": "修复轮基于同一原文重新生成 closed schema 结构。",
+                    "unresolved_decisions": [],
+                    "quality_flags": ["provider_backed_repair"],
+                    "screenplay_candidate": {
+                        "title": "花果山误会",
+                        "version_label": "repair-v1",
+                        "logline": "悟空误会八戒偷吃供果，两人在冲突中发现真正妖怪线索。",
+                        "characters": [
+                            {"name": "孙悟空", "goal": "查清供果去向", "conflict": "急躁误判八戒", "change": "从逼问转为联手"},
+                            {"name": "猪八戒", "goal": "证明自己清白", "conflict": "馋嘴名声不被信任", "change": "从躲闪转为指出妖气"},
+                        ],
+                        "scenes": [{
+                            "heading": "外景 - 花果山果林 - 傍晚",
+                            "space_type": "外景",
+                            "location": "花果山果林",
+                            "time_of_day": "傍晚",
+                            "purpose": "让误会从争执转为共同发现线索",
+                            "blocks": [
+                                {"type": "action", "text": "空篮倒在石阶旁，孙悟空握棒挡住猪八戒退路。"},
+                                {"type": "character", "text": "孙悟空"},
+                                {"type": "dialogue", "text": "呆子，供果少了三颗，你还护着篮子？"},
+                                {"type": "character", "text": "猪八戒"},
+                                {"type": "dialogue", "text": "猴哥，我真没偷，是林子里那股腥风先来过。"},
+                                {"type": "action", "text": "枝头黑影掠过，两人同时停手，转向妖气深处。"},
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-action-provider-repair"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(),
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "llm"
+    assert payload["provider_calls_started"] is True
+    assert payload["provider_lineage"]["provider_dispatch_count"] == 2
+    assert payload["provider_lineage"]["repair_attempted"] is True
+    assert payload["safe_manifest"]["provider_dispatch_count"] == 2
+    assert payload["safe_manifest"]["repair_attempted"] is True
+    assert payload["preview"]["screenplay_candidate"]["version_label"] == "repair-v1"
+    assert len(calls) == 2
+    assert "provider-backed 修复重试" in calls[1].prompt
 
 
 def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(tmp_path, monkeypatch) -> None:

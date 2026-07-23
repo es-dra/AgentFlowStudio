@@ -62,7 +62,7 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert '"script_revision"' in prompt_bar
     assert '"shot_breakdown"' in prompt_bar
     assert "优化提示词" in prompt_bar
-    assert "自动拆分分镜" in prompt_bar
+    assert "拆分分镜" in prompt_bar
     assert "/optimize-selected-default" not in prompt_bar
     assert "/plan-selected-script-shots" not in prompt_bar
     assert "expandTextIdeaToScript" not in prompt_bar

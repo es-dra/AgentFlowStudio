@@ -214,7 +214,7 @@ def strict_review_prompts(schema_digest: str) -> list[str]:
         "如果发现会误导真实创作者、破坏 ProductionGraph 单一真相、把本地模板冒充 AI、或让本地动作污染全局聊天，必须 fail。",
         "当前 exact head 的已验证安全事实：",
         "- 全局 AI 创作搭档已有真实 runtime LLM route；M6.5 新增节点内 embedded creative action preview route，使用 server_codex/codex_local closed JSON schema。",
-        "- 节点内 优化/自动拆分分镜 不再写入全局 AI transcript；预览阶段 graph_mutation=false，应用阶段只改声明目标节点的修订或 shot_plan 草稿。",
+        "- 节点内 优化/拆分分镜 不再写入全局 AI transcript；预览阶段 graph_mutation=false，应用阶段只改声明目标节点的修订或 shot_plan 草稿。",
         "- 全局 chat 的旧 /optimize 本地模板被 fail-closed 文案替代，不再生成 '核心意图/叙事推进/制作优化' 罐头大纲。",
         "- 默认 palette 收敛为 想法/文本、剧本/导入、场景与镜头、角色与资产、参考图/图片、视频；高级类型折叠。",
         "- 边线端点使用可见 handle/card border 几何，不用 last-edge 或位置猜测；Round A/B browser 已验证 <=2px gap。",

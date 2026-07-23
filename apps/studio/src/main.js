@@ -125,6 +125,7 @@ function initializeStudio(authUser) {
     },
     onRetry: refreshProductOverview,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
+    onDeleteProject: async (project) => { await projectController?.deleteProject(project); await refreshProductOverview(); },
     onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
