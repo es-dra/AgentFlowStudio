@@ -159,8 +159,13 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
 
 def assert_m6_preview_confirm(page: Page, base_url: str) -> dict[str, Any]:
     page.wait_for_selector(".graph-canvas-status.planning-required")
-    expect(page.locator(".graph-canvas-status.planning-required")).to_contain_text("可自由开始")
-    page.get_by_role("button", name="展开制作方案").click()
+    plan_status = page.locator(".graph-canvas-status.planning-required")
+    if page.get_by_role("button", name="展开制作方案").count():
+        expect(plan_status).to_contain_text("可自由开始")
+        page.get_by_role("button", name="展开制作方案").click()
+    else:
+        expect(plan_status).to_contain_text("制作方案")
+        page.get_by_role("button", name="制作方案").click()
     page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
     page.get_by_role("button", name="生成剧本制作方案").click()
     expect(page.locator(".agent-command-preview")).to_contain_text("确认M6剧本制作方案")

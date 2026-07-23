@@ -156,6 +156,11 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("has-media-result", Boolean(node.previewUrl || candidatePreviews(node).length));
   elNode.classList.toggle("is-generating", node.status === "generating");
   elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
+  const layoutRole = String(node.params?.layout_role || "");
+  elNode.dataset.layoutRole = layoutRole;
+  elNode.classList.toggle("shot-candidate-card", layoutRole === "shot_grid_item");
+  elNode.classList.toggle("scene-candidate-lane", layoutRole === "scene_lane");
+  elNode.classList.toggle("sequence-candidate-anchor", layoutRole === "sequence_group_anchor");
   const embeddedAction = node.params?.embeddedCreativeAction;
   const embeddedActive = Boolean(embeddedAction && embeddedAction.status !== "cancelled");
   const embeddedRunning = embeddedAction?.status === "running";

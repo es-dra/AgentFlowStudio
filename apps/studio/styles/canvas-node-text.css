@@ -13,6 +13,38 @@
   white-space: pre-wrap;
 }
 
+.node.shot-candidate-card {
+  background:
+    linear-gradient(180deg, rgba(73, 224, 235, .055), transparent 72px),
+    rgba(29, 35, 39, .96);
+}
+
+.node.shot-candidate-card .node-body {
+  justify-content: flex-start;
+  padding: 10px 12px 12px;
+  overflow: hidden;
+}
+
+.node.shot-candidate-card .node-state-strip {
+  min-height: 26px;
+  padding: 6px 10px 7px;
+}
+
+.node.shot-candidate-card .text-content-view {
+  max-height: none;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.42;
+  white-space: pre-line;
+}
+
+.node.scene-candidate-lane .node-body,
+.node.sequence-candidate-anchor .node-body {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
 .node .text-content-view.content-shimmer {
   border-radius: 8px;
   background-image:

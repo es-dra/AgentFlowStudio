@@ -492,11 +492,28 @@ export function createProductShell(options = {}) {
 
   function buildContextualPlanSurface(status, options = {}) {
     const existingCanvas = Boolean(options.existingCanvas);
-    const expanded = existingCanvas ? planningPanelOpen : isPlanningPanelExpanded();
+    if (existingCanvas && !planningPanelOpen) return buildInlinePlanAction(status);
+    const expanded = isPlanningPanelExpanded();
     status.className = `graph-canvas-status planning-required ${existingCanvas ? "contextual" : "empty-entry"} ${expanded ? "expanded" : "compact"}`;
     status.dataset.expanded = String(expanded);
     if (!expanded) return buildCompactPlanSurface(status);
     return buildExpandedPlanSurface(status);
+  }
+
+  function buildInlinePlanAction(status) {
+    status.className = "graph-canvas-status planning-required contextual-inline compact";
+    status.dataset.expanded = "false";
+    const action = node("button", "studio-text-button plan-inline-action", "制作方案");
+    action.type = "button";
+    action.title = "展开制作方案输入区";
+    action.addEventListener("click", () => {
+      setPlanningPanelOpen(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      requestAnimationFrame(() => document.querySelector(".m6-script-plan-entry textarea")?.focus());
+    });
+    status.appendChild(action);
+    return status;
   }
 
   function buildCompactPlanSurface(status) {
@@ -514,10 +531,7 @@ export function createProductShell(options = {}) {
       requestCanvasSafeAreaUpdate();
       requestAnimationFrame(() => document.querySelector(".m6-script-plan-entry textarea")?.focus());
     });
-    const ask = node("button", "studio-text-button", "让 AI 创作搭档建议下一步");
-    ask.type = "button";
-    ask.addEventListener("click", () => submitToAgentChat("下一步建议是什么"));
-    actions.append(expand, ask, ...planningImportControls());
+    actions.appendChild(expand);
     status.appendChild(actions);
     return status;
   }

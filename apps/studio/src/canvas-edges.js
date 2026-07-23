@@ -89,7 +89,7 @@ function syncEdgeElement(item, edge, from, to, state, relations, store) {
   item.dataset.edgeSelected = state.selection.edgeId === edge.id ? "true" : "false";
   path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
   item.setAttribute("aria-label", edgeAccessibleLabel(edge, from, to, relation));
-  label.textContent = relationLabel(relation);
+  label.textContent = edge.suppress_label === true ? "" : relationLabel(relation);
   label.setAttribute("x", String((x1 + x2) / 2));
   label.setAttribute("y", String((y1 + y2) / 2 - 8));
   label.classList.toggle("visible", Boolean(label.textContent));

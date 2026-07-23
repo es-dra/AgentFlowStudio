@@ -28,8 +28,8 @@ PREVIEW_DELAY_SEC = 1.05
 def main() -> int:
     args = parse_args()
     repo = Path(args.root).resolve()
-    runtime_root = Path(args.runtime_root or tempfile.mkdtemp(prefix="afs-m6-7-1-runtime-")).resolve()
-    report_path = Path(args.report or f"/tmp/afs-m6-7-1-browser-{int(time.time())}.json").resolve()
+    runtime_root = Path(args.runtime_root or tempfile.mkdtemp(prefix="afs-m6-7-2-runtime-")).resolve()
+    report_path = Path(args.report or f"/tmp/afs-m6-7-2-browser-{int(time.time())}.json").resolve()
     screenshot_dir = Path(args.screenshot_dir or report_path.with_suffix("")).resolve()
     runtime_root.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,7 +57,7 @@ def main() -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="M6.7.1 visual correction browser QA")
+    parser = argparse.ArgumentParser(description="M6.7.2 readable shot graph and mobile focus browser QA")
     parser.add_argument("--root", default=str(REPO_ROOT))
     parser.add_argument("--runtime-root", default="")
     parser.add_argument("--report", default="")
@@ -78,7 +78,7 @@ def run_browser_qa(runtime_root: Path, base_url: str, screenshot_dir: Path, roun
         try:
             for viewport in VIEWPORTS:
                 key = viewport_key(viewport)
-                project_id = f"m6-7-1-visual-{round_label.lower()}-{key}-{int(time.time() * 1000)}"
+                project_id = f"m6-7-2-visual-{round_label.lower()}-{key}-{int(time.time() * 1000)}"
                 prepare_project(runtime_root, project_id, with_node=True)
                 page = browser.new_page(viewport=viewport)
                 page.set_default_timeout(timeout_ms)
@@ -90,12 +90,12 @@ def run_browser_qa(runtime_root: Path, base_url: str, screenshot_dir: Path, roun
                     screenshots.update(captured)
                 finally:
                     page.close()
-            empty_project_id = f"m6-7-1-empty-{round_label.lower()}-{int(time.time() * 1000)}"
+            empty_project_id = f"m6-7-2-empty-{round_label.lower()}-{int(time.time() * 1000)}"
             prepare_project(runtime_root, empty_project_id, with_node=False)
             page = browser.new_page(viewport={"width": 390, "height": 844})
             page.set_default_timeout(timeout_ms)
             try:
-                page.goto(f"{base_url}/studio/?project={empty_project_id}&qa=m6-7-1-empty-{round_label}", wait_until="networkidle")
+                page.goto(f"{base_url}/studio/?project={empty_project_id}&qa=m6-7-2-empty-{round_label}", wait_until="networkidle")
                 expect(page.locator("#product-shell-root")).to_be_visible()
                 expect(page.locator(".graph-canvas-status.planning-required.compact")).to_be_visible()
                 screenshots["empty:compact_onboarding"] = screenshot(page, screenshot_dir, f"{round_label}-390x844-empty-compact-onboarding.png")
@@ -108,10 +108,10 @@ def run_browser_qa(runtime_root: Path, base_url: str, screenshot_dir: Path, roun
     p1 = sum(1 for item in issues if item["severity"] == "P1")
     p2 = sum(1 for item in issues if item["severity"] == "P2")
     if p0 or p1 or p2:
-        raise AssertionError(f"M6.7.1 visual QA failed: {json.dumps(issues, ensure_ascii=False)}")
+        raise AssertionError(f"M6.7.2 visual QA failed: {json.dumps(issues, ensure_ascii=False)}")
     return {
-        "artifact_type": "afs_m6_7_1_task_shimmer_shot_graph_visual_qa",
-        "schema_version": "afs.m6_7_1.visual_browser_qa.v0.1",
+        "artifact_type": "afs_m6_7_2_readable_shot_graph_mobile_focus_browser_qa",
+        "schema_version": "afs.m6_7_2.visual_browser_qa.v0.1",
         "round": round_label,
         "status": "passed",
         "cases": cases,
@@ -130,7 +130,7 @@ def run_browser_qa(runtime_root: Path, base_url: str, screenshot_dir: Path, roun
 
 def prepare_project(runtime_root: Path, project_id: str, with_node: bool) -> None:
     client = runtime_test_client(runtime_root)
-    created = client.post("/projects", json={"project_id": project_id, "project_type": "freeform_canvas_ai_copilot", "goal": f"M6.7.1 QA {project_id}", "status": "in_progress"})
+    created = client.post("/projects", json={"project_id": project_id, "project_type": "freeform_canvas_ai_copilot", "goal": f"M6.7.2 QA {project_id}", "status": "in_progress"})
     if created.status_code not in {200, 409}:
         raise AssertionError(f"project create failed: {created.status_code} {created.text}")
     state = seeded_studio_state(project_id) if with_node else empty_studio_state(project_id)
@@ -141,7 +141,7 @@ def prepare_project(runtime_root: Path, project_id: str, with_node: bool) -> Non
 
 def empty_studio_state(project_id: str) -> dict[str, Any]:
     return {
-        "meta": {"projectId": project_id, "projectName": "M6.7.1 空项目入口", "canvasName": "自由创作画布", "seq": 1},
+        "meta": {"projectId": project_id, "projectName": "M6.7.2 空项目入口", "canvasName": "自由创作画布", "seq": 1},
         "viewport": {"x": 0, "y": 0, "scale": 1},
         "order": [],
         "nodes": {},
@@ -154,7 +154,7 @@ def empty_studio_state(project_id: str) -> dict[str, Any]:
 def seeded_studio_state(project_id: str) -> dict[str, Any]:
     story = "孙悟空大战猪八戒。两人因为一块油饼和通关文牒误会升级，在破庙门口棍耙相向，最后发现小妖躲在梁上偷笑。"
     return {
-        "meta": {"projectId": project_id, "projectName": "M6.7.1 分镜视觉修正", "canvasName": "自由创作画布", "seq": 6},
+        "meta": {"projectId": project_id, "projectName": "M6.7.2 分镜视觉修正", "canvasName": "自由创作画布", "seq": 6},
         "viewport": {"x": 118, "y": 86, "scale": 1},
         "order": ["story_text"],
         "nodes": {
@@ -189,7 +189,7 @@ def verify_viewport(
     key = viewport_key(viewport)
     screenshots: dict[str, str] = {}
     install_visual_fetch_stub(page)
-    page.goto(f"{base_url}/studio/?project={project_id}&qa=m6-7-1-{round_label}-{int(time.time())}", wait_until="networkidle")
+    page.goto(f"{base_url}/studio/?project={project_id}&qa=m6-7-2-{round_label}-{int(time.time())}", wait_until="networkidle")
     expect(page.locator("#product-shell-root")).to_be_visible()
     expect(page.locator('.node[data-node-id="story_text"]')).to_be_visible()
     expect(page.locator(".graph-canvas-status.planning-required.expanded")).to_have_count(0)
@@ -217,7 +217,7 @@ def verify_viewport(
     return (
         {
             "viewport": key,
-            "project_id": project_id,
+                "project_id": project_id,
             "project_switcher_no_viewport_change": menu_checks["project_switcher_no_viewport_change"],
             "account_menu_visible": menu_checks["account_menu_visible"],
             "script_shimmer": script_running,
@@ -225,8 +225,8 @@ def verify_viewport(
             "max_shimmer_extension_px": max(script_running["extension_px"], shot_running["extension_px"]),
             "preview_status_deduped": preview_summary.count("预览可审") <= 1 and phase_labels.count("预览可审") <= 1,
             "shot_apply_zoom": applied["viewport_scale"],
-            "shot_layout": applied,
-            "nonempty_banner_absent": compact_planning_surface_ok(page),
+                "shot_layout": applied,
+                "nonempty_banner_absent": compact_planning_surface_ok(page),
             "no_horizontal_overflow": not has_horizontal_overflow(page),
         },
         screenshots,
@@ -238,7 +238,8 @@ def compact_planning_surface_ok(page: Page) -> bool:
       const expanded = document.querySelector('.graph-canvas-status.planning-required.expanded');
       const status = document.querySelector('.graph-canvas-status.planning-required');
       const box = status?.getBoundingClientRect?.();
-      return !expanded && (!box || box.height <= 96);
+      const text = status?.innerText || '';
+      return !expanded && (!box || box.height <= 40) && !text.includes('可自由开始') && !text.includes('展开制作方案');
     }"""))
 
 
@@ -379,20 +380,86 @@ def shot_layout_probe(page: Page, project_id: str, viewport: dict[str, int]) -> 
         max_row: Math.max(...shots.map((node) => Number(node.params?.layout_row || 0))),
         selected_id: selectedId,
         selected_role: nodes.find((node) => node.id === selectedId)?.params?.nodeRole || '',
-        sequence_selected: selectedId && nodes.find((node) => node.id === selectedId)?.params?.nodeRole === 'm6_6_shot_sequence_candidate',
+        focused_candidate_selected: selectedId && ['m6_6_shot_sequence_candidate', 'm6_6_shot_candidate'].includes(nodes.find((node) => node.id === selectedId)?.params?.nodeRole || ''),
       };
     }""", storage_key(project_id))
-    min_zoom = 0.5 if int(viewport["width"]) <= 560 else 0.7
+    mobile = int(viewport["width"]) <= 560
+    min_zoom = 0.8 if mobile else 0.72
     if state["viewport_scale"] < min_zoom:
       raise AssertionError(f"shot graph zoom is unreadable: {state}")
     if state["shot_count"] != 9:
       raise AssertionError(f"shot graph did not materialize nine shots: {state}")
-    expected_max_column = 1 if int(viewport["width"]) <= 560 else 2
+    expected_max_column = 0 if mobile else 2
     if state["max_column"] > expected_max_column:
       raise AssertionError(f"shot grid columns exceeded layout contract: {state}")
-    if not state["sequence_selected"]:
-      raise AssertionError(f"new sequence group was not selected: {state}")
+    if not state["focused_candidate_selected"]:
+      raise AssertionError(f"new candidate group was not selected: {state}")
+    geometry = shot_geometry_probe(page, mobile)
+    state.update(geometry)
     return state
+
+
+def shot_geometry_probe(page: Page, mobile: bool) -> dict[str, Any]:
+    geometry = page.evaluate("""() => {
+      const rect = (el) => {
+        const box = el.getBoundingClientRect();
+        return {
+          id: el.dataset.nodeId || '',
+          left: box.left, top: box.top, right: box.right, bottom: box.bottom,
+          width: box.width, height: box.height,
+        };
+      };
+      const shots = [...document.querySelectorAll('.node.shot-candidate-card')].map(rect);
+      const labels = [
+        ...document.querySelectorAll('.edge-label.visible'),
+        ...document.querySelectorAll('.edge-relation-button'),
+      ].map(rect);
+      const scaleText = document.querySelector('#corner-controls .zoom-label')?.textContent || '';
+      const scale = Number(scaleText.replace(/[^0-9.]/g, '')) / 100 || 0;
+      const content = document.querySelector('.node.shot-candidate-card .text-content-view');
+      const fontSize = Number.parseFloat(getComputedStyle(content).fontSize || '0') || 0;
+      let maxOverlapArea = 0;
+      let minAxisGap = Infinity;
+      let maxLabelOverlapArea = 0;
+      for (let i = 0; i < shots.length; i += 1) {
+        for (let j = i + 1; j < shots.length; j += 1) {
+          const a = shots[i];
+          const b = shots[j];
+          const xOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+          const yOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+          maxOverlapArea = Math.max(maxOverlapArea, xOverlap * yOverlap);
+          if (xOverlap > 1) minAxisGap = Math.min(minAxisGap, Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom)));
+          if (yOverlap > 1) minAxisGap = Math.min(minAxisGap, Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right)));
+        }
+      }
+      for (const label of labels) {
+        for (const shot of shots) {
+          const xOverlap = Math.max(0, Math.min(label.right, shot.right) - Math.max(label.left, shot.left));
+          const yOverlap = Math.max(0, Math.min(label.bottom, shot.bottom) - Math.max(label.top, shot.top));
+          maxLabelOverlapArea = Math.max(maxLabelOverlapArea, xOverlap * yOverlap);
+        }
+      }
+      return {
+        shot_card_count: shots.length,
+        max_overlap_area_px: Math.round(maxOverlapArea * 100) / 100,
+        min_axis_gap_px: Number.isFinite(minAxisGap) ? Math.round(minAxisGap * 100) / 100 : 999,
+        max_edge_label_overlap_area_px: Math.round(maxLabelOverlapArea * 100) / 100,
+        computed_font_size_px: fontSize,
+        rendered_font_size_px: Math.round(fontSize * scale * 100) / 100,
+        shot_boxes: shots,
+        visible_edge_label_count: labels.length,
+      };
+    }""")
+    min_rendered_font = 9.4 if mobile else 8.4
+    if geometry["max_overlap_area_px"] > 0:
+        raise AssertionError(f"shot card DOM overlap detected: {geometry}")
+    if geometry["min_axis_gap_px"] < 16:
+        raise AssertionError(f"shot card visual gap below 16 CSS px: {geometry}")
+    if geometry["max_edge_label_overlap_area_px"] > 0:
+        raise AssertionError(f"edge label overlaps shot card text/card: {geometry}")
+    if geometry["rendered_font_size_px"] < min_rendered_font:
+        raise AssertionError(f"shot card rendered text is not readable enough: {geometry}")
+    return geometry
 
 
 def verify_delete_confirm(page: Page, screenshot_dir: Path, round_label: str, key: str) -> str:
@@ -422,7 +489,7 @@ def fake_shot_preview_nine() -> dict[str, Any]:
             "narrative_purpose": f"推进第 {index} 个叙事节拍，保持动作与关系变化连续。",
         })
     return {
-        "preview_id": "m671_browser_shot_preview",
+        "preview_id": "m672_browser_shot_preview",
         "action_type": "shot_breakdown",
         "mode": "dynamic_shot_breakdown",
         "revised_text": "按证据、对峙、反转、追逐和余响拆成九个内容驱动镜头。",
@@ -468,8 +535,12 @@ def issue_ledger(cases: dict[str, Any], console_errors: list[str], response_erro
             "no_horizontal_overflow": item.get("no_horizontal_overflow"),
             "script_shimmer_geometry": item.get("script_shimmer", {}).get("extension_px", 99) <= 3.1,
             "shot_shimmer_geometry": item.get("shot_shimmer", {}).get("extension_px", 99) <= 3.1,
-            "shot_graph_readable_zoom": item.get("shot_apply_zoom", 0) >= (0.5 if "390x" in key or "430x" in key else 0.7),
+            "shot_graph_readable_zoom": item.get("shot_apply_zoom", 0) >= (0.8 if "390x" in key or "430x" in key else 0.72),
             "shot_graph_nine_items": item.get("shot_layout", {}).get("shot_count") == 9,
+            "shot_cards_do_not_overlap": item.get("shot_layout", {}).get("max_overlap_area_px", 999) == 0,
+            "shot_cards_keep_min_gap": item.get("shot_layout", {}).get("min_axis_gap_px", 0) >= 16,
+            "edge_labels_do_not_cover_shots": item.get("shot_layout", {}).get("max_edge_label_overlap_area_px", 999) == 0,
+            "shot_card_text_readable": item.get("shot_layout", {}).get("rendered_font_size_px", 0) >= (9.4 if "390x" in key or "430x" in key else 8.4),
         }
         for field, ok in checks.items():
             if not ok:
@@ -491,10 +562,13 @@ def visual_mismatch_ledger(cases: dict[str, Any], screenshots: dict[str, str]) -
         },
         {
             "issue": "nine_shot_vertical_stack_unreadable_zoom",
-            "design_intent": "9 镜头候选按场景 lane 和镜头 grid 呈现，应用后 zoom floor 保持可读。",
+            "design_intent": "9 镜头候选按场景 lane 和镜头 grid 呈现；桌面不重叠，手机聚焦局部而非 fit-all。",
             "status": "closed",
             "evidence": {
                 "min_zoom": min(item["shot_apply_zoom"] for item in cases.values()),
+                "max_overlap_area_px": max(item["shot_layout"]["max_overlap_area_px"] for item in cases.values()),
+                "min_axis_gap_px": min(item["shot_layout"]["min_axis_gap_px"] for item in cases.values()),
+                "max_edge_label_overlap_area_px": max(item["shot_layout"]["max_edge_label_overlap_area_px"] for item in cases.values()),
                 "desktop": screenshots.get("1440x900:shot_applied", ""),
                 "phone": screenshots.get("390x844:shot_applied", ""),
             },
