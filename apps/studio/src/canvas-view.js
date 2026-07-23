@@ -94,7 +94,7 @@ function nodeActions() {
   actions.dataset.role = "actions";
   actions.innerHTML = [
     `<button class="na-btn text-action" data-role="script-revision-action" data-action="embedded-creative-action" data-creative-action="script_revision" data-creative-mode="professional_expansion" title="节点内优化" aria-label="节点内优化">${icon("sparkles", 13)}</button>`,
-    `<button class="na-btn text-action" data-role="shot-breakdown-action" data-action="embedded-creative-action" data-creative-action="shot_breakdown" data-creative-mode="dynamic_shot_breakdown" title="自动拆分分镜" aria-label="自动拆分分镜">${icon("camera", 13)}</button>`,
+    `<button class="na-btn text-action" data-role="shot-breakdown-action" data-action="embedded-creative-action" data-creative-action="shot_breakdown" data-creative-mode="dynamic_shot_breakdown" title="拆分分镜" aria-label="拆分分镜">${icon("camera", 13)}</button>`,
     `<button class="na-btn" data-role="asset-action" data-action="fix-visual-asset" title="保存为素材" aria-label="保存为素材">${icon("bookmark", 13)}</button>`,
     `<button class="na-btn" data-role="run-action" data-action="run" title="生成" aria-label="生成">${icon("play", 13)}</button>`,
     `<button class="na-btn" data-role="duplicate-action" data-action="duplicate" title="复制节点" aria-label="复制节点">${icon("copy", 13)}</button>`,
@@ -156,7 +156,13 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("has-media-result", Boolean(node.previewUrl || candidatePreviews(node).length));
   elNode.classList.toggle("is-generating", node.status === "generating");
   elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
-  elNode.classList.toggle("has-embedded-action", Boolean(node.params?.embeddedCreativeAction && node.params.embeddedCreativeAction.status !== "cancelled"));
+  const embeddedAction = node.params?.embeddedCreativeAction;
+  const embeddedActive = Boolean(embeddedAction && embeddedAction.status !== "cancelled");
+  const embeddedRunning = embeddedAction?.status === "running";
+  elNode.classList.toggle("has-embedded-action", embeddedActive);
+  elNode.classList.toggle("embedded-task-running", embeddedRunning);
+  elNode.dataset.embeddedTaskState = embeddedAction?.status || "";
+  elNode.dataset.embeddedTaskAction = embeddedActive ? String(embeddedAction.action_type || "") : "";
   elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
 }
 
@@ -250,15 +256,23 @@ function syncNodeActions(elNode, node, def) {
     upload.disabled = !canUpload;
   }
   const revisionBtn = elNode.querySelector('[data-role="script-revision-action"]');
+  const embeddedAction = node.params?.embeddedCreativeAction;
+  const runningActionType = embeddedAction?.status === "running" ? embeddedAction.action_type : "";
   if (revisionBtn) {
     const canRevise = canUseEmbeddedCreativeAction(node, "script_revision");
     revisionBtn.hidden = !canRevise;
-    revisionBtn.disabled = !canRevise;
+    revisionBtn.disabled = !canRevise || runningActionType === "script_revision";
+    revisionBtn.classList.toggle("is-busy", runningActionType === "script_revision");
+    revisionBtn.title = runningActionType === "script_revision" ? "剧本化预览生成中" : "节点内优化";
+    revisionBtn.setAttribute("aria-label", revisionBtn.title);
   }
   const breakdownBtn = elNode.querySelector('[data-role="shot-breakdown-action"]');
   if (breakdownBtn) {
     const canBreakdown = canUseEmbeddedCreativeAction(node, "shot_breakdown");
     breakdownBtn.hidden = !canBreakdown;
-    breakdownBtn.disabled = !canBreakdown;
+    breakdownBtn.disabled = !canBreakdown || runningActionType === "shot_breakdown";
+    breakdownBtn.classList.toggle("is-busy", runningActionType === "shot_breakdown");
+    breakdownBtn.title = runningActionType === "shot_breakdown" ? "分镜任务生成中" : "拆分分镜";
+    breakdownBtn.setAttribute("aria-label", breakdownBtn.title);
   }
 }

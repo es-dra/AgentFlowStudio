@@ -26,7 +26,7 @@ def evaluate(root: Path) -> dict[str, Any]:
     expected_split = {
         "commandType": "start_embedded_creative_action",
         "previewStatus": "preview",
-        "title": "自动拆分分镜",
+        "title": "拆分分镜",
         "actionType": "shot_breakdown",
         "mode": "dynamic_shot_breakdown",
         "rawPreserved": True,
@@ -106,7 +106,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
         "shell": ["options.render === false", "syncSaveStatusElement"],
         "stable_input": ["compositionstart", "compositionupdate", "compositionend", "beforeinput", "paste", "inputType"],
         "node_body": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"'],
-        "prompt_bar": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"', "自动拆分分镜", "startEmbeddedCreativeAction", '"shot_breakdown"'],
+        "prompt_bar": ["bindStableTextInputLifecycle", 'renderScope: "canvas-local-edit"', "拆分分镜", "startEmbeddedCreativeAction", '"shot_breakdown"'],
         "lifecycle": ["request_story_plan_candidate", "planning_required", "需要智能规划器提交结构化候选"],
         "geometry": ["clientToCanvasPoint", "clientToWorld"],
         "port_geometry": ["nodePortCanvasCenter", "clientToCanvasPoint"],
@@ -135,7 +135,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
 
     evidence["static"] = {
         "stable_canvas_text_input": not any(item["scope"] in {"main", "shell", "store", "stable_input", "node_body", "prompt_bar"} for item in findings),
-        "auto_split_entry_restored": "自动拆分分镜" in text["prompt_bar"] and "startEmbeddedCreativeAction" in text["prompt_bar"],
+        "auto_split_entry_restored": "拆分分镜" in text["prompt_bar"] and "startEmbeddedCreativeAction" in text["prompt_bar"],
         "legacy_split_not_bound": "splitTextNodeToStoryboardNodes" not in text["prompt_bar"],
         "edge_selection_spark_removed": "touchesSelection" not in text["edges"],
     }

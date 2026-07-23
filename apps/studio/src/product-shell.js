@@ -63,7 +63,7 @@ export function createProductShell(options = {}) {
     const brand = node("button", "studio-unified-brand");
     brand.type = "button";
     brand.setAttribute("aria-label", "返回项目画布");
-    brand.innerHTML = '<strong aria-label="AgentFlow Studio">AFS</strong>';
+    brand.innerHTML = '<img class="studio-brand-logo" src="./favicon.svg" alt="" aria-hidden="true"><strong aria-label="AgentFlow Studio">AFS</strong>';
     brand.addEventListener("click", () => {
       projectDrawerOpen = false;
       contextOpen = false;
@@ -90,20 +90,6 @@ export function createProductShell(options = {}) {
     project.appendChild(projectLabel);
     if (contextOpen) project.appendChild(buildProjectMenu());
 
-    const navigator = node("button", `studio-stage-button ${projectDrawerOpen ? "active" : ""}`);
-    navigator.type = "button";
-    navigator.setAttribute("aria-label", "打开项目导航");
-    navigator.setAttribute("aria-controls", "studio-context-drawer");
-    navigator.setAttribute("aria-expanded", String(projectDrawerOpen));
-    navigator.innerHTML = `<span>项目</span>${icon("chevronDown", 13)}`;
-    navigator.addEventListener("click", () => {
-      projectDrawerOpen = !projectDrawerOpen;
-      helpOpen = false;
-      accountMenuOpen = false;
-      render();
-      requestCanvasSafeAreaUpdate();
-    });
-
     const viewSwitch = node("div", "studio-view-switch");
     viewSwitch.setAttribute("role", "tablist");
     viewSwitch.setAttribute("aria-label", "工作区视图");
@@ -118,6 +104,7 @@ export function createProductShell(options = {}) {
 
     const actions = node("div", "studio-header-actions");
     actions.appendChild(buildSaveStatus());
+    if (notice) actions.appendChild(buildHeaderNotice());
     actions.appendChild(buildHelpEntry());
     const language = node("button", "studio-icon-button");
     const account = buildAccountEntry();
@@ -132,7 +119,7 @@ export function createProductShell(options = {}) {
     actions.appendChild(language);
     actions.appendChild(account);
 
-    header.append(brand, project, navigator, viewSwitch, summary, actions);
+    header.append(brand, project, viewSwitch, summary, actions);
     return header;
   }
 
@@ -205,11 +192,10 @@ export function createProductShell(options = {}) {
     const menu = node("div", "studio-account-menu");
     menu.setAttribute("role", "menu");
     menu.appendChild(node("strong", "", "账户与工作区"));
-    menu.appendChild(accountMenuButton("项目管理", () => {
-      accountMenuOpen = false;
-      projectDrawerOpen = true;
-      render();
-    }));
+    const identity = node("p", "studio-account-identity", snapshot.authUser
+      ? `${snapshot.authUser.display_name || snapshot.authUser.email || "当前账号"}`
+      : "本地创作会话");
+    menu.appendChild(identity);
     menu.appendChild(accountMenuButton(locale === "zh-CN" ? "切换 English" : "切换中文", () => {
       locale = setLocale(locale === "zh-CN" ? "en" : "zh-CN");
       accountMenuOpen = false;
@@ -241,23 +227,73 @@ export function createProductShell(options = {}) {
     ].join("");
     menu.appendChild(current);
     const projects = snapshot.workspace?.projects || [];
-    for (const item of projects.slice(0, 6)) {
+    if (projects.length > 4) {
+      const search = node("input", "studio-project-search");
+      search.type = "search";
+      search.placeholder = "搜索最近项目";
+      search.setAttribute("aria-label", "搜索项目");
+      search.addEventListener("input", () => filterProjectMenu(menu, search.value));
+      menu.appendChild(search);
+    }
+    const list = node("section", "studio-project-switch-list");
+    list.setAttribute("aria-label", "切换项目");
+    for (const item of projects.slice(0, 8)) {
       const button = node("button", item.project_id === snapshot.project?.project_id ? "active" : "");
       button.type = "button";
       button.setAttribute("role", "menuitem");
+      button.dataset.projectOption = "true";
+      button.dataset.projectSearch = `${item.name || ""} ${item.episode || ""} ${item.project_id || ""}`.toLowerCase();
       button.innerHTML = `<strong>${escapeHtml(item.name || "未命名项目")}</strong><span>${escapeHtml(item.episode || "单集制作")}</span>`;
       button.addEventListener("click", () => {
         contextOpen = false;
         options.onSwitchProject?.(item.project_id);
       });
-      menu.appendChild(button);
+      list.appendChild(button);
     }
+    menu.appendChild(list);
+    const projectActions = node("section", "studio-project-management");
+    projectActions.setAttribute("aria-label", "当前项目管理");
     const create = node("button", "studio-project-create");
     create.type = "button";
     create.innerHTML = `${icon("plus", 14)}<span>新建项目</span>`;
-    create.addEventListener("click", () => options.onCreateProject?.());
-    menu.appendChild(create);
+    create.addEventListener("click", () => {
+      contextOpen = false;
+      options.onCreateProject?.();
+    });
+    const settings = node("button", "studio-project-settings");
+    settings.type = "button";
+    settings.innerHTML = `${icon("settings", 14)}<span>项目设置</span>`;
+    settings.addEventListener("click", () => {
+      contextOpen = false;
+      projectDrawerOpen = true;
+      render();
+    });
+    const remove = node("button", "studio-project-delete");
+    remove.type = "button";
+    remove.innerHTML = `${icon("trash", 14)}<span>删除项目</span>`;
+    remove.addEventListener("click", () => {
+      contextOpen = false;
+      options.onDeleteProject?.(snapshot.project);
+      render();
+    });
+    projectActions.append(create, settings, remove);
+    menu.appendChild(projectActions);
     return menu;
+  }
+
+  function filterProjectMenu(menu, query) {
+    const normalized = String(query || "").trim().toLowerCase();
+    menu.querySelectorAll("[data-project-option='true']").forEach((button) => {
+      button.hidden = Boolean(normalized) && !String(button.dataset.projectSearch || "").includes(normalized);
+    });
+  }
+
+  function buildHeaderNotice() {
+    const item = node("span", "studio-header-notice", notice);
+    item.setAttribute("role", "status");
+    item.setAttribute("aria-live", "polite");
+    item.title = notice;
+    return item;
   }
 
   function buildSaveStatus() {
@@ -708,11 +744,6 @@ export function createProductShell(options = {}) {
     else stage.appendChild(node("p", "canvas-unavailable", "画布编辑当前不可用；项目与审核上下文仍保持在此工作区。"));
     if (mediaOperationsReady()) stage.appendChild(buildMediaCanvasOverview());
     stage.appendChild(buildGraphCanvasStatus());
-    if (notice) {
-      const live = node("p", "studio-live-notice", notice);
-      live.setAttribute("aria-live", "polite");
-      stage.appendChild(live);
-    }
     main.appendChild(stage);
     return main;
   }
@@ -821,11 +852,6 @@ export function createProductShell(options = {}) {
     grid.classList.toggle("is-sparse", sparse);
     scene.shots.forEach((shot, index) => grid.appendChild(buildShotCard(shot, index)));
     sectionEl.appendChild(grid);
-    if (notice) {
-      const live = node("p", "studio-live-notice", notice);
-      live.setAttribute("aria-live", "polite");
-      sectionEl.appendChild(live);
-    }
     return sectionEl;
   }
 
@@ -851,11 +877,6 @@ export function createProductShell(options = {}) {
     lower.append(buildAssetContinuityPanel(ops, media), buildCostAndRecoveryPanel(ops, media), buildFinalReviewPanel(ops));
     sectionEl.appendChild(lower);
     sectionEl.appendChild(buildMediaEvidenceDrawer(ops));
-    if (notice) {
-      const live = node("p", "studio-live-notice", notice);
-      live.setAttribute("aria-live", "polite");
-      sectionEl.appendChild(live);
-    }
     return sectionEl;
   }
 
@@ -1367,7 +1388,12 @@ export function createProductShell(options = {}) {
     window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
     window.addEventListener("afs:agent-chat-open-task", () => {
       setAgentChatExpanded(true);
-      notice = "当前节点的 AI 创作任务已打开；确认前不会改动画布。";
+      notice = "当前节点任务已开始；请在节点与右侧任务区查看进度。";
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
+    window.addEventListener("afs:embedded-creative-task-finished", () => {
+      if (isNarrowAgentLayout()) closeResponsiveAgentOverlay();
       render();
       requestCanvasSafeAreaUpdate();
     });
@@ -1383,15 +1409,42 @@ export function createProductShell(options = {}) {
     });
     window.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
-      if (projectDrawerOpen || contextOpen || mobileAgentOpen || helpOpen) {
+      if (projectDrawerOpen || contextOpen || mobileAgentOpen || helpOpen || accountMenuOpen) {
+        const focusTarget = contextOpen
+          ? ".studio-project-button"
+          : accountMenuOpen
+          ? ".studio-account-button"
+          : helpOpen
+          ? ".studio-help-context .studio-icon-button"
+          : "#product-main";
         projectDrawerOpen = false;
         contextOpen = false;
         helpOpen = false;
+        accountMenuOpen = false;
         if (mobileAgentOpen) closeResponsiveAgentOverlay();
         render();
         requestCanvasSafeAreaUpdate();
+        requestAnimationFrame(() => document.querySelector(focusTarget)?.focus());
       }
     });
+    window.addEventListener("pointerdown", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+      let changed = false;
+      if (contextOpen && !target.closest(".studio-project-context")) {
+        contextOpen = false;
+        changed = true;
+      }
+      if (accountMenuOpen && !target.closest(".studio-account-context")) {
+        accountMenuOpen = false;
+        changed = true;
+      }
+      if (helpOpen && !target.closest(".studio-help-context") && !target.closest(".studio-mobile-help-sheet")) {
+        helpOpen = false;
+        changed = true;
+      }
+      if (changed) render();
+    }, true);
   }
 
   function syncResponsiveAgentState({ force = false } = {}) {

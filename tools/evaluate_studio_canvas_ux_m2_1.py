@@ -112,7 +112,7 @@ def _check_static_contract(root: Path, findings: list[dict[str, str]], evidence:
             "startEmbeddedCreativeAction",
             '"script_revision"',
             '"shot_breakdown"',
-            "自动拆分分镜",
+            "拆分分镜",
             "优化提示词",
             "isEditableTextPromptNode",
         ],

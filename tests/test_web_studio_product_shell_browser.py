@@ -104,7 +104,10 @@ def test_canvas_is_mounted_inside_the_persistent_project_shell() -> None:
     assert 'params.get("stage")' not in main
     assert 'url.searchParams.set("stage", "canvas")' not in shell
     assert 'stage.appendChild(editor)' in shell
-    assert 'stage.appendChild(live)' in shell
+    assert 'stage.appendChild(live)' not in shell
+    assert "studio-live-notice" not in shell
+    assert "buildHeaderNotice" in shell
+    assert "studio-header-notice" in shell
     assert "画布编辑请在桌面打开" in shell
     assert "showCanvas()" in shell
     assert 'setSection(next)' in shell

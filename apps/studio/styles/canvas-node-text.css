@@ -100,6 +100,47 @@
   box-shadow: 0 0 0 1px rgba(73, 224, 235, 0.45), 0 0 22px rgba(73, 224, 235, 0.18);
 }
 
+.node.embedded-task-running {
+  box-shadow: 0 0 0 1px rgba(73, 224, 235, 0.44), 0 0 26px rgba(73, 224, 235, 0.16);
+}
+
+.node.embedded-task-running::after {
+  position: absolute;
+  inset: -4px;
+  z-index: 3;
+  border-radius: 14px;
+  padding: 2px;
+  background:
+    conic-gradient(from 0deg, rgba(73, 224, 235, 0), rgba(73, 224, 235, .95), rgba(31, 153, 185, .25), rgba(73, 224, 235, 0));
+  content: "";
+  pointer-events: none;
+  animation: embeddedTaskPerimeterRotate 1.05s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.node.embedded-task-running .node-state-strip {
+  border-color: rgba(73, 224, 235, .36);
+  background: rgba(73, 224, 235, .08);
+}
+
+.na-btn.is-busy {
+  color: var(--port-out);
+}
+
+@keyframes embeddedTaskPerimeterRotate {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node.embedded-task-running::after {
+    animation: none;
+    background: rgba(73, 224, 235, .88);
+  }
+}
+
 .embedded-creative-action {
   display: grid;
   gap: 8px;

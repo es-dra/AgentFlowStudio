@@ -249,7 +249,7 @@ function buildBottomRow(store, runtime, node, textarea) {
   row.appendChild(optimizeBtn);
 
   if (isTextContentNode(node)) {
-    const splitBtn = textAction("frames", "自动拆分分镜", () => {
+    const splitBtn = textAction("frames", "拆分分镜", () => {
       if (!optimizableNodeText(store.get().nodes[node.id], textarea).trim()) {
         flashTooltip(splitBtn, "先输入剧本文本");
         return;

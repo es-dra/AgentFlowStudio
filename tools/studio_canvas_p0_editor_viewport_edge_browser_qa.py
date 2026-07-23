@@ -396,7 +396,7 @@ def assert_auto_split_entry(page: Page) -> dict[str, Any]:
     split = page.get_by_title("从当前剧本版本规划专业分镜")
     expect(split).to_be_visible()
     split.click()
-    preview = page.locator(".agent-command-preview").filter(has_text="自动拆分分镜").first
+    preview = page.locator(".agent-command-preview").filter(has_text="拆分分镜").first
     expect(preview).to_be_visible()
     preview.get_by_role("button", name="确认执行").click()
     expect(page.locator(".agent-receipt").filter(has_text="需要智能规划器")).to_be_visible()
@@ -405,7 +405,7 @@ def assert_auto_split_entry(page: Page) -> dict[str, Any]:
         () => {
           const visible = document.body.innerText;
           return {
-            hasSplitAction: visible.includes("自动拆分分镜"),
+            hasSplitAction: visible.includes("拆分分镜"),
             planningRequiredReceipt: visible.includes("需要智能规划器"),
             rawLeak: visible.includes("/plan-selected-script-shots") || visible.includes("structuredShotFromSegment"),
             fixedPlanLeak: visible.includes("4×15") || visible.includes("15秒"),

@@ -46,7 +46,7 @@ def test_p0_static_contract_restores_split_entry_without_legacy_breakdown() -> N
     assert 'renderScope: "canvas-local-edit"' in node_body
     assert 'renderScope: "canvas-local-edit"' in prompt_bar
 
-    assert "自动拆分分镜" in prompt_bar
+    assert "拆分分镜" in prompt_bar
     assert "startEmbeddedCreativeAction" in prompt_bar
     assert '"shot_breakdown"' in prompt_bar
     assert "/plan-selected-script-shots" not in prompt_bar
@@ -171,7 +171,7 @@ process.stdout.write(JSON.stringify({
     )
     assert payload["previewStatus"] == "preview"
     assert payload["commandType"] == "start_embedded_creative_action"
-    assert payload["title"] == "自动拆分分镜"
+    assert payload["title"] == "拆分分镜"
     assert payload["actionType"] == "shot_breakdown"
     assert payload["mode"] == "dynamic_shot_breakdown"
     assert payload["rawPreserved"] is True

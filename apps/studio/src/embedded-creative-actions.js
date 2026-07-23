@@ -98,6 +98,7 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
 }
 
 export function cancelEmbeddedCreativeAction(store, nodeId) {
+  let cancelled = false;
   store.set((state) => {
     const node = state.nodes[nodeId];
     if (!node?.params?.embeddedCreativeAction) return;
@@ -107,7 +108,13 @@ export function cancelEmbeddedCreativeAction(store, nodeId) {
       message: "预览已取消，当前节点没有改变。",
       cancelled_at: new Date().toISOString(),
     };
+    cancelled = true;
   }, { history: false });
+  if (cancelled) {
+    dispatchBrowserEvent("afs:embedded-creative-task-finished", {
+      detail: { node_id: nodeId, status: "cancelled" },
+    });
+  }
 }
 
 export function clearEmbeddedCreativeAction(store, nodeId) {
@@ -118,6 +125,7 @@ export function clearEmbeddedCreativeAction(store, nodeId) {
 }
 
 export function applyEmbeddedCreativeAction(store, nodeId) {
+  let applied = false;
   store.set((state) => {
     const node = state.nodes[nodeId];
     const action = node?.params?.embeddedCreativeAction;
@@ -171,6 +179,7 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
         applied_at: new Date().toISOString(),
       };
       state.selection = { nodeIds: [subgraph.sequence_node_id], edgeId: null };
+      applied = true;
       return;
     }
     node.content = revisedText;
@@ -187,7 +196,13 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
       applied_at: new Date().toISOString(),
     };
     state.selection = { nodeIds: [node.id], edgeId: null };
+    applied = true;
   });
+  if (applied) {
+    dispatchBrowserEvent("afs:embedded-creative-task-finished", {
+      detail: { node_id: nodeId, status: "applied" },
+    });
+  }
 }
 
 export function editEmbeddedCreativePreview(store, nodeId, text) {
