@@ -466,7 +466,7 @@ export function createProductShell(options = {}) {
       return status;
     }
     if (view.planningRequired) {
-      return buildContextualPlanSurface(status);
+      return buildContextualPlanSurface(status, { existingCanvas: hasCanvasContent() });
     }
     if (view.status !== "ready") {
       status.hidden = true;
@@ -490,9 +490,10 @@ export function createProductShell(options = {}) {
     return status;
   }
 
-  function buildContextualPlanSurface(status) {
-    const expanded = isPlanningPanelExpanded();
-    status.className = `graph-canvas-status planning-required ${expanded ? "expanded" : "compact"}`;
+  function buildContextualPlanSurface(status, options = {}) {
+    const existingCanvas = Boolean(options.existingCanvas);
+    const expanded = existingCanvas ? planningPanelOpen : isPlanningPanelExpanded();
+    status.className = `graph-canvas-status planning-required ${existingCanvas ? "contextual" : "empty-entry"} ${expanded ? "expanded" : "compact"}`;
     status.dataset.expanded = String(expanded);
     if (!expanded) return buildCompactPlanSurface(status);
     return buildExpandedPlanSurface(status);
@@ -693,7 +694,7 @@ export function createProductShell(options = {}) {
   }
 
   function buildWorkspace() {
-    const emptyCanvas = section === "canvas" && !hasStoryFacts();
+    const emptyCanvas = section === "canvas" && !hasCanvasContent();
     const canvasActive = section === "canvas";
     const agentChatCollapsed = isAgentChatCollapsed();
     const shell = node("div", `studio-unified-workspace ${agentChatCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${isNarrowAgentLayout() ? "agent-responsive-compact" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${mediaOperationsReady() ? "media-operations-ready" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
@@ -1388,7 +1389,6 @@ export function createProductShell(options = {}) {
     window.addEventListener("afs:agent-chat-focus", () => focusAgentComposer());
     window.addEventListener("afs:agent-chat-open-task", () => {
       setAgentChatExpanded(true);
-      notice = "当前节点任务已开始；请在节点与右侧任务区查看进度。";
       render();
       requestCanvasSafeAreaUpdate();
     });
@@ -1828,6 +1828,12 @@ export function createProductShell(options = {}) {
   function mediaOperationsReady() {
     const ops = mediaOperationsView();
     return ops["schema" + "_version"] === "afs.media_operations_review.v0.1" && Array.isArray(ops.shots) && ops.shots.length > 0;
+  }
+
+  function hasCanvasContent() {
+    if (hasStoryFacts() || graphWorkspaceReady() || mediaOperationsReady()) return true;
+    const state = snapshot.studioState || {};
+    return Object.keys(state.nodes || {}).length > 0 || Object.keys(state.edges || {}).length > 0;
   }
 
   function mediaShotModel() {

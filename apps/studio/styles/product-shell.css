@@ -237,7 +237,7 @@
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  z-index: 32;
+  z-index: 96;
   display: grid;
   width: min(340px, calc(100vw - 24px));
   gap: 8px;
@@ -1227,7 +1227,7 @@ textarea:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 /* M2.1 single-shell workspace overrides */
 :root {
-  --z-shell-header: 60;
+  --z-shell-header: 90;
   --z-context-drawer: 80;
   --z-agent-chat: 70;
   --z-canvas-controls: 45;
@@ -1442,6 +1442,11 @@ body,
 .graph-canvas-status span { overflow: hidden; color: var(--product-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .graph-canvas-status.planning-required {
   border-color: rgba(217, 154, 43, .5);
+}
+
+.graph-canvas-status.planning-required.contextual {
+  border-color: rgba(145, 166, 180, .28);
+  background: rgba(7, 16, 24, .88);
 }
 
 .graph-canvas-status.planning-required.compact {

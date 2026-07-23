@@ -400,7 +400,13 @@ function bindCanvasSafeAreaEvents() {
     window.cancelAnimationFrame(raf);
     raf = window.requestAnimationFrame(() => {
       if (!store || !document.getElementById("canvas-root")) return;
-      store.set((state) => fitCanvasProjection(state), { history: false, persist: false });
+      store.set((state) => {
+        if (window.__afsSuppressNextSafeAreaFit) {
+          window.__afsSuppressNextSafeAreaFit = false;
+          return;
+        }
+        fitCanvasProjection(state);
+      }, { history: false, persist: false });
     });
   });
 }
