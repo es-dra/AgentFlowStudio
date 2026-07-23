@@ -125,6 +125,9 @@ def _with_server_codex_service(payload: dict[str, Any]) -> dict[str, Any]:
         "account_ref": SERVER_CODEX_ACCOUNT_ID,
         "capability": "llm",
         "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "cli_model": "gpt-5.5",
+        "cli_reasoning_effort": "medium",
+        "timeout_sec": 300,
         "descriptor": {
             "schema_version": "provider_descriptor.v0.1",
             "modality": "llm",

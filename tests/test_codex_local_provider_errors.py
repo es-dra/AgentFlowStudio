@@ -35,8 +35,12 @@ def test_codex_local_missing_cli_is_reported_as_model_gateway_error(tmp_path, mo
 
 def test_server_codex_is_injected_without_rewriting_prompt_optimizer(tmp_path: Path) -> None:
     store = _store(tmp_path, _codex_local_provider_config())
-    assert store.service(SERVER_CODEX_SERVICE_ID)["provider"] == "codex_local"
-    assert store.service(SERVER_CODEX_SERVICE_ID)["capability"] == "llm"
+    server_codex = store.service(SERVER_CODEX_SERVICE_ID)
+    assert server_codex["provider"] == "codex_local"
+    assert server_codex["capability"] == "llm"
+    assert server_codex["cli_model"] == "gpt-5.5"
+    assert server_codex["cli_reasoning_effort"] == "medium"
+    assert server_codex["timeout_sec"] == 300
     assert store.service("prompt_optimizer")["provider"] == "codex_local"
     assert store.service("prompt_optimizer")["account_ref"] == "local_codex"
 
