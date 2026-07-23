@@ -108,9 +108,10 @@ def test_m6_7_1_visual_correction_contract() -> None:
     assert "fitCanvasProjection(state)" in main
 
     assert "hasCanvasContent()" in shell
-    assert "existingCanvas ? planningPanelOpen : isPlanningPanelExpanded()" in shell
+    assert "if (existingCanvas && !planningPanelOpen) return buildInlinePlanAction(status)" in shell
+    assert "buildInlinePlanAction" in shell
     assert "planning-required ${existingCanvas ? \"contextual\" : \"empty-entry\"}" in shell
-    assert ".graph-canvas-status.planning-required.contextual" in css
+    assert ".graph-canvas-status.planning-required.contextual-inline" in css
     assert "notice = \"当前节点任务已开始" not in shell
 
     assert "taskStatePhaseSummary" in panel
@@ -120,3 +121,30 @@ def test_m6_7_1_visual_correction_contract() -> None:
     assert "embeddedTaskPerimeterRotate" not in node_css
     assert "transform: none" in node_css
     assert "inset: -3px" in node_css
+
+
+def test_m6_7_2_readable_shot_graph_and_nonempty_shell_contract() -> None:
+    embedded = _read("apps/studio/src/embedded-creative-actions.js")
+    edges = _read("apps/studio/src/canvas-edges.js")
+    edge_buttons = _read("apps/studio/src/canvas-edge-relation-buttons.js")
+    view = _read("apps/studio/src/canvas-view.js")
+    node_css = _read("apps/studio/styles/canvas-node-text.css")
+    shell = _read("apps/studio/src/product-shell.js")
+    css = _read("apps/studio/styles/product-shell.css")
+
+    assert "const columns = narrow ? 1 : 3" in embedded
+    assert "const rowGap = narrow ? 64 : 80" in embedded
+    assert "const targetScale = clampScale(0.86)" in embedded
+    assert "first_shot_node_id" in embedded
+    assert "suppressLabel: true" in embedded
+    assert "compactShotText" in embedded
+
+    assert 'edge.suppress_label === true ? "" : relationLabel(relation)' in edges
+    assert "edge.suppress_label === true" in edge_buttons
+    assert "shot-candidate-card" in view and "scene-candidate-lane" in view
+    assert ".node.shot-candidate-card .text-content-view" in node_css
+
+    assert "buildInlinePlanAction" in shell
+    assert "可自由开始" in shell
+    assert "contextual-inline" in css
+    assert "plan-inline-action" in css

@@ -17,6 +17,10 @@ export function pruneEdgeRelationButtons(layer, seenEdgeIds) {
 
 export function syncEdgeRelationButton(layer, edge, from, to, state, store) {
   if (!layer) return;
+  if (edge.suppress_label === true) {
+    layer.querySelector(`[data-edge-id="${edge.id}"]`)?.remove();
+    return;
+  }
   const start = nodeFramePortWorldPoint(from, "out", state.viewport)
     || { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 };
   const end = nodeFramePortWorldPoint(to, "in", state.viewport)

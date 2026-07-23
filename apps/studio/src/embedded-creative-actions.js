@@ -180,8 +180,11 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
         applied_subgraph: subgraph,
         applied_at: new Date().toISOString(),
       };
-      state.selection = { nodeIds: [subgraph.sequence_node_id], edgeId: null };
-      frameCandidateSubgraph(state, subgraph.created_node_ids);
+      const focusNodeId = isNarrowViewport() && subgraph.first_shot_node_id
+        ? subgraph.first_shot_node_id
+        : subgraph.sequence_node_id;
+      state.selection = { nodeIds: [focusNodeId], edgeId: null };
+      frameCandidateSubgraph(state, subgraph.created_node_ids, { focusNodeId });
       applied = true;
       return;
     }
@@ -291,11 +294,12 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
       groupId: candidateId,
     });
     createdNodes.push(sceneNode.id);
-    createdEdges.push(upsertEdge(state, sequenceNode.id, sceneNode.id, "sequence"));
-    const visibleShots = [];
-    (scene.shots || []).forEach((shot, shotIndex) => {
-      const shotLayout = layout.shot(sceneIndex, shotIndex, scene);
-      const shotNode = candidateNode(state, "shot", {
+      createdEdges.push(upsertEdge(state, sequenceNode.id, sceneNode.id, "sequence"));
+      const visibleShots = [];
+      let firstShotNodeId = "";
+      (scene.shots || []).forEach((shot, shotIndex) => {
+        const shotLayout = layout.shot(sceneIndex, shotIndex, scene);
+        const shotNode = candidateNode(state, "shot", {
         title: shot.title || `镜头 ${shotIndex + 1}`,
         x: shotLayout.x,
         y: shotLayout.y,
@@ -321,21 +325,24 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
           layout_role: "shot_grid_item",
           layout_column: shotLayout.column,
           layout_row: shotLayout.row,
-        },
-        groupId: candidateId,
+          },
+          groupId: candidateId,
+        });
+        if (!firstShotNodeId) firstShotNodeId = shotNode.id;
+        createdNodes.push(shotNode.id);
+        createdEdges.push(upsertEdge(state, sceneNode.id, shotNode.id, "sequence", { suppressLabel: true }));
+        visibleShots.push({ ...shot, node_id: shotNode.id });
       });
-      createdNodes.push(shotNode.id);
-      createdEdges.push(upsertEdge(state, sceneNode.id, shotNode.id, "sequence"));
-      visibleShots.push({ ...shot, node_id: shotNode.id });
-    });
-    visibleScenes.push({ ...scene, node_id: sceneNode.id, shots: visibleShots });
+    visibleScenes.push({ ...scene, node_id: sceneNode.id, shots: visibleShots, first_shot_node_id: firstShotNodeId });
   });
+  const firstShotNodeId = visibleScenes.map((scene) => scene.first_shot_node_id).find(Boolean) || "";
   return {
     schema_version: "afs.m6_6.visible_shot_candidate_subgraph.v0.1",
     candidate_id: candidateId,
     source_node_id: sourceNode.id,
     source_revision_id: revisionId,
     sequence_node_id: sequenceNode.id,
+    first_shot_node_id: firstShotNodeId,
     scene_count: summary.scene_count,
     shot_count: summary.shot_count,
     estimated_duration_sec: summary.estimated_duration_sec,
@@ -352,24 +359,24 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
 }
 
 function shotCandidateLayout(sourceNode, shotPlan) {
-  const narrow = typeof window !== "undefined" && Number(window.innerWidth || 0) <= 560;
+  const narrow = isNarrowViewport();
   const sourceX = Number(sourceNode.x || 0);
   const sourceY = Number(sourceNode.y || 0);
   const sourceW = Number(sourceNode.w || 300);
   const sourceH = Number(sourceNode.h || 260);
-  const sequenceW = narrow ? 292 : 260;
-  const sequenceH = narrow ? 168 : 164;
-  const sceneW = narrow ? 270 : 236;
-  const sceneH = narrow ? 154 : 160;
-  const sceneGap = narrow ? 92 : 80;
-  const shotGridGap = narrow ? 0 : 64;
-  const shotW = narrow ? 236 : 236;
-  const shotH = narrow ? 178 : 176;
-  const columns = narrow ? 2 : 3;
-  const colGap = narrow ? 26 : 24;
-  const rowGap = narrow ? 24 : 24;
+  const sequenceW = narrow ? 278 : 260;
+  const sequenceH = narrow ? 142 : 154;
+  const sceneW = narrow ? 278 : 236;
+  const sceneH = narrow ? 132 : 146;
+  const sceneGap = narrow ? 82 : 88;
+  const shotGridGap = narrow ? 0 : 108;
+  const shotW = narrow ? 278 : 230;
+  const shotH = narrow ? 148 : 146;
+  const columns = narrow ? 1 : 3;
+  const colGap = narrow ? 0 : 46;
+  const rowGap = narrow ? 64 : 80;
   const sequence = narrow
-    ? { x: sourceX + 20, y: sourceY + sourceH + 140, w: sequenceW, h: sequenceH }
+    ? { x: sourceX + 18, y: sourceY + sourceH + 132, w: sequenceW, h: sequenceH }
     : { x: sourceX + sourceW + 150, y: sourceY, w: sequenceW, h: sequenceH };
 
   function rowsFor(scene) {
@@ -377,7 +384,9 @@ function shotCandidateLayout(sourceNode, shotPlan) {
   }
 
   function laneHeight(scene) {
-    return Math.max(300, rowsFor(scene) * shotH + Math.max(0, rowsFor(scene) - 1) * rowGap + 88);
+    const gridHeight = rowsFor(scene) * shotH + Math.max(0, rowsFor(scene) - 1) * rowGap;
+    const sceneAndGrid = narrow ? sceneH + 58 + gridHeight : Math.max(sceneH, gridHeight);
+    return Math.max(narrow ? 380 : 320, sceneAndGrid + (narrow ? 92 : 84));
   }
 
   function sceneOrigin(sceneIndex, scene) {
@@ -413,7 +422,7 @@ function shotCandidateLayout(sourceNode, shotPlan) {
     shot(sceneIndex, shotIndex, scene) {
       const origin = sceneOrigin(sceneIndex, scene);
       const gridX = narrow ? sequence.x : origin.x + sceneW + shotGridGap;
-      const gridY = origin.y + (narrow ? 190 : 0);
+      const gridY = origin.y + (narrow ? sceneH + 58 : 0);
       const column = shotIndex % columns;
       const row = Math.floor(shotIndex / columns);
       return {
@@ -428,7 +437,7 @@ function shotCandidateLayout(sourceNode, shotPlan) {
   };
 }
 
-function frameCandidateSubgraph(state, nodeIds) {
+function frameCandidateSubgraph(state, nodeIds, options = {}) {
   if (typeof document === "undefined") return;
   const nodes = {};
   for (const id of nodeIds || []) {
@@ -437,7 +446,8 @@ function frameCandidateSubgraph(state, nodeIds) {
   const bounds = nodesBounds(nodes);
   const frame = visibleCanvasFrame();
   if (!bounds || !frame.visible || frame.width < 160 || frame.height < 160) return;
-  const narrow = typeof window !== "undefined" && Number(window.innerWidth || 0) <= 560;
+  const narrow = isNarrowViewport();
+  const focusNode = options.focusNodeId ? state.nodes?.[options.focusNodeId] : null;
   const floor = narrow ? 0.58 : 0.72;
   const preferred = narrow ? 0.68 : 0.78;
   const left = Math.max(0, Number(frame.safeArea?.left || 0));
@@ -446,6 +456,18 @@ function frameCandidateSubgraph(state, nodeIds) {
   const bottom = Math.max(0, Number(frame.safeArea?.bottom || 0));
   const availableW = Math.max(160, frame.width - left - right);
   const availableH = Math.max(160, frame.height - top - bottom);
+  if (narrow && focusNode) {
+    const targetScale = clampScale(0.86);
+    const focusX = Number(focusNode.x || 0) + Number(focusNode.w || 280) / 2;
+    const focusY = Number(focusNode.y || 0) + Number(focusNode.h || 180) / 2;
+    state.viewport = {
+      scale: targetScale,
+      x: left + availableW / 2 - focusX * targetScale,
+      y: top + availableH * 0.48 - focusY * targetScale,
+    };
+    if (typeof window !== "undefined") window.__afsSuppressNextSafeAreaFit = true;
+    return;
+  }
   const boundsW = Math.max(1, bounds.maxX - bounds.minX);
   const boundsH = Math.max(1, bounds.maxY - bounds.minY);
   const centerX = (bounds.minX + bounds.maxX) / 2;
@@ -462,6 +484,10 @@ function frameCandidateSubgraph(state, nodeIds) {
     y,
   };
   if (typeof window !== "undefined") window.__afsSuppressNextSafeAreaFit = true;
+}
+
+function isNarrowViewport() {
+  return typeof window !== "undefined" && Number(window.innerWidth || 0) <= 560;
 }
 
 function candidateNode(state, type, spec) {
@@ -494,15 +520,16 @@ function nextStateId(state, prefix) {
   return `${prefix}_${state.meta.seq}`;
 }
 
-function upsertEdge(state, fromId, toId, relationType) {
+function upsertEdge(state, fromId, toId, relationType, options = {}) {
   if (!fromId || !toId || fromId === toId) return "";
   const existing = Object.values(state.edges || {}).find((edge) => edge.from === fromId && edge.to === toId);
   if (existing) {
     existing.relation_type = relationType;
+    existing.suppress_label = options.suppressLabel === true;
     return existing.id;
   }
   const id = uniqueEdgeId(state, fromId, toId);
-  state.edges[id] = { id, from: fromId, to: toId, relation_type: relationType };
+  state.edges[id] = { id, from: fromId, to: toId, relation_type: relationType, suppress_label: options.suppressLabel === true };
   state.ui = state.ui || {};
   state.ui.lastConnectedEdgeId = id;
   return id;
@@ -519,12 +546,14 @@ function uniqueEdgeId(state, fromId, toId) {
 function shotContent(shot) {
   return [
     `${Number(shot.duration_sec || 0)} 秒 · ${shot.shot_size || "景别待定"} · ${shot.camera_angle || "机位待定"}`,
-    `运动：${shot.movement || "待定"}`,
-    `调度：${shot.blocking || "待定"}`,
-    `声音：${shot.sound || "待定"}`,
-    `转场：${shot.transition || "待定"}`,
-    `目的：${shot.narrative_purpose || "待定"}`,
+    `${shot.movement || "运动待定"} · ${shot.transition || "转场待定"}`,
+    `目的：${compactShotText(shot.narrative_purpose || shot.blocking || "补足叙事目的")}`,
   ].join("\n");
+}
+
+function compactShotText(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > 34 ? `${text.slice(0, 34)}…` : text;
 }
 
 function sourceTextForNode(node) {

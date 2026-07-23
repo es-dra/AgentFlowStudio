@@ -1449,6 +1449,24 @@ body,
   background: rgba(7, 16, 24, .88);
 }
 
+.graph-canvas-status.planning-required.contextual-inline {
+  display: inline-flex;
+  width: auto;
+  max-width: min(180px, calc(100% - 28px));
+  min-height: 0;
+  gap: 0;
+  border-color: rgba(90, 200, 250, .22);
+  padding: 4px;
+  background: rgba(7, 16, 24, .72);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .18);
+}
+
+.graph-canvas-status.planning-required.contextual-inline .plan-inline-action {
+  min-height: 30px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
 .graph-canvas-status.planning-required.compact {
   grid-template-columns: auto minmax(0, 1fr);
   max-width: min(560px, calc(100% - 28px));
