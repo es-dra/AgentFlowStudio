@@ -272,4 +272,3 @@ def _text_list(value: Any, *, text: TextSanitizer, max_items: int, max_length: i
 
 def _compact(value: dict[str, Any]) -> dict[str, Any]:
     return {key: item for key, item in value.items() if item not in ("", [], {}, None)}
-
