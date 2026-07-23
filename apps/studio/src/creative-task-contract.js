@@ -52,6 +52,7 @@ export function normalizeCreativeTask(value, fallback = {}) {
     result_scope: safeToken(raw.result_scope || fallback.result_scope, 80),
     error_owner: safeToken(raw.error_owner || fallback.error_owner, 80),
     error_category: safeToken(raw.error_category || fallback.error_category, 120),
+    error_detail: safePublicText(raw.error_detail || fallback.error_detail, 360),
     started_at: safeToken(raw.started_at || fallback.started_at, 80),
     completed_at: safeToken(raw.completed_at || fallback.completed_at, 80),
     elapsed_ms: Number(raw.elapsed_ms || fallback.elapsed_ms || 0),
@@ -68,9 +69,12 @@ export function completeCreativeTask(task, state = "preview_ready", phase = "pre
   return next;
 }
 
-export function failCreativeTask(task, message = "") {
+export function failCreativeTask(task, category = "", options = {}) {
   const next = completeCreativeTask(task, "failed", "failed");
-  next.error_category = safeToken(message, 140) || "task_failed";
+  const detail = typeof options === "string" ? options : options?.error_detail || options?.detail || "";
+  next.error_category = safeToken(category, 140) || "task_failed";
+  next.error_owner = safeToken(options?.error_owner || next.error_owner, 80);
+  next.error_detail = safePublicText(detail, 360);
   return next;
 }
 
@@ -128,6 +132,42 @@ export function shotPlanSummary(plan) {
   };
 }
 
+export function creativeActionFailureInfo(action = {}) {
+  const task = action.creative_task || action.creativeTask || {};
+  const category = safeToken(action.error_category || task.error_category || "task_failed", 120) || "task_failed";
+  const detail = safePublicText(action.error_detail || task.error_detail || action.error || action.message || "", 420);
+  const preserved = safePublicText(action.preserved_state, 360)
+    || (action.action_type === "shot_breakdown"
+      ? "当前节点和已应用剧本已保留；ProductionGraph 未改变。"
+      : "当前节点内容已保留；ProductionGraph 未改变。");
+  const nextAction = safePublicText(action.next_action, 360) || failureNextAction(category, action.action_type);
+  return {
+    category,
+    label: failureCategoryLabel(category),
+    detail,
+    preserved_state: preserved,
+    next_action: nextAction,
+  };
+}
+
+export function failureCategoryLabel(category) {
+  return {
+    stale_node_version: "节点版本已变化",
+    studio_state_conflict: "画布版本冲突",
+    studio_state_persistence: "画布状态保存失败",
+    runtime_unavailable: "运行服务不可用",
+    provider_output_validation: "AI 输出结构未通过校验",
+    unsafe_or_invalid_llm_preview: "AI 输出结构未通过校验",
+    screenplay_candidate_missing: "剧本结构缺失",
+    shot_plan_missing: "分镜结构缺失",
+    shot_plan_empty: "分镜为空",
+    timeout: "任务超时",
+    media_error_isolated: "媒体能力错误已隔离",
+    client_runtime_state: "本地任务状态异常",
+    task_failed: "任务失败",
+  }[safeToken(category, 120)] || "任务失败";
+}
+
 export function nodeVersion(node, sourceText = "") {
   return [
     node?.id || "",
@@ -147,10 +187,32 @@ function uniquePhases(phases) {
   });
 }
 
+function failureNextAction(category, actionType) {
+  if (category === "stale_node_version" || category === "studio_state_conflict") {
+    return "刷新当前项目状态后，从当前节点重新预览。";
+  }
+  if (category === "provider_output_validation" || category === "unsafe_or_invalid_llm_preview") {
+    return actionType === "shot_breakdown"
+      ? "保留已扩写剧本，重新预览分镜；若再次失败，先检查剧本是否有清晰场次。"
+      : "保留原节点，重新预览剧本化修订。";
+  }
+  if (category === "timeout") return "稍后重新预览；不要重复点击以免创建并发任务。";
+  return "使用 AI 创作搭档中的重新预览继续；确认前不会改动画布。";
+}
+
 function elapsedMs(startedAt) {
   const started = Date.parse(startedAt || "");
   if (!Number.isFinite(started)) return 0;
   return Math.max(0, Date.now() - started);
+}
+
+function safePublicText(value, limit) {
+  return String(value || "")
+    .replace(/\bBearer\s+\S+/gi, "Bearer <redacted>")
+    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
 }
 
 function safeToken(value, limit) {

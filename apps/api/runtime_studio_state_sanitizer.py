@@ -123,6 +123,9 @@ def _nodes(value: Any, *, project_id: str | None = None) -> dict[str, Any]:
         }
         if preview_url:
             safe_node["previewUrl"] = preview_url
+        group_id = safe_id(_text(node.get("groupId"), "", 160))
+        if group_id:
+            safe_node["groupId"] = group_id
         result[node_id] = safe_node
     return result
 
@@ -135,14 +138,17 @@ def _edges(value: Any) -> dict[str, Any]:
             continue
         edge_id = safe_id(str(raw_id))
         relation = _text(edge.get("relation_type") or edge.get("relationType"), "generation", 40)
-        if relation not in {"generation", "director", "reference"}:
+        if relation not in {"generation", "director", "reference", "proposed", "sequence"}:
             relation = "generation"
-        result[edge_id] = {
+        safe_edge = {
             "id": edge_id,
             "from": safe_id(str(edge.get("from", ""))),
             "to": safe_id(str(edge.get("to", ""))),
             "relation_type": relation,
         }
+        if edge.get("suppress_label") is True or edge.get("suppressLabel") is True:
+            safe_edge["suppress_label"] = True
+        result[edge_id] = safe_edge
     return result
 
 

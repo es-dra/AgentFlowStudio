@@ -42,13 +42,15 @@ export function agentChatContextSnapshot({
   const meta = state.meta && typeof state.meta === "object" ? state.meta : {};
   const nodes = state.nodes && typeof state.nodes === "object" ? state.nodes : {};
   const nodeValues = Object.values(nodes).filter(Boolean);
-  const shotNodes = nodeValues.filter((node) => node?.params?.structuredShot || node?.params?.nodeRole === "storyboard_shot");
+  const sceneNodes = nodeValues.filter((node) => isSceneContextNode(node));
+  const shotNodes = nodeValues.filter((node) => isShotContextNode(node));
   const activeNode = selectedNode || null;
   const scriptTruth = state.production?.script_core_truth_projection || {};
   const productionPlan = state.production?.dynamic_production_plan_projection || {};
   const productionGraph = state.production?.production_graph_projection || {};
   const selectedCoreAsset = activeNode?.params?.coreAssetTruth || null;
   const selectedPlanEntity = activeNode?.params?.productionPlanTruth || null;
+  const selectedScreenplaySummary = screenplaySummaryForNode(activeNode);
   const selectedEdgeId = cleanToken(state.selection?.edgeId, 140);
   const selectedEdge = selectedEdgeId ? state.edges?.[selectedEdgeId] : null;
   const selectedEdgeFrom = selectedEdge?.from ? nodes[selectedEdge.from] : null;
@@ -86,6 +88,7 @@ export function agentChatContextSnapshot({
     selected_plan_chunk_id: cleanToken(selectedPlanEntity?.chunk_id, 160),
     selected_plan_entity_plan_id: cleanToken(selectedPlanEntity?.plan_id, 140),
     selected_plan_entity_plan_digest: cleanToken(selectedPlanEntity?.plan_digest, 80),
+    selected_screenplay_summary: selectedScreenplaySummary,
     selected_edge_id: selectedEdgeId,
     selected_edge_relation_type: cleanToken(selectedEdge?.relation_type || selectedEdge?.relationType || "", 80),
     selected_edge_from_node_id: cleanToken(selectedEdge?.from, 120),
@@ -96,7 +99,7 @@ export function agentChatContextSnapshot({
     current_shot_title: cleanText(currentShot?.title || "", 80),
     counts: {
       nodes: nodeValues.length,
-      scenes: Number(productionGraph.scene_count || 0) || inferSceneCount(shotNodes),
+      scenes: Number(productionGraph.scene_count || 0) || sceneNodes.length || inferSceneCount(shotNodes),
       shots: Number(productionGraph.shot_count || 0) || planShotCount || shotNodes.length,
       assets: Array.isArray(state.assets) ? state.assets.length : 0,
       graph_tasks: Number(productionGraph.task_count || 0),
@@ -129,6 +132,38 @@ export function agentChatContextSnapshot({
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
+}
+
+function screenplaySummaryForNode(node) {
+  const params = node?.params && typeof node.params === "object" ? node.params : {};
+  const revisions = Array.isArray(params.revisions) ? params.revisions : [];
+  const currentRevisionId = cleanToken(params.currentRevisionId, 160);
+  const currentRevision = revisions.find((revision) => cleanToken(revision?.revision_id, 160) === currentRevisionId)
+    || revisions.slice().reverse().find((revision) => revision?.screenplay_candidate);
+  const candidate = currentRevision?.screenplay_candidate || params.embeddedCreativeAction?.preview?.screenplay_candidate || null;
+  const scenes = Array.isArray(candidate?.scenes) ? candidate.scenes : [];
+  const characters = Array.isArray(candidate?.characters) ? candidate.characters : [];
+  if (!scenes.length && !characters.length && !currentRevisionId) return {};
+  return {
+    revision_id: currentRevisionId || cleanToken(currentRevision?.revision_id, 160),
+    title: cleanText(candidate?.title || "剧本候选", 120),
+    scene_count: scenes.length,
+    character_count: characters.length,
+    dialogue_blocks: scenes.reduce((sum, scene) => {
+      const blocks = Array.isArray(scene?.blocks) ? scene.blocks : [];
+      return sum + blocks.filter((block) => cleanToken(block?.type, 40) === "dialogue").length;
+    }, 0),
+  };
+}
+
+function isSceneContextNode(node) {
+  const role = cleanToken(node?.params?.nodeRole, 80);
+  return node?.type === "scene" || role === "storyboard_scene" || role === "m6_6_scene_candidate";
+}
+
+function isShotContextNode(node) {
+  const role = cleanToken(node?.params?.nodeRole, 80);
+  return Boolean(node?.params?.structuredShot) || node?.type === "shot" || role === "storyboard_shot" || role === "m6_6_shot_candidate";
 }
 
 export function stageProductionGraphCommand(session, context, { action, title, summary, targetNodeId = "", changedNodeIds = [], patch = {}, payload = {}, impact = null } = {}) {

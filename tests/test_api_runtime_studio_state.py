@@ -520,6 +520,221 @@ def test_studio_state_preserves_public_generation_and_model_context_summaries(tm
     assert "provider_raw_persisted" not in serialized
 
 
+def test_studio_state_roundtrips_embedded_creative_preview_and_shot_candidate_lineage(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-embedded-creative-roundtrip"
+    client.post("/projects", json={"project_id": project_id, "goal": "Embedded creative state"})
+    revision_id = "node_revision_m673"
+    state = {
+        "meta": {"projectName": "M6.7.3", "canvasName": "Roundtrip", "seq": 10},
+        "nodes": {
+            "story_text": {
+                "id": "story_text",
+                "type": "text",
+                "title": "故事文本",
+                "content": "INT. 摄影棚 - 夜\n导演坚持保留最后一条镜头。",
+                "params": {
+                    "currentRevisionId": revision_id,
+                    "revisions": [
+                        {
+                            "revision_id": revision_id,
+                            "action_type": "script_revision",
+                            "mode": "professional_expansion",
+                            "before_text": "导演保留镜头。",
+                            "after_text": "INT. 摄影棚 - 夜\n导演坚持保留最后一条镜头。",
+                            "source_node_version": "story_text:text:7:",
+                            "change_summary": ["补足场次和对白"],
+                            "provider_lineage": {
+                                "service_id": "server_codex",
+                                "provider_calls_started": True,
+                                "provider_dispatch_count": 1,
+                                "external_paid_cost_usd": 0,
+                            },
+                            "graph_mutation": {"mutated": False, "scope": "preview_only"},
+                            "screenplay_candidate": {
+                                "title": "最后一条",
+                                "version_label": "v1",
+                                "characters": [{"name": "导演", "goal": "保留胶片", "conflict": "预算耗尽"}],
+                                "scenes": [
+                                    {
+                                        "heading": "INT. 摄影棚 - 夜",
+                                        "location": "摄影棚",
+                                        "time_of_day": "夜",
+                                        "purpose": "提出冲突",
+                                        "blocks": [
+                                            {"type": "character", "character": "导演", "text": "导演"},
+                                            {"type": "dialogue", "character": "导演", "text": "再给我一条。"},
+                                        ],
+                                    }
+                                ],
+                            },
+                            "same_node_identity": True,
+                        }
+                    ],
+                    "lastEmbeddedCreativeActionSummary": {
+                        "action_type": "script_revision",
+                        "mode": "professional_expansion",
+                        "revision_id": revision_id,
+                        "provider_calls_started": True,
+                        "cost_usd": 0,
+                    },
+                    "embeddedCreativeAction": {
+                        "action_id": "embedded_m673",
+                        "action_type": "shot_breakdown",
+                        "mode": "dynamic_shot_breakdown",
+                        "status": "preview",
+                        "source_text": "INT. 摄影棚 - 夜\n导演坚持保留最后一条镜头。",
+                        "source_node_version": f"story_text:text:31:{revision_id}",
+                        "message": "分镜候选已生成：1 场 · 2 镜头。请在右侧审阅后应用或取消。",
+                        "creative_task": {
+                            "task_id": "creative_task_m673",
+                            "node_id": "story_text",
+                            "node_version": f"story_text:text:31:{revision_id}",
+                            "action_type": "shot_breakdown",
+                            "mode": "dynamic_shot_breakdown",
+                            "state": "preview_ready",
+                            "phase": "preview_ready",
+                            "completed_phases": ["queued", "context", "dispatching", "preview_ready"],
+                            "result_scope": "candidate_storyboard_subgraph",
+                        },
+                        "provider_lineage": {
+                            "service_id": "server_codex",
+                            "model_surface": "codex_local",
+                            "provider_calls_started": True,
+                            "provider_dispatch_count": 1,
+                            "external_paid_cost_usd": 0,
+                        },
+                        "graph_mutation": {"mutated": False, "scope": "preview_only"},
+                        "preview": {
+                            "preview_id": "preview_m673",
+                            "revised_text": "INT. 摄影棚 - 夜\n导演坚持保留最后一条镜头。",
+                            "shot_plan": {
+                                "schema_version": "afs.shot_plan.v0.1",
+                                "candidate_id": "shot_candidate_m673",
+                                "source_revision_id": revision_id,
+                                "total_shots": 2,
+                                "estimated_duration_sec": 9,
+                                "scenes": [
+                                    {
+                                        "scene_id": "scene_1",
+                                        "title": "摄影棚",
+                                        "purpose": "建立抉择",
+                                        "shots": [
+                                            {
+                                                "shot_id": "shot_1",
+                                                "title": "推轨靠近导演",
+                                                "duration_sec": 5,
+                                                "shot_size": "中景",
+                                                "camera_angle": "平视",
+                                                "movement": "缓慢推轨",
+                                                "blocking": "导演站在剪辑台前",
+                                                "sound": "雨声",
+                                                "transition": "切",
+                                                "narrative_purpose": "建立压力",
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                        },
+                        "latency_ms": 1200,
+                        "cost_usd": 0,
+                    },
+                    "shotPlanDraft": {
+                        "candidate_id": "shot_candidate_m673",
+                        "source_revision_id": revision_id,
+                        "total_shots": 2,
+                        "estimated_duration_sec": 9,
+                        "scenes": [{"scene_id": "scene_1", "node_id": "scene_1", "shots": [{"shot_id": "shot_1", "node_id": "shot_1"}]}],
+                    },
+                },
+            },
+            "sequence_1": {
+                "id": "sequence_1",
+                "type": "sequence",
+                "title": "分镜序列候选",
+                "groupId": "shot_candidate_m673",
+                "params": {
+                    "candidate_id": "shot_candidate_m673",
+                    "nodeRole": "m6_6_shot_sequence_candidate",
+                    "source_node_id": "story_text",
+                    "source_revision_id": revision_id,
+                    "creative_task_id": "creative_task_m673",
+                    "shot_count": 2,
+                    "scene_count": 1,
+                    "estimated_duration_sec": 9,
+                    "promotion_state": "candidate_preview",
+                    "layout_role": "sequence_group_anchor",
+                },
+            },
+            "scene_1": {
+                "id": "scene_1",
+                "type": "scene",
+                "title": "摄影棚",
+                "groupId": "shot_candidate_m673",
+                "params": {
+                    "candidate_id": "shot_candidate_m673",
+                    "nodeRole": "m6_6_scene_candidate",
+                    "source_sequence_node_id": "sequence_1",
+                    "source_revision_id": revision_id,
+                    "scene_index": 0,
+                    "purpose": "建立抉择",
+                    "layout_role": "scene_lane",
+                },
+            },
+            "shot_1": {
+                "id": "shot_1",
+                "type": "shot",
+                "title": "推轨靠近导演",
+                "groupId": "shot_candidate_m673",
+                "params": {
+                    "candidate_id": "shot_candidate_m673",
+                    "nodeRole": "m6_6_shot_candidate",
+                    "source_scene_node_id": "scene_1",
+                    "source_revision_id": revision_id,
+                    "scene_index": 0,
+                    "shot_index": 0,
+                    "duration_sec": 5,
+                    "shot_size": "中景",
+                    "camera_angle": "平视",
+                    "movement": "缓慢推轨",
+                    "blocking": "导演站在剪辑台前",
+                    "sound": "雨声",
+                    "transition": "切",
+                    "narrative_purpose": "建立压力",
+                    "layout_role": "shot_grid_item",
+                    "layout_column": 0,
+                    "layout_row": 0,
+                },
+            },
+        },
+        "edges": {
+            "edge_story_sequence": {"id": "edge_story_sequence", "from": "story_text", "to": "sequence_1", "relation_type": "proposed"},
+            "edge_sequence_scene": {"id": "edge_sequence_scene", "from": "sequence_1", "to": "scene_1", "relation_type": "sequence"},
+            "edge_scene_shot": {"id": "edge_scene_shot", "from": "scene_1", "to": "shot_1", "relation_type": "sequence", "suppress_label": True},
+        },
+        "order": ["story_text", "sequence_1", "scene_1", "shot_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+    assert saved.status_code == 200
+    restored = client.get(f"/projects/{project_id}/studio-state").json()["state"]
+    story_params = restored["nodes"]["story_text"]["params"]
+    assert story_params["currentRevisionId"] == revision_id
+    assert story_params["revisions"][0]["screenplay_candidate"]["scenes"][0]["blocks"][1]["type"] == "dialogue"
+    assert story_params["embeddedCreativeAction"]["status"] == "preview"
+    assert story_params["embeddedCreativeAction"]["creative_task"]["node_version"].endswith(revision_id)
+    assert story_params["embeddedCreativeAction"]["provider_lineage"]["provider_dispatch_count"] == 1
+    assert story_params["embeddedCreativeAction"]["preview"]["shot_plan"]["scenes"][0]["shots"][0]["camera_angle"] == "平视"
+    assert story_params["shotPlanDraft"]["source_revision_id"] == revision_id
+    assert restored["nodes"]["sequence_1"]["groupId"] == "shot_candidate_m673"
+    assert restored["nodes"]["shot_1"]["params"]["source_revision_id"] == revision_id
+    assert restored["nodes"]["shot_1"]["params"]["duration_sec"] == 5
+    assert restored["edges"]["edge_story_sequence"]["relation_type"] == "proposed"
+    assert restored["edges"]["edge_sequence_scene"]["relation_type"] == "sequence"
+    assert restored["edges"]["edge_scene_shot"]["suppress_label"] is True
+
+
 def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "studio-state-unsafe"
@@ -530,6 +745,7 @@ def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> 
         {"assets": [{"id": "a", "provider_raw": {"text": "raw"}}]},
         {"nodes": {"a": {"params": {"provider_config": "unsafe"}}}},
         {"nodes": {"a": {"params": {"signed_url": "https://example.invalid/signed"}}}},
+        {"nodes": {"a": {"params": {"embeddedCreativeAction": {"provider_raw": {"text": "unsafe"}}}}}},
         {"nodes": {"a": {"params": {"candidatePreviewUrls": [{"url": "https://example.invalid/private.png"}]}}}},
     ]
 
