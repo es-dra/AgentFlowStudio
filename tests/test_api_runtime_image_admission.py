@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.image_utils import image_dimensions
-from apps.api.runtime_image_admission import compile_image_admission_manifest
+from apps.api.runtime_image_admission import (
+    compile_image_admission_manifest,
+    enforce_image_admission_keyframe_request,
+)
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
@@ -32,9 +36,27 @@ def _asset(
         "review_state": "approved",
         "needs_confirmation": False,
         "negative_locks": ["do not add text/watermark/ui/borders"],
-        "positive_traits": [],
-        "continuity_states": [],
-        "source_evidence": [{"kind": "occurrence_ledger", "ref": stable_id}],
+        "visual_identity": f"{display_name} 的已确认轮廓、材质与配色身份",
+        "positive_traits": [f"保持 {display_name} 的稳定辨识特征", "材质细节清晰"],
+        "continuity_states": [
+            {
+                "state_id": f"continuity-{stable_id}",
+                "label": "当前场次造型与持有物保持一致",
+                "status": "confirmed",
+                "scene_ids": scene_ids,
+                "shot_ids": shot_ids,
+            }
+        ],
+        "pending_fields": [],
+        "source_evidence": [
+            {
+                "source_type": "occurrence_ledger",
+                "source_id": stable_id,
+                "scene_ids": scene_ids,
+                "shot_ids": shot_ids,
+                "excerpt": "已应用分镜中的资产出现范围",
+            }
+        ],
         "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
     }
 
@@ -50,6 +72,15 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
             "scene_id": f"scene-{1 + (index > 6) + (index > 12)}",
             "title": f"镜头 {index:02d}",
             "number": index,
+            "purpose": f"推进第 {index} 个叙事节拍",
+            "shot_size": "中景",
+            "composition": "主体位于画面三分线，保留动作空间",
+            "camera_angle": "平视",
+            "movement": "稳定跟随",
+            "action": f"角色完成镜头 {index} 的明确动作",
+            "dialogue": "" if index % 2 else f"第 {index} 镜对白",
+            "emotion": "克制而专注",
+            "continuity_cues": ["服装与关键道具位置延续上一镜"],
         }
         for index in range(1, 18)
     ]
@@ -57,9 +88,27 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
         _asset("asset-character-a", "character", "角色甲", scene_ids=["scene-1"], shot_ids=["scene-1-shot-1"]),
         _asset("asset-character-b", "character", "角色乙", scene_ids=["scene-1"], shot_ids=["scene-1-shot-2"]),
         _asset("asset-character-c", "character", "角色丙", scene_ids=["scene-3"], shot_ids=["scene-3-shot-17"]),
-        _asset("asset-scene-a", "scene", "主场景", scene_ids=["scene-1"], shot_ids=[]),
-        _asset("asset-scene-b", "scene", "次场景", scene_ids=["scene-2"], shot_ids=[]),
-        _asset("asset-scene-c", "scene", "终场景", scene_ids=["scene-3"], shot_ids=[]),
+        _asset(
+            "asset-scene-a",
+            "scene",
+            "主场景",
+            scene_ids=["scene-1"],
+            shot_ids=[f"scene-1-shot-{index}" for index in range(1, 7)],
+        ),
+        _asset(
+            "asset-scene-b",
+            "scene",
+            "次场景",
+            scene_ids=["scene-2"],
+            shot_ids=[f"scene-2-shot-{index}" for index in range(7, 13)],
+        ),
+        _asset(
+            "asset-scene-c",
+            "scene",
+            "终场景",
+            scene_ids=["scene-3"],
+            shot_ids=[f"scene-3-shot-{index}" for index in range(13, 18)],
+        ),
         _asset(
             "asset-prop-a",
             "prop",
@@ -98,11 +147,24 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
             "shot_count": 17,
         },
         "assets": assets,
+        "art_direction": {
+            "visual_style": "写实古装动作片",
+            "medium": "电影摄影，真实皮肤、织物与金属质感",
+            "palette": "低饱和青绿与暖金点缀",
+            "lighting": "黄昏侧逆光，人物面部清晰可辨",
+            "status": "confirmed",
+            "source": "human_review",
+            "confirmed_at": REQUESTED_AT,
+        },
         "coverage": {
             "coverage_pass": True,
             "quality_pass": True,
+            "scene_total": 3,
+            "scene_covered": 3,
             "shot_total": 17,
             "shot_covered": 17,
+            "asset_shot_covered": 17,
+            "missing_source_evidence_shot_count": 0,
             "required_occurrence_total": 35,
             "resolved_required": 35,
             "unresolved_required": 0,
@@ -121,6 +183,11 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
         "production_graph_version": graph_version,
         "production_graph_digest": graph_digest,
         "studio_state_version": "studio-state-current",
+        "art_direction": bible["art_direction"],
+        "shot_grounding": {
+            "scenes": scenes,
+            "shots": shots,
+        },
         "asset_bible": bible,
     }
 
@@ -159,6 +226,115 @@ def test_manifest_compiler_produces_exact_nine_unique_lineage_items_without_name
     assert all(item["source_fingerprint"] == manifest["source_fingerprint"] for item in manifest["items"])
     assert manifest["budget_contract"]["unit_estimate_usd"] == "0.0377"
     assert manifest["budget_contract"]["max_estimated_usd"] == "0.3500"
+    assert manifest["art_direction"]["visual_style"] == "写实古装动作片"
+    assert manifest["creative_grounding"]["status"] == "ready"
+    assert manifest["creative_grounding"]["source_evidence_summary"]["status"] == "complete"
+    assert manifest["creative_grounding"]["source_evidence_summary"]["traceable_shot_count"] == 17
+    character = next(item for item in manifest["items"] if item["item_type"] == "character_design")
+    assert character["asset_grounding"]["visual_identity"]
+    assert character["asset_grounding"]["positive_traits"]
+    assert character["asset_grounding"]["continuity_states"][0]["status"] == "confirmed"
+    assert character["prompt_contract"]["provider_prompt_digest"] == canonical_digest(
+        character["prompt_contract"]["provider_prompt"]
+    )
+    assert "【资产身份】" in character["prompt_contract"]["provider_prompt"]
+    assert "角色设定" in character["prompt_contract"]["provider_prompt"]
+    assert "禁止添加文字、水印、界面元素或边框" in character["prompt_contract"]["provider_prompt"]
+    assert "character_design" not in character["prompt_contract"]["provider_prompt"]
+    assert "do not add text" not in character["prompt_contract"]["provider_prompt"]
+    keyframe = next(item for item in manifest["items"] if item["item_type"] == "shot_keyframe")
+    assert keyframe["shot_grounding"]["purpose"]
+    assert keyframe["reference_asset_grounding"]
+    assert "【镜头依据】" in keyframe["prompt_contract"]["provider_prompt"]
+    assert "【引用资产】" in keyframe["prompt_contract"]["provider_prompt"]
+
+
+def test_manifest_compile_fails_closed_for_visual_pending_or_missing_art_direction() -> None:
+    source = source_contract()
+    source["asset_bible"]["assets"][0]["pending_fields"] = ["visual_identity"]
+    with pytest.raises(ValueError, match="图片准入创意依据不完整"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+
+
+def test_manifest_compile_fails_closed_for_missing_traceable_source_evidence(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "false")
+    source = source_contract()
+    for asset in source["asset_bible"]["assets"]:
+        asset["source_evidence"] = []
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+    forged = source_contract()
+    for asset in forged["asset_bible"]["assets"]:
+        asset["occurrences"]["shot_ids"] = []
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, forged)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {"type": "compile", "idempotency_key": "missing-evidence"},
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    readback = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()
+    assert readback["status"] == "empty"
+    assert readback["provider_dispatch_count"] == 0
+    assert readback["external_cost_usd"] == "0.0000"
+
+    source = source_contract()
+    source["art_direction"] = {}
+    source["asset_bible"]["art_direction"] = {}
+    with pytest.raises(ValueError, match="统一美术方向"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+
+
+@pytest.mark.parametrize(
+    ("source_type", "source_id"),
+    [
+        ("", "source-id"),
+        ("script_revision", ""),
+        ("custom_source", "source-id"),
+        ("script_revision", "../unsafe-source"),
+        ("script_revision", "script-revision-current"),
+        ("occurrence_ledger", "asset-other"),
+        ("applied_shot_plan", "shot-outside-occurrence"),
+    ],
+)
+def test_manifest_compile_recomputes_authoritative_evidence_semantics(
+    source_type: str,
+    source_id: str,
+) -> None:
+    source = source_contract()
+    for asset in source["asset_bible"]["assets"]:
+        asset["source_evidence"] = [
+            {
+                "source_type": source_type,
+                "source_id": source_id,
+                "scene_ids": asset["occurrences"]["scene_ids"],
+                "shot_ids": asset["occurrences"]["shot_ids"],
+                "excerpt": "伪造的镜头覆盖记录",
+            }
+        ]
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+
+
+def test_prompt_and_source_fingerprint_change_with_reviewed_creative_facts() -> None:
+    original = compile_image_admission_manifest(PROJECT_ID, source_contract(), created_at=REQUESTED_AT)
+    revised_source = source_contract()
+    revised_source["asset_bible"]["assets"][0]["visual_identity"] += "，额外确认面部纹理"
+    revised = compile_image_admission_manifest(PROJECT_ID, revised_source, created_at=REQUESTED_AT)
+
+    assert revised["source_fingerprint"] != original["source_fingerprint"]
+    assert revised["manifest_hash"] != original["manifest_hash"]
+    original_item = next(item for item in original["items"] if item["target_asset_ids"] == ["asset-character-a"])
+    revised_item = next(item for item in revised["items"] if item["target_asset_ids"] == ["asset-character-a"])
+    assert revised_item["prompt_contract"]["provider_prompt_digest"] != original_item["prompt_contract"]["provider_prompt_digest"]
 
 
 def test_manifest_compiler_blocks_ambiguous_character_or_prop_selection() -> None:
@@ -316,6 +492,41 @@ def test_generation_job_binding_survives_reload_without_another_reservation(tmp_
     assert next(
         receipt for receipt in reloaded["receipts"] if receipt["state"] == "job_recorded"
     )["provider_job_id"] == "keyframe-generation-job-a"
+
+
+def test_locked_prompt_contract_is_the_only_dispatch_prompt(tmp_path, monkeypatch) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    item = next(entry for entry in manifest["items"] if entry["item_type"] == "character_design")
+    reserved = _command(
+        client,
+        {"type": "reserve_dispatch", "item_id": item["item_id"], "idempotency_key": "reserve-prompt-a"},
+        source,
+    )["result"]["manifest"]
+    item = next(entry for entry in reserved["items"] if entry["item_id"] == item["item_id"])
+    request = SimpleNamespace(
+        node_parameters={
+            "image_admission": {
+                "manifest_id": reserved["manifest_id"],
+                "item_id": item["item_id"],
+                "reservation_token": item["reservation_token"],
+            },
+            "disable_provider_retry": True,
+        },
+        candidate_count=1,
+        provider_service_id="image_relay",
+        aspect_ratio=item["aspect_ratio"],
+        asset_refs=[],
+        node_id=item["target_asset_ids"][0],
+        prompt_text=item["prompt_contract"]["provider_prompt"],
+        style=reserved["art_direction"]["visual_style"],
+    )
+    store = RuntimeStore(tmp_path / "runtime")
+    assert enforce_image_admission_keyframe_request(store, PROJECT_ID, request)["item"]["item_id"] == item["item_id"]
+    request.prompt_text += "\n未审核附加内容"
+    with pytest.raises(ValueError, match="prompt differs"):
+        enforce_image_admission_keyframe_request(store, PROJECT_ID, request)
 
 
 def test_existing_keyframe_route_cannot_bypass_locked_admission_manifest(tmp_path, monkeypatch) -> None:

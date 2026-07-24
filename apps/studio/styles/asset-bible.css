@@ -96,6 +96,69 @@
 .asset-bible-quality-gate ul { display: grid; gap: 4px; padding-left: 18px; }
 .asset-bible-quality-gate button { justify-self: start; }
 
+.asset-bible-art-direction {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--product-line);
+  border-left: 3px solid #b26d5c;
+  padding: 11px 14px;
+  background: #21191b;
+}
+
+.asset-bible-art-direction.confirmed {
+  border-left-color: #2e936b;
+  background: #10231d;
+}
+
+.asset-bible-art-direction > p {
+  margin: 0;
+  color: var(--product-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.asset-bible-art-direction-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr)) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.asset-bible-art-direction-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.asset-bible-art-direction-form label > span,
+.asset-bible-art-direction-summary dt {
+  color: var(--product-muted);
+  font-size: 10px;
+}
+
+.asset-bible-art-direction-form input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--product-line);
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: #071018;
+  color: var(--product-text);
+}
+
+.asset-bible-art-direction-summary {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  gap: 5px 12px;
+  margin: 0;
+}
+
+.asset-bible-art-direction-summary dd {
+  margin: 0;
+  color: var(--product-text);
+  font-size: 11px;
+}
+
 .asset-bible-workspace {
   display: grid;
   flex: 1 1 auto;
@@ -386,7 +449,7 @@
 
 .image-admission-panel {
   display: grid;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   gap: 12px;
   max-height: 48vh;
   overflow: auto;
@@ -466,6 +529,32 @@
 .image-admission-item.state-failed .image-admission-item-state,
 .image-admission-item.state-rejected .image-admission-item-state { color: #efb1b8; }
 .image-admission-item-actions { justify-content: flex-end; }
+.image-admission-grounding {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  border-top: 1px solid var(--product-line-soft);
+  padding-top: 8px;
+}
+.image-admission-grounding > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+}
+.image-admission-grounding span,
+.image-admission-grounding summary {
+  color: var(--product-muted);
+  font-size: 10px;
+}
+.image-admission-grounding p {
+  margin: 0;
+  color: #c4d5de;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.image-admission-grounding details { margin-top: 2px; }
+.image-admission-grounding summary { cursor: pointer; }
 .image-admission-candidate-preview {
   display: block;
   width: 100%;
@@ -558,6 +647,8 @@
   .asset-bible-status-bar { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
   .asset-bible-workspace { grid-template-columns: minmax(240px, .72fr) minmax(320px, 1.28fr); }
   .image-admission-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .asset-bible-art-direction-form { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  .asset-bible-art-direction-form button { justify-self: start; }
 }
 
 @media (max-width: 760px) {
@@ -600,11 +691,16 @@
   .asset-bible-split-fields { grid-template-columns: 1fr; }
   .asset-bible-command-review,
   .asset-bible-failure,
-  .asset-bible-quality-gate { padding: 10px; }
+  .asset-bible-quality-gate,
+  .asset-bible-art-direction { padding: 10px; }
+  .asset-bible-art-direction-form,
+  .asset-bible-art-direction-summary { grid-template-columns: 1fr; }
+  .asset-bible-art-direction-summary { gap: 3px; }
   .image-admission-panel { max-height: none; padding: 12px 10px; overflow: visible; }
   .image-admission-head { align-items: flex-start; }
   .image-admission-item { align-items: flex-start; flex-wrap: wrap; }
   .image-admission-item-actions { width: 100%; justify-content: flex-start; }
+  .image-admission-grounding > div { grid-template-columns: 1fr; gap: 2px; }
   .image-admission-thumbnail-button { width: 100%; max-height: 240px; }
   .image-admission-viewer { padding: 56px 12px 16px; }
   .image-admission-viewer > img { max-height: calc(100vh - 154px); }

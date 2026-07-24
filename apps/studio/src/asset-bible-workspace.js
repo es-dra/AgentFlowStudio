@@ -33,6 +33,7 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
     current_revision_id: String(bible.current_revision_id || ""),
     locked_revision_id: String(bible.locked_revision_id || ""),
     candidate_set: bible.candidate_set || {},
+    art_direction: normalizeArtDirection(bible.art_direction),
     assets,
     active_assets: activeAssets,
     history_assets: historyAssets,
@@ -109,8 +110,12 @@ export function deriveProductionCopilotState({
   );
   const shotReady = shotTruth.status === "ready" || Number(bible.candidate_set?.shot_count || 0) > 0;
   const candidatesReady = bible.counts.total > 0;
+  const visualBlockers = bible.active_assets
+    .filter((asset) => ["candidate", "approved"].includes(asset.review_state))
+    .flatMap((asset) => assetVisualBlockers(asset).map((label) => `${asset.display_name}：${label}`));
+  const artDirectionReady = bible.art_direction.status === "confirmed";
   const bibleLocked = bible.status === "locked" && Boolean(bible.locked_revision_id);
-  const contentReady = bibleLocked && bible.coverage.coverage_pass;
+  const contentReady = bibleLocked && bible.coverage.coverage_pass && artDirectionReady && visualBlockers.length === 0;
   const imageEnabled = capabilityGates.image === true;
   const admissionStatus = String(imageAdmission?.status || "empty");
   const admissionCounts = imageAdmission?.counts || {};
@@ -133,6 +138,13 @@ export function deriveProductionCopilotState({
       reason: `识别质量门有 ${qualityIssues.length} 项阻塞；先修复具名资产、别名或场景镜头覆盖。`,
       enabled: !bibleLocked,
     };
+  } else if (candidatesReady && visualBlockers.length > 0) {
+    next = {
+      action: "complete_asset_visual_identity",
+      label: "补全视觉身份",
+      reason: `${visualBlockers.length} 项视觉依据未完成；候选不能批准，先编辑正向特征、视觉身份和连续性状态。`,
+      enabled: true,
+    };
   } else if (candidatesReady && bible.counts.candidate > 0) {
     next = {
       action: selectedAsset?.review_state === "candidate" ? "approve_selected_asset" : "review_asset_candidates",
@@ -152,6 +164,13 @@ export function deriveProductionCopilotState({
       action: "review_asset_coverage",
       label: "检查镜头覆盖",
       reason: `${bible.coverage.shot_covered}/${bible.coverage.shot_total} 镜头已完成资产需求检查。`,
+      enabled: true,
+    };
+  } else if (candidatesReady && !artDirectionReady) {
+    next = {
+      action: "set_art_direction",
+      label: "确认统一美术方向",
+      reason: "图片准入需要先审核视觉风格、媒介质感、色彩方案和光线规则。",
       enabled: true,
     };
   } else if (candidatesReady && !bibleLocked) {
@@ -234,6 +253,8 @@ export function deriveProductionCopilotState({
       { key: "assets", label: "资产候选", state: candidatesReady ? "ready" : "blocked" },
       { key: "quality", label: "识别质量", state: bible.recognition_quality.status === "pass" ? "ready" : "blocked" },
       { key: "coverage", label: "镜头覆盖", state: bible.coverage.coverage_pass ? "ready" : "blocked" },
+      { key: "visual_identity", label: "视觉身份", state: visualBlockers.length ? "blocked" : "ready" },
+      { key: "art_direction", label: "美术方向", state: artDirectionReady ? "ready" : "blocked" },
       { key: "bible", label: "Bible 锁定", state: bibleLocked ? "ready" : "blocked" },
     ],
     blockers: [
@@ -241,6 +262,8 @@ export function deriveProductionCopilotState({
       ...(scriptReady && !shotReady ? ["分镜尚未应用"] : []),
       ...qualityIssues.slice(0, 3).map((item) => item.message),
       ...(candidatesReady && bible.counts.candidate ? [`${bible.counts.candidate} 个资产待确认`] : []),
+      ...visualBlockers.slice(0, 3),
+      ...(candidatesReady && !artDirectionReady ? ["统一美术方向尚未审核确认"] : []),
       ...(candidatesReady && bible.coverage.unresolved_required ? [
         `${bible.coverage.unresolved_required} 个必要出现范围未解决（${bible.coverage.unresolved_shot_count} 镜头）`,
       ] : []),
@@ -306,6 +329,18 @@ export function pendingFieldLabel(value) {
   }[String(value || "")] || "待人工确认属性";
 }
 
+export function assetVisualBlockers(asset = {}) {
+  const pending = new Set(array(asset.pending_fields));
+  const blockers = [];
+  if (pending.has("visual_identity") || !String(asset.visual_identity || "").trim()) blockers.push("视觉身份");
+  if (pending.has("positive_traits") || !array(asset.positive_traits).length) blockers.push("正向视觉特征");
+  const continuityReady = array(asset.continuity_states).some(
+    (item) => item?.status === "confirmed" && String(item?.label || "").trim(),
+  );
+  if (pending.has("continuity_state") || !continuityReady) blockers.push("连续性状态");
+  return blockers;
+}
+
 export function assetOccurrenceLabel(candidateSet = {}, kind, id) {
   if (kind === "scene") {
     const item = array(candidateSet.scene_index).find((entry) => entry?.scene_id === id);
@@ -329,10 +364,26 @@ function normalizeAsset(value) {
       shot_ids: array(value.occurrences?.shot_ids),
     },
     positive_traits: array(value.positive_traits),
+    visual_identity: String(value.visual_identity || ""),
+    continuity_states: array(value.continuity_states),
     negative_locks: array(value.negative_locks),
     pending_fields: array(value.pending_fields),
     source_evidence: array(value.source_evidence),
     superseded_by_ids: array(value.superseded_by_ids),
+  };
+}
+
+function normalizeArtDirection(value = {}) {
+  const result = {
+    visual_style: String(value?.visual_style || ""),
+    medium: String(value?.medium || ""),
+    palette: String(value?.palette || ""),
+    lighting: String(value?.lighting || ""),
+    confirmed_at: String(value?.confirmed_at || ""),
+  };
+  return {
+    ...result,
+    status: Object.values(result).every(Boolean) ? "confirmed" : "pending",
   };
 }
 
@@ -357,6 +408,7 @@ function normalizeCoverage(value = {}, candidateSet = {}) {
     quality_issue_count: Number(value.quality_issue_count || 0),
     quality_pass: value.quality_pass === true,
     asset_shot_covered: Number(value.asset_shot_covered || 0),
+    missing_source_evidence_shot_count: Number(value.missing_source_evidence_shot_count || 0),
     coverage_pass: value.coverage_pass === true,
   };
 }
@@ -390,6 +442,9 @@ function normalizeRecognitionQuality(value = {}, coverage = {}) {
     orphan_scene_coverage_count: Number(value.orphan_scene_coverage_count || coverage.orphan_scene_coverage_count || 0),
     alias_collision_count: Number(value.alias_collision_count || coverage.alias_collision_count || 0),
     recognition_ambiguity_count: Number(value.recognition_ambiguity_count || coverage.recognition_ambiguity_count || 0),
+    missing_source_evidence_shot_count: Number(
+      value.missing_source_evidence_shot_count || coverage.missing_source_evidence_shot_count || 0
+    ),
   };
 }
 

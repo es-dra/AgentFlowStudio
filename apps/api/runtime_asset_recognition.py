@@ -157,6 +157,34 @@ def recognize_asset_occurrences(
                     "scene_id": scene_id,
                     "title": shot_title,
                     "number": shot_count,
+                    "description": str(
+                        shot.get("description")
+                        or shot.get("blocking")
+                        or ""
+                    ).strip()[:600],
+                    "purpose": str(
+                        shot.get("narrative_purpose")
+                        or shot.get("purpose")
+                        or ""
+                    ).strip()[:400],
+                    "shot_size": str(shot.get("shot_size") or "").strip()[:80],
+                    "composition": str(shot.get("composition") or "").strip()[:240],
+                    "camera_angle": str(shot.get("camera_angle") or "").strip()[:160],
+                    "movement": str(
+                        shot.get("movement")
+                        or shot.get("camera_motion")
+                        or ""
+                    ).strip()[:240],
+                    "action": str(shot.get("action") or "").strip()[:400],
+                    "dialogue": str(shot.get("dialogue") or "").strip()[:400],
+                    "emotion": str(shot.get("emotion") or "").strip()[:240],
+                    "continuity_cues": _dedupe_texts(
+                        [
+                            str(shot.get("continuity") or ""),
+                            str(shot.get("continuity_in") or ""),
+                            str(shot.get("continuity_out") or ""),
+                        ]
+                    )[:16],
                 }
             )
         scene_shots[scene_id] = shot_ids

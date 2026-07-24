@@ -8,6 +8,10 @@ from typing import Any, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
 
+from apps.api.runtime_asset_evidence import (
+    authoritative_source_evidence,
+    canonicalize_source_evidence,
+)
 from apps.api.runtime_asset_recognition import recognize_asset_occurrences
 from apps.api.runtime_asset_profile_plan import build_asset_profile_plan
 from apps.api.runtime_auth import RuntimeAuthStore
@@ -28,6 +32,7 @@ COMMANDS = {
     "generate_candidates",
     "regenerate_candidates",
     "create_asset",
+    "set_art_direction",
     "approve",
     "reject",
     "edit",
@@ -38,6 +43,7 @@ COMMANDS = {
     "lock",
 }
 ASSET_TYPES = {"character", "scene", "prop"}
+ART_DIRECTION_FIELDS = ("visual_style", "medium", "palette", "lighting")
 
 
 def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -293,6 +299,7 @@ def _apply_command(
             "assets": generated["assets"],
             "required_occurrences": _required_occurrences(generated["assets"]),
             "occurrence_resolutions": [],
+            "art_direction": {},
             "revisions": [],
             "current_revision_id": "",
             "locked_revision_id": "",
@@ -325,7 +332,14 @@ def _apply_command(
     index = {item["stable_id"]: item for item in assets}
     if command_type in {"approve", "reject", "edit", "split"} and (len(target_ids) != 1 or target_ids[0] not in index):
         raise ValueError("asset Bible command requires one current asset")
-    if command_type == "approve":
+    if command_type == "set_art_direction":
+        current["art_direction"] = _art_direction(
+            command.get("art_direction"),
+            confirmed_at=command_time,
+            require_complete=True,
+        )
+    elif command_type == "approve":
+        _assert_asset_visual_ready(index[target_ids[0]])
         index[target_ids[0]]["review_state"] = "approved"
         index[target_ids[0]]["needs_confirmation"] = False
     elif command_type == "reject":
@@ -425,7 +439,8 @@ def _apply_command(
                 "Asset Bible lock blocked: 识别质量门未通过："
                 f"{coverage.get('missing_anchor_count', 0)} 个具名资产遗漏，"
                 f"{coverage.get('alias_collision_count', 0)} 组别名冲突，"
-                f"{coverage.get('orphan_scene_coverage_count', 0)} 个场景覆盖断裂"
+                f"{coverage.get('orphan_scene_coverage_count', 0)} 个场景覆盖断裂，"
+                f"{coverage.get('missing_source_evidence_shot_count', 0)} 个镜头缺少来源证据"
             )
         if not coverage["coverage_pass"]:
             raise ValueError(
@@ -433,6 +448,17 @@ def _apply_command(
                 f"{coverage['unresolved_required']} required occurrences unresolved; "
                 f"{coverage['shot_covered']}/{coverage['shot_total']} shots covered"
             )
+        visual_blockers = [
+            f"{item['display_name']}：{'、'.join(_asset_visual_blockers(item))}"
+            for item in assets
+            if item.get("review_state") == "approved" and _asset_visual_blockers(item)
+        ]
+        if visual_blockers:
+            raise ValueError(
+                "Asset Bible lock blocked: 视觉身份资料未完成："
+                + "；".join(visual_blockers[:8])
+            )
+        _art_direction(current.get("art_direction"), require_complete=True)
         current["status"] = "locked"
         current["locked_at"] = command_time
     result = {**current, "assets": assets, "version": int(current.get("version") or 0) + 1}
@@ -505,16 +531,26 @@ def _candidate_asset(
                 "shot_ids": shot_ids,
             }
         ],
+        "visual_identity": "",
         "positive_traits": [],
         "negative_locks": list(profile.get("negative_locks") or []),
-        "pending_fields": ["positive_traits", "visual_identity"],
+        "pending_fields": ["positive_traits", "visual_identity", "continuity_state"],
         "source_evidence": [
             {
-                "source_type": "applied_shot_plan" if shot_ids else "script_revision",
-                "source_id": shot_ids[0] if shot_ids else revision_id or source_node_id,
-                "excerpt": excerpt,
-            }
-            for excerpt in item.get("evidence", [])[:4]
+                "source_type": "occurrence_ledger",
+                "source_id": stable_id,
+                "scene_ids": scene_ids,
+                "shot_ids": shot_ids,
+                "excerpt": "已应用分镜中的场景与镜头出现范围",
+            },
+            *[
+                {
+                    "source_type": "applied_shot_plan" if shot_ids else "script_revision",
+                    "source_id": shot_ids[0] if shot_ids else revision_id or source_node_id,
+                    "excerpt": excerpt,
+                }
+                for excerpt in item.get("evidence", [])[:4]
+            ],
         ],
         "lineage": {"parent_ids": [], "merged_from_ids": []},
     }
@@ -563,13 +599,13 @@ def _reconcile_recognition_assets(
             )
             retained["occurrences"] = deepcopy(generated["occurrences"])
             retained["source_evidence"] = _dedupe_evidence(
-                [*retained.get("source_evidence", []), *generated.get("source_evidence", [])]
+                [*retained.get("source_evidence", []), *generated.get("source_evidence", [])],
+                asset_id=retained["stable_id"],
             )
             retained["confidence"] = max(
                 float(retained.get("confidence") or 0),
                 float(generated.get("confidence") or 0),
             )
-            retained["continuity_states"] = deepcopy(generated.get("continuity_states", []))
             reconciled.append(retained)
             matched_previous.update(item["stable_id"] for item in matches)
             delta["retained_asset_ids"].append(retained["stable_id"])
@@ -641,20 +677,12 @@ def _asset_identity_overlap(left: Mapping[str, Any], right: Mapping[str, Any]) -
     )
 
 
-def _dedupe_evidence(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    seen = set()
-    for value in values:
-        key = (
-            str(value.get("source_type") or ""),
-            str(value.get("source_id") or ""),
-            str(value.get("excerpt") or ""),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(deepcopy(value))
-    return result[:12]
+def _dedupe_evidence(
+    values: list[dict[str, Any]],
+    *,
+    asset_id: str = "",
+) -> list[dict[str, Any]]:
+    return canonicalize_source_evidence(values, asset_id=asset_id)
 
 
 def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
@@ -666,15 +694,120 @@ def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
         if asset["display_name"] not in asset["aliases"]:
             asset["aliases"].append(asset["display_name"])
         asset["display_name"] = name
-    for field in ("aliases", "positive_traits", "negative_locks"):
+    for field in ("aliases", "negative_locks"):
         if field in data:
             values = [str(item).strip()[:160] for item in data.get(field, []) if str(item).strip()]
             asset[field] = list(dict.fromkeys(values))[:24]
+    if "visual_identity" in data:
+        asset["visual_identity"] = str(data.get("visual_identity") or "").strip()[:600]
+    if "positive_traits" in data:
+        values = [str(item).strip()[:160] for item in data.get("positive_traits", []) if str(item).strip()]
+        asset["positive_traits"] = list(dict.fromkeys(values))[:24]
+    if "continuity_states" in data:
+        labels = [
+            str(item.get("label") if isinstance(item, Mapping) else item).strip()[:160]
+            for item in data.get("continuity_states", [])
+            if str(item.get("label") if isinstance(item, Mapping) else item).strip()
+        ]
+        asset["continuity_states"] = [
+            {
+                "state_id": f"continuity-{asset['stable_id']}-{index + 1}",
+                "label": label,
+                "status": "confirmed",
+                "scene_ids": list(asset.get("occurrences", {}).get("scene_ids", [])),
+                "shot_ids": list(asset.get("occurrences", {}).get("shot_ids", [])),
+            }
+            for index, label in enumerate(dict.fromkeys(labels))
+        ][:16]
     asset["review_state"] = "candidate"
     asset["needs_confirmation"] = True
-    asset["pending_fields"] = [
-        field for field in asset.get("pending_fields", []) if field not in {"positive_traits", "visual_identity"}
-    ]
+    pending = set(asset.get("pending_fields", []))
+    for field, ready in (
+        ("positive_traits", bool(asset.get("positive_traits"))),
+        ("visual_identity", bool(str(asset.get("visual_identity") or "").strip())),
+        (
+            "continuity_state",
+            any(
+                item.get("status") == "confirmed" and str(item.get("label") or "").strip()
+                for item in asset.get("continuity_states", [])
+            ),
+        ),
+    ):
+        if ready:
+            pending.discard(field)
+        else:
+            pending.add(field)
+    asset["pending_fields"] = sorted(pending)
+
+
+def _asset_visual_blockers(asset: Mapping[str, Any]) -> list[str]:
+    blockers = []
+    pending = {
+        str(item)
+        for item in asset.get("pending_fields", [])
+        if str(item) in {"positive_traits", "visual_identity", "continuity_state"}
+    }
+    if "visual_identity" in pending or not str(asset.get("visual_identity") or "").strip():
+        blockers.append("视觉身份")
+    if "positive_traits" in pending or not asset.get("positive_traits"):
+        blockers.append("正向视觉特征")
+    continuity_ready = any(
+        isinstance(item, Mapping)
+        and item.get("status") == "confirmed"
+        and str(item.get("label") or "").strip()
+        for item in asset.get("continuity_states", [])
+    )
+    if "continuity_state" in pending or not continuity_ready:
+        blockers.append("连续性状态")
+    return blockers
+
+
+def _assert_asset_visual_ready(asset: Mapping[str, Any]) -> None:
+    blockers = _asset_visual_blockers(asset)
+    if blockers:
+        raise ValueError(
+            f"资产“{asset.get('display_name') or '待确认资产'}”仍缺少"
+            f"{'、'.join(blockers)}；请先编辑并预览影响"
+        )
+
+
+def _art_direction(
+    value: Any,
+    *,
+    confirmed_at: str = "",
+    require_complete: bool = False,
+) -> dict[str, Any]:
+    data = value if isinstance(value, Mapping) else {}
+    result = {
+        field: str(data.get(field) or "").strip()[:240]
+        for field in ART_DIRECTION_FIELDS
+    }
+    result.update(
+        {
+            "status": "confirmed" if all(result.values()) else "pending",
+            "source": "human_review",
+            "confirmed_at": str(data.get("confirmed_at") or confirmed_at or "")[:80],
+        }
+    )
+    if require_complete and (
+        result["status"] != "confirmed"
+        or not result["confirmed_at"]
+    ):
+        missing = [
+            {
+                "visual_style": "视觉风格",
+                "medium": "媒介与质感",
+                "palette": "色彩方案",
+                "lighting": "光线规则",
+            }[field]
+            for field in ART_DIRECTION_FIELDS
+            if not result[field]
+        ]
+        raise ValueError(
+            "统一美术方向尚未确认"
+            + (f"：缺少{'、'.join(missing)}" if missing else "")
+        )
+    return result
 
 
 def _required_occurrences(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -719,6 +852,13 @@ def _resolution_map(
             },
         )
     return result
+
+
+def _source_evidence_shot_ids(
+    asset: Mapping[str, Any],
+    known_shot_ids: set[str],
+) -> set[str]:
+    return authoritative_source_evidence(asset, known_shot_ids)[0]
 
 
 def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
@@ -790,12 +930,17 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             if key in alias_owner and alias_owner[key] != asset["stable_id"]:
                 collisions.add(key)
             alias_owner[key] = asset["stable_id"]
-    active_shot_ids = {
-        str(shot_id)
-        for asset in active_assets
-        for shot_id in asset.get("occurrences", {}).get("shot_ids", [])
-        if shot_id
+    known_shot_ids = {
+        str(item.get("shot_id") or "")
+        for item in shot_catalog
+        if item.get("shot_id")
     }
+    traceable_shot_ids = {
+        shot_id
+        for asset in active_assets
+        for shot_id in _source_evidence_shot_ids(asset, known_shot_ids)
+    }
+    untraceable_shot_ids = sorted(known_shot_ids - traceable_shot_ids)
     anchors = [
         item
         for item in candidate_set.get("required_asset_anchors", [])
@@ -888,6 +1033,21 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             }
             for item in scene_descendant_missing
         ],
+        *(
+            [
+                {
+                    "code": "missing_source_evidence",
+                    "asset_type": "",
+                    "display_name": "当前识别版本",
+                    "scene_count": 0,
+                    "shot_count": len(untraceable_shot_ids),
+                    "message": f"{len(untraceable_shot_ids)} 个已应用镜头缺少可审核的资产来源证据。",
+                    "action": "重新识别或补全资产出现范围证据后再锁定",
+                }
+            ]
+            if untraceable_shot_ids
+            else []
+        ),
         *[
             {
                 "code": str(item.get("code") or "recognition_ambiguity"),
@@ -919,7 +1079,8 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
         "scene_covered": len(scene_ids),
         "shot_total": len(shot_catalog),
         "shot_covered": len(covered_shots),
-        "asset_shot_covered": len(active_shot_ids & {str(item.get("shot_id") or "") for item in shot_catalog}),
+        "asset_shot_covered": len(traceable_shot_ids & known_shot_ids),
+        "missing_source_evidence_shot_count": len(untraceable_shot_ids),
         "required_occurrence_total": len(ledger),
         "resolved_required": len(ledger) - len(unresolved),
         "unresolved_required": len(unresolved),
@@ -941,6 +1102,7 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             and len(shot_catalog) > 0
             and len(scene_ids) == len(scene_catalog)
             and len(covered_shots) == len(shot_catalog)
+            and not untraceable_shot_ids
             and not unresolved
             and not collisions
             and quality_pass
@@ -957,6 +1119,7 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             "orphan_scene_coverage_count": len(scene_descendant_missing),
             "alias_collision_count": len(collisions),
             "recognition_ambiguity_count": len(ambiguities),
+            "missing_source_evidence_shot_count": len(untraceable_shot_ids),
         },
         "coverage": coverage,
     }
@@ -1113,6 +1276,7 @@ def _append_revision(state: dict[str, Any], command_type: str, *, created_at: st
         "status": state.get("status", "candidate_review"),
         "created_at": created_at,
         "command_type": command_type,
+        "art_direction": deepcopy(state.get("art_direction", {})),
         "asset_snapshot": [
             {
                 "stable_id": item["stable_id"],
@@ -1304,6 +1468,7 @@ def _graph_events(
                         "display_name": asset["display_name"],
                         "aliases": asset["aliases"],
                         "review_state": asset["review_state"],
+                        "visual_identity": asset.get("visual_identity", ""),
                         "continuity_states": asset["continuity_states"],
                         "positive_traits": asset["positive_traits"],
                         "negative_locks": asset["negative_locks"],
@@ -1359,6 +1524,7 @@ def _receipt(state: Mapping[str, Any], command: Mapping[str, Any], impact: Mappi
             "个当前资产；已批准事实保留，旧候选进入历史，未调用外部能力。"
         ),
         "create_asset": "人工补充资产已进入候选审核，出现范围等待确认。",
+        "set_art_direction": "统一美术方向已确认并写入 Asset Bible 当前版本。",
         "approve": "资产候选已批准，引用关系保持可追溯。",
         "reject": "资产候选已拒绝；仍被引用的出现范围会阻止锁定，直到完成重分配或明确无需。",
         "edit": "资产候选修订已保存为新版本。",
@@ -1405,6 +1571,7 @@ def _safe_command(command: Mapping[str, Any]) -> dict[str, Any]:
         "scene_ids",
         "shot_ids",
         "evidence",
+        "art_direction",
         "names",
         "occurrence_assignments",
         "requirement_ids",

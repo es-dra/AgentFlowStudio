@@ -91,11 +91,17 @@ export function imageAdmissionJobCommand(itemId, jobId) {
 }
 
 export function imageAdmissionGenerationRequest(item, manifestId, generatedAt) {
+  const promptContract = item?.prompt_contract || {};
+  const providerPrompt = String(promptContract.provider_prompt || "");
+  const visualStyle = String(promptContract.art_direction?.visual_style || "");
+  if (!providerPrompt || !visualStyle) {
+    throw new Error("图片项目缺少已锁定的创意提示合同");
+  }
   return {
     node_id: item.target_shot_id || item.target_asset_ids?.[0] || item.item_id,
-    prompt_text: imageAdmissionPrompt(item),
+    prompt_text: providerPrompt,
     target_platform: "short_video",
-    style: "cinematic",
+    style: visualStyle,
     aspect_ratio: item.aspect_ratio,
     candidate_count: 1,
     provider_service_id: "image_relay",
@@ -138,14 +144,4 @@ export function imageAdmissionGenerationResult(response) {
       }
       : null,
   };
-}
-
-function imageAdmissionPrompt(item) {
-  const kind = imageAdmissionItemTypeLabel(item.item_type);
-  const locks = (item.negative_locks || []).filter(Boolean);
-  return [
-    `${kind}：${item.label || "待确认图片项目"}。`,
-    "生成一张独立、可审核的电影制作参考图，保持已锁定资产身份与镜头连续性。",
-    locks.length ? `禁止项：${locks.join("；")}。` : "",
-  ].filter(Boolean).join("\n");
 }
