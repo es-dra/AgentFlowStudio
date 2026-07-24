@@ -2,9 +2,19 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime } from "./agent-chat-lifecycle.js";
+import { agentChatContextFingerprint, agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
+import {
+  assetBibleProjection,
+  assetBibleSourceContext,
+  assetOccurrenceLabel,
+  assetReviewLabel,
+  assetTypeLabel,
+  deriveProductionCopilotState,
+  localizedNegativeLock,
+  pendingFieldLabel,
+} from "./asset-bible-workspace.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -25,6 +35,15 @@ export function createProductShell(options = {}) {
   let planningPanelHeight = readPlanningPanelHeight();
   let graphRefreshPending = false;
   let agentChatWidth = readAgentChatWidth();
+  let selectedAssetId = "";
+  let assetCommandPreview = null;
+  let assetCommandError = "";
+  let lastAssetCommand = null;
+  let assetDraft = null;
+  let assetCreateOpen = false;
+  let assetCreateDraft = { asset_type: "prop", display_name: "", aliases: "", scene_ids: [], shot_ids: [], evidence: "" };
+  let resolutionReason = "";
+  let mergeAssetIds = new Set();
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -32,6 +51,8 @@ export function createProductShell(options = {}) {
     project: null,
     studioState: null,
     mediaOperations: null,
+    runtimeAssetBible: null,
+    mediaGates: {},
     mediaCommandPreview: null,
     error: "",
     authUser: null,
@@ -75,7 +96,7 @@ export function createProductShell(options = {}) {
 
     const project = node("div", "studio-project-context");
     const projectLabel = node("button", "studio-project-button");
-    const projectName = snapshot.project?.name || "项目";
+    const projectName = projectDisplayName();
     const episodeName = snapshot.project?.episode || "第一集";
     const fullProjectLabel = `${projectName} · ${episodeName}`;
     projectLabel.type = "button";
@@ -97,6 +118,7 @@ export function createProductShell(options = {}) {
     viewSwitch.append(
       viewButton("canvas", "画布"),
       viewButton("storyboard", "故事板"),
+      viewButton("asset_bible", "资产 Bible"),
     );
 
     const summary = node("div", "studio-header-summary");
@@ -223,7 +245,7 @@ export function createProductShell(options = {}) {
     current.setAttribute("aria-label", "当前项目完整标题");
     current.innerHTML = [
       "<span>当前项目</span>",
-      `<strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong>`,
+      `<strong>${escapeHtml(projectDisplayName())}</strong>`,
       `<small>${escapeHtml(snapshot.project?.episode || "单集制作")}</small>`,
     ].join("");
     menu.appendChild(current);
@@ -712,11 +734,17 @@ export function createProductShell(options = {}) {
     const emptyCanvas = section === "canvas" && !hasCanvasContent();
     const canvasActive = section === "canvas";
     const agentChatCollapsed = isAgentChatCollapsed();
-    const shell = node("div", `studio-unified-workspace ${agentChatCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${isNarrowAgentLayout() ? "agent-responsive-compact" : ""} ${canvasActive ? "canvas-section" : "storyboard-section"} ${mediaOperationsReady() ? "media-operations-ready" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
+    const legacyWorkspaceClass = canvasActive ? "canvas-section" : "storyboard-section";
+    const workspaceClass = section === "asset_bible" ? "asset-bible-section" : legacyWorkspaceClass;
+    const shell = node("div", `studio-unified-workspace ${agentChatCollapsed ? "agent-collapsed" : ""} ${mobileAgentOpen ? "agent-mobile-open" : ""} ${isNarrowAgentLayout() ? "agent-responsive-compact" : ""} ${workspaceClass} ${mediaOperationsReady() ? "media-operations-ready" : ""} ${emptyCanvas ? "canvas-empty-project" : ""}`);
     shell.dataset.contextKey = currentContextKey();
     shell.style.setProperty("--agent-chat-width", `${agentChatWidth}px`);
     if (section === "storyboard" && !emptyCanvas) shell.appendChild(buildSceneRail());
-    const main = section === "canvas" ? buildCanvasWorkspace() : buildStoryboardWorkspace();
+    const main = section === "canvas"
+      ? buildCanvasWorkspace()
+      : section === "asset_bible"
+        ? buildAssetBibleWorkspace()
+        : buildStoryboardWorkspace();
     shell.appendChild(main);
     if (isNarrowAgentLayout() && mobileAgentOpen) shell.appendChild(buildAgentMobileBackdrop());
     shell.appendChild(buildAgentChat());
@@ -764,6 +792,650 @@ export function createProductShell(options = {}) {
     return main;
   }
 
+  function buildAssetBibleWorkspace() {
+    const main = node("main", "studio-workspace-main studio-asset-bible");
+    main.id = "product-main";
+    main.tabIndex = -1;
+    const view = assetBibleView();
+    const source = assetBibleSourceContext(snapshot.studioState || {});
+    const header = node("header", "asset-bible-header");
+    const title = node("div", "");
+    title.append(
+      node("span", "eyebrow", "唯一 ProductionGraph · 资产连续性"),
+      node("h1", "", "Asset Bible"),
+      node(
+        "p",
+        "",
+        view.status === "locked"
+          ? `版本 ${view.version} 已锁定 · ${view.counts.approved} 已批准 · ${view.counts.rejected} 已拒绝 · ${view.counts.superseded} 已取代`
+          : view.counts.total
+            ? `版本 ${view.version} · ${view.counts.approved}/${view.counts.total} 已批准 · ${view.counts.candidate} 待确认`
+            : "从当前剧本和已应用分镜建立本地确定性资产候选。",
+      ),
+    );
+    const headerActions = node("div", "asset-bible-header-actions");
+    if (!view.counts.total) {
+      const identify = node("button", "studio-primary-button", "识别资产候选");
+      identify.type = "button";
+      identify.disabled = !source || Boolean(assetCommandPreview);
+      identify.title = source ? "基于当前剧本与已应用分镜执行本地确定性识别" : "请先应用分镜";
+      identify.addEventListener("click", () => void stageAssetBibleCommand({ type: "generate_candidates" }));
+      headerActions.appendChild(identify);
+    } else {
+      const add = node("button", "studio-secondary-button", "补充资产");
+      add.type = "button";
+      add.disabled = view.status === "locked" || Boolean(assetCommandPreview);
+      add.addEventListener("click", () => {
+        assetCreateOpen = !assetCreateOpen;
+        render();
+      });
+      const merge = node("button", "studio-secondary-button", `合并已选 ${mergeAssetIds.size}`);
+      merge.type = "button";
+      merge.disabled = mergeAssetIds.size < 2 || view.status === "locked" || Boolean(assetCommandPreview);
+      merge.addEventListener("click", () => {
+        const names = view.assets.filter((item) => mergeAssetIds.has(item.stable_id)).map((item) => item.display_name);
+        void stageAssetBibleCommand({
+          type: "merge",
+          target_ids: [...mergeAssetIds],
+          display_name: names[0] || "合并资产",
+        });
+      });
+      const lock = node("button", "studio-primary-button", view.status === "locked" ? "当前版本已锁定" : "锁定当前版本");
+      lock.type = "button";
+      lock.disabled = view.status === "locked"
+        || view.counts.candidate > 0
+        || !view.counts.approved
+        || !view.coverage.coverage_pass
+        || Boolean(assetCommandPreview);
+      lock.title = view.counts.candidate
+        ? `仍有 ${view.counts.candidate} 个候选待确认`
+        : view.coverage.unresolved_required
+          ? `${view.coverage.unresolved_required} 个必要出现范围尚未解决`
+          : !view.coverage.coverage_pass
+            ? `${view.coverage.shot_covered}/${view.coverage.shot_total} 镜头覆盖未完成`
+            : "锁定后才满足图片生产结构准入";
+      lock.addEventListener("click", () => void stageAssetBibleCommand({ type: "lock" }));
+      if (view.status === "locked") headerActions.append(lock);
+      else headerActions.append(add, merge, lock);
+    }
+    header.append(title, headerActions);
+    main.appendChild(header);
+    main.appendChild(assetBibleStatusBar(view, source));
+    if (assetCommandError) main.appendChild(assetBibleFailure());
+    if (assetCommandPreview) main.appendChild(assetBibleCommandReview());
+    if (assetCreateOpen && view.status !== "locked") main.appendChild(assetBibleCreateForm(view));
+    if (!view.counts.total) {
+      main.appendChild(assetBibleEmpty(source));
+      return main;
+    }
+    const workspace = node("div", "asset-bible-workspace");
+    workspace.append(assetBibleList(view), assetBibleDetail(view));
+    main.appendChild(workspace);
+    return main;
+  }
+
+  function assetBibleStatusBar(view, source) {
+    const bar = node("section", "asset-bible-status-bar");
+    bar.setAttribute("aria-live", "polite");
+    const items = [
+      ["剧本版本", source?.script_revision_id ? "已就绪" : "未识别"],
+      ["分镜", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待应用"],
+      ["资产", view.counts.total ? `${view.counts.total} 当前 · ${view.counts.rejected + view.counts.superseded} 历史` : "待识别"],
+      ["Bible", view.status === "locked" ? "已锁定" : view.counts.total ? "审核中" : "未建立"],
+      ["覆盖", view.counts.total ? `${view.coverage.shot_covered}/${view.coverage.shot_total} 镜头 · ${view.coverage.unresolved_required} 未解决` : "待识别"],
+      ["媒体准入", view.status === "locked" && view.coverage.coverage_pass ? "结构就绪 · 图片能力未启用" : "内容审核未通过"],
+      ["费用", "未调用 · 未计费"],
+    ];
+    for (const [label, value] of items) {
+      const item = node("div", "");
+      item.append(node("span", "", label), node("strong", "", value));
+      bar.appendChild(item);
+    }
+    return bar;
+  }
+
+  function assetBibleEmpty(source) {
+    const wrap = node("section", "asset-bible-empty");
+    wrap.appendChild(node("strong", "", source ? "可以建立资产候选" : "等待已应用分镜"));
+    wrap.appendChild(node(
+      "p",
+      "",
+      source
+        ? `将读取当前剧本版本和 ${source.scene_count} 场 / ${source.shot_count} 镜头，仅识别角色、场景、道具及连续性待确认项。`
+        : "先在 Canvas 完成剧本并应用拆镜；预览、失败或已取消的分镜不会进入 Asset Bible。",
+    ));
+    const facts = node("ul", "");
+    for (const text of ["不会调用外部文本、图片或视频能力", "候选不是最终审美结论", "确认前不会写入项目事实"]) {
+      facts.appendChild(node("li", "", text));
+    }
+    wrap.appendChild(facts);
+    return wrap;
+  }
+
+  function assetBibleList(view) {
+    const list = node("section", "asset-bible-list");
+    list.setAttribute("aria-label", "资产候选列表");
+    const summary = node("div", "asset-bible-list-summary");
+    summary.append(
+      node("strong", "", `${view.counts.total} 个当前资产`),
+      node("span", "", `${view.counts.character} 角色 · ${view.counts.scene} 场景 · ${view.counts.prop} 道具`),
+    );
+    list.appendChild(summary);
+    for (const asset of view.active_assets) {
+      list.appendChild(assetBibleListRow(asset, view, false));
+    }
+    if (view.history_assets.length) {
+      const history = node("details", "asset-bible-history");
+      history.appendChild(node(
+        "summary",
+        "",
+        `审核与版本历史 · ${view.counts.rejected} 已拒绝 · ${view.counts.superseded} 已取代`,
+      ));
+      for (const asset of view.history_assets) history.appendChild(assetBibleListRow(asset, view, true));
+      list.appendChild(history);
+    }
+    return list;
+  }
+
+  function assetBibleListRow(asset, view, historical) {
+      const row = node("article", `asset-bible-row ${asset.stable_id === selectedAsset()?.stable_id ? "selected" : ""}`);
+      const select = node("button", "asset-bible-row-main");
+      select.type = "button";
+      select.setAttribute("aria-pressed", String(asset.stable_id === selectedAsset()?.stable_id));
+      select.addEventListener("click", () => {
+        selectedAssetId = asset.stable_id;
+        assetDraft = null;
+        render();
+      });
+      const labels = node("div", "");
+      labels.append(
+        node("span", "eyebrow", assetTypeLabel(asset.asset_type)),
+        node("strong", "", asset.display_name),
+        node("small", "", `${asset.occurrences.scene_ids.length} 场 · ${asset.occurrences.shot_ids.length} 镜头`),
+      );
+      select.append(labels, node("span", `asset-review-state ${asset.review_state}`, assetReviewLabel(asset.review_state)));
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = mergeAssetIds.has(asset.stable_id);
+      checkbox.disabled = view.status === "locked" || historical;
+      checkbox.setAttribute("aria-label", `选择 ${asset.display_name} 用于合并`);
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) mergeAssetIds.add(asset.stable_id);
+        else mergeAssetIds.delete(asset.stable_id);
+        render();
+      });
+      row.append(select, checkbox);
+      return row;
+  }
+
+  function assetBibleDetail(view) {
+    const asset = selectedAsset();
+    const detail = node("section", "asset-bible-detail");
+    detail.setAttribute("aria-label", "资产详情与审核");
+    if (!asset) {
+      detail.appendChild(node("p", "", "选择一个资产查看来源、出现范围和连续性约束。"));
+      return detail;
+    }
+    const head = node("header", "");
+    const title = node("div", "");
+    title.append(
+      node("span", "eyebrow", `${assetTypeLabel(asset.asset_type)} · ${assetReviewLabel(asset.review_state)}`),
+      node("h2", "", asset.display_name),
+    );
+    const actions = node("div", "asset-bible-detail-actions");
+    if (view.status !== "locked" && asset.review_state !== "superseded") {
+      for (const [type, label, className] of [
+        ["approve", "批准", "studio-primary-button"],
+        ["reject", "拒绝", "studio-secondary-button"],
+      ]) {
+        const button = node("button", className, label);
+        button.type = "button";
+        button.disabled = Boolean(assetCommandPreview);
+        button.addEventListener("click", () => void stageAssetBibleCommand({ type, target_id: asset.stable_id }));
+        actions.appendChild(button);
+      }
+    }
+    head.appendChild(title);
+    if (actions.childElementCount) head.appendChild(actions);
+    detail.appendChild(head);
+    const metrics = node("dl", "asset-bible-metrics");
+    for (const [label, value] of [
+      ["可信度", `${Math.round(Number(asset.confidence || 0) * 100)}% · 仍需人工确认`],
+      ["出现", `${asset.occurrences.scene_ids.length} 场 · ${asset.occurrences.shot_ids.length} 镜头`],
+      ["别名", asset.aliases.join("、") || "无"],
+      ["待确认", asset.pending_fields.map(pendingFieldLabel).join("、") || "无"],
+    ]) metrics.append(node("dt", "", label), node("dd", "", value));
+    detail.appendChild(metrics);
+    detail.appendChild(assetTagSection("正向特征", asset.positive_traits, "尚未确认正向视觉特征"));
+    detail.appendChild(assetTagSection("禁改项", asset.negative_locks.map(localizedNegativeLock), "尚未设置禁改项"));
+    detail.appendChild(assetOccurrenceSection(asset, view));
+    if (view.status !== "locked") detail.appendChild(assetResolutionSection(asset, view));
+    detail.appendChild(assetEvidenceSection(asset));
+    if (view.status !== "locked" && asset.review_state !== "superseded") detail.appendChild(assetEditForm(asset));
+    return detail;
+  }
+
+  function assetTagSection(title, values, emptyText) {
+    const sectionEl = node("section", "asset-bible-tag-section");
+    sectionEl.appendChild(node("strong", "", title));
+    const tags = node("div", "");
+    if (values.length) {
+      for (const value of values) tags.appendChild(node("span", "", value));
+    } else {
+      tags.appendChild(node("small", "", emptyText));
+    }
+    sectionEl.appendChild(tags);
+    return sectionEl;
+  }
+
+  function assetOccurrenceSection(asset, view) {
+    const sectionEl = node("section", "asset-bible-occurrences");
+    sectionEl.appendChild(node("strong", "", "双向出现范围"));
+    const scenes = node(
+      "p",
+      "",
+      `场景：${asset.occurrences.scene_ids.map((id) => assetOccurrenceLabel(view.candidate_set, "scene", id)).join("、") || "未绑定"}`,
+    );
+    const shots = node(
+      "p",
+      "",
+      `镜头：${asset.occurrences.shot_ids.map((id) => assetOccurrenceLabel(view.candidate_set, "shot", id)).join("、") || "未绑定"}`,
+    );
+    sectionEl.append(scenes, shots);
+    return sectionEl;
+  }
+
+  function assetEvidenceSection(asset) {
+    const details = node("details", "asset-bible-evidence");
+    details.appendChild(node("summary", "", "来源与追溯"));
+    details.appendChild(node("p", "", `追溯标识：${asset.stable_id}`));
+    if (!asset.source_evidence.length) {
+      details.appendChild(node("p", "", "无可验证文本证据，保持待确认。"));
+    } else {
+      for (const evidence of asset.source_evidence) {
+        details.appendChild(node("p", "", evidence.excerpt || "结构引用"));
+      }
+    }
+    return details;
+  }
+
+  function assetResolutionSection(asset, view) {
+    const sectionEl = node("section", "asset-bible-resolution");
+    sectionEl.appendChild(node("strong", "", "必要出现范围"));
+    const requirements = view.resolution_ledger.filter(
+      (item) => item.source_asset_id === asset.stable_id || item.assigned_asset_id === asset.stable_id,
+    );
+    if (!requirements.length) {
+      sectionEl.appendChild(node("p", "", "当前资产没有必须解决的场景或镜头引用。"));
+      return sectionEl;
+    }
+    const unresolved = requirements.filter((item) => !item.resolved);
+    sectionEl.appendChild(node(
+      "p",
+      "",
+      unresolved.length
+        ? `${requirements.length - unresolved.length}/${requirements.length} 已解决；${unresolved.length} 项仍会阻止锁定。`
+        : `${requirements.length}/${requirements.length} 已解决。`,
+    ));
+    const list = node("ul", "asset-resolution-list");
+    for (const item of requirements.slice(0, 24)) {
+      list.appendChild(node(
+        "li",
+        item.resolved ? "resolved" : "blocked",
+        `${assetOccurrenceLabel(view.candidate_set, item.occurrence_kind, item.occurrence_id)} · ${resolutionStatusLabel(item.status)}`,
+      ));
+    }
+    sectionEl.appendChild(list);
+    if (!unresolved.length || asset.review_state === "superseded") return sectionEl;
+    const form = node("form", "asset-resolution-form");
+    const destinationLabel = node("label", "");
+    destinationLabel.appendChild(node("span", "", "重分配到已批准资产"));
+    const destination = document.createElement("select");
+    for (const candidate of view.active_assets.filter(
+      (item) => item.review_state === "approved"
+        && item.asset_type === asset.asset_type
+        && item.stable_id !== asset.stable_id,
+    )) {
+      const option = document.createElement("option");
+      option.value = candidate.stable_id;
+      option.textContent = `${assetTypeLabel(candidate.asset_type)} · ${candidate.display_name}`;
+      destination.appendChild(option);
+    }
+    destinationLabel.appendChild(destination);
+    const reassign = node("button", "studio-secondary-button", "预览重分配影响");
+    reassign.type = "button";
+    reassign.disabled = !destination.options.length;
+    reassign.addEventListener("click", () => void stageAssetBibleCommand({
+      type: "reassign_occurrences",
+      target_id: destination.value,
+      requirement_ids: unresolved.map((item) => item.requirement_id),
+      reason: `人工审核将 ${asset.display_name} 的必要出现范围重分配`,
+    }));
+    const reasonLabel = node("label", "");
+    reasonLabel.appendChild(node("span", "", "明确无需的审核理由"));
+    const reason = document.createElement("input");
+    reason.value = resolutionReason;
+    reason.placeholder = "说明为何这些场景/镜头不需要该资产";
+    reason.addEventListener("input", () => { resolutionReason = reason.value; });
+    reasonLabel.appendChild(reason);
+    const notNeeded = node("button", "studio-text-button", "预览标记为无需");
+    notNeeded.type = "button";
+    notNeeded.addEventListener("click", () => void stageAssetBibleCommand({
+      type: "mark_not_needed",
+      requirement_ids: unresolved.map((item) => item.requirement_id),
+      reason: resolutionReason,
+    }));
+    form.append(destinationLabel, reassign, reasonLabel, notNeeded);
+    sectionEl.appendChild(form);
+    return sectionEl;
+  }
+
+  function assetBibleCreateForm(view) {
+    const form = node("form", "asset-bible-create-form");
+    form.setAttribute("aria-label", "人工补充资产候选");
+    form.append(node("strong", "", "补充遗漏资产"), node("p", "", "仅添加有剧本或分镜依据的资产；出现范围将进入同一覆盖账本。"));
+    const typeLabel = node("label", "");
+    typeLabel.appendChild(node("span", "", "类型"));
+    const type = document.createElement("select");
+    for (const [value, label] of [["character", "角色"], ["scene", "场景"], ["prop", "道具"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      option.selected = assetCreateDraft.asset_type === value;
+      type.appendChild(option);
+    }
+    type.addEventListener("change", () => { assetCreateDraft.asset_type = type.value; });
+    typeLabel.appendChild(type);
+    const nameLabel = createAssetTextField("名称", "display_name", "例如：九齿钉耙");
+    const aliasesLabel = createAssetTextField("别名", "aliases", "顿号分隔");
+    const evidenceLabel = createAssetTextField("审核依据", "evidence", "说明来自哪段剧本或哪些镜头");
+    form.append(typeLabel, nameLabel, aliasesLabel, evidenceLabel);
+    form.appendChild(assetOccurrencePicker(view, "scene", "出现的场景"));
+    form.appendChild(assetOccurrencePicker(view, "shot", "出现的镜头"));
+    const actions = node("div", "asset-bible-edit-actions");
+    const preview = node("button", "studio-primary-button", "预览补充影响");
+    preview.type = "submit";
+    const cancel = node("button", "studio-secondary-button", "取消");
+    cancel.type = "button";
+    cancel.addEventListener("click", () => {
+      assetCreateOpen = false;
+      render();
+    });
+    actions.append(preview, cancel);
+    form.appendChild(actions);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void stageAssetBibleCommand({
+        type: "create_asset",
+        asset_type: assetCreateDraft.asset_type,
+        display_name: assetCreateDraft.display_name,
+        aliases: splitList(assetCreateDraft.aliases),
+        scene_ids: assetCreateDraft.scene_ids,
+        shot_ids: assetCreateDraft.shot_ids,
+        evidence: assetCreateDraft.evidence,
+      });
+    });
+    return form;
+  }
+
+  function createAssetTextField(label, key, placeholder) {
+    const wrap = node("label", "");
+    wrap.appendChild(node("span", "", label));
+    const input = document.createElement("input");
+    input.value = assetCreateDraft[key] || "";
+    input.placeholder = placeholder;
+    input.addEventListener("input", () => { assetCreateDraft[key] = input.value; });
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function assetOccurrencePicker(view, kind, title) {
+    const fieldset = document.createElement("fieldset");
+    fieldset.className = "asset-occurrence-picker";
+    fieldset.appendChild(node("legend", "", title));
+    const source = kind === "scene" ? view.candidate_set.scene_index || [] : view.candidate_set.shot_index || [];
+    const key = kind === "scene" ? "scene_ids" : "shot_ids";
+    for (const item of source) {
+      const id = kind === "scene" ? item.scene_id : item.shot_id;
+      const label = node("label", "");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = assetCreateDraft[key].includes(id);
+      input.addEventListener("change", () => {
+        const values = new Set(assetCreateDraft[key]);
+        if (input.checked) values.add(id);
+        else values.delete(id);
+        assetCreateDraft[key] = [...values];
+      });
+      label.append(input, node("span", "", assetOccurrenceLabel(view.candidate_set, kind, id)));
+      fieldset.appendChild(label);
+    }
+    return fieldset;
+  }
+
+  function assetEditForm(asset) {
+    if (!assetDraft || assetDraft.stable_id !== asset.stable_id) {
+      assetDraft = {
+        stable_id: asset.stable_id,
+        display_name: asset.display_name,
+        aliases: asset.aliases.join("、"),
+        positive_traits: asset.positive_traits.join("、"),
+        negative_locks: asset.negative_locks.join("、"),
+        split_name_a: `${asset.display_name} A`,
+        split_name_b: `${asset.display_name} B`,
+      };
+    }
+    const form = node("form", "asset-bible-edit-form");
+    form.appendChild(node("strong", "", "编辑当前候选"));
+    const fields = [
+      ["display_name", "名称", "text"],
+      ["aliases", "别名（顿号分隔）", "text"],
+      ["positive_traits", "正向特征（顿号分隔）", "text"],
+      ["negative_locks", "禁改项（顿号分隔）", "text"],
+    ];
+    for (const [key, label, type] of fields) {
+      const wrap = node("label", "");
+      wrap.appendChild(node("span", "", label));
+      const input = document.createElement("input");
+      input.type = type;
+      input.value = assetDraft[key] || "";
+      input.addEventListener("input", () => { assetDraft[key] = input.value; });
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+    }
+    const actions = node("div", "asset-bible-edit-actions");
+    const save = node("button", "studio-secondary-button", "预览编辑影响");
+    save.type = "submit";
+    const split = node("button", "studio-text-button", "拆分资产");
+    split.type = "button";
+    split.addEventListener("click", () => {
+      const sceneRefs = asset.occurrences.scene_ids;
+      const shotRefs = asset.occurrences.shot_ids;
+      void stageAssetBibleCommand({
+        type: "split",
+        target_id: asset.stable_id,
+        names: [assetDraft.split_name_a, assetDraft.split_name_b],
+        occurrence_assignments: {
+          "0": {
+            scene_ids: sceneRefs.slice(0, Math.ceil(sceneRefs.length / 2)),
+            shot_ids: shotRefs.slice(0, Math.ceil(shotRefs.length / 2)),
+          },
+          "1": {
+            scene_ids: sceneRefs.slice(Math.ceil(sceneRefs.length / 2)),
+            shot_ids: shotRefs.slice(Math.ceil(shotRefs.length / 2)),
+          },
+        },
+      });
+    });
+    actions.append(save, split);
+    form.appendChild(actions);
+    const splitNames = node("div", "asset-bible-split-fields");
+    for (const [key, label] of [["split_name_a", "拆分名称 A"], ["split_name_b", "拆分名称 B"]]) {
+      const wrap = node("label", "");
+      wrap.appendChild(node("span", "", label));
+      const input = document.createElement("input");
+      input.value = assetDraft[key];
+      input.addEventListener("input", () => { assetDraft[key] = input.value; });
+      wrap.appendChild(input);
+      splitNames.appendChild(wrap);
+    }
+    form.appendChild(splitNames);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void stageAssetBibleCommand({
+        type: "edit",
+        target_id: asset.stable_id,
+        patch: {
+          display_name: assetDraft.display_name,
+          aliases: splitList(assetDraft.aliases),
+          positive_traits: splitList(assetDraft.positive_traits),
+          negative_locks: splitList(assetDraft.negative_locks),
+        },
+      });
+    });
+    return form;
+  }
+
+  function assetBibleCommandReview() {
+    const preview = assetCommandPreview;
+    const command = preview.command || {};
+    const impact = preview.impact || {};
+    const sectionEl = node("section", "asset-bible-command-review");
+    sectionEl.setAttribute("role", "status");
+    sectionEl.setAttribute("aria-live", "polite");
+    sectionEl.append(
+      node("span", "eyebrow", "命令预览"),
+      node("strong", "", assetCommandLabel(command.type)),
+      node("p", "", `影响 ${impact.asset_ids?.length || preview.result?.asset_bible?.assets?.length || 0} 个资产 · ${impact.scene_count || 0} 场 · ${impact.shot_count || 0} 镜头；取消不会改变事实。`),
+    );
+    if (Number.isFinite(Number(impact.unresolved_required_after))) {
+      sectionEl.appendChild(node(
+        "p",
+        "",
+        `必要出现范围：${impact.unresolved_required_before || 0} 未解决 → ${impact.unresolved_required_after || 0} 未解决。`,
+      ));
+    }
+    for (const item of impact.occurrence_resolution_changes || []) {
+      const destination = preview.result?.asset_bible?.assets?.find(
+        (asset) => asset.stable_id === item.assigned_asset_id,
+      );
+      sectionEl.appendChild(node(
+        "small",
+        "",
+        `${assetOccurrenceLabel(preview.result?.asset_bible?.candidate_set || {}, item.occurrence_kind, item.occurrence_id)} → ${destination?.display_name || "无需资产"}（${resolutionStatusLabel(item.status)}）`,
+      ));
+    }
+    const actions = node("div", "");
+    const confirm = node("button", "studio-primary-button", "确认应用");
+    confirm.type = "button";
+    confirm.addEventListener("click", () => void confirmAssetBibleCommand());
+    const cancel = node("button", "studio-secondary-button", "取消");
+    cancel.type = "button";
+    cancel.addEventListener("click", cancelAssetBibleCommand);
+    actions.append(confirm, cancel);
+    sectionEl.appendChild(actions);
+    return sectionEl;
+  }
+
+  function assetBibleFailure() {
+    const sectionEl = node("section", "asset-bible-failure");
+    sectionEl.setAttribute("role", "alert");
+    sectionEl.append(
+      node("strong", "", "资产任务未完成"),
+      node("p", "", `${assetCommandError} 当前 Asset Bible 和 ProductionGraph 均已保留。`),
+    );
+    if (lastAssetCommand) {
+      const retry = node("button", "studio-primary-button", "重试同一命令");
+      retry.type = "button";
+      retry.addEventListener("click", () => void stageAssetBibleCommand(lastAssetCommand));
+      sectionEl.appendChild(retry);
+    }
+    return sectionEl;
+  }
+
+  async function stageAssetBibleCommand(command) {
+    if (assetCommandPreview) return;
+    const source = assetBibleSourceContext(snapshot.studioState || {});
+    if (command.type === "generate_candidates" && !source) {
+      assetCommandError = "缺少已应用的剧本和分镜上下文。";
+      render();
+      return;
+    }
+    lastAssetCommand = JSON.parse(JSON.stringify(command));
+    assetCommandError = "";
+    try {
+      section = "asset_bible";
+      const view = assetBibleView();
+      const context = currentAgentChatContext();
+      const request = {
+        asset_bible: view.authority_mode === "legacy_studio_adapter" ? snapshot.studioState?.assetBible || {} : view.raw || {},
+        authority_mode: view.authority_mode,
+        context_fingerprint: agentChatContextFingerprint(context),
+        expected_asset_bible_revision_id: view.current_revision_id || "",
+        command,
+        requested_at: new Date().toISOString(),
+        ...(command.type === "generate_candidates" ? source : {}),
+      };
+      const preview = await options.getRuntime?.().previewAssetBibleCommand(request);
+      assetCommandPreview = { ...preview, request };
+    } catch (error) {
+      assetCommandError = options.formatError?.(error) || String(error?.message || error || "资产命令预览失败");
+    }
+    render();
+  }
+
+  async function confirmAssetBibleCommand() {
+    const preview = assetCommandPreview;
+    if (!preview) return;
+    try {
+      const currentFingerprint = agentChatContextFingerprint(currentAgentChatContext());
+      if (preview.request?.context_fingerprint !== currentFingerprint) {
+        throw new Error("当前对象或版本已变化，请重新预览影响范围。");
+      }
+      const response = await options.getRuntime?.().confirmAssetBibleCommand({
+        ...preview.request,
+        preview_digest: preview.preview_digest,
+        expected_graph_version: Number(snapshot.sequenceWorkspace?.graph_version || 0),
+      });
+      if (response?.authority_mode === "canonical_production_graph") {
+        snapshot.runtimeAssetBible = {
+          authority_mode: "canonical_production_graph",
+          asset_bible: response.asset_bible,
+          graph_version: response.graph_version,
+          graph_digest: response.graph_digest,
+        };
+      } else {
+        options.getStore?.().set((state) => {
+          state.assetBible = response.asset_bible;
+        });
+      }
+      selectedAssetId = response?.asset_bible?.assets?.find((item) => item.review_state === "candidate")?.stable_id
+        || response?.asset_bible?.assets?.find((item) => item.review_state === "approved")?.stable_id
+        || "";
+      assetCommandPreview = null;
+      assetCommandError = "";
+      mergeAssetIds = new Set();
+      assetDraft = null;
+      if (preview.command?.type === "create_asset") {
+        assetCreateOpen = false;
+        assetCreateDraft = { asset_type: "prop", display_name: "", aliases: "", scene_ids: [], shot_ids: [], evidence: "" };
+      }
+      resolutionReason = "";
+      notice = response?.receipt?.summary || "Asset Bible 已更新。";
+    } catch (error) {
+      assetCommandError = options.formatError?.(error) || String(error?.message || error || "资产命令确认失败");
+      assetCommandPreview = null;
+    }
+    render();
+  }
+
+  function cancelAssetBibleCommand() {
+    assetCommandPreview = null;
+    assetCommandError = "";
+    notice = "资产命令预览已取消；Asset Bible 与 ProductionGraph 未改变。";
+    render();
+  }
+
   function buildMediaCanvasOverview() {
     const ops = mediaOperationsView();
     const panel = node("section", "media-canvas-overview");
@@ -808,7 +1480,7 @@ export function createProductShell(options = {}) {
       list.appendChild(node("p", "", "尚未创建场景"));
       aside.appendChild(list);
       const progress = node("div", "scene-progress");
-      progress.innerHTML = '<span>本集进度</span><strong>0 / 0 镜头</strong><div><i style="width:0%"></i></div>';
+      progress.innerHTML = '<span>媒体生产</span><strong>已生成媒体 0 / 0</strong><div><i style="width:0%"></i></div>';
       aside.appendChild(progress);
       return aside;
     }
@@ -824,7 +1496,7 @@ export function createProductShell(options = {}) {
     });
     aside.appendChild(list);
     const progress = node("div", "scene-progress");
-    progress.innerHTML = `<span>本集进度</span><strong>${totalReadyShots()} / ${totalShots()} 镜头</strong><div><i style="width:${completionPercent()}%"></i></div>`;
+    progress.innerHTML = `<span>媒体生产</span><strong>已生成媒体 ${generatedMediaCount()} / ${totalShots()}</strong><div><i style="width:${mediaCompletionPercent()}%"></i></div>`;
     aside.appendChild(progress);
     return aside;
   }
@@ -836,7 +1508,7 @@ export function createProductShell(options = {}) {
     const bar = node("header", "storyboard-context-bar");
     const selectionContext = node("div", "selection-context");
     selectionContext.innerHTML = empty
-      ? `<span>当前项目</span><strong>${escapeHtml(snapshot.project?.name || "未命名项目")}</strong><span>0 场景 · 0 镜头 · 尚未创建故事事实</span>`
+      ? `<span>当前项目</span><strong>${escapeHtml(projectDisplayName())}</strong><span>0 场景 · 0 镜头 · 尚未创建故事事实</span>`
       : `<span>当前选择</span><strong>场景 ${String(selection.sceneIndex + 1).padStart(2, "0")} · ${escapeHtml(scene.name)}</strong><span>镜头 ${String(selection.shotIndex + 1).padStart(2, "0")} · ${escapeHtml(shot.title)}</span>`;
     const actions = node("div", "context-actions");
     const canvas = node("button", "studio-text-button");
@@ -1226,6 +1898,7 @@ export function createProductShell(options = {}) {
 
   function buildAgentChat() {
     const context = currentAgentChatContext();
+    const copilot = currentCopilotState();
     const session = agentChatContexts.get(agentChatContextKey(context));
     const collapsed = isAgentChatCollapsed();
     return buildAgentChatPanel({
@@ -1235,6 +1908,8 @@ export function createProductShell(options = {}) {
       runtime: options.getRuntime?.(),
       collapsed,
       mobileOpen: mobileAgentOpen,
+      copilot,
+      onNextAction: handleCopilotAction,
       onToggleCollapse: () => {
         const nextExpanded = collapsed;
         setAgentChatExpanded(nextExpanded);
@@ -1258,7 +1933,7 @@ export function createProductShell(options = {}) {
   function buildMobileNav() {
     const nav = node("nav", "product-mobile-nav");
     nav.setAttribute("aria-label", "移动端 Studio 导航");
-    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["context", "项目"], ["help", "指南"], ["agent", "搭档"]]) {
+    for (const [key, label] of [["canvas", "画布"], ["storyboard", "故事板"], ["asset_bible", "资产"], ["context", "项目"], ["agent", "搭档"]]) {
       const active = key === "agent" ? mobileAgentOpen : key === "help" ? helpOpen : section === key;
       const button = node("button", active ? "active" : "", label);
       button.type = "button";
@@ -1268,6 +1943,8 @@ export function createProductShell(options = {}) {
           openCanvas();
         } else if (key === "storyboard") {
           showStoryboard();
+        } else if (key === "asset_bible") {
+          showAssetBible();
         } else if (key === "context") {
           projectDrawerOpen = true;
           closeResponsiveAgentOverlay();
@@ -1296,6 +1973,33 @@ export function createProductShell(options = {}) {
     return nav;
   }
 
+  function handleCopilotAction(action) {
+    if (!action?.action) return;
+    if (action.action === "generate_asset_candidates") {
+      void stageAssetBibleCommand({ type: "generate_candidates" });
+      return;
+    }
+    if (action.action === "approve_selected_asset" && selectedAsset()) {
+      void stageAssetBibleCommand({ type: "approve", target_id: selectedAsset().stable_id });
+      return;
+    }
+    if (action.action === "lock_asset_bible") {
+      void stageAssetBibleCommand({ type: "lock" });
+      return;
+    }
+    if (["review_asset_candidates", "resolve_required_occurrences", "review_asset_coverage"].includes(action.action)) {
+      showAssetBible();
+      return;
+    }
+    if (action.action === "open_storyboard") {
+      showStoryboard();
+      return;
+    }
+    if (action.action === "open_script") {
+      showCanvas();
+    }
+  }
+
   function buildMobileHelpSheet() {
     const sheet = node("section", "studio-mobile-help-sheet");
     sheet.tabIndex = -1;
@@ -1319,7 +2023,11 @@ export function createProductShell(options = {}) {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(active));
-    button.addEventListener("click", () => key === "canvas" ? openCanvas() : showStoryboard());
+    button.addEventListener("click", () => {
+      if (key === "canvas") openCanvas();
+      else if (key === "asset_bible") showAssetBible();
+      else showStoryboard();
+    });
     return button;
   }
 
@@ -1613,12 +2321,18 @@ export function createProductShell(options = {}) {
         visible_in_same_studio_shell: true,
       };
     }
+    const bible = assetBibleView();
+    const asset = section === "asset_bible" ? selectedAsset() : null;
+    const copilot = currentCopilotState();
     const context = agentChatContextSnapshot({
       project: snapshot.project,
       studioState,
       section,
       selectedNode: selectedCanvasNode(),
       currentShot: currentShot(),
+      selectedAsset: asset,
+      assetBible: bible,
+      copilot,
     });
     if (mediaOperationsReady()) {
       const ops = mediaOperationsView();
@@ -1643,7 +2357,9 @@ export function createProductShell(options = {}) {
 
   function selectedCanvasNode() {
     const state = snapshot.studioState || {};
-    const selectedId = state.selection?.nodeIds?.[0] || currentShot().nodeId || "";
+    const selectedId = section === "storyboard"
+      ? currentShot().nodeId || state.selection?.nodeIds?.[0] || ""
+      : state.selection?.nodeIds?.[0] || currentShot().nodeId || "";
     return selectedId ? state.nodes?.[selectedId] || null : null;
   }
 
@@ -1713,7 +2429,26 @@ export function createProductShell(options = {}) {
       if (sequenceWorkspace) {
         applyGraphWorkspace(sequenceWorkspace);
       }
-      snapshot = { loading: false, workspace, project, sequenceWorkspace, mediaOperations, mediaCommandPreview: null, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
+      let runtimeAssetBible = null;
+      let mediaGates = {};
+      if (activeProjectId) {
+        const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
+        try { runtimeAssetBible = await projectRuntime?.loadAssetBible?.(); } catch { runtimeAssetBible = null; }
+        try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
+      }
+      snapshot = {
+        loading: false,
+        workspace,
+        project,
+        sequenceWorkspace,
+        mediaOperations,
+        runtimeAssetBible,
+        mediaGates,
+        mediaCommandPreview: null,
+        error: "",
+        authUser,
+        studioState: options.getStudioState?.() || snapshot.studioState,
+      };
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -1746,6 +2481,12 @@ export function createProductShell(options = {}) {
     render();
   }
 
+  function showAssetBible() {
+    section = "asset_bible";
+    closeResponsiveAgentOverlay();
+    render();
+  }
+
   function showOverview() {
     showStoryboard();
   }
@@ -1759,8 +2500,8 @@ export function createProductShell(options = {}) {
   }
 
   function sceneModel() {
-    if (mediaOperationsReady()) return mediaSceneModel();
     if (graphWorkspaceReady()) return graphSceneModel();
+    if (mediaOperationsReady()) return mediaSceneModel();
     const legacyApplied = legacyAppliedStoryboardProjection(snapshot.studioState || {});
     if (legacyApplied.status === "ready") {
       const sceneIndex = Math.min(selection.sceneIndex, legacyApplied.scenes.length - 1);
@@ -1796,8 +2537,8 @@ export function createProductShell(options = {}) {
   }
 
   function shotModel() {
-    if (mediaOperationsReady()) return mediaShotModel();
     if (graphWorkspaceReady()) return graphShotModel();
+    if (mediaOperationsReady()) return mediaShotModel();
     const state = snapshot.studioState || {};
     const legacyApplied = legacyAppliedStoryboardProjection(state);
     if (legacyApplied.status === "ready") return legacyApplied.shots;
@@ -1909,7 +2650,33 @@ export function createProductShell(options = {}) {
 
   function currentScene() { return sceneModel()[selection.sceneIndex] || emptyScene(); }
   function currentShot() { return currentScene().shots[selection.shotIndex] || emptyShot(); }
+  function assetBibleView() {
+    return assetBibleProjection(snapshot.studioState || {}, snapshot.runtimeAssetBible);
+  }
+  function selectedAsset() {
+    const view = assetBibleView();
+    const selected = view.assets.find((item) => item.stable_id === selectedAssetId);
+    if (selected) return selected;
+    const fallback = view.active_assets.find((item) => item.review_state === "candidate") || view.active_assets[0] || null;
+    if (fallback) selectedAssetId = fallback.stable_id;
+    return fallback;
+  }
+  function currentCopilotState() {
+    return deriveProductionCopilotState({
+      studioState: snapshot.studioState || {},
+      runtimeAssetBible: snapshot.runtimeAssetBible,
+      capabilityGates: snapshot.mediaGates || {},
+      section,
+      selectedAsset: section === "asset_bible" ? selectedAsset() : null,
+    });
+  }
   function hasStoryFacts() { return shotModel().length > 0; }
+  function projectDisplayName() {
+    const names = [snapshot.project?.name, snapshot.studioState?.meta?.projectName]
+      .map((value) => String(value || "").trim());
+    return names.find((value) => value && !["未命名项目", "项目"].includes(value))
+      || String(snapshot.project?.project_id || snapshot.studioState?.meta?.projectId || "当前项目");
+  }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function storyboardTotalSummary() {
     const scenes = sceneModel();
@@ -1917,8 +2684,8 @@ export function createProductShell(options = {}) {
     const durationSec = scenes.reduce((sum, scene) => sum + scene.shots.reduce((shotSum, shot) => shotSum + Number.parseFloat(shot.duration || 0), 0), 0);
     return { scene_count: scenes.length, shot_count: shotCount, duration_sec: durationSec };
   }
-  function totalReadyShots() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => shot.state === "ready").length; }
-  function completionPercent() { return totalShots() ? Math.round((totalReadyShots() / totalShots()) * 100) : 0; }
+  function generatedMediaCount() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => Boolean(shot.preview)).length; }
+  function mediaCompletionPercent() { return totalShots() ? Math.round((generatedMediaCount() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
   function graphStateLabel(state) {
@@ -1944,12 +2711,13 @@ export function createProductShell(options = {}) {
     updateStudioState,
     showOverview,
     showStoryboard,
+    showAssetBible,
     showCanvas,
     setSection(next) {
       if (next === "agent") {
         setAgentChatExpanded(true);
-      } else if (next === "storyboard") {
-        section = "storyboard";
+      } else if (next === "storyboard" || next === "asset_bible") {
+        section = next;
       } else {
         section = "canvas";
       }
@@ -2002,6 +2770,40 @@ function emptyShot() {
 
 function shotTitle(index) {
   return `镜头 ${Number(index || 0) + 1}`;
+}
+
+function splitList(value) {
+  return String(value || "")
+    .split(/[、,，;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 24);
+}
+
+function assetCommandLabel(value) {
+  return {
+    generate_candidates: "建立本地确定性资产候选",
+    create_asset: "补充人工审核资产",
+    approve: "批准资产候选",
+    reject: "拒绝资产候选",
+    edit: "编辑资产候选",
+    merge: "合并资产候选",
+    split: "拆分资产候选",
+    reassign_occurrences: "重分配必要出现范围",
+    mark_not_needed: "标记出现范围为无需",
+    lock: "锁定 Asset Bible 版本",
+  }[String(value || "")] || "更新 Asset Bible";
+}
+
+function resolutionStatusLabel(value) {
+  return {
+    approved: "已由批准资产覆盖",
+    pending: "等待资产批准",
+    rejected: "引用资产已拒绝",
+    superseded: "引用资产已取代",
+    orphaned: "引用去向缺失",
+    not_needed: "已明确无需",
+  }[String(value || "")] || "待解决";
 }
 
 function cleanTitle(value) {

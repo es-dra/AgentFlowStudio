@@ -102,6 +102,39 @@ export function nodeBodySignature(node) {
   ].join("|");
 }
 
+export function shotSequenceDurationSummary(node, state = {}) {
+  if (node?.params?.nodeRole !== "m6_6_shot_sequence_candidate") return null;
+  const candidateId = String(node.groupId || node.params?.candidate_id || "");
+  const expectedShots = Math.max(0, Number(node.params?.shot_count || 0));
+  const shots = Object.values(state.nodes || {}).filter((item) => (
+    item?.params?.nodeRole === "m6_6_shot_candidate"
+    && String(item.groupId || item.params?.candidate_id || "") === candidateId
+  ));
+  const durations = shots.map((item) => Number(item.params?.duration_sec));
+  const hasCompleteShotDurations = expectedShots > 0
+    && shots.length === expectedShots
+    && durations.every((value) => Number.isFinite(value) && value >= 0);
+  const shotDurationSec = hasCompleteShotDurations
+    ? durations.reduce((sum, value) => sum + value, 0)
+    : 0;
+  const plannedDurationSec = Number(node.params?.provider_estimated_duration_sec ?? node.params?.estimated_duration_sec);
+  const hasPlannedDuration = Number.isFinite(plannedDurationSec) && plannedDurationSec >= 0;
+  const sceneCount = Math.max(0, Number(node.params?.scene_count || 0));
+  const durationParts = [];
+  if (hasCompleteShotDurations) durationParts.push(`镜头合计 ${Math.round(shotDurationSec)} 秒`);
+  if (hasPlannedDuration && (!hasCompleteShotDurations || Math.round(plannedDurationSec) !== Math.round(shotDurationSec))) {
+    durationParts.push(`计划估算 ${Math.round(plannedDurationSec)} 秒`);
+  }
+  return {
+    scene_count: sceneCount,
+    shot_count: expectedShots || shots.length,
+    shot_duration_sec: shotDurationSec,
+    planned_duration_sec: hasPlannedDuration ? plannedDurationSec : 0,
+    duration_source: hasCompleteShotDurations ? "per_shot_sum" : hasPlannedDuration ? "plan_estimate" : "unknown",
+    text: `动态分镜候选：${sceneCount} 场，${expectedShots || shots.length} 镜头${durationParts.length ? `，${durationParts.join("；")}` : ""}。`,
+  };
+}
+
 function directorBody(node, def) {
   const out = [];
   const summary = directorSummary(normalizeDirectorSetup(node.params?.directorSetup));
@@ -401,7 +434,7 @@ function contentBlock(node, store) {
   }
   const view = document.createElement("div");
   view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
-  view.textContent = node.content;
+  view.textContent = shotSequenceDurationSummary(node, store?.get?.())?.text || node.content;
   return view;
 }
 

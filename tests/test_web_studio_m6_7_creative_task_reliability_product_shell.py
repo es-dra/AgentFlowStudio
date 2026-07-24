@@ -71,7 +71,7 @@ def test_m6_7_product_shell_project_account_menu_contract() -> None:
     assert "studio-header-notice" in shell
     assert "studio-header-notice" in css
     assert "studio-account-identity" in css
-    assert "grid-template-columns: auto minmax(180px, 280px) 188px minmax(120px, 1fr) auto" in css
+    assert "grid-template-columns: auto minmax(180px, 280px) 276px minmax(120px, 1fr) auto" in css
     assert "grid-template-columns: minmax(0, 1fr) auto" in css
     assert ".studio-header-actions .studio-account-context" in css
     assert ".studio-account-menu" in css and "position: fixed" in css

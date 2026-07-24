@@ -33,12 +33,36 @@ export function agentChatContextKey(context = {}) {
   ].join(":");
 }
 
+export function agentChatContextFingerprint(context = {}) {
+  const parts = [
+    cleanToken(context.project_id, 120),
+    cleanToken(context.section, 80),
+    cleanToken(context.object_kind, 40),
+    cleanToken(context.object_id, 160),
+    cleanToken(context.script_revision_id, 160),
+    cleanToken(context.production_plan_id, 160),
+    cleanToken(context.production_plan_digest, 80),
+    String(Number(context.production_graph_version || 0)),
+    cleanToken(context.production_graph_digest, 80),
+    cleanToken(context.asset_bible_revision_id, 160),
+  ];
+  let hash = 2166136261;
+  for (const character of parts.join("\u001f")) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `agent-context-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
 export function agentChatContextSnapshot({
   project = null,
   studioState = null,
   section = "canvas",
   selectedNode = null,
   currentShot = null,
+  selectedAsset = null,
+  assetBible = null,
+  copilot = null,
 } = {}) {
   const state = studioState && typeof studioState === "object" ? studioState : {};
   const meta = state.meta && typeof state.meta === "object" ? state.meta : {};
@@ -52,15 +76,36 @@ export function agentChatContextSnapshot({
   const productionGraph = state.production?.production_graph_projection || {};
   const selectedCoreAsset = activeNode?.params?.coreAssetTruth || null;
   const selectedPlanEntity = activeNode?.params?.productionPlanTruth || null;
-  const selectedScreenplaySummary = screenplaySummaryForNode(activeNode);
+  const selectedScreenplaySummary = screenplaySummaryForNode(activeNode)
+    || latestScreenplaySummary(nodeValues);
   const selectedEdgeId = cleanToken(state.selection?.edgeId, 140);
   const selectedEdge = selectedEdgeId ? state.edges?.[selectedEdgeId] : null;
   const selectedEdgeFrom = selectedEdge?.from ? nodes[selectedEdge.from] : null;
   const selectedEdgeTo = selectedEdge?.to ? nodes[selectedEdge.to] : null;
-  const scriptRevisionId = cleanToken(scriptTruth.current_revision_id, 140);
+  const scriptRevisionId = cleanToken(
+    scriptTruth.current_revision_id
+    || selectedScreenplaySummary?.revision_id
+    || latestAppliedScriptRevisionId(nodeValues),
+    140,
+  );
   const scriptSourceDigest = cleanToken(scriptTruth.source_digest, 80);
   const planShotCount = Number(productionPlan.shot_count || 0);
-  return {
+  const normalizedSection = section === "storyboard" ? "storyboard_read_only" : section === "asset_bible" ? "asset_bible" : "canvas";
+  const objectKind = normalizedSection === "asset_bible" && selectedAsset?.stable_id
+    ? "asset"
+    : normalizedSection === "storyboard_read_only" && currentShot?.nodeId
+      ? "shot"
+      : activeNode?.id
+        ? "node"
+        : "project";
+  const objectId = objectKind === "asset"
+    ? cleanToken(selectedAsset?.stable_id, 160)
+    : objectKind === "shot"
+      ? cleanToken(currentShot?.nodeId, 160)
+      : objectKind === "node"
+        ? cleanToken(activeNode?.id, 160)
+        : cleanToken(project?.project_id || meta.projectId, 120);
+  const snapshot = {
     schema_version: SCHEMA_VERSION,
     project_id: cleanToken(project?.project_id || meta.projectId, 120),
     revision_id: scriptRevisionId || cleanToken(meta.seq ? `studio-state-${meta.seq}` : "", 80),
@@ -75,8 +120,10 @@ export function agentChatContextSnapshot({
     production_graph_version: Number(productionGraph.graph_version || 0),
     production_graph_digest: cleanToken(productionGraph.graph_digest, 80),
     canvas_name: cleanText(meta.canvasName || "画布", 40),
-    project_name: cleanText(project?.name || meta.projectName || "未命名项目", 80),
-    section: section === "storyboard" ? "storyboard_read_only" : "canvas",
+    project_name: cleanText(preferredProjectName(project?.name, meta.projectName), 80),
+    section: normalizedSection,
+    object_kind: objectKind,
+    object_id: objectId,
     selected_node_id: cleanToken(activeNode?.id, 120),
     selected_node_type: cleanToken(activeNode?.type, 40),
     selected_node_status: cleanToken(activeNode?.status, 40),
@@ -99,11 +146,21 @@ export function agentChatContextSnapshot({
     selected_edge_to_title: cleanText(selectedEdgeTo?.title || selectedEdgeTo?.label || "", 80),
     current_shot_node_id: cleanToken(currentShot?.nodeId, 120),
     current_shot_title: cleanText(currentShot?.title || "", 80),
+    selected_asset_id: cleanToken(selectedAsset?.stable_id, 160),
+    selected_asset_type: cleanToken(selectedAsset?.asset_type, 40),
+    selected_asset_title: cleanText(selectedAsset?.display_name || "", 120),
+    selected_asset_review_state: cleanToken(selectedAsset?.review_state, 40),
+    asset_bible_revision_id: cleanToken(assetBible?.current_revision_id, 160),
+    asset_bible_status: cleanToken(assetBible?.status, 40),
+    asset_candidate_set_id: cleanToken(assetBible?.candidate_set?.candidate_set_id, 160),
+    production_copilot: copilot || {},
     counts: {
       nodes: nodeValues.length,
       scenes: Number(productionGraph.scene_count || 0) || sceneNodes.length || inferSceneCount(shotNodes),
       shots: Number(productionGraph.shot_count || 0) || planShotCount || shotNodes.length,
       assets: Array.isArray(state.assets) ? state.assets.length : 0,
+      asset_candidates: Number(assetBible?.counts?.total || 0),
+      asset_candidates_pending: Number(assetBible?.counts?.candidate || 0),
       graph_tasks: Number(productionGraph.task_count || 0),
       graph_pending_reviews: Number(productionGraph.pending_review_count || 0),
       production_plan_shots: planShotCount,
@@ -134,6 +191,15 @@ export function agentChatContextSnapshot({
     remote_dispatch_count: 0,
     provider_dispatch_count: 0,
   };
+  snapshot.context_fingerprint = agentChatContextFingerprint(snapshot);
+  return snapshot;
+}
+
+function preferredProjectName(primary, fallback) {
+  const values = [primary, fallback].map((item) => String(item || "").trim());
+  return values.find((item) => item && !["未命名项目", "项目"].includes(item))
+    || values.find(Boolean)
+    || "未命名项目";
 }
 
 function screenplaySummaryForNode(node) {
@@ -145,7 +211,7 @@ function screenplaySummaryForNode(node) {
   const candidate = currentRevision?.screenplay_candidate || params.embeddedCreativeAction?.preview?.screenplay_candidate || null;
   const scenes = Array.isArray(candidate?.scenes) ? candidate.scenes : [];
   const characters = Array.isArray(candidate?.characters) ? candidate.characters : [];
-  if (!scenes.length && !characters.length && !currentRevisionId) return {};
+  if (!scenes.length && !characters.length && !currentRevisionId) return null;
   return {
     revision_id: currentRevisionId || cleanToken(currentRevision?.revision_id, 160),
     title: cleanText(candidate?.title || "剧本候选", 120),
@@ -156,6 +222,20 @@ function screenplaySummaryForNode(node) {
       return sum + blocks.filter((block) => cleanToken(block?.type, 40) === "dialogue").length;
     }, 0),
   };
+}
+
+function latestScreenplaySummary(nodes) {
+  return nodes
+    .map((node) => screenplaySummaryForNode(node))
+    .filter(Boolean)
+    .sort((left, right) => String(right.revision_id || "").localeCompare(String(left.revision_id || "")))[0] || {};
+}
+
+function latestAppliedScriptRevisionId(nodes) {
+  const applied = nodes
+    .map((node) => node?.params?.embeddedCreativeAction)
+    .filter((action) => action?.status === "applied" && action?.applied_revision_id);
+  return cleanToken(applied.slice(-1)[0]?.applied_revision_id, 140);
 }
 
 function isSceneContextNode(node) {
@@ -256,7 +336,7 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
   };
   appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
   session.pendingCommand = command;
-  appendMessage(session, { role: "assistant", text: "已生成M6方案预览；确认前不会写入制作图、调用Provider或改变画布事实。" });
+  appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
   return command;
 }
 
@@ -1259,8 +1339,8 @@ function generationPreviewCommand(context, intent) {
     status: "preview",
     title: intent.kind === "video" ? "预览视频生成" : "预览图片生成",
     summary: intent.kind === "video"
-      ? "确认后只记录当前节点的视频生成意图预览；Provider 关闭时不会提交视频任务。"
-      : "确认后只记录当前节点的图片生成意图预览；Provider 关闭时不会提交图片任务。",
+      ? "确认后只记录当前节点的视频生成意图预览；外部视频能力关闭时不会提交任务。"
+      : "确认后只记录当前节点的图片生成意图预览；外部图片能力关闭时不会提交任务。",
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     node_id: cleanToken(context.selected_node_id, 120),
@@ -1272,7 +1352,7 @@ function generationPreviewCommand(context, intent) {
       storyboard_write: false,
     },
     requires_confirmation: true,
-    provider_label: intent.kind === "video" ? "视频 Provider 当前按 gate 关闭" : "图片 Provider 当前按 gate 关闭",
+    provider_label: intent.kind === "video" ? "外部视频能力当前未启用" : "外部图片能力当前未启用",
     tool_label: "生成命令预览",
     cost_label: "本次不扣费；真实生成前需单独确认",
     remote_dispatch_count: 0,
@@ -1706,7 +1786,7 @@ function executeAgentCommand(command, state) {
 
 function localNodeReceiptSummary(command) {
   if (command.command_type === "revise_selected_node") return "当前节点已新增一个可撤销修订；没有创建新节点。";
-  if (command.command_type === "preview_generation_from_selected") return "生成意图预览已记录；Provider 未启动，也没有产生费用。";
+  if (command.command_type === "preview_generation_from_selected") return "生成意图预览已记录；未调用外部能力，也没有产生费用。";
   return `${command.title}已执行，影响范围：当前节点。`;
 }
 
@@ -2057,7 +2137,7 @@ function m3ContextAgentReceipt(command, response, runtimeReceipt) {
     source_digest: contextPack.source_digest || command.source_digest || "",
     context_pack_id: contextPack.context_pack_id || runtimeReceipt?.context_pack_id || "",
     canonical_truth_digest: contextPack.canonical_truth_digest || "",
-    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，Provider 保持关闭，草案不会写入事实。`,
+    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，外部能力保持关闭，草案不会写入事实。`,
     undo_available: Boolean(runtimeReceipt?.undo_available),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,

@@ -81,6 +81,7 @@ export function initialState(projectId = "") {
     order: [],
     selection: { nodeIds: [], edgeId: null },
     assets: [],
+    assetBible: {},
     production: {},
     ui: {
       drawerOpen: true,
@@ -107,6 +108,7 @@ export function snapshotStudioState(state) {
     edges: state.edges,
     order: state.order,
     assets: state.assets,
+    assetBible: state.assetBible,
     production: state.production,
   }), { stripProductionAuthority: true });
 }
@@ -131,6 +133,7 @@ export function normalizeSnapshot(snap) {
     edges: input.edges && typeof input.edges === "object" ? input.edges : {},
     order: Array.isArray(input.order) ? input.order : Object.keys(input.nodes || {}),
     assets: Array.isArray(input.assets) ? input.assets : base.assets,
+    assetBible: sanitizeAssetBibleForPersistence(input.assetBible),
     production: sanitizeProductionBinding(input.production),
   };
   return sanitizeSnapshotForPersistence(normalized);
@@ -143,6 +146,7 @@ export function replaceSerializable(state, snap) {
   state.edges = snap.edges;
   state.order = snap.order;
   state.assets = snap.assets;
+  state.assetBible = sanitizeAssetBibleForPersistence(snap.assetBible);
   state.production = sanitizeProductionBinding(snap.production);
   state.groups = state.groups || {};
   state.selection = { nodeIds: [], edgeId: null };
@@ -225,8 +229,18 @@ function sanitizeSnapshotForPersistence(snapshot, { stripProductionAuthority = f
     edges,
     order: (Array.isArray(snapshot.order) ? snapshot.order : []).filter((id) => !projectedNodeIds.has(id)),
     assets: sanitizeAssetsForPersistence(snapshot.assets || [], projectId),
+    assetBible: sanitizeAssetBibleForPersistence(snapshot.assetBible),
     production: stripProductionAuthority ? {} : sanitizeProductionBinding(snapshot.production),
   };
+}
+
+function sanitizeAssetBibleForPersistence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const next = stripForbiddenRawProviderFields(value);
+  if (next.schema_version !== "afs.asset_bible.v0.1") return {};
+  next.provider_dispatch_count = 0;
+  next.external_cost_usd = 0;
+  return next;
 }
 
 export function sanitizeProductionBinding(value) {

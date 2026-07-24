@@ -365,6 +365,10 @@ function resultReadyMessage(actionType, preview) {
 
 function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionId, action) {
   const summary = shotPlanSummary(shotPlan);
+  const durationLabel = summary.provider_estimated_duration_sec
+    && Math.round(summary.provider_estimated_duration_sec) !== Math.round(summary.estimated_duration_sec)
+    ? `镜头合计 ${Math.round(summary.estimated_duration_sec)} 秒；计划估算 ${Math.round(summary.provider_estimated_duration_sec)} 秒`
+    : `镜头合计 ${Math.round(summary.estimated_duration_sec)} 秒`;
   const candidateId = `shot_candidate_${Date.now().toString(36)}`;
   const layout = shotCandidateLayout(sourceNode, shotPlan);
   const sequenceNode = candidateNode(state, "sequence", {
@@ -373,7 +377,7 @@ function materializeShotCandidateSubgraph(state, sourceNode, shotPlan, revisionI
     y: layout.sequence.y,
     w: layout.sequence.w,
     h: layout.sequence.h,
-    content: `动态分镜候选：${summary.scene_count} 场，${summary.shot_count} 镜头，总时长约 ${Math.round(summary.estimated_duration_sec)} 秒。`,
+    content: `动态分镜候选：${summary.scene_count} 场，${summary.shot_count} 镜头，${durationLabel}。`,
     status: "draft",
     params: {
       candidate_id: candidateId,

@@ -140,6 +140,7 @@ export function createStore(projectId = "") {
     state.edges = {};
     state.order = [];
     state.assets = [];
+    state.assetBible = {};
     state.selection = { nodeIds: [], edgeId: null };
     history.past = [];
     history.future = [];
