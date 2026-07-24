@@ -19,7 +19,30 @@ def test_m6_frontend_contract_stays_in_single_shell_and_runtime_graph_path() -> 
     assert "confirmM6ScriptPlanAssetBible" in combined
     assert "stageM6ScriptPlanCandidateCommand" in combined
     assert "/m6/script-plan-asset-bible/preview" in combined
+    assert "/m6/script-plan-asset-bible/preview-runs/" in combined
     assert "/m6/script-plan-asset-bible/confirm" in combined
+    assert "恢复同一预览" in combined
+    assert "candidate_digest" in combined
+    assert "loadLatestM6ScriptPlanPreviewRun" in combined
+    assert "cancelM6ScriptPlanPreviewRun" in combined
+    assert "confirmPayload.candidate" not in combined
+    shell = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
+    restore = shell.split("async function restoreLatestM6PreviewRun", 1)[1].split("function currentPlanningPanelPreferenceKey", 1)[0]
+    assert "isM6RuntimeCurrent(runtime, expectedProjectId)" in restore
+    assert restore.index("await runtime?.loadLatestM6ScriptPlanPreviewRun?.()") < restore.index(
+        "if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;"
+    ) < restore.index("m6PreviewRun = run")
+    permanent_error = shell.split("if (error?.status && error.status !== 0) {", 1)[1].split("}", 1)[0]
+    assert "m6PreviewRecovering = false;" in permanent_error
+    assert "return;" in permanent_error
+    assert "String(run.project_id || \"\") === expectedProjectId" in shell
+    panel = (STUDIO_ROOT / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
+    assert 'if (run?.phase !== "cancelled")' in panel
+    cancelled = panel.split('if (run?.phase !== "cancelled")', 1)[1].split("} catch", 1)[0]
+    assert "session.pendingCommand = null;" in cancelled
+    assert "cancelAgentCommand(session)" not in cancelled
+    styles = (STUDIO_ROOT / "styles" / "product-shell.css").read_text(encoding="utf-8")
+    assert ".studio-unified-workspace.agent-collapsed .canvas-workspace-stage .graph-canvas-status," in styles
     assert "buildCanvasWorkspace" in combined
     assert "buildStoryboardWorkspace" in combined
     assert "buildAgentChat" in combined
@@ -71,14 +94,21 @@ const candidate = {
   rights_refs: ["rights"],
 };
 const preview = {
-  candidate,
-  validation: {
-    verdict: "PASS",
-    P0: 0,
-    P1: 0,
-    review_roles: candidate.review_requirements.map((item) => item.role),
-    provider_dispatch_count: 0,
-    cost_usd: 0,
+  run_id: "m6-preview-run",
+  candidate_digest: "c".repeat(64),
+  phase: "succeeded",
+  dispatch_count: 1,
+  preview: {
+    candidate,
+    candidate_digest: "c".repeat(64),
+    validation: {
+      verdict: "PASS",
+      P0: 0,
+      P1: 0,
+      review_roles: candidate.review_requirements.map((item) => item.role),
+      provider_dispatch_count: 1,
+      cost_usd: 0,
+    },
   },
 };
 const contexts = createAgentChatContextStore();
@@ -99,8 +129,8 @@ const runtime = {
 const store = { set: () => { throw new Error("M6 graph command should not mutate Studio state directly"); } };
 const receipt = await executePendingAgentCommandWithRuntime(session, store, runtime);
 if (command.command_type !== "m6_script_plan_asset_bible") process.exit(2);
-if (!confirmPayload || confirmPayload.candidate !== candidate || confirmPayload.expected_graph_version !== 0) process.exit(3);
-if (receipt.runtime_domain !== "production_graph" || receipt.graph_version !== 1 || receipt.provider_dispatch_count !== 0) process.exit(4);
+if (!confirmPayload || confirmPayload.run_id !== "m6-preview-run" || confirmPayload.candidate_digest !== "c".repeat(64) || confirmPayload.expected_graph_version !== 0 || confirmPayload.candidate) process.exit(3);
+if (receipt.runtime_domain !== "production_graph" || receipt.graph_version !== 1 || receipt.provider_dispatch_count !== 1) process.exit(4);
 console.log(JSON.stringify({ commandType: command.command_type, receiptDomain: receipt.runtime_domain, graphVersion: receipt.graph_version }));
 '''
     completed = subprocess.run(
@@ -111,3 +141,38 @@ console.log(JSON.stringify({ commandType: command.command_type, receiptDomain: r
     )
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["commandType"] == "m6_script_plan_asset_bible"
+
+
+def test_m6_run_reconciliation_keeps_one_task_message_and_unrelated_chat() -> None:
+    script = r'''
+import {
+  createAgentChatContextStore,
+  syncM6PreviewRunSession,
+} from "./apps/studio/src/agent-chat-lifecycle.js";
+
+const session = createAgentChatContextStore().get("project:canvas");
+session.messages.push({ role: "assistant", text: "保留这条无关对话", created_at: "before" });
+const context = { context_key: "project:canvas" };
+syncM6PreviewRunSession(session, context, { run_id: "run-1", phase: "queued" });
+syncM6PreviewRunSession(session, context, { run_id: "run-1", phase: "running" });
+syncM6PreviewRunSession(session, context, {
+  run_id: "run-1",
+  phase: "failed",
+  error: { message: "制作方案任务失败；制作事实未改变。" },
+});
+const matching = session.messages.filter((item) => item.m6_preview_run_id === "run-1" && item.role === "assistant");
+if (matching.length !== 1) process.exit(2);
+if (!matching[0].text.includes("制作事实未改变")) process.exit(3);
+if (!session.messages.some((item) => item.text === "保留这条无关对话")) process.exit(4);
+if (session.messages.some((item) => item.text.includes("重新生成"))) process.exit(5);
+if (session.messages.some((item) => item.text.includes("我会基于当前画布上下文生成命令预览"))) process.exit(6);
+console.log(JSON.stringify({ matching: matching.length, messages: session.messages.length }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        capture_output=True,
+        cwd=STUDIO_ROOT.parents[1],
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["matching"] == 1

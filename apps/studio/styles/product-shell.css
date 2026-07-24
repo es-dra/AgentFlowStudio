@@ -1548,6 +1548,37 @@ body,
 }
 .m6-script-plan-entry textarea::placeholder { color: var(--product-muted); }
 
+.m6-preview-run-status {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--product-line);
+  border-left: 3px solid var(--product-accent);
+  background: color-mix(in srgb, var(--product-panel) 92%, transparent);
+}
+
+.m6-preview-run-status strong,
+.m6-preview-run-status p {
+  margin: 0;
+}
+
+.m6-preview-run-status p {
+  color: var(--product-muted);
+  line-height: 1.5;
+}
+
+.m6-preview-run-status.phase-failed {
+  border-left-color: var(--product-danger);
+}
+
+.m6-preview-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .graph-plan-resize {
   grid-column: 1 / -1;
   width: 100%;
@@ -1864,6 +1895,7 @@ body,
     overflow: hidden;
   }
 
+  .studio-unified-workspace.agent-collapsed .canvas-workspace-stage .graph-canvas-status,
   .studio-unified-workspace.agent-collapsed .canvas-workspace-stage #canvas-empty-hint {
     right: 76px;
   }

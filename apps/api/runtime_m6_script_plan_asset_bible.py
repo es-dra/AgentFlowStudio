@@ -9,12 +9,21 @@ from pydantic import BaseModel, ConfigDict, Field
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_film_production_graph import compile_film_candidate, film_graph_projection
+from apps.api.runtime_logging import client_request_id_from_request
+from apps.api.runtime_m6_preview_runs import (
+    M6PreviewRunError,
+    M6PreviewRunStore,
+    preview_run_uses_remote_llm,
+    preview_source_digest,
+    submit_m6_preview_run,
+)
 from apps.api.runtime_production_graph import (
     GraphPlanningRequired,
     GraphVersionConflict,
     ProductionGraphError,
     ProductionGraphStore,
     canonical_digest,
+    graph_path,
 )
 from apps.api.runtime_store import RuntimeStore
 
@@ -48,60 +57,152 @@ class M6ScriptPlanPreviewRequest(BaseModel):
 class M6ScriptPlanConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    run_id: str = Field(min_length=1, max_length=120)
+    candidate_digest: str = Field(min_length=64, max_length=64)
     expected_graph_version: int = Field(ge=0)
-    idempotency_key: str = Field(min_length=1, max_length=180)
-    candidate: dict[str, Any]
     provider_dispatch_count: int = Field(default=0, ge=0, le=0)
     cost_usd: int = Field(default=0, ge=0, le=0)
 
 
 def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
     graph_store = ProductionGraphStore(store)
+    preview_runs = M6PreviewRunStore(store)
 
-    def require_access(request: Request, project_id: str) -> None:
+    def require_access(request: Request, project_id: str) -> str:
         if auth.enabled():
             user = auth.require_user(request)
             if not auth.user_can_access_project(str(user["user_id"]), project_id):
                 raise HTTPException(status_code=403, detail="project access denied")
+            return str(user["user_id"])
+        return "local-runtime-owner"
 
     @app.post("/projects/{project_id}/m6/script-plan-asset-bible/preview")
     def preview_script_plan_asset_bible(project_id: str, body: M6ScriptPlanPreviewRequest, request: Request) -> dict[str, Any]:
-        require_access(request, project_id)
+        owner_id = require_access(request, project_id)
         store.ensure_project_manifest(project_id)
+        client_request_id = client_request_id_from_request(request)
+        if not client_request_id:
+            raise _contract_error(
+                "m6_preview_client_request_required",
+                "M6 preview requires a stable client request id.",
+                project_id=project_id,
+                stage="m6_preview_create",
+                status_code=422,
+            )
+        remote_llm_enabled = _server_codex_m6_enabled()
+        graph_version = graph_store.load(project_id)["version"] if graph_path(store, project_id).is_file() else 0
         try:
-            if _server_codex_m6_enabled():
-                from apps.api.runtime_m6_server_codex_planner import build_m6_server_codex_script_plan_asset_bible
+            run, _ = preview_runs.create_or_load(
+                project_id,
+                owner_id=owner_id,
+                client_request_id=client_request_id,
+                source_digest=preview_source_digest(body.model_dump()),
+                expected_graph_version=graph_version,
+                remote_llm_enabled=remote_llm_enabled,
+            )
+            committed_remote_llm = preview_run_uses_remote_llm(run)
+            if committed_remote_llm and not remote_llm_enabled:
+                run = preview_runs.fail(
+                    project_id,
+                    str(run["run_id"]),
+                    owner_id=owner_id,
+                    error=M6PreviewRunError(
+                        "preview_provider_gate_closed",
+                        "committed text provider gate is closed",
+                    ),
+                )
+                return preview_runs.public(run)
+            submit_m6_preview_run(
+                preview_runs,
+                project_id,
+                str(run["run_id"]),
+                owner_id=owner_id,
+                body=body.model_dump(),
+                planner_resolver=_preview_planner,
+            )
+            return preview_runs.public(preview_runs.load(project_id, str(run["run_id"]), owner_id=owner_id))
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_preview_create") from exc
 
-                preview = build_m6_server_codex_script_plan_asset_bible(project_id, body.model_dump())
-            else:
-                preview = build_m6_script_plan_asset_bible(project_id, body.model_dump())
-        except M6PlanningError as exc:
-            raise _contract_error("m6_planning_required", str(exc), project_id=project_id, stage="m6_preview", status_code=409) from exc
-        return preview
+    @app.get("/projects/{project_id}/m6/script-plan-asset-bible/preview-runs/latest")
+    def latest_script_plan_preview_run(project_id: str, request: Request) -> dict[str, Any]:
+        owner_id = require_access(request, project_id)
+        try:
+            run = preview_runs.latest(project_id, owner_id=owner_id)
+            return {"status": "empty", "run": None} if run is None else preview_runs.public(run)
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_preview_recover") from exc
+
+    @app.get("/projects/{project_id}/m6/script-plan-asset-bible/preview-runs/by-client/{client_request_id}")
+    def recover_script_plan_preview_by_client(project_id: str, client_request_id: str, request: Request) -> dict[str, Any]:
+        owner_id = require_access(request, project_id)
+        try:
+            run = preview_runs.load_by_client_request(
+                project_id,
+                client_request_id,
+                owner_id=owner_id,
+            )
+            return preview_runs.public(run)
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_preview_recover") from exc
+
+    @app.get("/projects/{project_id}/m6/script-plan-asset-bible/preview-runs/{run_id}")
+    def load_script_plan_preview_run(project_id: str, run_id: str, request: Request) -> dict[str, Any]:
+        owner_id = require_access(request, project_id)
+        try:
+            return preview_runs.public(preview_runs.recover(project_id, run_id, owner_id=owner_id))
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_preview_recover") from exc
+
+    @app.post("/projects/{project_id}/m6/script-plan-asset-bible/preview-runs/{run_id}/cancel")
+    def cancel_script_plan_preview_run(project_id: str, run_id: str, request: Request) -> dict[str, Any]:
+        owner_id = require_access(request, project_id)
+        try:
+            return preview_runs.public(preview_runs.cancel(project_id, run_id, owner_id=owner_id))
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_preview_cancel") from exc
 
     @app.post("/projects/{project_id}/m6/script-plan-asset-bible/confirm")
     def confirm_script_plan_asset_bible(project_id: str, body: M6ScriptPlanConfirmRequest, request: Request) -> dict[str, Any]:
-        require_access(request, project_id)
+        owner_id = require_access(request, project_id)
         try:
-            validation = validate_m6_candidate(body.candidate)
-            events = compile_film_candidate(project_id, body.candidate)
-            graph = graph_store.append(
+            def build_confirmation(run: dict[str, Any], preview: dict[str, Any]) -> dict[str, Any]:
+                candidate = preview.get("candidate")
+                if not isinstance(candidate, dict):
+                    raise M6PreviewRunError("preview_candidate_missing", "stored preview candidate is unavailable")
+                validation = validate_m6_candidate(candidate)
+                events = compile_film_candidate(project_id, candidate)
+                graph = graph_store.append(
+                    project_id,
+                    expected_version=body.expected_graph_version,
+                    idempotency_key=f"confirm-{body.run_id}",
+                    semantic_digest=canonical_digest(candidate),
+                    events=events,
+                )
+                return {
+                    "status": "confirmed",
+                    "run_id": body.run_id,
+                    "candidate_digest": body.candidate_digest,
+                    "graph": graph,
+                    "projection": film_graph_projection(graph, "studio"),
+                    "m6_validation": validation,
+                    "provider_dispatch_count": int(run.get("dispatch_count") or 0),
+                    "cost": dict(run.get("cost") or {}),
+                    "cost_usd": (run.get("cost") or {}).get("contract_cost_usd", 0),
+                }
+
+            return preview_runs.confirm_once(
                 project_id,
-                expected_version=body.expected_graph_version,
-                idempotency_key=body.idempotency_key,
-                semantic_digest=canonical_digest(body.candidate),
-                events=events,
+                body.run_id,
+                owner_id=owner_id,
+                candidate_digest=body.candidate_digest,
+                expected_graph_version=body.expected_graph_version,
+                build_response=build_confirmation,
             )
+        except M6PreviewRunError as exc:
+            raise _preview_run_http_error(exc, project_id=project_id, stage="m6_confirm") from exc
         except (M6PlanningError, GraphPlanningRequired, GraphVersionConflict, ProductionGraphError, KeyError, TypeError, ValueError) as exc:
             raise _contract_error("m6_candidate_rejected", str(exc), project_id=project_id, stage="m6_confirm", status_code=409) from exc
-        return {
-            "status": "confirmed",
-            "graph": graph,
-            "projection": film_graph_projection(graph, "studio"),
-            "m6_validation": validation,
-            "provider_dispatch_count": int(body.candidate.get("provider_dispatch_count") or 0),
-            "cost_usd": body.candidate.get("cost_usd", 0),
-        }
 
 
 class M6PlanningError(ValueError):
@@ -112,6 +213,25 @@ def _server_codex_m6_enabled() -> bool:
     from apps.api.runtime_m6_server_codex_planner import server_codex_m6_enabled
 
     return server_codex_m6_enabled()
+
+
+def _preview_planner(remote_llm_enabled: bool):
+    if remote_llm_enabled:
+        from apps.api.runtime_m6_server_codex_planner import build_m6_server_codex_script_plan_asset_bible
+
+        return build_m6_server_codex_script_plan_asset_bible
+    return build_m6_script_plan_asset_bible
+
+
+def _preview_run_http_error(exc: M6PreviewRunError, *, project_id: str, stage: str) -> HTTPException:
+    status_code = 409
+    if exc.code == "preview_run_not_found":
+        status_code = 404
+    elif exc.code == "preview_run_expired":
+        status_code = 410
+    elif exc.code == "preview_run_access_denied":
+        status_code = 403
+    return _contract_error(exc.code, str(exc), project_id=project_id, stage=stage, status_code=status_code)
 
 
 def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -> dict[str, Any]:

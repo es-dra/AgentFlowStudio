@@ -310,8 +310,11 @@ export function stageProductionGraphCandidateCommand(session, context, candidate
 }
 
 export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
-  const candidate = preview?.candidate || {};
-  const validation = preview?.validation || {};
+  const previewPayload = preview?.preview || preview || {};
+  const candidate = previewPayload?.candidate || {};
+  const validation = previewPayload?.validation || {};
+  const runId = cleanToken(preview?.run_id, 120);
+  const candidateDigest = cleanToken(preview?.candidate_digest || previewPayload?.candidate_digest, 80);
   const characters = Array.isArray(candidate.characters) ? candidate.characters.length : 0;
   const scenes = Array.isArray(candidate.scenes) ? candidate.scenes.length : 0;
   const shots = Array.isArray(candidate.shots) ? candidate.shots.length : 0;
@@ -332,15 +335,73 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
     project_id: context?.project_id || "",
     graph_version: Number(context?.production_graph_version || 0),
     graph_digest: context?.production_graph_digest || "",
+    run_id: runId,
+    candidate_digest: candidateDigest,
     candidate,
     m6_validation: validation,
     storyboard_write: false,
-    provider_dispatch_count: 0,
+    provider_dispatch_count: Number(preview?.dispatch_count || previewPayload?.provider_dispatch_count || 0),
   };
-  appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
+  if (runId) {
+    appendM6RunMessage(session, runId, "user", "生成M6剧本制作方案", "submitted");
+  } else {
+    appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
+  }
   session.pendingCommand = command;
-  appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
+  if (runId) {
+    syncM6PreviewRunSession(session, context, preview);
+  } else {
+    appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
+  }
   return command;
+}
+
+export function syncM6PreviewRunSession(session, context, run) {
+  const runId = cleanToken(run?.run_id, 120);
+  if (!session || !runId) return null;
+  const phase = cleanToken(run?.phase, 40) || "queued";
+  const errorMessage = cleanText(run?.error?.message, 300);
+  const copy = {
+    queued: "制作方案已提交；确认前不会改变制作事实。",
+    running: "制作方案处理中。即使浏览器连接中断，也会恢复同一任务，不会重复提交。",
+    running_cancel_requested: "已记录停止后续处理的请求；当前同步文本任务可能仍在完成，不会虚假显示已取消。",
+    succeeded: "制作方案预览已恢复；请先审阅，确认前不会写入 ProductionGraph。",
+    failed: errorMessage || "制作方案任务失败；已保留原项目事实，可查看同一任务的失败状态。",
+    unknown: errorMessage || "文本任务状态需要人工核对；系统不会自动再次提交。",
+    cancelled: "制作方案预览已取消；ProductionGraph 未改变。",
+    confirmed: "制作方案已确认并写入唯一 ProductionGraph；刷新后仍可恢复本次确认回执。",
+  }[phase] || "制作方案状态正在恢复；不会重复提交。";
+  return appendM6RunMessage(session, runId, "assistant", copy, phase, context);
+}
+
+function appendM6RunMessage(session, runId, role, text, phase, context = null) {
+  const messages = (Array.isArray(session.messages) ? [...session.messages] : []).filter((message) => (
+    role !== "assistant"
+    || message?.placeholder_id !== AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID
+    || (context?.context_key && message?.context_key && message.context_key !== context.context_key)
+  ));
+  const markerRole = role === "user" ? "user" : "assistant";
+  const matching = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    if (messages[index]?.m6_preview_run_id === runId && messages[index]?.role === markerRole) matching.push(index);
+  }
+  const message = {
+    role: markerRole,
+    text: cleanText(text, 900),
+    tone: phase === "failed" ? "error" : phase === "cancelled" ? "warning" : "",
+    created_at: new Date().toISOString(),
+    m6_preview_run_id: runId,
+    m6_preview_phase: cleanToken(phase, 40),
+    context_key: cleanToken(context?.context_key, 180),
+  };
+  if (matching.length) {
+    messages[matching.at(-1)] = { ...messages[matching.at(-1)], ...message };
+    for (const index of matching.slice(0, -1).reverse()) messages.splice(index, 1);
+  } else {
+    messages.push(message);
+  }
+  session.messages = messages.slice(-MESSAGE_LIMIT);
+  return message;
 }
 
 export function submitAgentChatMessage(session, rawText, context) {
@@ -450,6 +511,14 @@ export function executePendingAgentCommand(session, state) {
   return receipt;
 }
 
+function dispatchM6PreviewRunUpdate(run) {
+  try {
+    window.dispatchEvent(new CustomEvent("afs:m6-preview-run-updated", { detail: { run } }));
+  } catch {
+    // Lifecycle contracts can execute in Node without a browser event target.
+  }
+}
+
 export async function executePendingAgentCommandWithRuntime(session, store, runtime) {
   const command = session?.pendingCommand;
   if (!command) throw new Error("agent command preview is empty");
@@ -468,8 +537,8 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
   if (command.command_type === "m6_script_plan_asset_bible") {
     response = await runtime.confirmM6ScriptPlanAssetBible({
       expected_graph_version: command.graph_version,
-      idempotency_key: command.command_id,
-      candidate: command.candidate,
+      run_id: command.run_id,
+      candidate_digest: command.candidate_digest,
     });
     const graph = response?.graph || {};
     runtimeReceipt = { graph_version: graph.version, graph_digest: graph.graph_digest, recovery: "refresh_and_retry_on_version_conflict" };
@@ -574,7 +643,20 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
       : runtimeAgentReceipt(command, response, runtimeReceipt, projectionSummary);
   session.pendingCommand = null;
   recordReceipt(session, receipt);
-  appendMessage(session, { role: "assistant", text: receipt.summary });
+  if (command.command_type === "m6_script_plan_asset_bible" && command.run_id) {
+    syncM6PreviewRunSession(session, { context_key: command.context_key }, {
+      run_id: command.run_id,
+      phase: "confirmed",
+    });
+    dispatchM6PreviewRunUpdate({
+      run_id: command.run_id,
+      project_id: command.project_id,
+      phase: "confirmed",
+      confirmation: runtimeReceipt,
+    });
+  } else {
+    appendMessage(session, { role: "assistant", text: receipt.summary });
+  }
   return receipt;
 }
 
@@ -605,8 +687,10 @@ function productionGraphAgentReceipt(command, runtimeReceipt = {}) {
     storyboard_write: false,
     execution_mode: "runtime",
     runtime_domain: "production_graph",
-    provider_dispatch_count: 0,
-    remote_dispatch_count: 0,
+    provider_dispatch_count: Number(command.provider_dispatch_count || 0),
+    remote_dispatch_count: command.command_type === "m6_script_plan_asset_bible"
+      ? Number(command.provider_dispatch_count || 0)
+      : 0,
   };
 }
 

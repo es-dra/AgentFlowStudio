@@ -349,7 +349,28 @@ function commandPreview({ session, store, runtime, onRender }) {
   }
   const cancel = el("button", "studio-secondary-button", "取消");
   cancel.type = "button";
-  cancel.addEventListener("click", () => {
+  cancel.addEventListener("click", async () => {
+    cancel.disabled = true;
+    if (command.command_type === "m6_script_plan_asset_bible" && command.run_id) {
+      try {
+        const run = await runtime?.cancelM6ScriptPlanPreviewRun?.(command.run_id);
+        window.dispatchEvent(new CustomEvent("afs:m6-preview-run-updated", { detail: { run } }));
+        if (run?.phase !== "cancelled") {
+          command.error_message = "已记录停止后续处理；当前文本任务可能仍会完成，请恢复同一预览查看最终状态。";
+          cancel.disabled = true;
+          onRender?.();
+          return;
+        }
+        session.pendingCommand = null;
+        onRender?.();
+        return;
+      } catch (error) {
+        command.error_message = error?.message || "无法取消同一制作方案预览；制作事实未改变。";
+        cancel.disabled = false;
+        onRender?.();
+        return;
+      }
+    }
     cancelAgentCommand(session);
     onRender?.();
   });

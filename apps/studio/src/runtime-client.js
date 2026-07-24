@@ -402,6 +402,10 @@ function inferUserAction(route, method) {
   if (/\/m3-zero-cost\/context-packs\/undo$/.test(route) && method === "POST") return "undo_m3_context_pack";
   if (/\/m3-zero-cost\/audit-truth$/.test(route) && method === "GET") return "load_m3_zero_cost_audit_truth";
   if (/\/m6\/script-plan-asset-bible\/preview$/.test(route) && method === "POST") return "preview_m6_script_plan_asset_bible";
+  if (/\/m6\/script-plan-asset-bible\/preview-runs\/latest$/.test(route) && method === "GET") return "recover_latest_m6_script_plan_preview";
+  if (/\/m6\/script-plan-asset-bible\/preview-runs\/by-client\//.test(route) && method === "GET") return "recover_m6_script_plan_preview";
+  if (/\/m6\/script-plan-asset-bible\/preview-runs\/[^/]+\/cancel$/.test(route) && method === "POST") return "cancel_m6_script_plan_preview";
+  if (/\/m6\/script-plan-asset-bible\/preview-runs\/[^/]+$/.test(route) && method === "GET") return "poll_m6_script_plan_preview";
   if (/\/m6\/script-plan-asset-bible\/confirm$/.test(route) && method === "POST") return "confirm_m6_script_plan_asset_bible";
   if (/\/manga-first-l4b\/production-truth$/.test(route) && method === "POST") return "create_manga_first_production_truth";
   if (/\/manga-first-l4b\/workspace$/.test(route) && method === "GET") return "load_manga_first_workspace";
@@ -549,8 +553,31 @@ export function createRuntimeClient(projectId = "") {
     confirmSequenceAction(payload) {
       return requestJson(`/projects/${encoded}/m5/actions/confirm`, { method: "POST", payload });
     },
-    previewM6ScriptPlanAssetBible(payload) {
-      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview`, { method: "POST", payload });
+    newM6PreviewClientRequestId() {
+      return newClientRequestId();
+    },
+    previewM6ScriptPlanAssetBible(payload, clientRequestId = "") {
+      const stableRequestId = String(clientRequestId || newClientRequestId());
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview`, {
+        method: "POST",
+        payload,
+        meta: { client_request_id: stableRequestId },
+      });
+    },
+    recoverM6ScriptPlanPreviewByClient(clientRequestId) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview-runs/by-client/${encodeURIComponent(clientRequestId)}`);
+    },
+    loadM6ScriptPlanPreviewRun(runId) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview-runs/${encodeURIComponent(runId)}`);
+    },
+    loadLatestM6ScriptPlanPreviewRun() {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview-runs/latest`);
+    },
+    cancelM6ScriptPlanPreviewRun(runId) {
+      return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/preview-runs/${encodeURIComponent(runId)}/cancel`, {
+        method: "POST",
+        payload: {},
+      });
     },
     confirmM6ScriptPlanAssetBible(payload) {
       return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/confirm`, { method: "POST", payload });
