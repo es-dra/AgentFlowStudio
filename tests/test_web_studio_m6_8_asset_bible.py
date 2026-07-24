@@ -51,7 +51,7 @@ console.log(JSON.stringify({ view, copilot, canonical }));
     )
     assert result["view"]["counts"]["total"] == 2
     assert result["view"]["counts"]["candidate"] == 1
-    assert result["copilot"]["next_valid_action"]["action"] in {"open_script", "approve_selected_asset"}
+    assert result["copilot"]["next_valid_action"]["action"] == "regenerate_asset_candidates"
     assert result["canonical"]["authority_mode"] == "canonical_production_graph"
     assert result["canonical"]["status"] == "locked"
     assert result["canonical"]["coverage"]["coverage_pass"] is False
@@ -121,7 +121,8 @@ const bible = {
     { stable_id: "asset-character-bajie", asset_type: "character", display_name: "猪八戒", review_state: "rejected", aliases: ["八戒"], occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] } },
   ],
   resolution_ledger: [{ requirement_id: "req-1", source_asset_id: "asset-character-bajie", assigned_asset_id: "asset-character-bajie", occurrence_kind: "shot", occurrence_id: "shot-1", status: "rejected", resolved: false }],
-  coverage: { scene_total: 3, scene_covered: 3, shot_total: 17, shot_covered: 17, unresolved_required: 1, unresolved_shot_count: 1, coverage_pass: false },
+  coverage: { scene_total: 3, scene_covered: 3, shot_total: 17, shot_covered: 17, unresolved_required: 1, unresolved_shot_count: 1, quality_pass: true, coverage_pass: false },
+  recognition_quality: { status: "pass", issues: [] },
 };
 const state = { assetBible: bible, nodes: {}, edges: {}, assets: [] };
 const view = assetBibleProjection(state);

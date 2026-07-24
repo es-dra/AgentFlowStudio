@@ -15,6 +15,7 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
   const activeAssets = assets.filter((asset) => !["rejected", "superseded"].includes(asset.review_state));
   const historyAssets = assets.filter((asset) => ["rejected", "superseded"].includes(asset.review_state));
   const coverage = normalizeCoverage(bible.coverage, bible.candidate_set);
+  const recognitionQuality = normalizeRecognitionQuality(bible.recognition_quality, coverage);
   const counts = {
     total: activeAssets.length,
     approved: activeAssets.filter((asset) => asset.review_state === "approved").length,
@@ -37,6 +38,7 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
     history_assets: historyAssets,
     counts,
     coverage,
+    recognition_quality: recognitionQuality,
     resolution_ledger: array(bible.resolution_ledger),
     last_receipt: bible.last_receipt || {},
     raw: bible,
@@ -68,11 +70,22 @@ export function assetBibleSourceContext(studioState = {}) {
     || action.preview?.shot_plan
     || null;
   if (!sourceText || !shotPlan?.scenes?.length) return null;
+  const sourceContextTexts = [
+    currentRevision?.source_text,
+    currentRevision?.before_text,
+    currentRevision?.screenplay_candidate?.source_text,
+    sourceNode.content,
+    sourceNode.prompt,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter((value, index, values) => value && value !== sourceText && values.indexOf(value) === index)
+    .slice(0, 8);
   return {
     source_node_id: sourceNode.id,
     script_revision_id: currentRevisionId || projection.source_revision_id,
     shot_candidate_id: projection.candidate_id,
     source_text: sourceText,
+    source_context_texts: sourceContextTexts,
     shot_plan: shotPlan,
     scene_count: projection.scene_count,
     shot_count: projection.shot_count,
@@ -102,6 +115,7 @@ export function deriveProductionCopilotState({
   const admissionStatus = String(imageAdmission?.status || "empty");
   const admissionCounts = imageAdmission?.counts || {};
   const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
+  const qualityIssues = bible.recognition_quality.issues;
   let next = {
     action: "open_script",
     label: "选择当前剧本",
@@ -112,6 +126,13 @@ export function deriveProductionCopilotState({
     next = { action: "open_storyboard", label: "拆分分镜", reason: "剧本已就绪，下一步是建立镜头计划。", enabled: true };
   } else if (shotReady && !candidatesReady) {
     next = { action: "generate_asset_candidates", label: "识别资产候选", reason: "分镜已应用，可执行本地确定性资产识别，不调用外部能力。", enabled: true };
+  } else if (candidatesReady && qualityIssues.length > 0) {
+    next = {
+      action: "regenerate_asset_candidates",
+      label: "重新识别资产",
+      reason: `识别质量门有 ${qualityIssues.length} 项阻塞；先修复具名资产、别名或场景镜头覆盖。`,
+      enabled: !bibleLocked,
+    };
   } else if (candidatesReady && bible.counts.candidate > 0) {
     next = {
       action: selectedAsset?.review_state === "candidate" ? "approve_selected_asset" : "review_asset_candidates",
@@ -211,12 +232,14 @@ export function deriveProductionCopilotState({
       { key: "script", label: "当前剧本", state: scriptReady ? "ready" : "blocked" },
       { key: "shots", label: "已应用分镜", state: shotReady ? "ready" : "blocked" },
       { key: "assets", label: "资产候选", state: candidatesReady ? "ready" : "blocked" },
+      { key: "quality", label: "识别质量", state: bible.recognition_quality.status === "pass" ? "ready" : "blocked" },
       { key: "coverage", label: "镜头覆盖", state: bible.coverage.coverage_pass ? "ready" : "blocked" },
       { key: "bible", label: "Bible 锁定", state: bibleLocked ? "ready" : "blocked" },
     ],
     blockers: [
       ...(!scriptReady ? ["缺少当前剧本版本"] : []),
       ...(scriptReady && !shotReady ? ["分镜尚未应用"] : []),
+      ...qualityIssues.slice(0, 3).map((item) => item.message),
       ...(candidatesReady && bible.counts.candidate ? [`${bible.counts.candidate} 个资产待确认`] : []),
       ...(candidatesReady && bible.coverage.unresolved_required ? [
         `${bible.coverage.unresolved_required} 个必要出现范围未解决（${bible.coverage.unresolved_shot_count} 镜头）`,
@@ -328,7 +351,45 @@ function normalizeCoverage(value = {}, candidateSet = {}) {
     unresolved_shot_count: Number(value.unresolved_shot_count || 0),
     unresolved_asset_ids: array(value.unresolved_asset_ids),
     alias_collision_count: Number(value.alias_collision_count || 0),
+    missing_anchor_count: Number(value.missing_anchor_count || 0),
+    orphan_scene_coverage_count: Number(value.orphan_scene_coverage_count || 0),
+    recognition_ambiguity_count: Number(value.recognition_ambiguity_count || 0),
+    quality_issue_count: Number(value.quality_issue_count || 0),
+    quality_pass: value.quality_pass === true,
+    asset_shot_covered: Number(value.asset_shot_covered || 0),
     coverage_pass: value.coverage_pass === true,
+  };
+}
+
+function normalizeRecognitionQuality(value = {}, coverage = {}) {
+  const persistedIssues = array(value.issues).map((item) => ({
+    code: String(item?.code || "recognition_quality_issue"),
+    asset_type: String(item?.asset_type || ""),
+    display_name: String(item?.display_name || "待确认资产"),
+    scene_count: Number(item?.scene_count || 0),
+    shot_count: Number(item?.shot_count || 0),
+    message: String(item?.message || "资产识别需要复核。"),
+    action: String(item?.action || "重新识别或人工修复"),
+  }));
+  const qualityPassed = value.status === "pass" && persistedIssues.length === 0 && coverage.quality_pass;
+  const issues = qualityPassed || persistedIssues.length
+    ? persistedIssues
+    : [{
+        code: "recognition_evidence_missing",
+        asset_type: "",
+        display_name: "当前识别版本",
+        scene_count: Number(coverage.scene_total || 0),
+        shot_count: Number(coverage.shot_total || 0),
+        message: "当前版本缺少具名资产与出现范围的质量证据。",
+        action: "预览重新识别并确认替换",
+      }];
+  return {
+    status: qualityPassed ? "pass" : "blocked",
+    issues,
+    missing_anchor_count: Number(value.missing_anchor_count || coverage.missing_anchor_count || 0),
+    orphan_scene_coverage_count: Number(value.orphan_scene_coverage_count || coverage.orphan_scene_coverage_count || 0),
+    alias_collision_count: Number(value.alias_collision_count || coverage.alias_collision_count || 0),
+    recognition_ambiguity_count: Number(value.recognition_ambiguity_count || coverage.recognition_ambiguity_count || 0),
   };
 }
 

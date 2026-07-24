@@ -204,6 +204,13 @@ def compile_image_admission_manifest(
     coverage = bible.get("coverage") if isinstance(bible.get("coverage"), Mapping) else {}
     if not coverage.get("coverage_pass") or int(coverage.get("unresolved_required") or 0) != 0:
         raise ValueError("image admission requires complete resolved occurrence coverage")
+    quality = (
+        bible.get("recognition_quality")
+        if isinstance(bible.get("recognition_quality"), Mapping)
+        else {}
+    )
+    if quality.get("status") != "pass" or not coverage.get("quality_pass"):
+        raise ValueError("image admission requires a passed asset recognition quality gate")
     active = [
         _asset(item)
         for item in bible.get("assets", [])
