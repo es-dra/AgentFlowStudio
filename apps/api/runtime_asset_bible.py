@@ -83,7 +83,13 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
     def confirm_asset_bible_command(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
         require_access(request, project_id)
         try:
-            supplied_idempotency_key = _optional_token(body.get("idempotency_key"))
+            supplied_command_id = _optional_token(body.get("command_id"))
+            supplied_idempotency_key = _optional_token(
+                supplied_command_id or body.get("idempotency_key")
+            )
+            supplied_digest = str(body.get("preview_digest") or "")
+            if supplied_command_id and supplied_command_id != _command_id(supplied_digest):
+                raise ValueError("asset Bible command identity does not match the reviewed preview")
             current = _clean_state(body.get("asset_bible"))
             authority_mode = "legacy_studio_adapter"
             graph: dict[str, Any] | None = None
@@ -111,10 +117,11 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
                 reject_unsafe_payload(replay)
                 return replay
             preview = preview_asset_bible_command_result(project_id, body)
-            supplied_digest = str(body.get("preview_digest") or "")
             if not supplied_digest or supplied_digest != preview["preview_digest"]:
                 raise ValueError("asset Bible preview is stale; review the impact again")
-            idempotency_key = _optional_token(body.get("idempotency_key")) or f"asset-{preview['preview_digest'][:32]}"
+            if supplied_command_id and supplied_command_id != preview["command_id"]:
+                raise ValueError("asset Bible command identity does not match the reviewed preview")
+            idempotency_key = supplied_idempotency_key or preview["command_id"]
             result = deepcopy(preview["result"])
             state = result["asset_bible"]
             if idempotency_key in state.get("idempotency_keys", []):
@@ -178,7 +185,15 @@ def preview_asset_bible_command_result(project_id: str, body: Mapping[str, Any])
         "requires_confirmation": True,
     }
     payload["preview_digest"] = canonical_digest(payload)
+    payload["command_id"] = _command_id(payload["preview_digest"])
     return payload
+
+
+def _command_id(preview_digest: Any) -> str:
+    digest = str(preview_digest or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return ""
+    return f"asset-command-{digest[:32]}"
 
 
 def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[str, Any]:

@@ -70,6 +70,11 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "stageAssetBibleCommand" in shell
     assert "previewAssetBibleCommand(request)" in shell
     assert "confirmAssetBibleCommand" in shell
+    assert "assetBibleConfirmRequest" in shell
+    assert "assetBibleConfirmRecovery" in shell
+    assert "syncAssetBibleCommandAssistantReceipt" in shell
+    assert "重试同一确认" in shell
+    assert "assetCommandConfirmPending" in shell
     assert "cancelAssetBibleCommand" in shell
     assert "取消不会改变事实" in shell
     assert "当前 Asset Bible 和 ProductionGraph 均已保留" in shell
@@ -97,6 +102,99 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "@media (prefers-reduced-motion: reduce)" in styles
     assert "flex-direction: column" in styles
     assert "white-space: nowrap" in styles
+
+
+def test_asset_bible_confirm_recovery_keeps_one_reviewed_command() -> None:
+    result = run_node_probe(
+        r'''
+import {
+  assetBibleConfirmRecovery,
+  assetBibleConfirmRequest,
+} from "./apps/studio/src/asset-bible-command-recovery.js";
+
+const preview = {
+  command_id: "asset-command-1234",
+  preview_digest: "a".repeat(64),
+  request: {
+    command: { type: "set_art_direction" },
+    requested_at: "2026-07-24T14:00:00Z",
+    context_fingerprint: "ctx-1",
+  },
+};
+const requestA = assetBibleConfirmRequest(preview, 7);
+const requestB = assetBibleConfirmRequest(preview, 7);
+const network = assetBibleConfirmRecovery({
+  status: 0,
+  errorCode: "network_connection_interrupted",
+  message: "Runtime request failed: network connection interrupted",
+});
+const timeout = assetBibleConfirmRecovery({
+  status: 0,
+  errorCode: "request_aborted",
+  cause: { name: "AbortError" },
+});
+const stale = assetBibleConfirmRecovery({ status: 409, message: "stale" });
+console.log(JSON.stringify({ requestA, requestB, network, timeout, stale }));
+''',
+    )
+    assert result["requestA"] == result["requestB"]
+    assert result["requestA"]["command_id"] == "asset-command-1234"
+    assert result["requestA"]["expected_graph_version"] == 7
+    assert result["network"]["preserve_preview"] is True
+    assert result["network"]["retryable"] is True
+    assert result["timeout"]["category"] == "确认超时"
+    assert result["stale"]["preserve_preview"] is False
+
+
+def test_asset_bible_terminal_receipt_replaces_only_matching_startup_message() -> None:
+    result = run_node_probe(
+        r'''
+import { AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID } from "./apps/studio/src/agent-chat-lifecycle.js";
+import { syncAssetBibleCommandAssistantReceipt } from "./apps/studio/src/asset-bible-command-recovery.js";
+
+const session = {
+  context_key: "project-1:asset_bible:agent-chat",
+  messages: [
+    {
+      role: "assistant",
+      text: "我会基于当前画布上下文生成命令预览；确认前不改变事实。",
+      placeholder_id: AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
+      context_key: "project-1:asset_bible:agent-chat",
+    },
+    { role: "user", text: "保留用户问题。" },
+    { role: "assistant", text: "保留无关回复。" },
+  ],
+};
+const first = {
+  last_receipt: {
+    receipt_id: "asset-receipt-1",
+    command_type: "generate_candidates",
+    status: "confirmed",
+    summary: "资产候选已建立。",
+  },
+};
+const applied = {
+  last_receipt: {
+    receipt_id: "asset-receipt-2",
+    command_type: "set_art_direction",
+    status: "confirmed",
+    summary: "统一美术方向已确认并写入 Asset Bible 当前版本。",
+  },
+};
+syncAssetBibleCommandAssistantReceipt(session, first);
+syncAssetBibleCommandAssistantReceipt(session, applied);
+const restored = { context_key: session.context_key, messages: [] };
+syncAssetBibleCommandAssistantReceipt(restored, applied);
+console.log(JSON.stringify({ session, restored }));
+''',
+    )
+    messages = result["session"]["messages"]
+    assert len([item for item in messages if item.get("asset_bible_terminal_key")]) == 1
+    assert not any(item.get("placeholder_id") == "agent_command_preview_default_v1" for item in messages)
+    assert any(item["text"] == "保留用户问题。" for item in messages)
+    assert any(item["text"] == "保留无关回复。" for item in messages)
+    assert messages[-1]["text"] == "统一美术方向已确认并写入 Asset Bible 当前版本。"
+    assert result["restored"]["messages"][0]["text"] == messages[-1]["text"]
 
 
 def test_content_coverage_blocks_media_admission_before_runtime_capability() -> None:

@@ -101,6 +101,10 @@ async function requestJson(route, { method = "GET", payload = null, meta = null,
     error.route = route;
     error.clientRequestId = requestMeta.client_request_id;
     error.cause = fetchError;
+    error.errorCode = fetchError?.name === "AbortError"
+      ? "request_aborted"
+      : "network_connection_interrupted";
+    error.retryable = true;
     logStudioRequestFinished(requestMeta, { status: "network_error", status_code: 0, elapsed_ms: Date.now() - started });
     throw error;
   }
