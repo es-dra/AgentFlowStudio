@@ -9,13 +9,19 @@ import {
 } from "./studio-project-session.js";
 import { el, showModal } from "./overlay.js";
 import { icon } from "./icons.js";
+import { projectDisplayName, requestProjectName } from "./studio-project-name-dialog.js";
 import {
   createProjectWithRetry,
   isTestProject,
-  reportProjectAccessRecovery,
   reportProjectCreateClientError,
   reportProjectDeleteClientError,
 } from "./studio-project-runtime-ops.js";
+import {
+  beginProjectIdentityLoad,
+  blockProjectIdentity,
+  commitProjectListIdentity,
+  clearProjectIdentity,
+} from "./project-identity-gate.js";
 import {
   emptyProjectRuntimeClient, isCanonicalGraphProject,
   isReadOnlyProjectionProject,
@@ -29,28 +35,51 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   let showAllProjects = false;
   let currentAuthUser = null;
   let projectAccessRecovery = null;
+  let projectTransitionEpoch = 0;
 
-  async function applyProject(projectId, runtimeClient, { projectName, syncAssets = true, recoverOnDenied = true } = {}) {
+  async function applyProject(projectId, runtimeClient, {
+    projectName,
+    syncAssets = true,
+    navigation = "replace",
+  } = {}) {
     const safe = safeProjectId(projectId);
     if (!safe) {
       await showEmptyProjectState();
       return;
     }
-    persistActiveProject(safe);
-    rememberProject(safe);
-    syncProjectUrl(safe);
-    setRuntime(runtimeClient);
+    const transitionEpoch = ++projectTransitionEpoch;
+    const transitionCurrent = () => transitionEpoch === projectTransitionEpoch;
+    const accountId = String(currentAuthUser?.user_id || "").trim();
+    beginProjectIdentityLoad(safe, accountId);
+    store.markProjectLoading(safe);
     const readOnlyProjection = isReadOnlyProjectionProject(safe, projectSummaries);
-    const switchResult = await store.switchProject(safe, runtimeClient, {
+    const prepared = await store.prepareProject(safe, runtimeClient, {
+      accountId,
+      requireCacheAttestation: Boolean(accountId),
       persistenceMode: readOnlyProjection ? "production_graph_read_only" : "studio_state",
     });
-    if (isProjectAccessDeniedError(switchResult?.error)) {
-      if (recoverOnDenied) {
-        await recoverProjectAccessDenied(switchResult.error);
-      } else {
-        await showEmptyProjectState();
-      }
-      return;
+    if (!transitionCurrent()) return { status: "stale" };
+    if (prepared.status === "blocked") {
+      setRuntime(runtimeClient, { attachStore: false });
+      store.blockProject(safe, prepared);
+      blockProjectIdentity(safe, { accountId, reason: prepared.reason });
+      syncProjectUrl(safe, { replace: navigation !== "push" });
+      render();
+      return { status: "blocked", reason: prepared.reason, error: prepared.error };
+    }
+    setRuntime(runtimeClient, { attachStore: false });
+    await store.commitPreparedProject(prepared, runtimeClient, {
+      accountId,
+      isCurrent: transitionCurrent,
+      persistenceMode: readOnlyProjection ? "production_graph_read_only" : "studio_state",
+    });
+    if (!transitionCurrent()) return { status: "stale" };
+    persistActiveProject(safe);
+    rememberProject(safe);
+    syncProjectUrl(safe, { replace: navigation !== "push" });
+    if (prepared.readOnly) {
+      render();
+      return { status: "cache_read_only", source: prepared.source };
     }
     if (projectName) {
       store.set((s) => {
@@ -61,10 +90,13 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     if (readOnlyProjection) store.setRuntimePersistenceMode("production_graph_read_only");
     else await store.flushRuntimeSave();
     if (syncAssets && !readOnlyProjection) {
-      await syncRuntimeAssets(store, runtimeClient);
+      await syncRuntimeAssets(store, runtimeClient, { isCurrent: transitionCurrent });
     }
-    await onProjectReady?.(runtimeClient);
+    if (!transitionCurrent()) return { status: "stale" };
+    await onProjectReady?.(runtimeClient, { isCurrent: transitionCurrent });
+    if (!transitionCurrent()) return { status: "stale" };
     await refreshProjectSummaries();
+    return { status: prepared.readOnly ? "cache_read_only" : "ready", source: prepared.source };
   }
 
   async function refreshProjectSummaries() {
@@ -81,17 +113,15 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   async function ensureAccessibleStartupProject() {
     await refreshProjectSummaries();
     const runtime = getRuntime();
-    if (projectSummaries.some((item) => item.project_id === runtime.projectId)) {
-      if (isReadOnlyProjectionProject(runtime.projectId, projectSummaries)) {
-        store.setRuntimePersistenceMode("production_graph_read_only");
-      }
+    if (!runtime.projectId || runtime.projectId === EMPTY_PROJECT_ID) {
+      await showEmptyProjectState();
       return;
     }
-    if (projectSummaries.length) {
-      await switchProject(projectSummaries[0].project_id);
-      return;
-    }
-    await showEmptyProjectState();
+    const summary = projectSummaries.find((item) => item.project_id === runtime.projectId);
+    await applyProject(runtime.projectId, runtime, {
+      projectName: summary ? projectDisplayName(summary) : "",
+      navigation: "replace",
+    });
   }
 
   function currentProjectIsReadOnlyProjection() {
@@ -107,22 +137,22 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   async function recoverProjectAccessDenied(error = null) {
     if (projectAccessRecovery) return projectAccessRecovery;
     projectAccessRecovery = (async () => {
-      await refreshProjectSummaries();
+      projectTransitionEpoch += 1;
       const runtime = getRuntime();
       const currentId = runtime.projectId || store.get().meta.projectId;
-      if (projectSummaries.some((item) => item.project_id === currentId)) {
-        return false;
-      }
-      const next = projectSummaries.find((item) => item.project_id);
-      if (next?.project_id) {
-        await applyProject(next.project_id, createRuntimeClient(next.project_id), {
-          projectName: projectDisplayName(next),
-          recoverOnDenied: false,
-        });
-      } else {
-        await showEmptyProjectState();
-      }
-      reportProjectAccessRecovery(runtime, error, currentId, next?.project_id || EMPTY_PROJECT_ID, safeError);
+      const failure = projectIdentityFailure(error);
+      const prepared = {
+        reason: failure.reason,
+        message: failure.message,
+        error,
+      };
+      store.blockProject(currentId, prepared);
+      blockProjectIdentity(currentId, {
+        accountId: currentAuthUser?.user_id || "",
+        reason: prepared.reason,
+      });
+      syncProjectUrl(currentId);
+      render();
       return true;
     })().finally(() => {
       projectAccessRecovery = null;
@@ -136,7 +166,22 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       return;
     }
     const nextRuntime = createRuntimeClient(safe);
-    await applyProject(safe, nextRuntime);
+    return applyProject(safe, nextRuntime, { navigation: "push" });
+  }
+
+  async function loadRequestedProject(projectId) {
+    const safe = safeProjectId(projectId);
+    if (!safe || safe === EMPTY_PROJECT_ID) {
+      await showEmptyProjectState();
+      return { status: "empty" };
+    }
+    return applyProject(safe, createRuntimeClient(safe), { navigation: "replace" });
+  }
+
+  async function retryCurrentProject() {
+    const currentId = safeProjectId(getRuntime().projectId || store.get().meta.projectId);
+    if (!currentId || currentId === EMPTY_PROJECT_ID) return { status: "empty" };
+    return applyProject(currentId, createRuntimeClient(currentId), { navigation: "replace" });
   }
 
   async function createNewProject() {
@@ -241,6 +286,8 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     currentProjectIsReadOnlyProjection,
     currentProjectHasCanonicalGraphAuthority,
     switchProject,
+    loadRequestedProject,
+    retryCurrentProject,
     createNewProject,
     deleteProject,
     projectOptions,
@@ -267,11 +314,15 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   }
 
   async function showEmptyProjectState() {
+    projectTransitionEpoch += 1;
     const nextRuntime = emptyProjectRuntimeClient();
+    clearProjectIdentity();
     persistActiveProject(EMPTY_PROJECT_ID);
     syncProjectUrl(EMPTY_PROJECT_ID);
-    setRuntime(nextRuntime);
+    setRuntime(nextRuntime, { attachStore: false });
     await store.switchProject(EMPTY_PROJECT_ID, nextRuntime);
+    commitProjectListIdentity(currentAuthUser?.user_id || "");
+    syncProjectUrl("");
     store.set((s) => {
       s.meta.projectName = "暂无项目";
       s.meta.canvasName = "请新建项目";
@@ -287,112 +338,6 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   }
 }
 
-function requestProjectName(existingProjects = []) {
-  return new Promise((resolve) => {
-    const modal = el("div", "modal compact project-create-modal");
-    const head = el("div", "modal-head");
-    head.appendChild(el("strong", "", "新建视频项目"));
-    const closeBtn = el("button", "modal-close");
-    closeBtn.innerHTML = icon("x", 15);
-    head.appendChild(el("span", "head-spacer"));
-    head.appendChild(closeBtn);
-
-    const body = el("div", "modal-body project-create-body");
-    const field = el("label", "modal-field");
-    field.appendChild(el("span", "", "项目名称"));
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = uniqueProjectName("未命名项目", existingProjects);
-    input.maxLength = 80;
-    field.appendChild(input);
-    const error = el("div", "modal-error");
-    error.hidden = true;
-    body.append(field, error);
-
-    const actions = el("div", "modal-actions");
-    const cancel = el("button", "ghost-btn", "取消");
-    const confirm = el("button", "primary-btn", "创建并切换");
-    actions.append(cancel, confirm);
-
-    modal.append(head, body, actions);
-    let settled = false;
-    const close = showModal(modal, { onClose: () => { if (!settled) resolve(null); } });
-    const finish = () => {
-      if (settled) return;
-      const name = input.value.trim();
-      if (!name) {
-        error.textContent = "请先填写项目名称。";
-        error.hidden = false;
-        input.focus();
-        return;
-      }
-      if (isDuplicateProjectName(name, existingProjects)) {
-        error.textContent = `项目名称“${name}”已存在，请换一个名称。`;
-        error.hidden = false;
-        input.focus();
-        input.select();
-        return;
-      }
-      settled = true;
-      close();
-      resolve(name);
-    };
-
-    confirm.addEventListener("click", finish);
-    cancel.addEventListener("click", () => {
-      if (settled) return;
-      settled = true;
-      close();
-      resolve(null);
-    });
-    closeBtn.addEventListener("click", () => {
-      if (settled) return;
-      settled = true;
-      close();
-      resolve(null);
-    });
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        finish();
-      }
-      if (event.key === "Escape") {
-        if (settled) return;
-        settled = true;
-        close();
-        resolve(null);
-      }
-    });
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
-}
-
-function isDuplicateProjectName(name, projects) {
-  const normalized = normalizeProjectName(name);
-  if (!normalized) return false;
-  return (Array.isArray(projects) ? projects : []).some((project) => normalizeProjectName(projectDisplayName(project)) === normalized);
-}
-
-function uniqueProjectName(baseName, projects) {
-  const base = String(baseName || "未命名项目").trim() || "未命名项目";
-  if (!isDuplicateProjectName(base, projects)) return base;
-  for (let index = 2; index < 1000; index += 1) {
-    const candidate = `${base} ${index}`;
-    if (!isDuplicateProjectName(candidate, projects)) return candidate;
-  }
-  return `${base} ${Date.now()}`;
-}
-
-function normalizeProjectName(name) {
-  return String(name || "").replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-function projectDisplayName(project) {
-  return project?.studio_state_meta?.projectName || project?.goal || project?.project_id || "";
-}
-
 function isProjectAccessDeniedError(error) {
   if (!error) return false;
   const code = String(error.errorCode || error.payload?.error || error.payload?.detail?.error || "").trim();
@@ -400,6 +345,33 @@ function isProjectAccessDeniedError(error) {
   const status = Number(error.status || 0);
   const message = error instanceof Error ? error.message : String(error || "");
   return status === 403 && /project[_ ]access[_ ]denied|没有访问该项目的权限/i.test(message);
+}
+
+function projectIdentityFailure(error) {
+  const status = Number(error?.status || 0);
+  const code = String(error?.errorCode || "").trim();
+  if (isProjectAccessDeniedError(error)) {
+    return {
+      reason: "project_access_denied",
+      message: "当前账号无权访问此项目。没有加载其他项目，也未发送任何修改请求。",
+    };
+  }
+  if (status === 404 || code === "project_not_found") {
+    return {
+      reason: "project_not_found",
+      message: "项目不存在或已被移除。没有加载其他项目，也未发送任何修改请求。",
+    };
+  }
+  if (code === "project_identity_mismatch") {
+    return {
+      reason: "project_identity_mismatch",
+      message: "服务返回的项目身份不一致。当前视图已清空，未发送任何修改请求。",
+    };
+  }
+  return {
+    reason: "project_load_failed",
+    message: "项目身份校验失败。当前视图已清空，未发送任何修改请求。",
+  };
 }
 
 function showProjectCreateError(error) {

@@ -35,6 +35,7 @@ import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
 import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCardDraft } from "./studio-runtime-events.js";
 import { createProjectReadyHandler, hydrateStartupProject } from "./studio-startup-project.js";
 import { bindCanvasEmptyOnboarding } from "./studio-canvas-onboarding.js";
+import { beginProjectIdentityLoad, clearProjectIdentity } from "./project-identity-gate.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -86,6 +87,7 @@ async function bootstrap() {
   bindDomainCrewEvents();
   bindSaveAuthRecovery();
   bindProjectAccessRecovery();
+  bindProjectHistoryNavigation();
   bindSessionExpiryBoundary();
 
   store.subscribe(renderAll);
@@ -106,8 +108,8 @@ async function bootstrap() {
 }
 function initializeStudio(authUser) {
   runtime = createRuntimeClient(initialProjectId());
-  store = createStore(runtime.projectId);
-  store.attachRuntime(runtime);
+  beginProjectIdentityLoad(runtime.projectId, authUser?.user_id || "");
+  store = createStore(runtime.projectId, { deferProjectLoad: true });
   domainCrewController = createDomainCrewController({
     getRuntime: () => runtime,
     onNavigateNode: (nodeId) => window.dispatchEvent(new CustomEvent("afs:studio-select-node", { detail: { node_id: nodeId } })),
@@ -121,15 +123,20 @@ function initializeStudio(authUser) {
     onSignOut: handleSignOut,
     onSwitchProject: async (projectId) => {
       await projectController.switchProject(projectId);
+    },
+    onRetry: async () => {
+      if (store.get().ui?.projectIdentity?.status === "blocked") {
+        await projectController.retryCurrentProject();
+      }
       await refreshProductOverview();
     },
-    onRetry: refreshProductOverview,
     onCreateProject: async () => { if (await projectController?.createNewProject()) await refreshProductOverview(); },
     onDeleteProject: async (project) => { await projectController?.deleteProject(project); await refreshProductOverview(); },
     onOpenExternalVideoDemo: async () => ((!hasActiveProject() && !(await promptCreateProjectBeforeStarter())) ? null : openExternalVideoDemoPanel({ runtime, formatError: safeError })),
     createRuntime: createRuntimeClient,
     isRuntimeCurrent: (candidate) => candidate === runtime,
     formatError: safeError,
+    onProjectIdentityInvalid: (error) => projectController.recoverProjectAccessDenied(error),
   });
   productShell.render({ authUser });
   installClientErrorReporter({
@@ -139,9 +146,9 @@ function initializeStudio(authUser) {
   projectController = createProjectController({
     store,
     getRuntime: () => runtime,
-    setRuntime: (nextRuntime) => {
+    setRuntime: (nextRuntime, { attachStore = true } = {}) => {
       runtime = nextRuntime;
-      store.attachRuntime(runtime);
+      if (attachStore) store.attachRuntime(runtime);
       domainCrewController.setContext({ runtime, userId: projectController.authUser?.user_id || "" });
       void refreshRuntimeSurfaceStatus();
     },
@@ -222,7 +229,28 @@ async function recoverSaveAuthBoundary(status) {
   await store.flushRuntimeSave();
 }
 function bindProjectAccessRecovery() {
-  window.addEventListener("afs:project-access-denied", () => void projectController.recoverProjectAccessDenied());
+  window.addEventListener("afs:project-access-denied", (event) => {
+    const deniedProjectId = String(event.detail?.project_id || "");
+    if (deniedProjectId && deniedProjectId !== runtime?.projectId) return;
+    void projectController.recoverProjectAccessDenied({
+      status: 403,
+      errorCode: "project_access_denied",
+    });
+  });
+  window.addEventListener("afs:project-identity-invalid", (event) => {
+    const invalidProjectId = String(event.detail?.project_id || "");
+    if (invalidProjectId && invalidProjectId !== runtime?.projectId) return;
+    void projectController.recoverProjectAccessDenied({
+      status: Number(event.detail?.status || 0),
+      errorCode: String(event.detail?.error_code || ""),
+    });
+  });
+}
+function bindProjectHistoryNavigation() {
+  window.addEventListener("popstate", () => {
+    const projectId = new URLSearchParams(window.location.search || "").get("project") || "studio-empty";
+    void projectController.loadRequestedProject(projectId);
+  });
 }
 function bindSessionExpiryBoundary() {
   window.addEventListener("afs:auth-session-expired", () => void recoverExpiredSession());
@@ -421,6 +449,7 @@ async function handleSignOut() {
   editorMounted = false;
   const logoutRuntime = runtime;
   store?.resetIdentityState?.();
+  clearProjectIdentity();
   projectController?.setAuthUser(null);
   clearProjectSession();
   clearIdentityScopedStudioState();
@@ -436,6 +465,7 @@ async function recoverExpiredSession() {
   identityBoundaryInFlight = true;
   editorMounted = false;
   store?.resetIdentityState?.();
+  clearProjectIdentity();
   projectController?.setAuthUser(null);
   clearProjectSession();
   clearIdentityScopedStudioState();

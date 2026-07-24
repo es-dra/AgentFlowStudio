@@ -1099,6 +1099,13 @@
 .product-state { display: grid; min-height: 0; place-content: center; justify-items: center; gap: 12px; padding: 24px; color: var(--product-muted); text-align: center; }
 .product-state h1 { margin: 0; color: var(--product-text); font-size: 22px; }
 .product-state p { max-width: 520px; margin: 0; line-height: 1.6; }
+.product-state-identity { min-height: min(620px, calc(100vh - 64px)); background: #081119; }
+.product-state-lock { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(244, 183, 64, .32); border-radius: 6px; color: #f4b740; background: rgba(244, 183, 64, .07); }
+.product-state-preserved { color: #b7c7d0; }
+.product-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.identity-cache-read-only { position: relative; }
+.identity-cache-read-only .canvas-workspace-stage { pointer-events: none; }
+.identity-cache-banner { position: absolute; z-index: 12; top: 8px; left: 50%; max-width: calc(100% - 24px); border: 1px solid rgba(244, 183, 64, .32); border-radius: 6px; padding: 7px 10px; background: #182016; color: #f5d68a; font-size: 12px; transform: translateX(-50%); }
 .state-spinner { width: 28px; height: 28px; border: 2px solid var(--product-line); border-top-color: var(--product-accent); border-radius: 50%; animation: product-spin .8s linear infinite; }
 .product-mobile-nav { display: none; }
 

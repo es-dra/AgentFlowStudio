@@ -975,8 +975,8 @@ def test_candidate_selection_ui_exposes_accessible_explicit_actions_and_mobile_r
     assert "min-height: 44px" in styles
     assert "createProjectReadyHandler" in main
     assert startup.count("await refreshProjectRuntimeDecorations({") == 2
-    assert "restoreCandidateSelectionsAfterLoad(store, runtimeClient)" in startup
-    assert startup.index("await store.hydrateRuntime(runtime)") < startup.index("syncAssets: true")
+    assert "restoreCandidateSelectionsAfterLoad(store, runtimeClient, { isCurrent: current })" in startup
+    assert startup.index("ensureAccessibleStartupProject") < startup.index("syncAssets: true")
     assert 'closeBtn.setAttribute("aria-label", "Close media preview")' in media_preview
     assert "showModal(modal, { initialFocus: closeBtn })" in media_preview
 

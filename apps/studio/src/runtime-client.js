@@ -1,6 +1,8 @@
 // Minimal Studio API client. It sends only project ids, safe node context,
 // safe generation summaries, Studio state JSON, and explicit user-selected image uploads.
 
+import { assertProjectRequestIdentity } from "./project-identity-gate.js";
+
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
 const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
 export const AUTH_TOKEN_STORAGE_KEY = "afs_auth_session_token";
@@ -74,6 +76,7 @@ function isLocalHost(hostname) {
 }
 
 async function requestJson(route, { method = "GET", payload = null, meta = null, headers: extraHeaders = null, signal = null } = {}) {
+  assertProjectRequestIdentity(route, method, payload);
   const requestMeta = buildRequestMeta(route, method, payload, meta);
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
   headers["X-Client-Request-ID"] = requestMeta.client_request_id;
@@ -120,6 +123,7 @@ async function requestJson(route, { method = "GET", payload = null, meta = null,
     error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
     dispatchAuthBoundaryRequired(error, route);
     dispatchProjectAccessDenied(error, parsed);
+    dispatchProjectIdentityInvalid(error, parsed);
     logStudioRequestFinished(requestMeta, {
       status: "failed",
       status_code: response.status,
@@ -161,6 +165,26 @@ function dispatchProjectAccessDenied(error, parsed = null) {
         route: error.route,
         request_id: error.requestId,
         client_request_id: error.clientRequestId,
+      },
+    }));
+  } catch {
+    // The Studio can run under tests without a browser event target.
+  }
+}
+
+function dispatchProjectIdentityInvalid(error, parsed = null) {
+  const status = Number(error?.status || 0);
+  const route = String(error?.route || "");
+  const coreProjectLoad = /\/projects\/[^/]+\/(?:studio-state|product-overview)$/.test(route);
+  if (status !== 403 && !(status === 404 && coreProjectLoad)) return;
+  try {
+    window.dispatchEvent(new CustomEvent("afs:project-identity-invalid", {
+      detail: {
+        project_id: parsed?.project_id || projectIdFromRoute(route),
+        status,
+        error_code: error?.errorCode || (status === 404 ? "project_not_found" : "project_access_denied"),
+        request_id: error?.requestId || "",
+        client_request_id: error?.clientRequestId || "",
       },
     }));
   } catch {

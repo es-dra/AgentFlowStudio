@@ -568,13 +568,19 @@ def test_l4b_two_distinct_briefs_run_full_no_provider_e2e(tmp_path: Path, monkey
 
 def test_studio_runtime_client_reaches_manga_first_workspace_contract(tmp_path: Path) -> None:
     client_js = REPO_ROOT / "apps" / "studio" / "src" / "runtime-client.js"
+    identity_gate_js = REPO_ROOT / "apps" / "studio" / "src" / "project-identity-gate.js"
     brief_path = _write_json_fixture(tmp_path / "runtime_client_brief.json", _brief())
     digest = "a" * 64
     script = f"""
       import {{ readFileSync }} from "node:fs";
       import {{ createRuntimeClient }} from {json.dumps(client_js.as_uri())};
+      import {{ commitProjectIdentity }} from {json.dumps(identity_gate_js.as_uri())};
       const brief = JSON.parse(readFileSync({json.dumps(str(brief_path))}, "utf8"));
       const calls = [];
+      globalThis.window = {{
+        location: {{ search: "?project=manga-a" }},
+        dispatchEvent: () => {{}},
+      }};
       globalThis.fetch = async (url, options = {{}}) => {{
         calls.push({{
           url,
@@ -590,6 +596,7 @@ def test_studio_runtime_client_reaches_manga_first_workspace_contract(tmp_path: 
         }};
       }};
       const client = createRuntimeClient("manga-a");
+      commitProjectIdentity({{ projectId: "manga-a" }});
       await client.createMangaFirstProductionTruth(brief, {{
         idempotencyKey: "manga-first-create-v1",
         includeManifest: true,

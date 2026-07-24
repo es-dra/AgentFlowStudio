@@ -99,10 +99,22 @@ export function createProductShell(options = {}) {
     root.replaceChildren();
     root.appendChild(buildHeader());
     if (projectDrawerOpen && snapshot.project) root.appendChild(buildProjectDrawer());
-    if (snapshot.loading) root.appendChild(statePanel("loading"));
+    if (projectIdentityStatus() === "blocked") root.appendChild(statePanel("identity"));
+    else if (projectIdentityStatus() === "loading") root.appendChild(statePanel("loading"));
+    else if (snapshot.loading) root.appendChild(statePanel("loading"));
     else if (snapshot.error) root.appendChild(statePanel("error"));
     else if (!snapshot.project) root.appendChild(statePanel("empty"));
-    else root.appendChild(buildWorkspace());
+    else {
+      const workspace = buildWorkspace();
+      if (projectIdentityStatus() === "cache_read_only") {
+        workspace.classList.add("identity-cache-read-only");
+        workspace.querySelectorAll("button, input, textarea, select").forEach((control) => {
+          control.disabled = true;
+        });
+        workspace.prepend(node("div", "identity-cache-banner", "只读缓存 · 重新验证当前项目后才能继续修改或调用 AI"));
+      }
+      root.appendChild(workspace);
+    }
     if (helpOpen && isMobileNavigationLayout()) root.appendChild(buildMobileHelpSheet());
     root.appendChild(buildMobileNav());
     if (imageAdmissionViewer) root.appendChild(buildImageAdmissionViewer());
@@ -311,6 +323,7 @@ export function createProductShell(options = {}) {
       contextOpen = false;
       options.onCreateProject?.();
     });
+    create.disabled = ["blocked", "cache_read_only", "loading"].includes(projectIdentityStatus());
     const settings = node("button", "studio-project-settings");
     settings.type = "button";
     settings.innerHTML = `${icon("settings", 14)}<span>项目设置</span>`;
@@ -327,6 +340,7 @@ export function createProductShell(options = {}) {
       options.onDeleteProject?.(snapshot.project);
       render();
     });
+    remove.disabled = projectIdentityStatus() !== "ready";
     projectActions.append(create, settings, remove);
     menu.appendChild(projectActions);
     return menu;
@@ -2803,6 +2817,7 @@ export function createProductShell(options = {}) {
     button.type = "button";
     button.setAttribute("role", "tab");
     button.setAttribute("aria-selected", String(active));
+    button.disabled = projectIdentityStatus() === "blocked";
     button.addEventListener("click", () => {
       if (key === "canvas") openCanvas();
       else if (key === "asset_bible") showAssetBible();
@@ -3162,9 +3177,40 @@ export function createProductShell(options = {}) {
 
   function statePanel(kind) {
     const wrap = node("section", `product-state product-state-${kind}`);
-    wrap.setAttribute("role", kind === "error" ? "alert" : "status");
+    wrap.setAttribute("role", ["error", "identity"].includes(kind) ? "alert" : "status");
     if (kind === "loading") {
       wrap.append(node("div", "state-spinner"), node("h1", "", message("loading", locale)), node("p", "", "正在恢复项目、场景与镜头上下文。"));
+    } else if (kind === "identity") {
+      const identity = snapshot.studioState?.ui?.projectIdentity || {};
+      const reason = String(identity.reason || "");
+      const title = reason === "project_access_denied"
+        ? "无权访问此项目"
+        : reason === "project_not_found"
+          ? "项目不存在"
+          : reason === "network_unavailable"
+            ? "暂时无法验证项目"
+            : "项目身份校验未通过";
+      const lockMark = node("span", "product-state-lock");
+      lockMark.innerHTML = icon("lock", 20);
+      wrap.append(
+        lockMark,
+        node("h1", "", title),
+        node("p", "", identity.message || "为保护项目数据，当前视图没有加载任何项目内容。"),
+        node("p", "product-state-preserved", "没有自动切换到其他项目，也未发送修改、生成或 AI 请求。"),
+      );
+      const actions = node("div", "product-state-actions");
+      const retry = node("button", "studio-primary-button", "重试加载");
+      retry.type = "button";
+      retry.addEventListener("click", () => options.onRetry?.());
+      const choose = node("button", "studio-secondary-button", "选择其他项目");
+      choose.type = "button";
+      choose.addEventListener("click", () => {
+        contextOpen = true;
+        render();
+        requestAnimationFrame(() => document.querySelector(".studio-project-menu button")?.focus());
+      });
+      actions.append(retry, choose);
+      wrap.appendChild(actions);
     } else if (kind === "error") {
       wrap.append(node("h1", "", message("error", locale)), node("p", "", snapshot.error), node("p", "", message("recovery", locale)));
       const retry = node("button", "studio-primary-button", message("retry", locale));
@@ -3181,6 +3227,27 @@ export function createProductShell(options = {}) {
   }
 
   async function refresh(runtime, authUser = null) {
+    if (projectIdentityStatus() === "blocked") {
+      let workspace = snapshot.workspace;
+      try {
+        workspace = await runtime.workspaceOverview();
+      } catch {
+        workspace = null;
+      }
+      snapshot = clearedProjectSnapshot({ ...snapshot, loading: false, authUser, workspace });
+      render();
+      return;
+    }
+    if (projectIdentityStatus() === "cache_read_only") {
+      snapshot = {
+        ...clearedProjectSnapshot(snapshot),
+        loading: false,
+        authUser,
+        project: cachedProjectSummary(snapshot.studioState),
+      };
+      render();
+      return;
+    }
     const requestRuntime = runtime;
     snapshot = { ...snapshot, loading: true, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     render();
@@ -3197,6 +3264,13 @@ export function createProductShell(options = {}) {
         const payload = await projectRuntime?.projectOverview?.();
         if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
         project = payload?.project || null;
+        if (project && String(project.project_id || "") !== activeProjectId) {
+          const mismatch = new Error("Runtime returned a different project identity");
+          mismatch.status = 409;
+          mismatch.errorCode = "project_identity_mismatch";
+          options.onProjectIdentityInvalid?.(mismatch);
+          throw mismatch;
+        }
       }
       let sequenceWorkspace = null;
       if (activeProjectId) {
@@ -3240,7 +3314,16 @@ export function createProductShell(options = {}) {
   }
 
   function updateStudioState(studioState, options = {}) {
+    const previousIdentity = projectIdentityStatus();
     snapshot = { ...snapshot, studioState };
+    const nextIdentity = projectIdentityStatus();
+    if (["blocked", "loading"].includes(nextIdentity)) {
+      snapshot = clearedProjectSnapshot(snapshot);
+      if (previousIdentity !== nextIdentity) agentChatContexts.clear();
+      section = "canvas";
+      mobileAgentOpen = false;
+      agentCollapsed = true;
+    }
     if (!document.getElementById("app")?.classList.contains("product-mode")) return;
     if (options.render === false || options.deferRender === true) {
       syncSaveStatusElement();
@@ -3462,10 +3545,15 @@ export function createProductShell(options = {}) {
   }
   function hasStoryFacts() { return shotModel().length > 0; }
   function projectDisplayName() {
+    if (projectIdentityStatus() === "blocked") return "项目未载入";
+    if (projectIdentityStatus() === "loading") return "正在验证项目";
     const names = [snapshot.project?.name, snapshot.studioState?.meta?.projectName]
       .map((value) => String(value || "").trim());
     return names.find((value) => value && !["未命名项目", "项目"].includes(value))
       || String(snapshot.project?.project_id || snapshot.studioState?.meta?.projectId || "当前项目");
+  }
+  function projectIdentityStatus() {
+    return String(snapshot.studioState?.ui?.projectIdentity?.status || "ready");
   }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function storyboardTotalSummary() {
@@ -3531,6 +3619,32 @@ export function showSecureEntry(messageText, { error = false } = {}) {
   const overlay = document.createElement("div");
   overlay.id = "overlay-root";
   app.append(secure, overlay);
+}
+
+function clearedProjectSnapshot(snapshot) {
+  return {
+    ...snapshot,
+    project: null,
+    sequenceWorkspace: null,
+    mediaOperations: null,
+    runtimeAssetBible: null,
+    imageAdmission: null,
+    mediaGates: {},
+    mediaCommandPreview: null,
+    error: "",
+  };
+}
+
+function cachedProjectSummary(studioState) {
+  const name = String(studioState?.meta?.projectName || "").trim() || "离线项目缓存";
+  return {
+    project_id: String(studioState?.meta?.projectId || ""),
+    name,
+    episode: "只读缓存",
+    current_stage: "等待重新验证",
+    next_action: "重试连接并验证项目身份",
+    stages: [],
+  };
 }
 
 function statusItem(iconName, label, tone) {

@@ -18,7 +18,6 @@ export async function hydrateStartupProject({
     if (!projectController.currentProjectHasCanonicalGraphAuthority?.()) return;
   }
 
-  await store.hydrateRuntime(runtime);
   await refreshProjectRuntimeDecorations({
     store,
     runtimeClient: runtime,
@@ -36,15 +35,17 @@ export function createProjectReadyHandler({
   refreshProductionPlanTruth,
   refreshProductOverview,
 }) {
-  return async function handleProjectReady(runtimeClient) {
+  return async function handleProjectReady(runtimeClient, options = {}) {
     if (isEditorMounted()) {
       await refreshProjectRuntimeDecorations({
         store,
         runtimeClient,
         refreshScriptCoreTruth,
         refreshProductionPlanTruth,
+        isCurrent: options.isCurrent,
       });
     }
+    if (options.isCurrent && !options.isCurrent()) return;
     await refreshProductOverview();
   };
 }
@@ -56,10 +57,17 @@ export async function refreshProjectRuntimeDecorations({
   refreshProductionPlanTruth,
   syncAssets = false,
   readOnlyProjection = false,
+  isCurrent = null,
 }) {
-  if (syncAssets && !readOnlyProjection) await syncRuntimeAssets(store, runtimeClient);
-  await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
-  await refreshPendingKeyframeGenerations(store, runtimeClient);
+  const current = () => !isCurrent || isCurrent();
+  if (syncAssets && !readOnlyProjection) await syncRuntimeAssets(store, runtimeClient, { isCurrent: current });
+  if (!current()) return { skipped: "stale_project_transition" };
+  await restoreCandidateSelectionsAfterLoad(store, runtimeClient, { isCurrent: current });
+  if (!current()) return { skipped: "stale_project_transition" };
+  await refreshPendingKeyframeGenerations(store, runtimeClient, { isCurrent: current });
+  if (!current()) return { skipped: "stale_project_transition" };
   await refreshScriptCoreTruth(runtimeClient);
+  if (!current()) return { skipped: "stale_project_transition" };
   await refreshProductionPlanTruth(runtimeClient);
+  return current() ? { refreshed: true } : { skipped: "stale_project_transition" };
 }

@@ -13,6 +13,7 @@ def test_m6_3_media_operations_stays_inside_canvas_storyboard_shell() -> None:
     startup = (STUDIO_ROOT / "src" / "studio-startup-project.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    store_transition = (STUDIO_ROOT / "src" / "store-project-transition.js").read_text(encoding="utf-8")
 
     assert 'viewButton("canvas", "画布")' in shell
     assert 'viewButton("storyboard", "故事板")' in shell
@@ -42,7 +43,8 @@ def test_m6_3_media_operations_stays_inside_canvas_storyboard_shell() -> None:
     assert "currentProjectIsReadOnlyProjection" in startup
     assert "createProjectReadyHandler" in main
     assert "export function createProjectReadyHandler" in startup
-    assert "async function switchProject(projectId, runtime, options = {})" in store
+    assert "async function switchProject(projectId, runtime, options = {})" in store_transition
+    assert "createStoreProjectTransition" in store
 
 
 def test_m6_3_read_only_evidence_startup_is_named_and_fail_closed() -> None:
@@ -53,8 +55,9 @@ def test_m6_3_read_only_evidence_startup_is_named_and_fail_closed() -> None:
     assert "await store.hydrateRuntime(runtime); await" not in main
     assert "export async function hydrateStartupProject" in startup
     assert 'store.setRuntimePersistenceMode?.("production_graph_read_only")' in startup
-    assert "await store.hydrateRuntime(runtime)" in startup
-    assert startup.index("currentProjectIsReadOnlyProjection") < startup.index("await store.hydrateRuntime(runtime)")
+    assert "ensureAccessibleStartupProject" in startup
+    assert "store.prepareProject" in (STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
+    assert startup.index("currentProjectIsReadOnlyProjection") < startup.index("refreshProjectRuntimeDecorations")
     assert "currentProjectHasCanonicalGraphAuthority" in startup
     assert "if (syncAssets && !readOnlyProjection)" in startup
 

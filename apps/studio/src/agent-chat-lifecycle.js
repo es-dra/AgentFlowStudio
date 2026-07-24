@@ -22,6 +22,9 @@ export function createAgentChatContextStore() {
       if (!contexts.has(safeKey)) contexts.set(safeKey, emptySession(safeKey));
       return contexts.get(safeKey);
     },
+    clear() {
+      contexts.clear();
+    },
   };
 }
 

@@ -97,7 +97,7 @@ export function buildCreatorDecisionContext(run, node, candidate, decision, revi
   };
 }
 
-export async function restoreCandidateSelection(store, runtime, node) {
+export async function restoreCandidateSelection(store, runtime, node, options = {}) {
   const runId = activeRunId(store, node);
   if (!runtime?.getProductionRun) {
     return recordFailure(store, node.id, "client_contract_missing", "Production readback is unavailable.");
@@ -105,11 +105,13 @@ export async function restoreCandidateSelection(store, runtime, node) {
   try {
     requireReusableAssetAuthority(preflightRestorableCandidate(store, node));
     const payload = await runtime.getProductionRun(runId);
+    if (options.isCurrent && !options.isCurrent()) return { ok: true, skipped: "stale_project_transition" };
     const run = authoritativeRun(payload);
     const result = applyAuthoritativeProductionRun(store, node.id, run, { binding: payload?.studio_binding });
     await store.flushRuntimeSave?.();
     return { ok: true, ...result };
   } catch (error) {
+    if (options.isCurrent && !options.isCurrent()) return { ok: true, skipped: "stale_project_transition" };
     if (isNonMutatingAuthorityError(error)) return failureResult(error);
     return recordFailure(store, node.id, classifyError(error), publicErrorMessage(error));
   }
@@ -128,7 +130,7 @@ function preflightRestorableCandidate(store, node) {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
-export async function restoreCandidateSelectionsAfterLoad(store, runtime) {
+export async function restoreCandidateSelectionsAfterLoad(store, runtime, options = {}) {
   if (!store?.get) return { ok: true, skipped: "store_unavailable" };
   if (!runtime?.getProductionRun) return { ok: true, skipped: "authority_unavailable" };
   const state = store.get();
@@ -138,7 +140,7 @@ export async function restoreCandidateSelectionsAfterLoad(store, runtime) {
   if (!node) return { ok: true, skipped: "selection_target_unavailable" };
   const existing = AUTO_RESTORE_IN_FLIGHT.get(store);
   if (existing) return existing;
-  const pending = restoreCandidateSelection(store, runtime, node);
+  const pending = restoreCandidateSelection(store, runtime, node, options);
   AUTO_RESTORE_IN_FLIGHT.set(store, pending);
   try {
     return await pending;
