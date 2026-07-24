@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_asset_evidence import authoritative_source_evidence
 from apps.api.runtime_asset_bible import (
     _dedupe_evidence,
     build_asset_candidate_set,
@@ -99,6 +100,30 @@ def _complete_visual(asset: dict) -> None:
         }
     ]
     asset["pending_fields"] = []
+
+
+def _fully_reviewed_bible() -> dict:
+    bible = _generated_bible()
+    for asset in bible["assets"]:
+        _complete_visual(asset)
+    bible = _command(
+        bible,
+        {
+            "type": "set_art_direction",
+            "art_direction": {
+                "visual_style": "写实动作片",
+                "medium": "电影摄影，真实材质",
+                "palette": "低饱和冷色与暖光点缀",
+                "lighting": "主体面部清晰的侧逆光",
+            },
+        },
+    )["result"]["asset_bible"]
+    for asset in list(bible["assets"]):
+        bible = _command(
+            bible,
+            {"type": "approve", "target_id": asset["stable_id"]},
+        )["result"]["asset_bible"]
+    return bible
 
 
 def test_recognition_clusters_aliases_and_propagates_scene_descendants_stably() -> None:
@@ -224,26 +249,7 @@ def test_rerecognition_refreshes_approved_evidence_monotonically_and_remains_loc
     tmp_path,
 ) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
-    bible = _generated_bible()
-    for asset in bible["assets"]:
-        _complete_visual(asset)
-    bible = _command(
-        bible,
-        {
-            "type": "set_art_direction",
-            "art_direction": {
-                "visual_style": "写实动作片",
-                "medium": "电影摄影，真实材质",
-                "palette": "低饱和冷色与暖光点缀",
-                "lighting": "主体面部清晰的侧逆光",
-            },
-        },
-    )["result"]["asset_bible"]
-    for asset in list(bible["assets"]):
-        bible = _command(
-            bible,
-            {"type": "approve", "target_id": asset["stable_id"]},
-        )["result"]["asset_bible"]
+    bible = _fully_reviewed_bible()
 
     target = next(
         item
@@ -354,6 +360,36 @@ def test_evidence_dedupe_is_bounded_and_noncanonical_ranges_do_not_create_covera
             "shot_ids": ["shot-a", "shot-b", "../invalid-shot"],
             "excerpt": "已应用分镜中的场景与镜头出现范围",
         },
+        {
+            "source_type": "",
+            "source_id": "empty-type",
+            "shot_ids": ["shot-a"],
+            "excerpt": "invalid",
+        },
+        {
+            "source_type": "script_revision",
+            "source_id": "",
+            "shot_ids": ["shot-a"],
+            "excerpt": "invalid",
+        },
+        {
+            "source_type": "custom_source",
+            "source_id": "custom-source",
+            "shot_ids": ["shot-a"],
+            "excerpt": "invalid",
+        },
+        {
+            "source_type": "script_revision",
+            "source_id": "../unsafe-source",
+            "shot_ids": ["shot-a"],
+            "excerpt": "invalid",
+        },
+        {
+            "source_type": "occurrence_ledger",
+            "source_id": "asset-other",
+            "shot_ids": ["shot-a"],
+            "excerpt": "invalid",
+        },
         *[
             {
                 "source_type": "script_revision",
@@ -365,10 +401,16 @@ def test_evidence_dedupe_is_bounded_and_noncanonical_ranges_do_not_create_covera
             for index in range(20)
         ],
     ]
-    first = _dedupe_evidence(values)
-    second = _dedupe_evidence(list(reversed(values)))
+    first = _dedupe_evidence(values, asset_id="asset-scene-a")
+    second = _dedupe_evidence(list(reversed(values)), asset_id="asset-scene-a")
     assert first == second
     assert len(first) == 12
+    assert all(
+        item["source_type"] in {"occurrence_ledger", "applied_shot_plan", "script_revision"}
+        and item["source_id"]
+        and item["source_id"] != "asset-other"
+        for item in first
+    )
     ledger = first[0]
     assert ledger["scene_ids"] == ["scene-a"]
     assert ledger["shot_ids"] == ["shot-a", "shot-b"]
@@ -380,6 +422,7 @@ def test_evidence_dedupe_is_bounded_and_noncanonical_ranges_do_not_create_covera
     target = bible["assets"][0]
     target["occurrences"] = {"scene_ids": ["scene-field"], "shot_ids": ["scene-field-shot-1"]}
     target["source_evidence"] = deepcopy(first[:1])
+    target["source_evidence"][0]["source_id"] = target["stable_id"]
     target["source_evidence"][0]["shot_ids"] = [
         "scene-field-shot-1",
         "scene-field-shot-2",
@@ -393,6 +436,71 @@ def test_evidence_dedupe_is_bounded_and_noncanonical_ranges_do_not_create_covera
     assert refreshed["coverage"]["asset_shot_covered"] == 1
     assert refreshed["coverage"]["missing_source_evidence_shot_count"] == 16
     assert refreshed["recognition_quality"]["status"] == "blocked"
+
+
+@pytest.mark.parametrize(
+    ("source_type", "source_id"),
+    [
+        ("", "source-id"),
+        ("script_revision", ""),
+        ("custom_source", "source-id"),
+        ("script_revision", "../unsafe-source"),
+        ("script_revision", "script-revision-current"),
+        ("occurrence_ledger", "asset-other"),
+        ("applied_shot_plan", "shot-outside-occurrence"),
+    ],
+)
+def test_bible_quality_and_lock_reject_non_authoritative_evidence(
+    source_type: str,
+    source_id: str,
+) -> None:
+    bible = _fully_reviewed_bible()
+    for asset in bible["assets"]:
+        asset["source_evidence"] = [
+            {
+                "source_type": source_type,
+                "source_id": source_id,
+                "scene_ids": asset["occurrences"]["scene_ids"],
+                "shot_ids": asset["occurrences"]["shot_ids"],
+                "excerpt": "伪造的镜头覆盖记录",
+            }
+        ]
+    checked = _command(
+        bible,
+        {"type": "approve", "target_id": bible["assets"][0]["stable_id"]},
+    )["result"]["asset_bible"]
+    assert checked["coverage"]["asset_shot_covered"] == 0
+    assert checked["coverage"]["missing_source_evidence_shot_count"] == 17
+    assert checked["recognition_quality"]["status"] == "blocked"
+    with pytest.raises(ValueError, match="17 个镜头缺少来源证据"):
+        _command(checked, {"type": "lock"})
+
+
+def test_authoritative_applied_shot_evidence_requires_canonical_source_identity() -> None:
+    known = {"shot-a", "shot-b"}
+    asset = {
+        "stable_id": "asset-character-a",
+        "occurrences": {"scene_ids": ["scene-a"], "shot_ids": ["shot-a", "shot-b"]},
+        "source_evidence": [
+            {
+                "source_type": "applied_shot_plan",
+                "source_id": "shot-a",
+                "shot_ids": ["shot-b"],
+                "excerpt": "applied shot evidence",
+            },
+            {
+                "source_type": "script_revision",
+                "source_id": "script-revision-a",
+                "shot_ids": ["shot-a", "shot-b"],
+                "excerpt": "script audit only",
+            },
+        ],
+    }
+    traceable, records = authoritative_source_evidence(asset, known)
+    assert traceable == {"shot-a", "shot-b"}
+    assert next(item for item in records if item["source_type"] == "script_revision")[
+        "shot_ids"
+    ] == []
 
 
 def test_rerecognition_confirm_is_idempotent_and_reload_preserves_quality(tmp_path) -> None:

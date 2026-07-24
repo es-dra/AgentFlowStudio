@@ -8,6 +8,10 @@ from typing import Any, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
 
+from apps.api.runtime_asset_evidence import (
+    authoritative_source_evidence,
+    canonicalize_source_evidence,
+)
 from apps.api.runtime_asset_recognition import recognize_asset_occurrences
 from apps.api.runtime_asset_profile_plan import build_asset_profile_plan
 from apps.api.runtime_auth import RuntimeAuthStore
@@ -595,7 +599,8 @@ def _reconcile_recognition_assets(
             )
             retained["occurrences"] = deepcopy(generated["occurrences"])
             retained["source_evidence"] = _dedupe_evidence(
-                [*retained.get("source_evidence", []), *generated.get("source_evidence", [])]
+                [*retained.get("source_evidence", []), *generated.get("source_evidence", [])],
+                asset_id=retained["stable_id"],
             )
             retained["confidence"] = max(
                 float(retained.get("confidence") or 0),
@@ -672,61 +677,12 @@ def _asset_identity_overlap(left: Mapping[str, Any], right: Mapping[str, Any]) -
     )
 
 
-def _dedupe_evidence(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for value in values:
-        if not isinstance(value, Mapping):
-            continue
-        key = (
-            str(value.get("source_type") or "").strip()[:40],
-            _strict_stable_id(value.get("source_id")),
-            str(value.get("excerpt") or "").strip()[:240],
-        )
-        evidence = grouped.setdefault(
-            key,
-            {
-                "source_type": key[0],
-                "source_id": key[1],
-                "excerpt": key[2],
-                "scene_ids": set(),
-                "shot_ids": set(),
-            },
-        )
-        evidence["scene_ids"].update(_strict_stable_ids(value.get("scene_ids"), limit=80))
-        evidence["shot_ids"].update(_strict_stable_ids(value.get("shot_ids"), limit=160))
-    result = []
-    for key in sorted(
-        grouped,
-        key=lambda item: (
-            0 if item[0] == "occurrence_ledger" else 1,
-            item,
-        ),
-    )[:12]:
-        evidence = grouped[key]
-        result.append(
-            {
-                "source_type": evidence["source_type"],
-                "source_id": evidence["source_id"],
-                "excerpt": evidence["excerpt"],
-                "scene_ids": sorted(evidence["scene_ids"])[:80],
-                "shot_ids": sorted(evidence["shot_ids"])[:160],
-            }
-        )
-    return result
-
-
-def _strict_stable_id(value: Any) -> str:
-    raw = str(value or "").strip()
-    return raw if raw and safe_id(raw) == raw else ""
-
-
-def _strict_stable_ids(value: Any, *, limit: int) -> set[str]:
-    values = value if isinstance(value, list) else []
-    return {
-        token
-        for item in values[:limit]
-        if (token := _strict_stable_id(item))
-    }
+def _dedupe_evidence(
+    values: list[dict[str, Any]],
+    *,
+    asset_id: str = "",
+) -> list[dict[str, Any]]:
+    return canonicalize_source_evidence(values, asset_id=asset_id)
 
 
 def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
@@ -902,24 +858,7 @@ def _source_evidence_shot_ids(
     asset: Mapping[str, Any],
     known_shot_ids: set[str],
 ) -> set[str]:
-    result: set[str] = set()
-    occurrence_shot_ids = {
-        str(shot_id)
-        for shot_id in asset.get("occurrences", {}).get("shot_ids", [])
-        if str(shot_id) in known_shot_ids
-    }
-    for evidence in asset.get("source_evidence", []):
-        if not isinstance(evidence, Mapping):
-            continue
-        result.update(
-            str(shot_id)
-            for shot_id in evidence.get("shot_ids", [])
-            if str(shot_id) in occurrence_shot_ids
-        )
-        source_id = str(evidence.get("source_id") or "")
-        if evidence.get("source_type") == "applied_shot_plan" and source_id in occurrence_shot_ids:
-            result.add(source_id)
-    return result
+    return authoritative_source_evidence(asset, known_shot_ids)[0]
 
 
 def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:

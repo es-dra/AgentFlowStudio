@@ -14,6 +14,7 @@ from agentflow.harness.json_io import exclusive_file_lock, write_json
 from agentflow_studio.model_gateway.image_utils import image_dimensions, image_mime_type_from_bytes
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
+from apps.api.runtime_asset_evidence import authoritative_source_evidence
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_image_assets import image_asset_file_path, image_asset_metadata
 from apps.api.runtime_production_graph import (
@@ -1057,38 +1058,13 @@ def _source_traceability_contract(
     for asset in bible.get("assets", []):
         if not isinstance(asset, Mapping) or asset.get("review_state") != "approved":
             continue
-        occurrences = asset.get("occurrences") if isinstance(asset.get("occurrences"), Mapping) else {}
-        occurrence_shot_ids = {
-            str(shot_id)
-            for shot_id in occurrences.get("shot_ids", [])
-            if str(shot_id) in known_shot_ids
-        }
-        for evidence in asset.get("source_evidence", []):
-            if not isinstance(evidence, Mapping):
-                continue
-            source_type = str(evidence.get("source_type") or "")
-            source_id = str(evidence.get("source_id") or "")
-            if not source_type or not source_id:
-                continue
-            evidence_shot_ids = {
-                str(shot_id)
-                for shot_id in evidence.get("shot_ids", [])
-                if str(shot_id) in occurrence_shot_ids
-            }
-            if source_type == "applied_shot_plan" and source_id in occurrence_shot_ids:
-                evidence_shot_ids.add(source_id)
-            traceable_shot_ids.update(evidence_shot_ids)
+        asset_shot_ids, asset_records = authoritative_source_evidence(asset, known_shot_ids)
+        traceable_shot_ids.update(asset_shot_ids)
+        for evidence in asset_records:
             evidence_records.append(
                 {
                     "asset_id": str(asset.get("stable_id") or ""),
-                    "source_type": source_type,
-                    "source_id": source_id,
-                    "scene_ids": sorted(
-                        str(scene_id)
-                        for scene_id in evidence.get("scene_ids", [])
-                        if str(scene_id)
-                    ),
-                    "shot_ids": sorted(evidence_shot_ids),
+                    **evidence,
                 }
             )
     evidence_records.sort(

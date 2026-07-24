@@ -293,6 +293,37 @@ def test_manifest_compile_fails_closed_for_missing_traceable_source_evidence(
         compile_image_admission_manifest(PROJECT_ID, source)
 
 
+@pytest.mark.parametrize(
+    ("source_type", "source_id"),
+    [
+        ("", "source-id"),
+        ("script_revision", ""),
+        ("custom_source", "source-id"),
+        ("script_revision", "../unsafe-source"),
+        ("script_revision", "script-revision-current"),
+        ("occurrence_ledger", "asset-other"),
+        ("applied_shot_plan", "shot-outside-occurrence"),
+    ],
+)
+def test_manifest_compile_recomputes_authoritative_evidence_semantics(
+    source_type: str,
+    source_id: str,
+) -> None:
+    source = source_contract()
+    for asset in source["asset_bible"]["assets"]:
+        asset["source_evidence"] = [
+            {
+                "source_type": source_type,
+                "source_id": source_id,
+                "scene_ids": asset["occurrences"]["scene_ids"],
+                "shot_ids": asset["occurrences"]["shot_ids"],
+                "excerpt": "伪造的镜头覆盖记录",
+            }
+        ]
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+
+
 def test_prompt_and_source_fingerprint_change_with_reviewed_creative_facts() -> None:
     original = compile_image_admission_manifest(PROJECT_ID, source_contract(), created_at=REQUESTED_AT)
     revised_source = source_contract()
