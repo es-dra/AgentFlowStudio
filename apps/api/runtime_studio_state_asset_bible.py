@@ -86,6 +86,32 @@ def sanitize_asset_bible(
                 for index, item in enumerate(_list(candidate_set.get("shot_index"))[:240])
                 if isinstance(item, dict) and _id(item.get("shot_id"))
             ],
+            "required_asset_anchors": [
+                {
+                    "anchor_id": _id(item.get("anchor_id")),
+                    "source_asset_id": _id(item.get("source_asset_id")),
+                    "asset_type": text(item.get("asset_type"), "", 40),
+                    "display_name": text(item.get("display_name"), "待确认资产", 120),
+                    "aliases": _texts(item.get("aliases"), text=text, limit=20, length=120),
+                    "scene_ids": _ids(item.get("scene_ids"), 80),
+                    "shot_ids": _ids(item.get("shot_ids"), 160),
+                    "ambiguity": text(item.get("ambiguity"), "", 64),
+                }
+                for item in _list(candidate_set.get("required_asset_anchors"))[:96]
+                if isinstance(item, dict)
+                and _id(item.get("anchor_id"))
+                and text(item.get("asset_type"), "", 40) in ASSET_TYPES
+            ],
+            "recognition_ambiguities": [
+                {
+                    "code": text(item.get("code"), "recognition_ambiguity", 64),
+                    "asset_type": text(item.get("asset_type"), "", 40),
+                    "labels": _texts(item.get("labels"), text=text, limit=8, length=120),
+                    "message": text(item.get("message"), "资产别名关系需要人工确认。", 240),
+                }
+                for item in _list(candidate_set.get("recognition_ambiguities"))[:32]
+                if isinstance(item, dict)
+            ],
             "source_digest": _digest(candidate_set.get("source_digest")),
             "created_at": text(candidate_set.get("created_at"), "", 80),
         },
@@ -101,6 +127,25 @@ def sanitize_asset_bible(
             if item and item["requirement_id"] in requirement_ids
         ],
         "coverage": _coverage(data.get("coverage"), number=number),
+        "recognition_quality": _recognition_quality(
+            data.get("recognition_quality"),
+            text=text,
+            number=number,
+        ),
+        "recognition_delta": {
+            key: _ids(
+                data.get("recognition_delta", {}).get(key)
+                if isinstance(data.get("recognition_delta"), dict)
+                else [],
+                96,
+            )
+            for key in (
+                "added_asset_ids",
+                "merged_asset_ids",
+                "retained_asset_ids",
+                "history_asset_ids",
+            )
+        },
         "revisions": revisions,
         "current_revision_id": _id(data.get("current_revision_id")),
         "locked_revision_id": _id(data.get("locked_revision_id")),
@@ -229,17 +274,59 @@ def _coverage(value: Any, *, number: NumberSanitizer) -> dict[str, Any]:
         "scene_covered",
         "shot_total",
         "shot_covered",
+        "asset_shot_covered",
         "required_occurrence_total",
         "resolved_required",
         "unresolved_required",
         "unresolved_scene_count",
         "unresolved_shot_count",
         "alias_collision_count",
+        "missing_anchor_count",
+        "orphan_scene_coverage_count",
+        "recognition_ambiguity_count",
+        "quality_issue_count",
     )
     result = {key: max(0, int(number(data.get(key), 0))) for key in keys}
     result["unresolved_asset_ids"] = _ids(data.get("unresolved_asset_ids"), 96)
     result["coverage_pass"] = data.get("coverage_pass") is True
+    result["quality_pass"] = data.get("quality_pass") is True
     return result
+
+
+def _recognition_quality(
+    value: Any,
+    *,
+    text: TextSanitizer,
+    number: NumberSanitizer,
+) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    status = text(data.get("status"), "blocked", 24)
+    if status not in {"pass", "blocked"}:
+        status = "blocked"
+    return {
+        "status": status,
+        "issues": [
+            {
+                "code": text(item.get("code"), "recognition_quality_issue", 64),
+                "asset_type": text(item.get("asset_type"), "", 40),
+                "display_name": text(item.get("display_name"), "待确认资产", 120),
+                "scene_count": max(0, int(number(item.get("scene_count"), 0))),
+                "shot_count": max(0, int(number(item.get("shot_count"), 0))),
+                "message": text(item.get("message"), "资产识别需要复核。", 240),
+                "action": text(item.get("action"), "重新识别或人工修复", 160),
+            }
+            for item in _list(data.get("issues"))[:64]
+            if isinstance(item, dict)
+        ],
+        "missing_anchor_count": max(0, int(number(data.get("missing_anchor_count"), 0))),
+        "orphan_scene_coverage_count": max(
+            0, int(number(data.get("orphan_scene_coverage_count"), 0))
+        ),
+        "alias_collision_count": max(0, int(number(data.get("alias_collision_count"), 0))),
+        "recognition_ambiguity_count": max(
+            0, int(number(data.get("recognition_ambiguity_count"), 0))
+        ),
+    }
 
 
 def _revision(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[str, Any]:

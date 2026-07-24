@@ -841,6 +841,11 @@ export function createProductShell(options = {}) {
       identify.addEventListener("click", () => void stageAssetBibleCommand({ type: "generate_candidates" }));
       headerActions.appendChild(identify);
     } else {
+      const recognize = node("button", "studio-secondary-button", "重新识别");
+      recognize.type = "button";
+      recognize.disabled = view.status === "locked" || Boolean(assetCommandPreview);
+      recognize.title = "预览新增、聚类、保留与历史变化；确认前不改变事实";
+      recognize.addEventListener("click", () => void stageAssetBibleCommand({ type: "regenerate_candidates" }));
       const add = node("button", "studio-secondary-button", "补充资产");
       add.type = "button";
       add.disabled = view.status === "locked" || Boolean(assetCommandPreview);
@@ -864,10 +869,13 @@ export function createProductShell(options = {}) {
       lock.disabled = view.status === "locked"
         || view.counts.candidate > 0
         || !view.counts.approved
+        || view.recognition_quality.status !== "pass"
         || !view.coverage.coverage_pass
         || Boolean(assetCommandPreview);
       lock.title = view.counts.candidate
         ? `仍有 ${view.counts.candidate} 个候选待确认`
+        : view.recognition_quality.status !== "pass"
+          ? `识别质量门有 ${view.recognition_quality.issues.length} 项阻塞`
         : view.coverage.unresolved_required
           ? `${view.coverage.unresolved_required} 个必要出现范围尚未解决`
           : !view.coverage.coverage_pass
@@ -875,7 +883,7 @@ export function createProductShell(options = {}) {
             : "锁定后才满足图片生产结构准入";
       lock.addEventListener("click", () => void stageAssetBibleCommand({ type: "lock" }));
       if (view.status === "locked") headerActions.append(lock);
-      else headerActions.append(add, merge, lock);
+      else headerActions.append(recognize, add, merge, lock);
       if (view.status === "locked") {
         const admission = node("button", "studio-secondary-button", "图片准入");
         admission.type = "button";
@@ -889,6 +897,7 @@ export function createProductShell(options = {}) {
     header.append(title, headerActions);
     main.appendChild(header);
     main.appendChild(assetBibleStatusBar(view, source));
+    if (view.counts.total) main.appendChild(assetBibleQualityGate(view));
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
       main.appendChild(buildImageAdmissionPanel());
     }
@@ -914,6 +923,11 @@ export function createProductShell(options = {}) {
       ["资产", view.counts.total ? `${view.counts.total} 当前 · ${view.counts.rejected + view.counts.superseded} 历史` : "待识别"],
       ["Bible", view.status === "locked" ? "已锁定" : view.counts.total ? "审核中" : "未建立"],
       ["覆盖", view.counts.total ? `${view.coverage.shot_covered}/${view.coverage.shot_total} 镜头 · ${view.coverage.unresolved_required} 未解决` : "待识别"],
+      ["识别质量", view.counts.total
+        ? view.recognition_quality.status === "pass"
+          ? "已通过"
+          : `${view.recognition_quality.issues.length} 项阻塞`
+        : "待识别"],
       ["媒体准入", imageAdmissionView().status === "locked"
         ? (snapshot.mediaGates?.image ? "清单已锁定 · 可受控生成" : "清单已锁定 · 图片能力未启用")
         : view.status === "locked" && view.coverage.coverage_pass ? "结构就绪 · 待审核清单" : "内容审核未通过"],
@@ -927,6 +941,41 @@ export function createProductShell(options = {}) {
       bar.appendChild(item);
     }
     return bar;
+  }
+
+  function assetBibleQualityGate(view) {
+    const sectionEl = node(
+      "section",
+      `asset-bible-quality-gate ${view.recognition_quality.status === "pass" ? "pass" : "blocked"}`,
+    );
+    sectionEl.setAttribute("aria-live", "polite");
+    const head = node("div", "");
+    head.append(
+      node("strong", "", view.recognition_quality.status === "pass" ? "识别质量门已通过" : "识别质量门阻止锁定"),
+      node(
+        "span",
+        "",
+        `${view.coverage.asset_shot_covered}/${view.coverage.shot_total} 镜头有可追溯资产范围`,
+      ),
+    );
+    sectionEl.appendChild(head);
+    if (view.recognition_quality.status === "pass") {
+      sectionEl.appendChild(node("p", "", "具名资产、别名唯一性与场景下属镜头覆盖均已通过结构检查。"));
+      return sectionEl;
+    }
+    const list = node("ul", "");
+    for (const issue of view.recognition_quality.issues.slice(0, 8)) {
+      list.appendChild(node("li", "", `${issue.message} 下一步：${issue.action}。`));
+    }
+    sectionEl.appendChild(list);
+    if (view.status !== "locked") {
+      const retry = node("button", "studio-primary-button", "预览重新识别");
+      retry.type = "button";
+      retry.disabled = Boolean(assetCommandPreview);
+      retry.addEventListener("click", () => void stageAssetBibleCommand({ type: "regenerate_candidates" }));
+      sectionEl.appendChild(retry);
+    }
+    return sectionEl;
   }
 
   function assetBibleEmpty(source) {
@@ -1350,6 +1399,14 @@ export function createProductShell(options = {}) {
         `必要出现范围：${impact.unresolved_required_before || 0} 未解决 → ${impact.unresolved_required_after || 0} 未解决。`,
       ));
     }
+    if (impact.recognition_delta) {
+      const delta = impact.recognition_delta;
+      sectionEl.appendChild(node(
+        "p",
+        "",
+        `重新识别变化：新增 ${delta.added_asset_ids?.length || 0} · 聚类 ${delta.merged_asset_ids?.length || 0} · 保留已审核 ${delta.retained_asset_ids?.length || 0} · 转入历史 ${delta.history_asset_ids?.length || 0}；质量阻塞 ${impact.quality_issue_count_before || 0} → ${impact.quality_issue_count_after || 0}。`,
+      ));
+    }
     for (const item of impact.occurrence_resolution_changes || []) {
       const destination = preview.result?.asset_bible?.assets?.find(
         (asset) => asset.stable_id === item.assigned_asset_id,
@@ -1391,7 +1448,7 @@ export function createProductShell(options = {}) {
   async function stageAssetBibleCommand(command) {
     if (assetCommandPreview) return;
     const source = assetBibleSourceContext(snapshot.studioState || {});
-    if (command.type === "generate_candidates" && !source) {
+    if (["generate_candidates", "regenerate_candidates"].includes(command.type) && !source) {
       assetCommandError = "缺少已应用的剧本和分镜上下文。";
       render();
       return;
@@ -1409,7 +1466,7 @@ export function createProductShell(options = {}) {
         expected_asset_bible_revision_id: view.current_revision_id || "",
         command,
         requested_at: new Date().toISOString(),
-        ...(command.type === "generate_candidates" ? source : {}),
+        ...(["generate_candidates", "regenerate_candidates"].includes(command.type) ? source : {}),
       };
       const preview = await options.getRuntime?.().previewAssetBibleCommand(request);
       assetCommandPreview = { ...preview, request };
@@ -2500,6 +2557,10 @@ export function createProductShell(options = {}) {
       void stageAssetBibleCommand({ type: "generate_candidates" });
       return;
     }
+    if (action.action === "regenerate_asset_candidates") {
+      void stageAssetBibleCommand({ type: "regenerate_candidates" });
+      return;
+    }
     if (action.action === "approve_selected_asset" && selectedAsset()) {
       void stageAssetBibleCommand({ type: "approve", target_id: selectedAsset().stable_id });
       return;
@@ -3327,6 +3388,7 @@ function splitList(value) {
 function assetCommandLabel(value) {
   return {
     generate_candidates: "建立本地确定性资产候选",
+    regenerate_candidates: "重新识别并预览替换",
     create_asset: "补充人工审核资产",
     approve: "批准资产候选",
     reject: "拒绝资产候选",

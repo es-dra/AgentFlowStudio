@@ -202,7 +202,8 @@ def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_
         status: "locked",
         locked_revision_id: "asset-bible-r1",
         candidate_set: {{ script_revision_id: "script-r1", shot_count: 17, scene_count: 3 }},
-        coverage: {{ coverage_pass: true, shot_total: 17, shot_covered: 17, unresolved_required: 0 }},
+        coverage: {{ coverage_pass: true, quality_pass: true, shot_total: 17, shot_covered: 17, unresolved_required: 0 }},
+        recognition_quality: {{ status: "pass", issues: [] }},
         assets: [{{ stable_id: "asset-a", asset_type: "character", display_name: "角色", review_state: "approved", occurrences: {{ scene_ids: [], shot_ids: [] }} }}],
       }};
       const base = {{ studioState: {{ assetBible: bible, nodes: {{}} }}, capabilityGates: {{ image: false }}, section: "asset_bible" }};

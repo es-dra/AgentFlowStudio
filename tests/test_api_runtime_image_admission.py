@@ -100,11 +100,20 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
         "assets": assets,
         "coverage": {
             "coverage_pass": True,
+            "quality_pass": True,
             "shot_total": 17,
             "shot_covered": 17,
             "required_occurrence_total": 35,
             "resolved_required": 35,
             "unresolved_required": 0,
+        },
+        "recognition_quality": {
+            "status": "pass",
+            "issues": [],
+            "missing_anchor_count": 0,
+            "orphan_scene_coverage_count": 0,
+            "alias_collision_count": 0,
+            "recognition_ambiguity_count": 0,
         },
     }
     return {
