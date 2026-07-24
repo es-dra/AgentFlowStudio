@@ -1,4 +1,4 @@
-export async function syncRuntimeAssets(store, runtime) {
+export async function syncRuntimeAssets(store, runtime, options = {}) {
   const [imagePayload, visualPayload] = await Promise.allSettled([
     runtime.listImageAssets?.(),
     runtime.listVisualAssets?.("fixed"),
@@ -9,6 +9,7 @@ export async function syncRuntimeAssets(store, runtime) {
   const visualAssets = visualPayload.status === "fulfilled" && Array.isArray(visualPayload.value?.assets)
     ? visualPayload.value.assets
     : [];
+  if (options.isCurrent && !options.isCurrent()) return { skipped: "stale_project_transition" };
   const imagePreviewById = new Map(
     imageAssets.map((asset) => [asset.asset_id, asset.preview_url]).filter(([assetId, previewUrl]) => assetId && previewUrl),
   );
@@ -31,6 +32,7 @@ export async function syncRuntimeAssets(store, runtime) {
       }),
     ];
   }, { history: false });
+  return { synced: true };
 }
 
 function visualAssetProjection(asset, runtime, imagePreviewById) {

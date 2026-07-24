@@ -171,12 +171,13 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert '!String(next.previewUrl).includes("/video-generations/")' in state_source
     main_source = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     project_controller = (STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
+    project_name_dialog = (STUDIO_ROOT / "src" / "studio-project-name-dialog.js").read_text(encoding="utf-8")
     assert "syncCurrentProjectMetaFromSummaries" in project_controller
     assert "const currentId = runtime.projectId || store.get().meta.projectId;" in project_controller
     assert "recoverProjectAccessDenied" in project_controller
     assert "isProjectAccessDeniedError" in project_controller
     assert "!projectSummaries.length && currentId" in project_controller
-    assert 'input.type = "text";' in project_controller
+    assert 'input.type = "text";' in project_name_dialog
     assert "createProjectController" in main_source
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert "state.meta.projectId, state.meta.projectName, state.meta.canvasName" in drawer_source

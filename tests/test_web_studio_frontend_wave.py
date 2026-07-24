@@ -328,8 +328,8 @@ def test_keyframe_progress_uses_percentage_long_polling_without_timeout_failure(
     assert "startBackgroundKeyframePolling" in keyframe_actions
     assert "void startBackgroundKeyframePolling" in keyframe_actions
     assert "runtime.pollKeyframe(jobId)" in keyframe_actions
-    assert "refreshPendingKeyframeGenerations(store, runtimeClient)" in startup
-    assert "onProjectReady?.(runtimeClient)" in project_controller
+    assert "refreshPendingKeyframeGenerations(store, runtimeClient, { isCurrent: current })" in startup
+    assert "onProjectReady?.(runtimeClient, { isCurrent: transitionCurrent })" in project_controller
     assert "throw new Error(`图片生成仍在处理中" not in keyframe_actions
     assert "const isIndeterminate = !progress || progress?.percent == null" in body
     assert "`${progress.percent}%`" in body

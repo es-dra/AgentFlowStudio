@@ -96,9 +96,11 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
     .filter((node) => node?.type === "image" && node.status === "generating" && node.params?.lastKeyframeJobId)
     .slice(0, Math.max(0, limit));
   for (const node of nodes) {
+    if (options.isCurrent && !options.isCurrent()) return { skipped: "stale_project_transition" };
     const jobId = node.params.lastKeyframeJobId;
     try {
       const response = await runtime.pollKeyframe(jobId);
+      if (options.isCurrent && !options.isCurrent()) return { skipped: "stale_project_transition" };
       applyKeyframeResponse(store, node.id, response, fallbackRequest(node), {
         kind: nodeGenerationKind(node),
         retrying: Boolean(node.params?.retryFailedItemsOnly),
@@ -109,6 +111,7 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
       }
     } catch {}
   }
+  return { refreshed: true };
 }
 function startBackgroundKeyframePolling(store, runtime, nodeId, jobId, request) {
   const key = String(jobId || "");

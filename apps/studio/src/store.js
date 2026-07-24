@@ -1,5 +1,6 @@
 import { loadPersisted, migrateLegacyCanvasStorage, persist } from "./store-persistence.js";
 import { emptyNotifyMeta, mergeNotifyMeta } from "./store-notify-meta.js";
+import { createStoreProjectTransition } from "./store-project-transition.js";
 import { createRuntimePersistenceController } from "./store-runtime-persistence-controller.js";
 import { shouldKeepLocalOverRemote } from "./store-runtime-save.js";
 import {
@@ -13,9 +14,13 @@ import {
   snapshotStudioState,
 } from "./store-state.js";
 
-export function createStore(projectId = "") {
+export function createStore(projectId = "", options = {}) {
   migrateLegacyCanvasStorage(projectId);
-  let state = loadPersisted(projectId) || initialState(projectId);
+  let state = options.deferProjectLoad ? initialState(projectId) : loadPersisted(projectId) || initialState(projectId);
+  if (options.deferProjectLoad) {
+    state.meta.projectName = "";
+    state.meta.canvasName = "";
+  }
   const listeners = new Set();
   const history = { past: [], future: [] };
   let scheduled = false;
@@ -26,10 +31,20 @@ export function createStore(projectId = "") {
     getState: () => state,
     notify: notifySoon,
   });
+  const projectTransition = createStoreProjectTransition({
+    getState: () => state,
+    setState: (next) => { state = next; },
+    setRuntime: (next) => { runtimeClient = next; },
+    runtimePersistence,
+    history,
+    notify: notifySoon,
+  });
 
   function get() { return state; }
 
   function set(mutator, options = {}) {
+    const identityStatus = String(state.ui?.projectIdentity?.status || "");
+    if (["blocked", "cache_read_only", "loading"].includes(identityStatus) && options.identityOverride !== true) return;
     const before = snapshotStudioState(state);
     mutator(state);
     let after = snapshotStudioState(state);
@@ -66,6 +81,12 @@ export function createStore(projectId = "") {
       state.ui.saveState = "同步中";
       notifySoon();
       const payload = await runtime.loadStudioState();
+      if (targetProjectId && payload?.project_id && String(payload.project_id) !== targetProjectId) {
+        const mismatch = new Error("Runtime returned a different project identity");
+        mismatch.status = 409;
+        mismatch.errorCode = "project_identity_mismatch";
+        throw mismatch;
+      }
       if (targetProjectId && state.meta.projectId !== targetProjectId) {
         return { source: "stale", projectId: targetProjectId };
       }
@@ -118,18 +139,6 @@ export function createStore(projectId = "") {
     notifySoon();
   }
 
-  async function switchProject(projectId, runtime, options = {}) {
-    runtimeClient = runtime;
-    runtimePersistence.reset();
-    state = loadPersisted(projectId) || initialState(projectId);
-    state.meta.projectId = projectId;
-    if (options.persistenceMode) runtimePersistence.setMode(options.persistenceMode);
-    history.past = [];
-    history.future = [];
-    notifySoon();
-    return hydrateRuntime(runtime);
-  }
-
   function resetIdentityState() {
     runtimePersistence.reset();
     runtimeClient = null;
@@ -162,5 +171,22 @@ export function createStore(projectId = "") {
     });
   }
 
-  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, resetIdentityState, flushRuntimeSave, setRuntimePersistenceMode, undo, redo };
+  return {
+    get,
+    set,
+    subscribe,
+    nextId,
+    attachRuntime,
+    hydrateRuntime,
+    prepareProject: projectTransition.prepareProject,
+    markProjectLoading: projectTransition.markProjectLoading,
+    commitPreparedProject: projectTransition.commitPreparedProject,
+    blockProject: projectTransition.blockProject,
+    switchProject: projectTransition.switchProject,
+    resetIdentityState,
+    flushRuntimeSave,
+    setRuntimePersistenceMode,
+    undo,
+    redo,
+  };
 }

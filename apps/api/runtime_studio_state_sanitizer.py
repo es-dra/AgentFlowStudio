@@ -80,6 +80,8 @@ def sanitize_studio_state(value: dict[str, Any], *, project_id: str | None = Non
         "production": _production(value.get("production")),
     }
     _reject_forbidden(sanitized)
+    if project_id:
+        sanitized["meta"]["projectId"] = str(project_id)
     return sanitized
 
 

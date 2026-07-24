@@ -62,6 +62,7 @@ def test_product_shell_exposes_loading_empty_error_recovery_and_focus_states() -
 
 def test_new_project_enters_unified_studio_and_empty_storyboard_has_no_demo_facts() -> None:
     controller = (STUDIO / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
+    project_name_dialog = (STUDIO / "src" / "studio-project-name-dialog.js").read_text(encoding="utf-8")
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     context = (STUDIO / "src" / "product-shell-context.js").read_text(encoding="utf-8")
     styles = (STUDIO / "styles" / "product-shell.css").read_text(encoding="utf-8")
@@ -69,7 +70,7 @@ def test_new_project_enters_unified_studio_and_empty_storyboard_has_no_demo_fact
     assert 'project_type: "studio_creator_authoring"' in controller
     assert "window.location.assign" not in controller
     assert "created?.episode_bootstrap?.workspace_entry?.href" not in controller
-    assert 'uniqueProjectName("未命名项目", existingProjects)' in controller
+    assert 'uniqueProjectName("未命名项目", existingProjects)' in project_name_dialog
     assert "AFS 内测项目" not in controller
     assert "exampleProjectName" not in controller
 

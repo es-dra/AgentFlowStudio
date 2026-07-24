@@ -13,6 +13,7 @@ from apps.api.runtime_production_runs import resolve_project_studio_binding
 from apps.api.runtime_production_graph import graph_has_authority
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state
+from apps.api.runtime_studio_cache_identity import studio_cache_identity
 
 
 class StudioStateRequest(BaseModel):
@@ -25,14 +26,23 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth
     def get_studio_state(project_id: str, request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
         production_binding = _project_production_binding(store, auth, request, project_id)
+        user = auth.require_user(request) if auth.enabled() else None
         path = _state_path(store, project_id)
         if not path.exists():
+            state = {"production": production_binding} if production_binding else None
             return {
                 "project_id": project_id,
                 "source": "empty",
-                "state": {"production": production_binding} if production_binding else None,
+                "state": state,
                 "state_version": "",
                 "saved_at": "",
+                "cache_identity": studio_cache_identity(
+                    request,
+                    user_id=str(user.get("user_id", "")) if user else "",
+                    project_id=project_id,
+                    state_version="",
+                    state=state,
+                ) if isinstance(state, dict) else {},
             }
         try:
             payload = read_json(path)
@@ -45,17 +55,26 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth
                 detail=safe_exception_detail(exc, "studio_state_recovery_required"),
             ) from exc
         state = {**state, "production": production_binding}
+        state_version = _payload_version(payload)
         return {
             "project_id": project_id,
             "source": "runtime",
             "state": state,
-            "state_version": _payload_version(payload),
+            "state_version": state_version,
             "saved_at": str(payload.get("saved_at", "")),
+            "cache_identity": studio_cache_identity(
+                request,
+                user_id=str(user.get("user_id", "")) if user else "",
+                project_id=project_id,
+                state_version=state_version,
+                state=state,
+            ),
         }
 
     @app.put("/projects/{project_id}/studio-state")
     def put_studio_state(project_id: str, body: StudioStateRequest, request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        user = auth.require_user(request) if auth.enabled() else None
         if graph_has_authority(store, project_id):
             raise HTTPException(
                 status_code=409,
@@ -110,6 +129,13 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore, auth
             "state": state,
             "state_version": state_version,
             "saved_at": saved_at,
+            "cache_identity": studio_cache_identity(
+                request,
+                user_id=str(user.get("user_id", "")) if user else "",
+                project_id=project_id,
+                state_version=state_version,
+                state=state,
+            ),
         }
 
 

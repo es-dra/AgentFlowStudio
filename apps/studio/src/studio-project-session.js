@@ -7,7 +7,7 @@ export function initialProjectId() {
   const fromQuery = safeProjectId(params.get("project"));
   if (fromQuery) return fromQuery;
   const stored = safeProjectId(localStorage.getItem(ACTIVE_PROJECT_KEY));
-  return stored || sessionProjectId();
+  return stored || "studio-empty";
 }
 
 export function persistActiveProject(projectId) {
@@ -41,12 +41,13 @@ export function recentProjectIds() {
   }
 }
 
-export function syncProjectUrl(projectId) {
+export function syncProjectUrl(projectId, { replace = true } = {}) {
   const url = new URL(window.location.href);
   const safe = safeProjectId(projectId);
   if (safe) url.searchParams.set("project", safe);
   else url.searchParams.delete("project");
-  window.history.replaceState({}, "", url);
+  if (replace) window.history.replaceState({}, "", url);
+  else window.history.pushState({}, "", url);
 }
 
 export function clearProjectSession() {
@@ -64,21 +65,4 @@ export function clearProjectSession() {
   } catch {
     // URL cleanup is best-effort during identity teardown.
   }
-}
-
-function sessionProjectId() {
-  try {
-    const stored = safeProjectId(localStorage.getItem(SESSION_PROJECT_KEY));
-    if (stored) return stored;
-    const next = createSessionProjectId();
-    localStorage.setItem(SESSION_PROJECT_KEY, next);
-    return next;
-  } catch {
-    return createSessionProjectId();
-  }
-}
-
-function createSessionProjectId() {
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return safeProjectId(`studio-${Date.now()}-${suffix}`);
 }

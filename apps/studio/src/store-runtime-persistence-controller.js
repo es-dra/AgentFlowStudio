@@ -4,6 +4,7 @@ import { runtimeSaveFailureState, snapshotKey } from "./store-runtime-save.js";
 const SAVE_DEBOUNCE_MS = 700;
 const STUDIO_STATE_MODE = "studio_state";
 const GRAPH_READ_ONLY_MODE = "production_graph_read_only";
+const IDENTITY_READ_ONLY_MODE = "identity_read_only";
 
 export function createRuntimePersistenceController({ getRuntime, getState, notify }) {
   let mode = STUDIO_STATE_MODE;
@@ -42,9 +43,20 @@ export function createRuntimePersistenceController({ getRuntime, getState, notif
   }
 
   function setMode(requestedMode = STUDIO_STATE_MODE) {
-    mode = requestedMode === GRAPH_READ_ONLY_MODE ? GRAPH_READ_ONLY_MODE : STUDIO_STATE_MODE;
+    mode = requestedMode === GRAPH_READ_ONLY_MODE
+      ? GRAPH_READ_ONLY_MODE
+      : requestedMode === IDENTITY_READ_ONLY_MODE
+        ? IDENTITY_READ_ONLY_MODE
+        : STUDIO_STATE_MODE;
     if (mode === STUDIO_STATE_MODE) return;
     cancelPendingSave();
+    if (mode === IDENTITY_READ_ONLY_MODE) {
+      const state = getState();
+      state.ui.saveState = "只读缓存";
+      state.ui.saveMessage = "连接恢复并重新验证当前项目后，才可继续修改。";
+      notify({ renderScope: "save-status" });
+      return;
+    }
     publishGraphReadOnlyStatus();
   }
 
