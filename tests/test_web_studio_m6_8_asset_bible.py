@@ -79,6 +79,8 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert 'node("code", "", asset.stable_id)' not in shell
     assert "assetOccurrenceLabel" in shell
     assert "localizedNegativeLock" in shell
+    assert 'if (view.status !== "locked" && asset.review_state !== "superseded")' in shell
+    assert "if (actions.childElementCount) head.appendChild(actions)" in shell
     assert "/m6/asset-bible/commands/preview" in client
     assert "/m6/asset-bible/commands/confirm" in client
     assert 'section === "asset_bible" ? "asset_bible"' in lifecycle
@@ -92,6 +94,8 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "grid-template-columns: auto minmax(180px, 280px) 276px" in product_styles
     assert "@media (max-width: 760px)" in styles
     assert "@media (prefers-reduced-motion: reduce)" in styles
+    assert "flex-direction: column" in styles
+    assert "white-space: nowrap" in styles
 
 
 def test_content_coverage_blocks_media_admission_before_runtime_capability() -> None:

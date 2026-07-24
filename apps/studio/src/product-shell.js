@@ -983,17 +983,20 @@ export function createProductShell(options = {}) {
       node("h2", "", asset.display_name),
     );
     const actions = node("div", "asset-bible-detail-actions");
-    for (const [type, label, className] of [
-      ["approve", "批准", "studio-primary-button"],
-      ["reject", "拒绝", "studio-secondary-button"],
-    ]) {
-      const button = node("button", className, label);
-      button.type = "button";
-      button.disabled = view.status === "locked" || asset.review_state === "superseded" || Boolean(assetCommandPreview);
-      button.addEventListener("click", () => void stageAssetBibleCommand({ type, target_id: asset.stable_id }));
-      actions.appendChild(button);
+    if (view.status !== "locked" && asset.review_state !== "superseded") {
+      for (const [type, label, className] of [
+        ["approve", "批准", "studio-primary-button"],
+        ["reject", "拒绝", "studio-secondary-button"],
+      ]) {
+        const button = node("button", className, label);
+        button.type = "button";
+        button.disabled = Boolean(assetCommandPreview);
+        button.addEventListener("click", () => void stageAssetBibleCommand({ type, target_id: asset.stable_id }));
+        actions.appendChild(button);
+      }
     }
-    head.append(title, actions);
+    head.appendChild(title);
+    if (actions.childElementCount) head.appendChild(actions);
     detail.appendChild(head);
     const metrics = node("dl", "asset-bible-metrics");
     for (const [label, value] of [

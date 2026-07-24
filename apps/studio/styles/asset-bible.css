@@ -390,8 +390,20 @@
   }
 
   .studio-asset-bible { padding-bottom: 68px; overflow: auto; }
-  .asset-bible-header { align-items: flex-start; min-height: auto; padding: 12px 10px; }
-  .asset-bible-header-actions { justify-content: flex-end; }
+  .asset-bible-header {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: auto;
+    padding: 12px 10px;
+  }
+  .asset-bible-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .asset-bible-header-actions .studio-primary-button {
+    max-width: 100%;
+    white-space: nowrap;
+  }
   .asset-bible-create-form { grid-template-columns: 1fr; padding: 10px; }
   .asset-occurrence-picker { grid-template-columns: 1fr; }
   .asset-resolution-form { grid-template-columns: 1fr; }
