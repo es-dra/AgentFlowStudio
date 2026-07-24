@@ -212,6 +212,18 @@ def compile_image_admission_manifest(
     )
     if quality.get("status") != "pass" or not coverage.get("quality_pass"):
         raise ValueError("image admission requires a passed asset recognition quality gate")
+    candidate_set = (
+        bible.get("candidate_set")
+        if isinstance(bible.get("candidate_set"), Mapping)
+        else {}
+    )
+    source_traceability = _source_traceability_contract(bible, candidate_set)
+    if source_traceability["status"] != "complete":
+        raise ValueError(
+            "image admission requires traceable source evidence for every applied shot: "
+            f"{source_traceability['traceable_shot_count']}/"
+            f"{source_traceability['shot_total']} traceable"
+        )
     active = [
         _asset(item)
         for item in bible.get("assets", [])
@@ -228,7 +240,6 @@ def compile_image_admission_manifest(
         raise ValueError("at least one approved scene asset is required")
     if len(props) < 2:
         raise ValueError("at least two approved prop assets are required")
-    candidate_set = bible.get("candidate_set") if isinstance(bible.get("candidate_set"), Mapping) else {}
     shot_grounding = source.get("shot_grounding") if isinstance(source.get("shot_grounding"), Mapping) else {}
     scene_index = sorted(
         [
@@ -358,6 +369,7 @@ def compile_image_admission_manifest(
             "status": "ready",
             "prompt_contract_version": PROMPT_CONTRACT_VERSION,
             "source_fingerprint": source_fingerprint,
+            "source_evidence_summary": source_traceability,
         },
         "items": items,
         "budget_contract": contract,
@@ -1028,6 +1040,74 @@ def _source_contract(project_id: str, value: Any) -> dict[str, Any]:
         "art_direction": art_direction,
         "shot_grounding": shot_grounding,
         "asset_bible": deepcopy(dict(bible)),
+    }
+
+
+def _source_traceability_contract(
+    bible: Mapping[str, Any],
+    candidate_set: Mapping[str, Any],
+) -> dict[str, Any]:
+    known_shot_ids = {
+        str(item.get("shot_id") or "")
+        for item in candidate_set.get("shot_index", [])
+        if isinstance(item, Mapping) and item.get("shot_id")
+    }
+    traceable_shot_ids: set[str] = set()
+    evidence_records = []
+    for asset in bible.get("assets", []):
+        if not isinstance(asset, Mapping) or asset.get("review_state") != "approved":
+            continue
+        occurrences = asset.get("occurrences") if isinstance(asset.get("occurrences"), Mapping) else {}
+        occurrence_shot_ids = {
+            str(shot_id)
+            for shot_id in occurrences.get("shot_ids", [])
+            if str(shot_id) in known_shot_ids
+        }
+        for evidence in asset.get("source_evidence", []):
+            if not isinstance(evidence, Mapping):
+                continue
+            source_type = str(evidence.get("source_type") or "")
+            source_id = str(evidence.get("source_id") or "")
+            if not source_type or not source_id:
+                continue
+            evidence_shot_ids = {
+                str(shot_id)
+                for shot_id in evidence.get("shot_ids", [])
+                if str(shot_id) in occurrence_shot_ids
+            }
+            if source_type == "applied_shot_plan" and source_id in occurrence_shot_ids:
+                evidence_shot_ids.add(source_id)
+            traceable_shot_ids.update(evidence_shot_ids)
+            evidence_records.append(
+                {
+                    "asset_id": str(asset.get("stable_id") or ""),
+                    "source_type": source_type,
+                    "source_id": source_id,
+                    "scene_ids": sorted(
+                        str(scene_id)
+                        for scene_id in evidence.get("scene_ids", [])
+                        if str(scene_id)
+                    ),
+                    "shot_ids": sorted(evidence_shot_ids),
+                }
+            )
+    evidence_records.sort(
+        key=lambda item: (
+            item["asset_id"],
+            item["source_type"],
+            item["source_id"],
+            item["scene_ids"],
+            item["shot_ids"],
+        )
+    )
+    missing = known_shot_ids - traceable_shot_ids
+    return {
+        "status": "complete" if known_shot_ids and not missing else "blocked",
+        "shot_total": len(known_shot_ids),
+        "traceable_shot_count": len(traceable_shot_ids),
+        "missing_shot_count": len(missing),
+        "evidence_record_count": len(evidence_records),
+        "evidence_digest": canonical_digest(evidence_records),
     }
 
 

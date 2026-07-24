@@ -114,6 +114,13 @@ def test_candidate_generation_is_zero_provider_preview_with_stable_occurrence_li
     assert all(item["needs_confirmation"] is True for item in first["assets"])
     assert all(item["pending_fields"] for item in first["assets"])
     assert any(item["occurrences"]["shot_ids"] for item in first["assets"] if item["asset_type"] != "scene")
+    traceable_shots = {
+        shot_id
+        for asset in first["assets"]
+        for evidence in asset["source_evidence"]
+        for shot_id in evidence.get("shot_ids", [])
+    }
+    assert len(traceable_shots) == 17
 
     preview = preview_asset_bible_command_result(PROJECT_ID, generation_body())
     assert preview["status"] == "preview"
@@ -138,9 +145,16 @@ def test_visual_identity_and_art_direction_fail_closed_before_approval_and_lock(
         )["result"]["asset_bible"]
     assert bible["art_direction"]["status"] == "confirmed"
     assert bible["art_direction"]["source"] == "human_review"
+    missing_evidence = deepcopy(bible)
+    for asset in missing_evidence["assets"]:
+        asset["source_evidence"] = []
+    with pytest.raises(ValueError, match="17 个镜头缺少来源证据"):
+        command_preview(missing_evidence, {"type": "lock"})
     locked = command_preview(bible, {"type": "lock"})["result"]["asset_bible"]
     assert locked["status"] == "locked"
     assert locked["art_direction"]["visual_style"] == "写实动作片"
+    assert locked["coverage"]["asset_shot_covered"] == 17
+    assert locked["coverage"]["missing_source_evidence_shot_count"] == 0
 
 
 def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
@@ -282,6 +296,7 @@ def test_studio_state_roundtrip_preserves_asset_bible_without_accepting_provider
     assert state["assetBible"]["assets"][0]["stable_id"] == bible["assets"][0]["stable_id"]
     assert state["assetBible"]["assets"][0]["visual_identity"] == bible["assets"][0]["visual_identity"]
     assert state["assetBible"]["assets"][0]["continuity_states"][0]["status"] == "confirmed"
+    assert state["assetBible"]["assets"][0]["source_evidence"][0]["shot_ids"]
     assert state["assetBible"]["art_direction"]["status"] == "confirmed"
     assert state["assetBible"]["art_direction"]["visual_style"] == "写实动作片"
     assert state["assetBible"]["provider_dispatch_count"] == 0

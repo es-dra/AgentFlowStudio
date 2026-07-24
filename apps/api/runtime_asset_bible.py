@@ -435,7 +435,8 @@ def _apply_command(
                 "Asset Bible lock blocked: 识别质量门未通过："
                 f"{coverage.get('missing_anchor_count', 0)} 个具名资产遗漏，"
                 f"{coverage.get('alias_collision_count', 0)} 组别名冲突，"
-                f"{coverage.get('orphan_scene_coverage_count', 0)} 个场景覆盖断裂"
+                f"{coverage.get('orphan_scene_coverage_count', 0)} 个场景覆盖断裂，"
+                f"{coverage.get('missing_source_evidence_shot_count', 0)} 个镜头缺少来源证据"
             )
         if not coverage["coverage_pass"]:
             raise ValueError(
@@ -532,11 +533,20 @@ def _candidate_asset(
         "pending_fields": ["positive_traits", "visual_identity", "continuity_state"],
         "source_evidence": [
             {
-                "source_type": "applied_shot_plan" if shot_ids else "script_revision",
-                "source_id": shot_ids[0] if shot_ids else revision_id or source_node_id,
-                "excerpt": excerpt,
-            }
-            for excerpt in item.get("evidence", [])[:4]
+                "source_type": "occurrence_ledger",
+                "source_id": stable_id,
+                "scene_ids": scene_ids,
+                "shot_ids": shot_ids,
+                "excerpt": "已应用分镜中的场景与镜头出现范围",
+            },
+            *[
+                {
+                    "source_type": "applied_shot_plan" if shot_ids else "script_revision",
+                    "source_id": shot_ids[0] if shot_ids else revision_id or source_node_id,
+                    "excerpt": excerpt,
+                }
+                for excerpt in item.get("evidence", [])[:4]
+            ],
         ],
         "lineage": {"parent_ids": [], "merged_from_ids": []},
     }
@@ -848,6 +858,30 @@ def _resolution_map(
     return result
 
 
+def _source_evidence_shot_ids(
+    asset: Mapping[str, Any],
+    known_shot_ids: set[str],
+) -> set[str]:
+    result: set[str] = set()
+    occurrence_shot_ids = {
+        str(shot_id)
+        for shot_id in asset.get("occurrences", {}).get("shot_ids", [])
+        if str(shot_id) in known_shot_ids
+    }
+    for evidence in asset.get("source_evidence", []):
+        if not isinstance(evidence, Mapping):
+            continue
+        result.update(
+            str(shot_id)
+            for shot_id in evidence.get("shot_ids", [])
+            if str(shot_id) in occurrence_shot_ids
+        )
+        source_id = str(evidence.get("source_id") or "")
+        if evidence.get("source_type") == "applied_shot_plan" and source_id in occurrence_shot_ids:
+            result.add(source_id)
+    return result
+
+
 def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
     requirements = list(state.get("required_occurrences", []))
     resolutions = _resolution_map(list(state.get("occurrence_resolutions", [])), requirements)
@@ -917,12 +951,17 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             if key in alias_owner and alias_owner[key] != asset["stable_id"]:
                 collisions.add(key)
             alias_owner[key] = asset["stable_id"]
-    active_shot_ids = {
-        str(shot_id)
-        for asset in active_assets
-        for shot_id in asset.get("occurrences", {}).get("shot_ids", [])
-        if shot_id
+    known_shot_ids = {
+        str(item.get("shot_id") or "")
+        for item in shot_catalog
+        if item.get("shot_id")
     }
+    traceable_shot_ids = {
+        shot_id
+        for asset in active_assets
+        for shot_id in _source_evidence_shot_ids(asset, known_shot_ids)
+    }
+    untraceable_shot_ids = sorted(known_shot_ids - traceable_shot_ids)
     anchors = [
         item
         for item in candidate_set.get("required_asset_anchors", [])
@@ -1015,6 +1054,21 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             }
             for item in scene_descendant_missing
         ],
+        *(
+            [
+                {
+                    "code": "missing_source_evidence",
+                    "asset_type": "",
+                    "display_name": "当前识别版本",
+                    "scene_count": 0,
+                    "shot_count": len(untraceable_shot_ids),
+                    "message": f"{len(untraceable_shot_ids)} 个已应用镜头缺少可审核的资产来源证据。",
+                    "action": "重新识别或补全资产出现范围证据后再锁定",
+                }
+            ]
+            if untraceable_shot_ids
+            else []
+        ),
         *[
             {
                 "code": str(item.get("code") or "recognition_ambiguity"),
@@ -1046,7 +1100,8 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
         "scene_covered": len(scene_ids),
         "shot_total": len(shot_catalog),
         "shot_covered": len(covered_shots),
-        "asset_shot_covered": len(active_shot_ids & {str(item.get("shot_id") or "") for item in shot_catalog}),
+        "asset_shot_covered": len(traceable_shot_ids & known_shot_ids),
+        "missing_source_evidence_shot_count": len(untraceable_shot_ids),
         "required_occurrence_total": len(ledger),
         "resolved_required": len(ledger) - len(unresolved),
         "unresolved_required": len(unresolved),
@@ -1068,6 +1123,7 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             and len(shot_catalog) > 0
             and len(scene_ids) == len(scene_catalog)
             and len(covered_shots) == len(shot_catalog)
+            and not untraceable_shot_ids
             and not unresolved
             and not collisions
             and quality_pass
@@ -1084,6 +1140,7 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
             "orphan_scene_coverage_count": len(scene_descendant_missing),
             "alias_collision_count": len(collisions),
             "recognition_ambiguity_count": len(ambiguities),
+            "missing_source_evidence_shot_count": len(untraceable_shot_ids),
         },
         "coverage": coverage,
     }

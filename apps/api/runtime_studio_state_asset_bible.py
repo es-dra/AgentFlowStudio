@@ -216,6 +216,8 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
                 "source_type": text(item.get("source_type"), "script", 40),
                 "source_id": _id(item.get("source_id")),
                 "excerpt": text(item.get("excerpt"), "", 240),
+                "scene_ids": _ids(item.get("scene_ids"), 80),
+                "shot_ids": _ids(item.get("shot_ids"), 160),
             }
             for item in _list(data.get("source_evidence"))[:12]
             if isinstance(item, dict)
@@ -309,6 +311,7 @@ def _coverage(value: Any, *, number: NumberSanitizer) -> dict[str, Any]:
         "shot_total",
         "shot_covered",
         "asset_shot_covered",
+        "missing_source_evidence_shot_count",
         "required_occurrence_total",
         "resolved_required",
         "unresolved_required",
@@ -359,6 +362,9 @@ def _recognition_quality(
         "alias_collision_count": max(0, int(number(data.get("alias_collision_count"), 0))),
         "recognition_ambiguity_count": max(
             0, int(number(data.get("recognition_ambiguity_count"), 0))
+        ),
+        "missing_source_evidence_shot_count": max(
+            0, int(number(data.get("missing_source_evidence_shot_count"), 0))
         ),
     }
 

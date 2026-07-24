@@ -408,6 +408,7 @@ function normalizeCoverage(value = {}, candidateSet = {}) {
     quality_issue_count: Number(value.quality_issue_count || 0),
     quality_pass: value.quality_pass === true,
     asset_shot_covered: Number(value.asset_shot_covered || 0),
+    missing_source_evidence_shot_count: Number(value.missing_source_evidence_shot_count || 0),
     coverage_pass: value.coverage_pass === true,
   };
 }
@@ -441,6 +442,9 @@ function normalizeRecognitionQuality(value = {}, coverage = {}) {
     orphan_scene_coverage_count: Number(value.orphan_scene_coverage_count || coverage.orphan_scene_coverage_count || 0),
     alias_collision_count: Number(value.alias_collision_count || coverage.alias_collision_count || 0),
     recognition_ambiguity_count: Number(value.recognition_ambiguity_count || coverage.recognition_ambiguity_count || 0),
+    missing_source_evidence_shot_count: Number(
+      value.missing_source_evidence_shot_count || coverage.missing_source_evidence_shot_count || 0
+    ),
   };
 }
 

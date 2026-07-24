@@ -48,7 +48,15 @@ def _asset(
             }
         ],
         "pending_fields": [],
-        "source_evidence": [{"kind": "occurrence_ledger", "ref": stable_id}],
+        "source_evidence": [
+            {
+                "source_type": "occurrence_ledger",
+                "source_id": stable_id,
+                "scene_ids": scene_ids,
+                "shot_ids": shot_ids,
+                "excerpt": "已应用分镜中的资产出现范围",
+            }
+        ],
         "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
     }
 
@@ -80,9 +88,27 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
         _asset("asset-character-a", "character", "角色甲", scene_ids=["scene-1"], shot_ids=["scene-1-shot-1"]),
         _asset("asset-character-b", "character", "角色乙", scene_ids=["scene-1"], shot_ids=["scene-1-shot-2"]),
         _asset("asset-character-c", "character", "角色丙", scene_ids=["scene-3"], shot_ids=["scene-3-shot-17"]),
-        _asset("asset-scene-a", "scene", "主场景", scene_ids=["scene-1"], shot_ids=[]),
-        _asset("asset-scene-b", "scene", "次场景", scene_ids=["scene-2"], shot_ids=[]),
-        _asset("asset-scene-c", "scene", "终场景", scene_ids=["scene-3"], shot_ids=[]),
+        _asset(
+            "asset-scene-a",
+            "scene",
+            "主场景",
+            scene_ids=["scene-1"],
+            shot_ids=[f"scene-1-shot-{index}" for index in range(1, 7)],
+        ),
+        _asset(
+            "asset-scene-b",
+            "scene",
+            "次场景",
+            scene_ids=["scene-2"],
+            shot_ids=[f"scene-2-shot-{index}" for index in range(7, 13)],
+        ),
+        _asset(
+            "asset-scene-c",
+            "scene",
+            "终场景",
+            scene_ids=["scene-3"],
+            shot_ids=[f"scene-3-shot-{index}" for index in range(13, 18)],
+        ),
         _asset(
             "asset-prop-a",
             "prop",
@@ -133,8 +159,12 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
         "coverage": {
             "coverage_pass": True,
             "quality_pass": True,
+            "scene_total": 3,
+            "scene_covered": 3,
             "shot_total": 17,
             "shot_covered": 17,
+            "asset_shot_covered": 17,
+            "missing_source_evidence_shot_count": 0,
             "required_occurrence_total": 35,
             "resolved_required": 35,
             "unresolved_required": 0,
@@ -198,6 +228,8 @@ def test_manifest_compiler_produces_exact_nine_unique_lineage_items_without_name
     assert manifest["budget_contract"]["max_estimated_usd"] == "0.3500"
     assert manifest["art_direction"]["visual_style"] == "写实古装动作片"
     assert manifest["creative_grounding"]["status"] == "ready"
+    assert manifest["creative_grounding"]["source_evidence_summary"]["status"] == "complete"
+    assert manifest["creative_grounding"]["source_evidence_summary"]["traceable_shot_count"] == 17
     character = next(item for item in manifest["items"] if item["item_type"] == "character_design")
     assert character["asset_grounding"]["visual_identity"]
     assert character["asset_grounding"]["positive_traits"]
@@ -222,6 +254,37 @@ def test_manifest_compile_fails_closed_for_visual_pending_or_missing_art_directi
     source["asset_bible"]["assets"][0]["pending_fields"] = ["visual_identity"]
     with pytest.raises(ValueError, match="图片准入创意依据不完整"):
         compile_image_admission_manifest(PROJECT_ID, source)
+
+
+def test_manifest_compile_fails_closed_for_missing_traceable_source_evidence(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "false")
+    source = source_contract()
+    for asset in source["asset_bible"]["assets"]:
+        asset["source_evidence"] = []
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, source)
+    forged = source_contract()
+    for asset in forged["asset_bible"]["assets"]:
+        asset["occurrences"]["shot_ids"] = []
+    with pytest.raises(ValueError, match="0/17 traceable"):
+        compile_image_admission_manifest(PROJECT_ID, forged)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {"type": "compile", "idempotency_key": "missing-evidence"},
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    readback = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()
+    assert readback["status"] == "empty"
+    assert readback["provider_dispatch_count"] == 0
+    assert readback["external_cost_usd"] == "0.0000"
 
     source = source_contract()
     source["art_direction"] = {}
