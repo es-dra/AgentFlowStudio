@@ -536,6 +536,15 @@ export function createRuntimeClient(projectId = "") {
     confirmAssetBibleCommand(payload) {
       return requestJson(`/projects/${encoded}/m6/asset-bible/commands/confirm`, { method: "POST", payload });
     },
+    loadImageAdmission() {
+      return requestJson(`/projects/${encoded}/m6/image-admission`);
+    },
+    previewImageAdmissionCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/image-admission/commands/preview`, { method: "POST", payload });
+    },
+    confirmImageAdmissionCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/image-admission/commands/confirm`, { method: "POST", payload });
+    },
     createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
       return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
         method: "POST",

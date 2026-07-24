@@ -152,6 +152,7 @@ def build_keyframe_generation(
         reference_images,
         request_format=service_request_format,
     )
+    image_input_fidelity = _declared_image_input_fidelity(descriptor, image_operation)
     if reference_images:
         reference_instruction = _reference_prompt_instruction(request, len(reference_images))
         prompt_with_references = (
@@ -180,7 +181,7 @@ def build_keyframe_generation(
             "prompt_char_limit": int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
             "reference_image_slots": effective_reference_slots,
             "image_operation": image_operation,
-            "image_input_fidelity": "high" if image_operation == "edit" else None,
+            "image_input_fidelity": image_input_fidelity,
             "reference_transform_mode": reference_transform_mode_for_request(request) or None,
         },
     )
@@ -264,7 +265,7 @@ def build_keyframe_generation(
                 subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
                 edit_source_image_path=reference_images[0]["path"] if image_operation == "edit" else None,
                 edit_reference_image_paths=tuple(item["path"] for item in reference_images) if image_operation == "edit" else (),
-                image_input_fidelity="high" if image_operation == "edit" else None,
+                image_input_fidelity=image_input_fidelity,
             )
             runtime_file_event(
                 "keyframe",
@@ -468,7 +469,7 @@ def build_keyframe_generation(
         request_plan["reference_transform_mode"] = reference_transform_mode
     if image_operation == "edit" and reference_images:
         request_plan["edit_source_asset_id"] = reference_images[0]["public"]["asset_id"]
-        request_plan["image_input_fidelity"] = "high"
+        request_plan["image_input_fidelity"] = image_input_fidelity
     request_plan["model_call_context_id"] = model_call_context["context_id"]
     request_plan["model_request_plan_ref"] = "model_request_plan.json"
     review_preview_refs = keyframe_review_preview_refs(project_id, output_dir.name, provider_outputs)
@@ -603,6 +604,20 @@ def _service_request_format(registry: Any, service_id: str) -> str:
     if not isinstance(service, dict):
         return ""
     return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
+
+
+def _declared_image_input_fidelity(descriptor: Any, image_operation: str) -> str | None:
+    if image_operation != "edit":
+        return None
+    capabilities = getattr(descriptor, "image_edit_capabilities", None)
+    if capabilities is None:
+        return "high"
+    modes = list(getattr(capabilities, "input_fidelity_modes", []) or [])
+    if "high" in modes:
+        return "high"
+    if "low" in modes:
+        return "low"
+    return None
 
 
 def _uses_openai_images_relay(request_format: str) -> bool:

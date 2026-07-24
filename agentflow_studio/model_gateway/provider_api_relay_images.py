@@ -23,6 +23,9 @@ ASPECT_RATIO_SIZES = {
     "9:16": "720x1280",
 }
 MAX_IMAGE_DOWNLOAD_BYTES = 32 * 1024 * 1024
+MAX_EDIT_IMAGE_COUNT = 4
+MAX_EDIT_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_EDIT_TOTAL_BYTES = 24 * 1024 * 1024
 
 
 def openai_images_payload(*, service: dict[str, Any], model: str, request: ProviderDispatchRequest) -> dict[str, Any]:
@@ -58,7 +61,18 @@ def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request:
         "quality": str(service.get("quality") or "low"),
         "output_format": str(service.get("output_format") or "png"),
     }
-    configured_fidelity = str(service.get("input_fidelity") or "").strip()
+    descriptor = service.get("descriptor") if isinstance(service.get("descriptor"), dict) else {}
+    edit_capabilities = (
+        descriptor.get("image_edit_capabilities")
+        if isinstance(descriptor.get("image_edit_capabilities"), dict)
+        else {}
+    )
+    supported_fidelity = {
+        str(item) for item in edit_capabilities.get("input_fidelity_modes", []) if str(item)
+    }
+    configured_fidelity = str(service.get("input_fidelity") or request.image_input_fidelity or "").strip()
+    if configured_fidelity and configured_fidelity not in supported_fidelity:
+        raise ModelGatewayError("Image relay input fidelity is not declared by the provider descriptor")
     if configured_fidelity:
         fields["input_fidelity"] = configured_fidelity
     extra_body = service.get("extra_body")
@@ -71,7 +85,7 @@ def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request:
         "__transport": "multipart",
         "__endpoint": _edit_endpoint(service),
         "fields": fields,
-        "files": [_image_file_part(field_name, path) for path in image_paths],
+        "files": [_image_file_part(field_name, path, index) for index, path in enumerate(image_paths, start=1)],
     }
 
 
@@ -98,22 +112,36 @@ def _edit_image_paths(request: ProviderDispatchRequest) -> list[Path | str]:
             continue
         seen.add(key)
         result.append(value)
-        if len(result) >= 16:
-            break
+    if len(result) > MAX_EDIT_IMAGE_COUNT:
+        raise ModelGatewayError(f"Image relay edit accepts at most {MAX_EDIT_IMAGE_COUNT} reference images")
+    total_bytes = 0
+    for value in result:
+        image_path = Path(value)
+        if not image_path.is_file():
+            raise ModelGatewayError("Image relay edit source image is missing")
+        byte_count = image_path.stat().st_size
+        if byte_count > MAX_EDIT_IMAGE_BYTES:
+            raise ModelGatewayError("Image relay edit reference exceeds the per-file byte limit")
+        total_bytes += byte_count
+    if total_bytes > MAX_EDIT_TOTAL_BYTES:
+        raise ModelGatewayError("Image relay edit references exceed the total byte limit")
     return result
 
 
-def _image_file_part(field_name: str, path: Path | str) -> dict[str, Any]:
+def _image_file_part(field_name: str, path: Path | str, index: int) -> dict[str, Any]:
     image_path = Path(path)
     if not image_path.is_file():
         raise ModelGatewayError("Image relay edit source image is missing")
     image_bytes = image_path.read_bytes()
+    if len(image_bytes) > MAX_EDIT_IMAGE_BYTES:
+        raise ModelGatewayError("Image relay edit reference exceeds the per-file byte limit")
     mime_type = _mime_type_for_bytes(image_bytes)
     if not mime_type:
         raise ModelGatewayError("Image relay edit source image must be PNG or JPEG")
+    safe_suffix = ".png" if mime_type == "image/png" else ".jpg"
     return {
         "field_name": field_name,
-        "filename": image_path.name or "source.png",
+        "filename": f"reference_{index:03d}{safe_suffix}",
         "mime_type": mime_type,
         "byte_count": len(image_bytes),
         "sha256": hashlib.sha256(image_bytes).hexdigest(),

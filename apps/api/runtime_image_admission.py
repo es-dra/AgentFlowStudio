@@ -1,0 +1,1105 @@
+from __future__ import annotations
+
+import os
+from copy import deepcopy
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any, Mapping
+
+from fastapi import FastAPI, HTTPException, Request
+
+from agentflow.harness.json_io import exclusive_file_lock, write_json
+from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
+from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_image_assets import image_asset_metadata
+from apps.api.runtime_production_graph import (
+    GraphIdempotencyConflict,
+    GraphVersionConflict,
+    ProductionGraphError,
+    ProductionGraphStore,
+    canonical_digest,
+    graph_has_authority,
+)
+from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
+
+
+SCHEMA_VERSION = "afs.image_admission_manifest.v0.1"
+SERVICE_ID = "image_relay"
+LEGACY_SERVICE_ID = "codex_image"
+MODEL_ID = "gpt-image-2"
+TRUE_VALUES = {"1", "true", "yes", "on"}
+ITEM_TYPES = {"character_design", "scene_plate", "prop_design", "shot_keyframe"}
+ITEM_STATES = {"planned", "reserved", "processing", "candidate", "approved", "rejected", "failed", "cancelled"}
+COMMANDS = {
+    "compile",
+    "lock",
+    "reserve_dispatch",
+    "record_job",
+    "record_candidate",
+    "record_failure",
+    "approve",
+    "reject",
+    "replace",
+    "cancel_batch",
+}
+ASPECT_SIZES = {
+    "1:1": "1024x1024",
+    "3:4": "960x1280",
+    "16:9": "1280x720",
+}
+
+
+def register_runtime_image_admission_routes(
+    app: FastAPI,
+    store: RuntimeStore,
+    auth: RuntimeAuthStore,
+) -> None:
+    graph_store = ProductionGraphStore(store)
+
+    def require_access(request: Request, project_id: str) -> None:
+        store.ensure_project_manifest(project_id)
+        if auth.enabled():
+            user = auth.require_user(request)
+            if not auth.user_can_access_project(str(user["user_id"]), project_id):
+                raise HTTPException(status_code=403, detail="project access denied")
+
+    @app.get("/projects/{project_id}/m6/image-admission")
+    def get_image_admission(project_id: str, request: Request) -> dict[str, Any]:
+        require_access(request, project_id)
+        manifest = load_image_admission_manifest(store, project_id)
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "status": manifest.get("status", "empty") if manifest else "empty",
+            "manifest": manifest,
+            "capability": image_admission_capability(),
+            "budget_contract": budget_contract(),
+            "provider_dispatch_count": int((manifest or {}).get("budget", {}).get("dispatches_reserved") or 0),
+            "external_cost_usd": str((manifest or {}).get("budget", {}).get("estimated_reserved_usd") or "0.0000"),
+        }
+
+    @app.post("/projects/{project_id}/m6/image-admission/commands/preview")
+    def preview_image_admission(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
+        require_access(request, project_id)
+        try:
+            result = preview_image_admission_command(store, project_id, body)
+            reject_unsafe_payload(result)
+            return result
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/projects/{project_id}/m6/image-admission/commands/confirm")
+    def confirm_image_admission(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
+        require_access(request, project_id)
+        lock_path = _manifest_path(store, project_id).with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with exclusive_file_lock(lock_path):
+                existing = load_image_admission_manifest(store, project_id)
+                replay = _idempotent_receipt(existing, body.get("command"))
+                if replay:
+                    return {
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "confirmed",
+                        "idempotent_replay": True,
+                        "command": _safe_command(body.get("command")),
+                        "result": {"manifest": existing, "graph_mutation": 0},
+                        "receipt": replay,
+                        "provider_dispatch_count": 0,
+                        "external_cost_usd": "0.0000",
+                    }
+                preview = preview_image_admission_command(store, project_id, body)
+                if str(body.get("preview_digest") or "") != preview["preview_digest"]:
+                    raise ValueError("image admission preview is stale; review the impact again")
+                result = deepcopy(preview["result"]["manifest"])
+                command = preview["command"]
+                if command["type"] == "approve":
+                    result = _approve_to_graph(
+                        store,
+                        graph_store,
+                        project_id,
+                        result,
+                        command,
+                    )
+                result["updated_at"] = _now()
+                path = _manifest_path(store, project_id)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                reject_unsafe_payload(result)
+                write_json(path, result)
+            return {
+                **preview,
+                "status": "confirmed",
+                "result": {"manifest": result, "graph_mutation": 1 if command["type"] == "approve" else 0},
+                "receipt": result.get("receipts", [])[-1] if result.get("receipts") else {},
+            }
+        except (GraphVersionConflict, GraphIdempotencyConflict) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except (ProductionGraphError, KeyError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def preview_image_admission_command(
+    store: RuntimeStore,
+    project_id: str,
+    body: Mapping[str, Any],
+) -> dict[str, Any]:
+    command = _safe_command(body.get("command"))
+    requested_at = _requested_at(body)
+    if command["type"] == "compile":
+        manifest = compile_image_admission_manifest(project_id, body.get("source"), created_at=requested_at)
+        _append_receipt(
+            manifest,
+            {"item_id": "manifest"},
+            "manifest_compiled",
+            command,
+            recorded_at=requested_at,
+        )
+        before = {}
+    else:
+        before = load_image_admission_manifest(store, project_id)
+        if not before:
+            raise ValueError("image admission manifest has not been compiled")
+        _assert_source_current(before, body.get("source"))
+        manifest = _apply_command(store, project_id, before, command, recorded_at=requested_at)
+    impact = _impact(before, manifest, command)
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "status": "preview",
+        "command": command,
+        "impact": impact,
+        "result": {
+            "manifest": manifest,
+            "graph_mutation": 0,
+        },
+        "provider_dispatch_count": 0,
+        "external_cost_usd": "0.0000",
+        "requires_confirmation": True,
+    }
+    payload["preview_digest"] = canonical_digest(payload)
+    return payload
+
+
+def compile_image_admission_manifest(
+    project_id: str,
+    source_value: Any,
+    *,
+    created_at: str | None = None,
+) -> dict[str, Any]:
+    timestamp = created_at or _now()
+    source = _source_contract(project_id, source_value)
+    bible = source["asset_bible"]
+    if bible.get("status") != "locked" or not bible.get("locked_revision_id"):
+        raise ValueError("image admission requires a locked Asset Bible revision")
+    coverage = bible.get("coverage") if isinstance(bible.get("coverage"), Mapping) else {}
+    if not coverage.get("coverage_pass") or int(coverage.get("unresolved_required") or 0) != 0:
+        raise ValueError("image admission requires complete resolved occurrence coverage")
+    active = [
+        _asset(item)
+        for item in bible.get("assets", [])
+        if isinstance(item, Mapping) and item.get("review_state") == "approved"
+    ]
+    characters = [item for item in active if item["asset_type"] == "character"]
+    scenes = [item for item in active if item["asset_type"] == "scene"]
+    props = [item for item in active if item["asset_type"] == "prop"]
+    if len(characters) != 3:
+        raise ValueError("three approved character assets must be selected explicitly before manifest lock")
+    if not scenes:
+        raise ValueError("at least one approved scene asset is required")
+    if len(props) < 2:
+        raise ValueError("at least two approved prop assets are required")
+    candidate_set = bible.get("candidate_set") if isinstance(bible.get("candidate_set"), Mapping) else {}
+    scene_index = sorted(
+        [dict(item) for item in candidate_set.get("scene_index", []) if isinstance(item, Mapping)],
+        key=lambda item: (int(item.get("number") or 9999), str(item.get("scene_id") or "")),
+    )
+    shot_index = sorted(
+        [dict(item) for item in candidate_set.get("shot_index", []) if isinstance(item, Mapping)],
+        key=lambda item: (int(item.get("number") or 9999), str(item.get("shot_id") or "")),
+    )
+    if not scene_index or len(shot_index) < 3:
+        raise ValueError("applied shot plan must provide stable scene and shot indexes")
+    primary_scene_id = str(scene_index[0].get("scene_id") or "")
+    primary_scenes = [
+        item for item in scenes if primary_scene_id in item["occurrences"]["scene_ids"]
+    ]
+    if len(primary_scenes) != 1:
+        raise ValueError("primary scene selection is ambiguous and requires confirmation")
+    ranked_props = sorted(
+        props,
+        key=lambda item: (
+            -len(item["occurrences"]["shot_ids"]),
+            -len(item["occurrences"]["scene_ids"]),
+            item["stable_id"],
+        ),
+    )
+    if len(ranked_props) > 2 and _asset_rank(ranked_props[1]) == _asset_rank(ranked_props[2]):
+        raise ValueError("core prop selection is ambiguous and requires confirmation")
+    selected_props = ranked_props[:2]
+    first_shot = shot_index[0]
+    last_shot = shot_index[-1]
+    middle = shot_index[1:-1]
+    pressure_shot = max(
+        middle,
+        key=lambda shot: (
+            _shot_reference_count(active, str(shot.get("shot_id") or "")),
+            -int(shot.get("number") or 0),
+        ),
+    )
+    selected_shots = [first_shot, pressure_shot, last_shot]
+    source_fingerprint = canonical_digest(_source_fingerprint_payload(source))
+    items: list[dict[str, Any]] = []
+    for asset in sorted(characters, key=lambda item: item["stable_id"]):
+        items.append(_asset_item(asset, "character_design", "3:4", source_fingerprint))
+    items.append(_asset_item(primary_scenes[0], "scene_plate", "16:9", source_fingerprint))
+    for asset in selected_props:
+        items.append(_asset_item(asset, "prop_design", "1:1", source_fingerprint))
+    for role, shot in zip(("opening", "continuity_pressure", "closing_relation"), selected_shots, strict=True):
+        shot_id = str(shot.get("shot_id") or "")
+        reference_assets = [
+            item["stable_id"]
+            for item in active
+            if shot_id in item["occurrences"]["shot_ids"]
+            or str(shot.get("scene_id") or "") in item["occurrences"]["scene_ids"]
+        ]
+        items.append(
+            _keyframe_item(
+                shot,
+                role,
+                sorted(set(reference_assets)),
+                source_fingerprint,
+                negative_locks=sorted(
+                    {
+                        lock
+                        for item in active
+                        if item["stable_id"] in reference_assets
+                        for lock in item["negative_locks"]
+                    }
+                ),
+            )
+        )
+    if len(items) != 9 or len({item["item_id"] for item in items}) != 9:
+        raise ValueError("image admission compiler must produce nine unique items")
+    contract = budget_contract()
+    capability = image_admission_capability()
+    manifest_contract = {
+        "schema_version": SCHEMA_VERSION,
+        "project_id": project_id,
+        "version": 1,
+        "source": {key: value for key, value in source.items() if key != "asset_bible"},
+        "source_fingerprint": source_fingerprint,
+        "items": items,
+        "budget_contract": contract,
+        "provider_contract": {
+            "service_id": SERVICE_ID,
+            "model": MODEL_ID,
+            "concurrency": 1,
+            "candidate_count": 1,
+            "auto_retry": 0,
+            "capability": capability,
+        },
+    }
+    manifest_hash = canonical_digest(manifest_contract)
+    return {
+        **manifest_contract,
+        "manifest_id": f"image-admission-{manifest_hash[:16]}",
+        "manifest_hash": manifest_hash,
+        "accepted_graph_snapshots": [
+            {
+                "version": source["production_graph_version"],
+                "graph_digest": source["production_graph_digest"],
+                "reason": "manifest_source",
+            }
+        ],
+        "status": "draft",
+        "locked_at": "",
+        "stale_reason": "",
+        "budget": {
+            "dispatches_reserved": 0,
+            "estimated_reserved_usd": "0.0000",
+            "remaining_dispatches": int(contract["max_dispatches"]),
+            "remaining_estimated_usd": contract["max_estimated_usd"],
+        },
+        "receipts": [],
+        "history": [],
+        "created_at": timestamp,
+        "updated_at": timestamp,
+        "provider_dispatch_count": 0,
+        "actual_usd": None,
+        "billing_verification_state": "unverified",
+    }
+
+
+def load_image_admission_manifest(store: RuntimeStore, project_id: str) -> dict[str, Any]:
+    path = _manifest_path(store, project_id)
+    if not path.is_file():
+        return {}
+    value = read_json(path)
+    reject_unsafe_payload(value)
+    if value.get("schema_version") != SCHEMA_VERSION or value.get("project_id") != project_id:
+        raise ValueError("image admission manifest storage scope is invalid")
+    return value
+
+
+def budget_contract() -> dict[str, Any]:
+    unit = _money_env("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0377")
+    maximum = _money_env("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.3500")
+    if unit <= 0 or maximum <= 0:
+        raise ValueError("image admission pricing must be positive")
+    return {
+        "currency": "USD",
+        "unit_estimate_usd": _money(unit),
+        "max_dispatches": 9,
+        "max_estimated_usd": _money(maximum),
+        "concurrency": 1,
+        "candidate_count": 1,
+        "auto_retry": 0,
+        "price_source": os.getenv(
+            "AFS_IMAGE_ADMISSION_PRICE_SOURCE",
+            "Crazyrouter public gpt-image-2 pricing",
+        )[:160],
+        "price_as_of": os.getenv("AFS_IMAGE_ADMISSION_PRICE_AS_OF", "2026-06-06")[:32],
+        "disclosure": "公开估算，非最终账单",
+    }
+
+
+def image_admission_capability() -> dict[str, Any]:
+    capability = {
+        "service_id": SERVICE_ID,
+        "configured_from": LEGACY_SERVICE_ID,
+        "model": MODEL_ID,
+        "configured": False,
+        "image_gate_open": _gate_open(),
+        "fixture_mode": _fixture_mode(),
+        "reference_image_slots": 0,
+        "trusted_image_edit": False,
+        "keyframe_continuity_ready": False,
+        "blocker": "图片服务未配置",
+    }
+    try:
+        descriptor = load_provider_registry().descriptor(SERVICE_ID)
+        reference_slots = int(descriptor.reference_image_slots or 0)
+        edit = descriptor.image_edit_capabilities
+        trusted_edit = bool(
+            descriptor.image_edit_capabilities_present
+            and edit.supports_image_edit
+            and edit.max_reference_images > 0
+        )
+        capability.update(
+            {
+                "configured": True,
+                "reference_image_slots": reference_slots,
+                "trusted_image_edit": trusted_edit,
+                "input_fidelity_modes": list(edit.input_fidelity_modes),
+                "keyframe_continuity_ready": reference_slots > 0 or trusted_edit,
+                "blocker": "" if reference_slots > 0 or trusted_edit else "当前图片适配器未声明受信任的参考图或编辑输入能力",
+            }
+        )
+    except (ModelGatewayError, OSError, ValueError):
+        pass
+    return capability
+
+
+def validate_image_admission_reservation(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    manifest_id: str,
+    item_id: str,
+    reservation_token: str,
+) -> dict[str, Any]:
+    manifest = load_image_admission_manifest(store, project_id)
+    if not manifest:
+        raise ValueError("image admission manifest is required")
+    if manifest.get("status") != "locked":
+        raise ValueError("image admission manifest must be locked")
+    if manifest.get("manifest_id") != manifest_id:
+        raise ValueError("image admission manifest id mismatch")
+    item = _manifest_item(manifest, item_id)
+    if item.get("state") != "reserved" or item.get("reservation_token") != reservation_token:
+        raise ValueError("image admission reservation is missing or stale")
+    return {"manifest": manifest, "item": item}
+
+
+def enforce_image_admission_keyframe_request(
+    store: RuntimeStore,
+    project_id: str,
+    request: Any,
+) -> dict[str, Any] | None:
+    manifest = load_image_admission_manifest(store, project_id)
+    if not manifest or manifest.get("status") != "locked":
+        return None
+    parameters = request.node_parameters if isinstance(request.node_parameters, dict) else {}
+    binding = parameters.get("image_admission") if isinstance(parameters.get("image_admission"), dict) else {}
+    validated = validate_image_admission_reservation(
+        store,
+        project_id,
+        manifest_id=str(binding.get("manifest_id") or ""),
+        item_id=str(binding.get("item_id") or ""),
+        reservation_token=str(binding.get("reservation_token") or ""),
+    )
+    item = validated["item"]
+    if request.candidate_count != 1:
+        raise ValueError("image admission requires one independent candidate per dispatch")
+    if request.provider_service_id != SERVICE_ID:
+        raise ValueError("image admission must use the locked image relay service")
+    if request.aspect_ratio != item.get("aspect_ratio"):
+        raise ValueError("keyframe request aspect ratio differs from the locked manifest")
+    if list(request.asset_refs or []) != list(item.get("reference_media_ids") or []):
+        raise ValueError("keyframe request references differ from the locked manifest")
+    expected_node_id = item.get("target_shot_id") or next(iter(item.get("target_asset_ids") or []), item["item_id"])
+    if request.node_id != expected_node_id:
+        raise ValueError("keyframe request target differs from the locked manifest")
+    if parameters.get("disable_provider_retry") is not True:
+        raise ValueError("image admission forbids implicit provider retry")
+    if item.get("item_type") == "shot_keyframe" and not image_admission_capability()["keyframe_continuity_ready"]:
+        raise ValueError("keyframe continuity is blocked by the configured image reference capability")
+    return validated
+
+
+def _apply_command(
+    store: RuntimeStore,
+    project_id: str,
+    before: Mapping[str, Any],
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str | None = None,
+) -> dict[str, Any]:
+    timestamp = recorded_at or _now()
+    manifest = deepcopy(before)
+    command_type = command["type"]
+    if command_type == "lock":
+        if manifest.get("status") != "draft":
+            raise ValueError("only a draft image admission manifest can be locked")
+        if len(manifest.get("items", [])) != 9:
+            raise ValueError("image admission manifest must contain nine items")
+        manifest["status"] = "locked"
+        manifest["locked_at"] = timestamp
+        _append_receipt(manifest, {"item_id": "manifest"}, "manifest_locked", command, recorded_at=timestamp)
+    elif command_type == "reserve_dispatch":
+        _reserve_dispatch(store, project_id, manifest, command, recorded_at=timestamp)
+    elif command_type == "record_candidate":
+        _record_candidate(project_id, manifest, command, recorded_at=timestamp)
+    elif command_type == "record_job":
+        item = _manifest_item(manifest, command.get("item_id"))
+        if item.get("state") not in {"reserved", "processing"}:
+            raise ValueError("only a reserved image admission item can bind a generation job")
+        job_id = _token(command.get("provider_job_id"), "provider_job_id")
+        if item.get("provider_job_id") and item["provider_job_id"] != job_id:
+            raise ValueError("image admission item already belongs to another generation job")
+        item["provider_job_id"] = job_id
+        item["state"] = "processing"
+        _append_receipt(manifest, item, "job_recorded", command, recorded_at=timestamp)
+    elif command_type == "record_failure":
+        item = _manifest_item(manifest, command.get("item_id"))
+        fixture = command.get("fixture") is True
+        if fixture and not _fixture_mode():
+            raise ValueError("deterministic media fixtures are disabled")
+        allowed_states = {"reserved", "processing"} | ({"planned"} if fixture else set())
+        if item.get("state") not in allowed_states:
+            raise ValueError("only a reserved or processing item can record a dispatch failure")
+        item["state"] = "failed"
+        item["error_category"] = str(
+            command.get("error_category") or ("deterministic_fixture_failure" if fixture else "generation_failed")
+        )[:80]
+        _append_receipt(manifest, item, "failed", command, recorded_at=timestamp)
+    elif command_type == "approve":
+        item = _manifest_item(manifest, command.get("item_id"))
+        if item.get("state") != "candidate" or not item.get("candidate"):
+            raise ValueError("only a candidate image can be approved")
+        item["state"] = "approved"
+        _append_receipt(manifest, item, "approved", command, recorded_at=timestamp)
+    elif command_type == "reject":
+        item = _manifest_item(manifest, command.get("item_id"))
+        if item.get("state") != "candidate":
+            raise ValueError("only a candidate image can be rejected")
+        item["state"] = "rejected"
+        _append_receipt(manifest, item, "rejected", command, recorded_at=timestamp)
+    elif command_type == "replace":
+        item = _manifest_item(manifest, command.get("item_id"))
+        if item.get("state") not in {"candidate", "rejected", "failed"}:
+            raise ValueError("only a candidate, rejected, or failed item can be replaced")
+        if item.get("candidate"):
+            manifest["history"].append(
+                {
+                    "item_id": item["item_id"],
+                    "candidate": deepcopy(item["candidate"]),
+                    "retired_at": timestamp,
+                    "reason": str(command.get("reason") or "replacement requested")[:160],
+                }
+            )
+        item.pop("candidate", None)
+        item.pop("reservation_token", None)
+        item["state"] = "planned"
+        _append_receipt(manifest, item, "replacement_planned", command, recorded_at=timestamp)
+    elif command_type == "cancel_batch":
+        cancelled = 0
+        for item in manifest.get("items", []):
+            if item.get("state") == "planned":
+                item["state"] = "cancelled"
+                cancelled += 1
+        manifest["status"] = "cancelled" if cancelled else manifest.get("status")
+        manifest["cancel_semantics"] = {
+            "unsent_cancelled": cancelled,
+            "in_flight_cancelled": 0,
+            "statement": "仅停止尚未发送的项目；同步处理中项目未宣称已取消。",
+        }
+        _append_receipt(manifest, {"item_id": "batch"}, "batch_cancelled", command, recorded_at=timestamp)
+    else:
+        raise ValueError("unsupported image admission command")
+    manifest["updated_at"] = timestamp
+    return manifest
+
+
+def _reserve_dispatch(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: dict[str, Any],
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str | None = None,
+) -> None:
+    if manifest.get("status") != "locked":
+        raise ValueError("image admission manifest must be locked before dispatch")
+    if not _gate_open():
+        raise ValueError("图片能力未启用；未发送任何外部请求")
+    item = _manifest_item(manifest, command.get("item_id"))
+    if item.get("state") not in {"planned", "failed", "rejected"}:
+        raise ValueError("image admission item is not dispatchable")
+    capability = image_admission_capability()
+    if item["item_type"] == "shot_keyframe":
+        if not item.get("reference_asset_ids"):
+            raise ValueError("keyframe continuity requires canonical reference assets")
+        if not item.get("reference_media_ids"):
+            raise ValueError("keyframe continuity requires approved reference media")
+        if not capability["keyframe_continuity_ready"]:
+            raise ValueError(capability["blocker"])
+        _validate_reference_media(store, project_id, item["reference_media_ids"])
+    budget = manifest["budget"]
+    contract = manifest["budget_contract"]
+    dispatches = int(budget.get("dispatches_reserved") or 0)
+    next_cost = Decimal(str(budget.get("estimated_reserved_usd") or "0")) + Decimal(
+        str(contract["unit_estimate_usd"])
+    )
+    if dispatches + 1 > int(contract["max_dispatches"]):
+        raise ValueError("image admission dispatch cap reached; new authorization required")
+    if next_cost > Decimal(str(contract["max_estimated_usd"])):
+        raise ValueError("image admission estimated USD cap reached; new authorization required")
+    ordinal = dispatches + 1
+    token = canonical_digest(
+        {
+            "manifest_id": manifest["manifest_id"],
+            "item_id": item["item_id"],
+            "ordinal": ordinal,
+            "idempotency_key": command.get("idempotency_key"),
+        }
+    )
+    item["state"] = "reserved"
+    item["dispatch_ordinal"] = ordinal
+    item["reservation_token"] = token
+    budget["dispatches_reserved"] = ordinal
+    budget["estimated_reserved_usd"] = _money(next_cost)
+    budget["remaining_dispatches"] = int(contract["max_dispatches"]) - ordinal
+    budget["remaining_estimated_usd"] = _money(
+        Decimal(str(contract["max_estimated_usd"])) - next_cost
+    )
+    manifest["provider_dispatch_count"] = ordinal
+    _append_receipt(manifest, item, "reserved", command, recorded_at=recorded_at)
+
+
+def _record_candidate(
+    project_id: str,
+    manifest: dict[str, Any],
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str | None = None,
+) -> None:
+    timestamp = recorded_at or _now()
+    item = _manifest_item(manifest, command.get("item_id"))
+    fixture = command.get("fixture") is True
+    if fixture and not _fixture_mode():
+        raise ValueError("deterministic media fixtures are disabled")
+    if not fixture and item.get("state") not in {"reserved", "processing"}:
+        raise ValueError("provider candidate requires an atomic dispatch reservation")
+    candidate = command.get("candidate") if isinstance(command.get("candidate"), Mapping) else {}
+    image_asset_id = _token(candidate.get("image_asset_id"), "candidate.image_asset_id")
+    sha = str(candidate.get("sha256") or "")
+    if len(sha) != 64 or any(char not in "0123456789abcdef" for char in sha):
+        raise ValueError("candidate.sha256 must be a lowercase SHA-256 digest")
+    width = int(candidate.get("width") or 0)
+    height = int(candidate.get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise ValueError("candidate dimensions are required")
+    image_format = str(candidate.get("format") or "png").lower()
+    if image_format not in {"png", "jpeg", "jpg"}:
+        raise ValueError("image admission candidates must be PNG or JPEG")
+    preview_url = str(candidate.get("preview_url") or "")
+    expected_preview = f"/projects/{safe_id(project_id)}/image-assets/{safe_id(image_asset_id)}/preview"
+    if preview_url and preview_url != expected_preview:
+        raise ValueError("candidate preview URL is outside the same project image asset route")
+    item["candidate"] = {
+        "image_asset_id": image_asset_id,
+        "sha256": sha,
+        "format": "jpeg" if image_format == "jpg" else image_format,
+        "width": width,
+        "height": height,
+        "preview_url": preview_url,
+        "fixture": fixture,
+        "recorded_at": timestamp,
+    }
+    item["state"] = "candidate"
+    _append_receipt(manifest, item, "candidate_recorded", command, recorded_at=timestamp)
+
+
+def _approve_to_graph(
+    store: RuntimeStore,
+    graph_store: ProductionGraphStore,
+    project_id: str,
+    manifest: dict[str, Any],
+    command: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not graph_has_authority(store, project_id):
+        raise ValueError("approval requires an existing authoritative ProductionGraph; legacy data is not migrated implicitly")
+    item = _manifest_item(manifest, command.get("item_id"))
+    candidate = item.get("candidate") or {}
+    graph = graph_store.load(project_id)
+    target_ids = [*item.get("target_asset_ids", [])]
+    if item.get("target_shot_id"):
+        target_ids.append(item["target_shot_id"])
+    missing = sorted(set(target_ids) - set(graph.get("nodes", {})))
+    if missing:
+        raise ValueError("approval targets are missing from authoritative ProductionGraph")
+    node_id = f"image-media-{safe_id(manifest['manifest_id'])}-{safe_id(item['item_id'])}"
+    events: list[dict[str, Any]] = [
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": node_id,
+                "category": "artifact",
+                "state": "active",
+                "metadata": {
+                    "kind": "approved_image",
+                    "manifest_id": manifest["manifest_id"],
+                    "manifest_hash": manifest["manifest_hash"],
+                    "item_id": item["item_id"],
+                    "image_asset_id": candidate["image_asset_id"],
+                    "sha256": candidate["sha256"],
+                    "format": candidate["format"],
+                    "width": candidate["width"],
+                    "height": candidate["height"],
+                    "asset_bible_revision_id": manifest["source"]["asset_bible_revision_id"],
+                    "shot_candidate_id": manifest["source"]["shot_candidate_id"],
+                    "billing_verification_state": "unverified",
+                    "actual_usd": None,
+                },
+            },
+        }
+    ]
+    for target_id in sorted(set(target_ids)):
+        events.append(
+            {
+                "type": "relation_upserted",
+                "from_id": target_id,
+                "to_id": node_id,
+                "relation_type": "approved_image",
+            }
+        )
+    key = str(command.get("idempotency_key") or f"approve-{manifest['manifest_id']}-{item['item_id']}")
+    updated = graph_store.append(
+        project_id,
+        expected_version=int(graph["version"]),
+        idempotency_key=key,
+        semantic_digest=canonical_digest(
+            {
+                "manifest_hash": manifest["manifest_hash"],
+                "item_id": item["item_id"],
+                "candidate_sha256": candidate["sha256"],
+            }
+        ),
+        events=events,
+    )
+    item["promotion"] = {
+        "production_graph_node_id": node_id,
+        "graph_version": updated["version"],
+        "graph_digest": updated["graph_digest"],
+        "idempotent_replay": bool(updated.get("idempotent_replay")),
+        "promoted_at": _now(),
+    }
+    graph_snapshot = {
+        "version": updated["version"],
+        "graph_digest": updated["graph_digest"],
+        "reason": f"approved:{item['item_id']}",
+    }
+    if graph_snapshot not in manifest.setdefault("accepted_graph_snapshots", []):
+        manifest["accepted_graph_snapshots"].append(graph_snapshot)
+    manifest["receipts"][-1]["candidate_promotion_revision"] = updated["version"]
+    if item["item_type"] != "shot_keyframe":
+        for keyframe in manifest.get("items", []):
+            if (
+                keyframe.get("item_type") == "shot_keyframe"
+                and set(item.get("target_asset_ids", [])) & set(keyframe.get("reference_asset_ids", []))
+            ):
+                keyframe["reference_media_ids"] = sorted(
+                    set(keyframe.get("reference_media_ids", [])) | {candidate["image_asset_id"]}
+                )
+    return manifest
+
+
+def _validate_reference_media(
+    store: RuntimeStore,
+    project_id: str,
+    reference_media_ids: list[str],
+) -> list[dict[str, Any]]:
+    if len(reference_media_ids) > 4:
+        raise ValueError("keyframe continuity accepts at most four approved reference media")
+    if not graph_has_authority(store, project_id):
+        raise ValueError("approved reference media require an authoritative ProductionGraph")
+    graph = ProductionGraphStore(store).load(project_id)
+    approved_media = {
+        str(node.get("metadata", {}).get("image_asset_id") or ""): node
+        for node in graph.get("nodes", {}).values()
+        if node.get("state") == "active"
+        and node.get("metadata", {}).get("kind") == "approved_image"
+    }
+    total_bytes = 0
+    result = []
+    for raw_id in reference_media_ids:
+        asset_id = _token(raw_id, "reference_media_id")
+        if asset_id not in approved_media:
+            raise ValueError("reference media must be approved in the same project ProductionGraph")
+        try:
+            metadata = image_asset_metadata(store, project_id, asset_id)
+        except (KeyError, ValueError) as exc:
+            raise ValueError("reference media metadata is missing or invalid") from exc
+        if metadata.get("mime_type") not in {"image/png", "image/jpeg"}:
+            raise ValueError("reference media format must be PNG or JPEG")
+        if not metadata.get("sha256") or int(metadata.get("width") or 0) <= 0 or int(metadata.get("height") or 0) <= 0:
+            raise ValueError("reference media digest and dimensions are required")
+        byte_count = int(metadata.get("byte_count") or 0)
+        if byte_count <= 0 or byte_count > 8 * 1024 * 1024:
+            raise ValueError("reference media exceeds the per-file byte limit")
+        total_bytes += byte_count
+        result.append(
+            {
+                "image_asset_id": asset_id,
+                "sha256": metadata["sha256"],
+                "mime_type": metadata["mime_type"],
+                "width": int(metadata["width"]),
+                "height": int(metadata["height"]),
+                "byte_count": byte_count,
+            }
+        )
+    if total_bytes > 24 * 1024 * 1024:
+        raise ValueError("reference media exceed the total byte limit")
+    return result
+
+
+def _source_contract(project_id: str, value: Any) -> dict[str, Any]:
+    source = value if isinstance(value, Mapping) else {}
+    bible = source.get("asset_bible") if isinstance(source.get("asset_bible"), Mapping) else {}
+    if not bible:
+        raise ValueError("image admission source requires Asset Bible state")
+    candidate_set = bible.get("candidate_set") if isinstance(bible.get("candidate_set"), Mapping) else {}
+    return {
+        "project_id": project_id,
+        "authority_mode": str(source.get("authority_mode") or "legacy_studio_adapter"),
+        "production_graph_version": int(source.get("production_graph_version") or 0),
+        "production_graph_digest": str(source.get("production_graph_digest") or ""),
+        "studio_state_version": str(source.get("studio_state_version") or ""),
+        "asset_bible_revision_id": _token(
+            bible.get("locked_revision_id") or bible.get("current_revision_id"),
+            "asset_bible_revision_id",
+        ),
+        "candidate_set_id": _token(candidate_set.get("candidate_set_id"), "candidate_set_id"),
+        "shot_candidate_id": _token(candidate_set.get("shot_candidate_id"), "shot_candidate_id"),
+        "script_revision_id": _token(candidate_set.get("script_revision_id"), "script_revision_id"),
+        "asset_bible": deepcopy(dict(bible)),
+    }
+
+
+def _source_fingerprint_payload(source: Mapping[str, Any]) -> dict[str, Any]:
+    bible = source["asset_bible"]
+    return {
+        "project_id": source["project_id"],
+        "authority_mode": source["authority_mode"],
+        "asset_bible_revision_id": source["asset_bible_revision_id"],
+        "candidate_set_id": source["candidate_set_id"],
+        "shot_candidate_id": source["shot_candidate_id"],
+        "script_revision_id": source["script_revision_id"],
+        "asset_digest": canonical_digest(bible.get("assets", [])),
+        "coverage_digest": canonical_digest(bible.get("coverage", {})),
+    }
+
+
+def _assert_source_current(manifest: Mapping[str, Any], source_value: Any) -> None:
+    source = _source_contract(str(manifest["project_id"]), source_value)
+    fingerprint = canonical_digest(_source_fingerprint_payload(source))
+    if fingerprint != manifest.get("source_fingerprint"):
+        raise ValueError("image admission manifest source is stale; compile and review a new manifest")
+    observed_graph = (
+        int(source["production_graph_version"]),
+        str(source["production_graph_digest"]),
+    )
+    accepted_graphs = {
+        (int(item.get("version") or 0), str(item.get("graph_digest") or ""))
+        for item in manifest.get("accepted_graph_snapshots", [])
+        if isinstance(item, Mapping)
+    }
+    if observed_graph not in accepted_graphs:
+        raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
+
+
+def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
+    occurrences = value.get("occurrences") if isinstance(value.get("occurrences"), Mapping) else {}
+    asset_type = str(value.get("asset_type") or "")
+    if asset_type not in {"character", "scene", "prop"}:
+        raise ValueError("image admission supports character, scene, and prop assets")
+    return {
+        "stable_id": _token(value.get("stable_id"), "asset.stable_id"),
+        "display_name": str(value.get("display_name") or "待确认资产")[:120],
+        "asset_type": asset_type,
+        "importance": str(value.get("importance") or ""),
+        "occurrences": {
+            "scene_ids": sorted({_token(item, "scene occurrence") for item in occurrences.get("scene_ids", [])}),
+            "shot_ids": sorted({_token(item, "shot occurrence") for item in occurrences.get("shot_ids", [])}),
+        },
+        "negative_locks": sorted({str(item)[:160] for item in value.get("negative_locks", []) if str(item).strip()}),
+        "source_evidence": [
+            deepcopy(item) for item in value.get("source_evidence", []) if isinstance(item, Mapping)
+        ][:24],
+    }
+
+
+def _asset_item(asset: Mapping[str, Any], item_type: str, aspect: str, source_fingerprint: str) -> dict[str, Any]:
+    stable_id = str(asset["stable_id"])
+    return {
+        "item_id": f"admit-{item_type}-{canonical_digest(stable_id)[:10]}",
+        "item_type": item_type,
+        "label": asset["display_name"],
+        "target_asset_ids": [stable_id],
+        "target_shot_id": "",
+        "aspect_ratio": aspect,
+        "size": ASPECT_SIZES[aspect],
+        "candidate_count": 1,
+        "negative_locks": asset["negative_locks"],
+        "source_evidence": asset["source_evidence"],
+        "occurrence_references": deepcopy(asset["occurrences"]),
+        "reference_asset_ids": [],
+        "reference_media_ids": [],
+        "source_fingerprint": source_fingerprint,
+        "state": "planned",
+    }
+
+
+def _keyframe_item(
+    shot: Mapping[str, Any],
+    role: str,
+    reference_asset_ids: list[str],
+    source_fingerprint: str,
+    *,
+    negative_locks: list[str],
+) -> dict[str, Any]:
+    shot_id = _token(shot.get("shot_id"), "shot_id")
+    return {
+        "item_id": f"admit-shot-keyframe-{canonical_digest({'shot': shot_id, 'role': role})[:10]}",
+        "item_type": "shot_keyframe",
+        "label": str(shot.get("title") or f"镜头 {shot.get('number') or ''}")[:120],
+        "keyframe_role": role,
+        "target_asset_ids": [],
+        "target_shot_id": shot_id,
+        "aspect_ratio": "16:9",
+        "size": ASPECT_SIZES["16:9"],
+        "candidate_count": 1,
+        "negative_locks": negative_locks,
+        "source_evidence": [{"shot_id": shot_id, "scene_id": str(shot.get("scene_id") or "")}],
+        "occurrence_references": {
+            "scene_ids": [str(shot.get("scene_id") or "")],
+            "shot_ids": [shot_id],
+        },
+        "reference_asset_ids": reference_asset_ids,
+        "reference_media_ids": [],
+        "source_fingerprint": source_fingerprint,
+        "state": "planned",
+    }
+
+
+def _asset_rank(asset: Mapping[str, Any]) -> tuple[int, int]:
+    return (
+        len(asset["occurrences"]["shot_ids"]),
+        len(asset["occurrences"]["scene_ids"]),
+    )
+
+
+def _shot_reference_count(assets: list[Mapping[str, Any]], shot_id: str) -> int:
+    return sum(shot_id in item["occurrences"]["shot_ids"] for item in assets)
+
+
+def _manifest_item(manifest: Mapping[str, Any], item_id: Any) -> dict[str, Any]:
+    token = _token(item_id, "item_id")
+    item = next((item for item in manifest.get("items", []) if item.get("item_id") == token), None)
+    if not item:
+        raise ValueError("image admission item was not found")
+    return item
+
+
+def _append_receipt(
+    manifest: dict[str, Any],
+    item: Mapping[str, Any],
+    state: str,
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str | None = None,
+) -> None:
+    candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+    receipt = {
+        "receipt_id": f"image-admission-receipt-{canonical_digest({'manifest': manifest['manifest_id'], 'item': item.get('item_id'), 'state': state, 'count': len(manifest.get('receipts', []))})[:16]}",
+        "manifest_id": manifest["manifest_id"],
+        "manifest_hash": manifest["manifest_hash"],
+        "item_id": item.get("item_id"),
+        "idempotency_key": str(command.get("idempotency_key") or ""),
+        "provider": "api_relay",
+        "service_id": SERVICE_ID,
+        "model": MODEL_ID,
+        "provider_job_id": item.get("provider_job_id"),
+        "dispatch_ordinal": item.get("dispatch_ordinal"),
+        "estimated_usd": (
+            manifest["budget_contract"]["unit_estimate_usd"]
+            if item.get("dispatch_ordinal")
+            else "0.0000"
+        ),
+        "actual_usd": None,
+        "billing_verification_state": "unverified",
+        "input_digest": item.get("source_fingerprint"),
+        "source_digest": manifest.get("source_fingerprint"),
+        "output_sha256": candidate.get("sha256"),
+        "format": candidate.get("format"),
+        "width": candidate.get("width"),
+        "height": candidate.get("height"),
+        "candidate_revision": len(
+            [receipt for receipt in manifest.get("receipts", []) if receipt.get("item_id") == item.get("item_id")]
+        )
+        + 1,
+        "candidate_promotion_revision": None,
+        "state": state,
+        "recorded_at": recorded_at or _now(),
+        "error_category": str(command.get("error_category") or ""),
+        "cancel_semantics": manifest.get("cancel_semantics"),
+        "provider_raw_response_stored": False,
+    }
+    manifest.setdefault("receipts", []).append(receipt)
+
+
+def _impact(before: Mapping[str, Any], after: Mapping[str, Any], command: Mapping[str, Any]) -> dict[str, Any]:
+    before_states = {item.get("item_id"): item.get("state") for item in before.get("items", [])}
+    changed = [
+        item["item_id"]
+        for item in after.get("items", [])
+        if before_states.get(item["item_id"]) != item.get("state")
+    ]
+    return {
+        "item_ids": changed or [item["item_id"] for item in after.get("items", [])],
+        "item_count": len(after.get("items", [])),
+        "manifest_status_before": before.get("status", "empty"),
+        "manifest_status_after": after.get("status", "empty"),
+        "dispatches_reserved_before": int(before.get("budget", {}).get("dispatches_reserved") or 0),
+        "dispatches_reserved_after": int(after.get("budget", {}).get("dispatches_reserved") or 0),
+        "graph_mutation_before_confirm": 0,
+        "provider_calls_before_confirm": 0,
+        "preserved_on_cancel": True,
+        "command_type": command["type"],
+    }
+
+
+def _safe_command(value: Any) -> dict[str, Any]:
+    command = value if isinstance(value, Mapping) else {}
+    command_type = str(command.get("type") or "")
+    if command_type not in COMMANDS:
+        raise ValueError("unsupported image admission command")
+    allowed = {
+        "type",
+        "item_id",
+        "idempotency_key",
+        "candidate",
+        "fixture",
+        "reason",
+        "error_category",
+        "provider_job_id",
+    }
+    return {key: deepcopy(value) for key, value in command.items() if key in allowed}
+
+
+def _idempotent_receipt(manifest: Mapping[str, Any], command_value: Any) -> dict[str, Any]:
+    if not manifest:
+        return {}
+    command = _safe_command(command_value)
+    key = str(command.get("idempotency_key") or "")
+    if not key:
+        return {}
+    item_id = str(command.get("item_id") or ("manifest" if command["type"] in {"compile", "lock"} else "batch"))
+    return next(
+        (
+            deepcopy(receipt)
+            for receipt in manifest.get("receipts", [])
+            if receipt.get("idempotency_key") == key and receipt.get("item_id") == item_id
+        ),
+        {},
+    )
+
+
+def _manifest_path(store: RuntimeStore, project_id: str):
+    return store.projects_dir / safe_id(project_id) / "image_admission" / "manifest.json"
+
+
+def _money_env(name: str, default: str) -> Decimal:
+    try:
+        return Decimal(os.getenv(name, default))
+    except InvalidOperation as exc:
+        raise ValueError(f"{name} must be a decimal amount") from exc
+
+
+def _money(value: Decimal) -> str:
+    return str(value.quantize(Decimal("0.0001")))
+
+
+def _gate_open() -> bool:
+    return os.getenv("AFS_ALLOW_REMOTE_IMAGE", "").strip().lower() in TRUE_VALUES
+
+
+def _fixture_mode() -> bool:
+    return os.getenv("AFS_ALLOW_DETERMINISTIC_MEDIA_FIXTURES", "").strip().lower() in TRUE_VALUES
+
+
+def _token(value: Any, field: str) -> str:
+    raw = str(value or "").strip()
+    if not raw or safe_id(raw) != raw:
+        raise ValueError(f"{field} is required and must be a stable id")
+    return raw
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _requested_at(body: Mapping[str, Any]) -> str:
+    raw = str(body.get("requested_at") or "").strip()
+    if not raw:
+        return "1970-01-01T00:00:00+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("requested_at must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat()
+
+
+__all__ = (
+    "SCHEMA_VERSION",
+    "budget_contract",
+    "compile_image_admission_manifest",
+    "enforce_image_admission_keyframe_request",
+    "image_admission_capability",
+    "load_image_admission_manifest",
+    "preview_image_admission_command",
+    "register_runtime_image_admission_routes",
+    "validate_image_admission_reservation",
+)

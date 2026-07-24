@@ -15,6 +15,16 @@ import {
   localizedNegativeLock,
   pendingFieldLabel,
 } from "./asset-bible-workspace.js";
+import {
+  imageAdmissionCommand,
+  imageAdmissionGenerationRequest,
+  imageAdmissionGenerationResult,
+  imageAdmissionItemTypeLabel,
+  imageAdmissionItemJobId,
+  imageAdmissionJobCommand,
+  imageAdmissionProjection,
+  imageAdmissionStateLabel,
+} from "./image-admission-workspace.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -44,6 +54,9 @@ export function createProductShell(options = {}) {
   let assetCreateDraft = { asset_type: "prop", display_name: "", aliases: "", scene_ids: [], shot_ids: [], evidence: "" };
   let resolutionReason = "";
   let mergeAssetIds = new Set();
+  let imageAdmissionOpen = false;
+  let imageAdmissionPreview = null;
+  let imageAdmissionError = "";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -52,6 +65,7 @@ export function createProductShell(options = {}) {
     studioState: null,
     mediaOperations: null,
     runtimeAssetBible: null,
+    imageAdmission: null,
     mediaGates: {},
     mediaCommandPreview: null,
     error: "",
@@ -857,10 +871,22 @@ export function createProductShell(options = {}) {
       lock.addEventListener("click", () => void stageAssetBibleCommand({ type: "lock" }));
       if (view.status === "locked") headerActions.append(lock);
       else headerActions.append(add, merge, lock);
+      if (view.status === "locked") {
+        const admission = node("button", "studio-secondary-button", "图片准入");
+        admission.type = "button";
+        admission.addEventListener("click", () => {
+          imageAdmissionOpen = true;
+          render();
+        });
+        headerActions.appendChild(admission);
+      }
     }
     header.append(title, headerActions);
     main.appendChild(header);
     main.appendChild(assetBibleStatusBar(view, source));
+    if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
+      main.appendChild(buildImageAdmissionPanel());
+    }
     if (assetCommandError) main.appendChild(assetBibleFailure());
     if (assetCommandPreview) main.appendChild(assetBibleCommandReview());
     if (assetCreateOpen && view.status !== "locked") main.appendChild(assetBibleCreateForm(view));
@@ -883,8 +909,12 @@ export function createProductShell(options = {}) {
       ["资产", view.counts.total ? `${view.counts.total} 当前 · ${view.counts.rejected + view.counts.superseded} 历史` : "待识别"],
       ["Bible", view.status === "locked" ? "已锁定" : view.counts.total ? "审核中" : "未建立"],
       ["覆盖", view.counts.total ? `${view.coverage.shot_covered}/${view.coverage.shot_total} 镜头 · ${view.coverage.unresolved_required} 未解决` : "待识别"],
-      ["媒体准入", view.status === "locked" && view.coverage.coverage_pass ? "结构就绪 · 图片能力未启用" : "内容审核未通过"],
-      ["费用", "未调用 · 未计费"],
+      ["媒体准入", imageAdmissionView().status === "locked"
+        ? (snapshot.mediaGates?.image ? "清单已锁定 · 可受控生成" : "清单已锁定 · 图片能力未启用")
+        : view.status === "locked" && view.coverage.coverage_pass ? "结构就绪 · 待审核清单" : "内容审核未通过"],
+      ["费用", imageAdmissionView().status === "empty"
+        ? "未调用 · 未计费"
+        : `${imageAdmissionView().budget.estimated_reserved_usd || "0.0000"} USD 已占用估算`],
     ];
     for (const [label, value] of items) {
       const item = node("div", "");
@@ -1381,6 +1411,370 @@ export function createProductShell(options = {}) {
     } catch (error) {
       assetCommandError = options.formatError?.(error) || String(error?.message || error || "资产命令预览失败");
     }
+    render();
+  }
+
+  function imageAdmissionSource() {
+    const view = assetBibleView();
+    return {
+      authority_mode: view.authority_mode,
+      production_graph_version: Number(snapshot.sequenceWorkspace?.graph_version || 0),
+      production_graph_digest: String(snapshot.sequenceWorkspace?.graph_digest || ""),
+      studio_state_version: String(snapshot.studioState?.meta?.stateVersion || ""),
+      asset_bible: view.raw || {},
+    };
+  }
+
+  function buildImageAdmissionPanel() {
+    const view = imageAdmissionView();
+    const panel = node("section", "image-admission-panel");
+    panel.setAttribute("aria-label", "图片准入");
+    const head = node("div", "image-admission-head");
+    const copy = node("div", "");
+    copy.append(
+      node("span", "eyebrow", "九项代表集 · 费用硬门"),
+      node("h2", "", "图片准入"),
+      node("p", "", view.status === "empty"
+        ? "先审核角色、场景、道具与关键帧清单；确认前不会调用外部能力。"
+        : `清单 ${view.manifest?.version || 1} · ${view.items.length} 项 · ${view.budget_contract.disclosure || "公开估算，非最终账单"}`),
+    );
+    const close = node("button", "studio-icon-button");
+    close.type = "button";
+    close.title = "收起图片准入";
+    close.setAttribute("aria-label", "收起图片准入");
+    close.innerHTML = icon("x", 15);
+    close.addEventListener("click", () => {
+      imageAdmissionOpen = false;
+      render();
+    });
+    head.append(copy, close);
+    panel.appendChild(head);
+    if (imageAdmissionError) {
+      const error = node("div", "image-admission-error");
+      error.setAttribute("role", "alert");
+      error.append(node("strong", "", "图片准入未改变"), node("p", "", imageAdmissionError));
+      panel.appendChild(error);
+    }
+    if (imageAdmissionPreview) {
+      panel.appendChild(buildImageAdmissionReview());
+      return panel;
+    }
+    if (view.status === "empty") {
+      const empty = node("div", "image-admission-empty");
+      empty.append(
+        node("strong", "", "编译不可变九项清单"),
+        node("p", "", "3 个角色、1 个主场景、2 个核心道具、3 个镜头关键帧；选择只依据资产类型、出现范围与镜头顺序。"),
+      );
+      const prepare = node("button", "studio-primary-button", "预览准入清单");
+      prepare.type = "button";
+      prepare.addEventListener("click", () => void stageImageAdmissionCommand({ type: "compile" }));
+      empty.appendChild(prepare);
+      panel.appendChild(empty);
+      return panel;
+    }
+    const metrics = node("div", "image-admission-metrics");
+    for (const [label, value] of [
+      ["公开单价", `$${view.budget_contract.unit_estimate_usd || "0.0377"} / 张`],
+      ["硬上限", `$${view.budget_contract.max_estimated_usd || "0.3500"} · ${view.budget_contract.max_dispatches || 9} 次`],
+      ["已占用", `${view.budget.dispatches_reserved || 0} 次 · $${view.budget.estimated_reserved_usd || "0.0000"}`],
+      ["实际账单", view.actual_usd == null ? "未核验" : `$${view.actual_usd}`],
+    ]) {
+      const item = node("div", "");
+      item.append(node("span", "", label), node("strong", "", value));
+      metrics.appendChild(item);
+    }
+    panel.appendChild(metrics);
+    const blocker = node("div", view.capability.keyframe_continuity_ready ? "image-admission-capability ready" : "image-admission-capability");
+    blocker.append(
+      node("strong", "", view.capability.keyframe_continuity_ready ? "参考图编辑合同已声明" : "关键帧连续性被阻断"),
+      node("p", "", view.capability.keyframe_continuity_ready
+        ? `最多 ${view.capability.reference_image_slots || 0} 张同项目已批准参考媒体；有引用时只走图片编辑接口。`
+        : view.capability.blocker || "当前图片适配器未声明参考图能力。"),
+      node("p", "", snapshot.mediaGates?.image ? "图片能力已启用；每次发送前仍需占用预算。" : "图片能力未启用；当前不会发送任何外部请求。"),
+    );
+    panel.appendChild(blocker);
+    const list = node("div", "image-admission-list");
+    for (const item of view.items) list.appendChild(buildImageAdmissionItem(item, view));
+    panel.appendChild(list);
+    const actions = node("div", "image-admission-actions");
+    if (view.status === "draft") {
+      const lock = node("button", "studio-primary-button", "预览锁定清单");
+      lock.type = "button";
+      lock.addEventListener("click", () => void stageImageAdmissionCommand({ type: "lock" }));
+      actions.appendChild(lock);
+    } else if (view.status === "locked") {
+      const cancel = node("button", "studio-secondary-button", "停止未发送项目");
+      cancel.type = "button";
+      cancel.disabled = !view.counts.planned;
+      cancel.addEventListener("click", () => void stageImageAdmissionCommand({ type: "cancel_batch" }));
+      actions.appendChild(cancel);
+    }
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function buildImageAdmissionItem(item, view) {
+    const row = node("article", `image-admission-item state-${String(item.state || "planned")}`);
+    const main = node("div", "");
+    main.append(
+      node("span", "image-admission-item-kind", imageAdmissionItemTypeLabel(item.item_type)),
+      node("strong", "", item.label || "待确认图片项目"),
+      node("p", "", `${item.aspect_ratio} · ${item.size} · 独立单图`),
+    );
+    const occurrenceCount = Number(item.occurrence_references?.shot_ids?.length || 0);
+    const referenceCount = Number(item.reference_media_ids?.length || 0);
+    main.appendChild(node(
+      "small",
+      "",
+      item.item_type === "shot_keyframe"
+        ? `镜头已绑定 · ${referenceCount} 张已批准参考图`
+        : `${occurrenceCount} 个镜头出现 · 来源已绑定`,
+    ));
+    if (item.candidate?.preview_url) {
+      const image = document.createElement("img");
+      image.className = "image-admission-candidate-preview";
+      image.alt = `${item.label || "图片项目"}候选预览`;
+      image.src = options.getRuntime?.().toMediaUrl(item.candidate.preview_url);
+      main.appendChild(image);
+    } else if (item.candidate?.fixture) {
+      main.appendChild(node("small", "image-admission-fixture-note", "确定性测试候选 · 仅验证审核链，不代表创作质量"));
+    }
+    const state = node("span", "image-admission-item-state", imageAdmissionStateLabel(item.state));
+    row.append(main, state);
+    const actions = node("div", "image-admission-item-actions");
+    if (snapshot.mediaGates?.image && view.status === "locked" && item.state === "planned") {
+      const generate = node("button", "studio-primary-button", "预览生成");
+      generate.type = "button";
+      generate.addEventListener("click", () => void stageImageAdmissionCommand({
+        type: "reserve_dispatch",
+        item_id: item.item_id,
+      }));
+      actions.appendChild(generate);
+    }
+    if (snapshot.mediaGates?.image && item.state === "reserved") {
+      const resumeSubmit = node("button", "studio-primary-button", "继续发送");
+      resumeSubmit.type = "button";
+      resumeSubmit.addEventListener("click", () => void dispatchImageAdmissionItem(item));
+      actions.appendChild(resumeSubmit);
+    }
+    if (item.state === "processing" && imageAdmissionItemJobId(item)) {
+      const resumePoll = node("button", "studio-secondary-button", "继续检查");
+      resumePoll.type = "button";
+      resumePoll.addEventListener("click", () => void pollImageAdmissionItem(item));
+      actions.appendChild(resumePoll);
+    }
+    if (view.capability.fixture_mode && item.state === "planned") {
+      const fixture = node("button", "studio-secondary-button", "载入测试候选");
+      const fixtureFailure = node("button", "studio-secondary-button", "模拟失败");
+      fixture.type = "button";
+      fixtureFailure.type = "button";
+      fixture.addEventListener("click", () => void stageImageAdmissionCommand({
+        type: "record_candidate",
+        item_id: item.item_id,
+        fixture: true,
+        candidate: {
+          image_asset_id: `fixture-${item.item_id}`,
+          sha256: deterministicHex(item.item_id),
+          format: "png",
+          width: Number(String(item.size || "").split("x")[0] || 1024),
+          height: Number(String(item.size || "").split("x")[1] || 1024),
+        },
+      }));
+      fixtureFailure.addEventListener("click", () => void stageImageAdmissionCommand({
+        type: "record_failure",
+        item_id: item.item_id,
+        fixture: true,
+        error_category: "deterministic_fixture_failure",
+      }));
+      actions.append(fixture, fixtureFailure);
+    }
+    if (item.state === "candidate") {
+      const approve = node("button", "studio-primary-button", "预览批准");
+      const reject = node("button", "studio-secondary-button", "预览拒绝");
+      approve.type = reject.type = "button";
+      approve.addEventListener("click", () => void stageImageAdmissionCommand({ type: "approve", item_id: item.item_id }));
+      reject.addEventListener("click", () => void stageImageAdmissionCommand({ type: "reject", item_id: item.item_id, reason: "人工审核未通过" }));
+      actions.append(approve, reject);
+    }
+    if (["failed", "rejected"].includes(item.state)) {
+      const replace = node("button", "studio-secondary-button", "预览替换");
+      replace.type = "button";
+      replace.addEventListener("click", () => void stageImageAdmissionCommand({ type: "replace", item_id: item.item_id, reason: "创建替换候选" }));
+      actions.appendChild(replace);
+    }
+    if (actions.childElementCount) row.appendChild(actions);
+    return row;
+  }
+
+  function buildImageAdmissionReview() {
+    const preview = imageAdmissionPreview;
+    const willDispatch = preview.command?.type === "reserve_dispatch";
+    const review = node("section", "image-admission-review");
+    review.setAttribute("aria-live", "polite");
+    review.append(
+      node("strong", "", willDispatch ? "确认占用一次额度并生成" : "确认图片准入变更"),
+      node("p", "", willDispatch
+        ? `确认后将先占用第 ${preview.impact?.dispatches_reserved_after || 0} 次额度，再串行发送这一项；失败也占用次数，不会自动重试。`
+        : `影响 ${preview.impact?.item_count || 0} 项；确认前外部调用 0，制作事实写入 0。`),
+    );
+    const actions = node("div", "image-admission-actions");
+    const cancel = node("button", "studio-secondary-button", "取消");
+    const confirm = node("button", "studio-primary-button", "确认");
+    cancel.type = confirm.type = "button";
+    cancel.addEventListener("click", cancelImageAdmissionCommand);
+    confirm.addEventListener("click", () => void confirmImageAdmissionCommand());
+    actions.append(cancel, confirm);
+    review.appendChild(actions);
+    return review;
+  }
+
+  async function stageImageAdmissionCommand(command) {
+    if (imageAdmissionPreview) return;
+    imageAdmissionError = "";
+    imageAdmissionOpen = true;
+    try {
+      const stableCommand = imageAdmissionCommand(command);
+      const request = {
+        command: stableCommand,
+        source: imageAdmissionSource(),
+        requested_at: new Date().toISOString(),
+      };
+      const preview = await options.getRuntime?.().previewImageAdmissionCommand(request);
+      imageAdmissionPreview = { ...preview, request };
+    } catch (error) {
+      imageAdmissionError = options.formatError?.(error) || String(error?.message || error || "图片准入预览失败");
+    }
+    render();
+  }
+
+  async function confirmImageAdmissionCommand() {
+    const preview = imageAdmissionPreview;
+    if (!preview) return;
+    try {
+      const response = await options.getRuntime?.().confirmImageAdmissionCommand({
+        ...preview.request,
+        preview_digest: preview.preview_digest,
+      });
+      snapshot.imageAdmission = {
+        ...(snapshot.imageAdmission || {}),
+        status: response?.result?.manifest?.status || "ready",
+        manifest: response?.result?.manifest || null,
+      };
+      const confirmedCommand = preview.request?.command || {};
+      imageAdmissionPreview = null;
+      imageAdmissionError = "";
+      notice = confirmedCommand.type === "reserve_dispatch"
+        ? "额度已原子占用，正在发送单项生成请求。"
+        : "图片准入清单已更新；未调用外部能力。";
+      render();
+      if (confirmedCommand.type === "reserve_dispatch") {
+        const item = response?.result?.manifest?.items?.find(
+          (entry) => entry.item_id === confirmedCommand.item_id,
+        );
+        if (item) await dispatchImageAdmissionItem(item);
+      }
+    } catch (error) {
+      imageAdmissionError = options.formatError?.(error) || String(error?.message || error || "图片准入确认失败");
+      imageAdmissionPreview = null;
+    }
+    render();
+  }
+
+  async function commitImageAdmissionCommand(command) {
+    const request = {
+      command: imageAdmissionCommand(command),
+      source: imageAdmissionSource(),
+      requested_at: new Date().toISOString(),
+    };
+    const preview = await options.getRuntime?.().previewImageAdmissionCommand(request);
+    const response = await options.getRuntime?.().confirmImageAdmissionCommand({
+      ...request,
+      preview_digest: preview.preview_digest,
+    });
+    snapshot.imageAdmission = {
+      ...(snapshot.imageAdmission || {}),
+      status: response?.result?.manifest?.status || "ready",
+      manifest: response?.result?.manifest || null,
+    };
+    return response?.result?.manifest || null;
+  }
+
+  async function dispatchImageAdmissionItem(item) {
+    if (!snapshot.mediaGates?.image) {
+      imageAdmissionError = "图片能力未启用；未发送任何外部请求。";
+      render();
+      return;
+    }
+    const runtime = options.getRuntime?.();
+    const request = imageAdmissionGenerationRequest(
+      item,
+      imageAdmissionView().manifest?.manifest_id || "",
+      new Date().toISOString(),
+    );
+    imageAdmissionError = "";
+    try {
+      const preflight = await runtime.preflightKeyframe(request);
+      const response = await runtime.generateKeyframe({
+        ...request,
+        preflight_token: preflight.preflight_token,
+      });
+      await reconcileImageAdmissionGeneration(item, response);
+    } catch (error) {
+      try {
+        await commitImageAdmissionCommand({
+          type: "record_failure",
+          item_id: item.item_id,
+          error_category: "generation_request_failed",
+        });
+      } catch {}
+      imageAdmissionError = options.formatError?.(error) || String(error?.message || error || "图片生成请求失败");
+      notice = "这一项失败且已隔离；Asset Bible 与其他图片项目未改变。";
+    }
+    render();
+  }
+
+  async function pollImageAdmissionItem(item) {
+    imageAdmissionError = "";
+    try {
+      const response = await options.getRuntime?.().pollKeyframe(imageAdmissionItemJobId(item));
+      await reconcileImageAdmissionGeneration(item, response);
+    } catch (error) {
+      imageAdmissionError = options.formatError?.(error) || String(error?.message || error || "图片任务恢复失败");
+    }
+    render();
+  }
+
+  async function reconcileImageAdmissionGeneration(item, response) {
+    const result = imageAdmissionGenerationResult(response);
+    if (result.candidate) {
+      await commitImageAdmissionCommand({
+        type: "record_candidate",
+        item_id: item.item_id,
+        candidate: result.candidate,
+      });
+      notice = "单项候选已生成，等待批准；尚未写入 ProductionGraph。";
+      return;
+    }
+    const jobId = result.job_id;
+    const status = result.status;
+    if (["failed", "blocked", "cancelled"].includes(status)) {
+      await commitImageAdmissionCommand({
+        type: "record_failure",
+        item_id: item.item_id,
+        error_category: status || "generation_failed",
+      });
+      notice = "这一项失败且已隔离；可在预算范围内预览替换。";
+      return;
+    }
+    if (!jobId) throw new Error("图片任务未返回可恢复的任务标识。");
+    await commitImageAdmissionCommand(imageAdmissionJobCommand(item.item_id, jobId));
+    notice = "图片任务仍在处理中；刷新后可继续检查，不会重复发送。";
+  }
+
+  function cancelImageAdmissionCommand() {
+    imageAdmissionPreview = null;
+    imageAdmissionError = "";
+    notice = "图片准入预览已取消；清单、预算与 ProductionGraph 均未改变。";
     render();
   }
 
@@ -1987,6 +2381,18 @@ export function createProductShell(options = {}) {
       void stageAssetBibleCommand({ type: "lock" });
       return;
     }
+    if ([
+      "image_admission_ready",
+      "media_gate_closed",
+      "recover_image_admission",
+      "review_image_candidates",
+      "resume_image_admission",
+      "review_image_admission",
+    ].includes(action.action)) {
+      imageAdmissionOpen = true;
+      showAssetBible();
+      return;
+    }
     if (["review_asset_candidates", "resolve_required_occurrences", "review_asset_coverage"].includes(action.action)) {
       showAssetBible();
       return;
@@ -2430,10 +2836,12 @@ export function createProductShell(options = {}) {
         applyGraphWorkspace(sequenceWorkspace);
       }
       let runtimeAssetBible = null;
+      let imageAdmission = null;
       let mediaGates = {};
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
         try { runtimeAssetBible = await projectRuntime?.loadAssetBible?.(); } catch { runtimeAssetBible = null; }
+        try { imageAdmission = await projectRuntime?.loadImageAdmission?.(); } catch { imageAdmission = null; }
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
       }
       snapshot = {
@@ -2443,6 +2851,7 @@ export function createProductShell(options = {}) {
         sequenceWorkspace,
         mediaOperations,
         runtimeAssetBible,
+        imageAdmission,
         mediaGates,
         mediaCommandPreview: null,
         error: "",
@@ -2653,6 +3062,9 @@ export function createProductShell(options = {}) {
   function assetBibleView() {
     return assetBibleProjection(snapshot.studioState || {}, snapshot.runtimeAssetBible);
   }
+  function imageAdmissionView() {
+    return imageAdmissionProjection(snapshot.imageAdmission);
+  }
   function selectedAsset() {
     const view = assetBibleView();
     const selected = view.assets.find((item) => item.stable_id === selectedAssetId);
@@ -2668,6 +3080,7 @@ export function createProductShell(options = {}) {
       capabilityGates: snapshot.mediaGates || {},
       section,
       selectedAsset: section === "asset_bible" ? selectedAsset() : null,
+      imageAdmission: imageAdmissionView(),
     });
   }
   function hasStoryFacts() { return shotModel().length > 0; }
@@ -2834,6 +3247,16 @@ function userLabel(user) {
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+}
+
+function deterministicHex(value) {
+  let seed = 2166136261;
+  const text = String(value || "fixture");
+  for (let index = 0; index < text.length; index += 1) {
+    seed ^= text.charCodeAt(index);
+    seed = Math.imul(seed, 16777619) >>> 0;
+  }
+  return seed.toString(16).padStart(8, "0").repeat(8);
 }
 
 function node(tag, className = "", text = "") {
