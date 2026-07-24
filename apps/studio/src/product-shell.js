@@ -2,7 +2,7 @@ import { currentLocale, message, setLocale } from "./i18n.js";
 import { icon } from "./icons.js";
 import { findNextProductionTarget, productContextKey } from "./product-shell-context.js";
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
-import { agentChatContextFingerprint, agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime } from "./agent-chat-lifecycle.js";
+import { agentChatContextFingerprint, agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime, syncM6PreviewRunSession } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
 import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
 import {
@@ -47,6 +47,9 @@ export function createProductShell(options = {}) {
   let notice = "";
   let pendingGraphImpact = null;
   let m6SourceText = "";
+  let m6PreviewRun = null;
+  let m6PreviewRecovering = false;
+  let m6PreviewPollGeneration = 0;
   let planningPanelOpen = false;
   let planningPanelPreferenceKey = "";
   let planningPanelHeight = readPlanningPanelHeight();
@@ -642,10 +645,64 @@ export function createProductShell(options = {}) {
     });
     const preview = node("button", "studio-primary-button", "生成剧本制作方案");
     preview.type = "button";
+    const previewBusy = ["queued", "running"].includes(String(m6PreviewRun?.phase || ""));
+    preview.disabled = previewBusy;
+    preview.textContent = previewBusy ? "制作方案处理中" : "生成剧本制作方案";
     preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
     planner.append(textarea, preview, ...planningImportControls());
+    if (m6PreviewRun?.run_id) planner.appendChild(buildM6PreviewRunStatus());
     status.append(planner, planResizeHandle());
     return status;
+  }
+
+  function buildM6PreviewRunStatus() {
+    const phase = String(m6PreviewRun?.phase || "queued");
+    const panel = node("section", `m6-preview-run-status phase-${phase}`);
+    panel.setAttribute("role", "status");
+    panel.setAttribute("aria-live", "polite");
+    const copy = m6PreviewRecovering
+      ? "正在恢复同一制作方案预览，不会再次提交文本任务。"
+      : {
+          queued: "已提交制作方案；确认前不会改变制作事实。",
+          running: "制作方案处理中。连接中断后仍可恢复同一任务。",
+          running_cancel_requested: "已请求停止后续处理；当前同步任务可能仍会完成。",
+          succeeded: "预览已恢复并可审阅；确认前 ProductionGraph 不变。",
+          failed: m6PreviewRun?.error?.message || "制作方案未完成；原项目事实已保留。",
+          unknown: m6PreviewRun?.error?.message || "文本任务状态需要人工核对；系统不会自动再次提交。",
+          cancelled: "预览已取消；ProductionGraph 未改变。",
+          confirmed: "制作方案已确认并写入 ProductionGraph。",
+        }[phase] || "正在读取同一制作方案任务状态。";
+    panel.appendChild(node("strong", "", m6PreviewRecovering ? "正在恢复" : m6PreviewPhaseLabel(phase)));
+    panel.appendChild(node("p", "", copy));
+    const actions = node("div", "m6-preview-run-actions");
+    if (["queued", "running", "running_cancel_requested"].includes(phase)) {
+      const cancel = node("button", "studio-secondary-button", "停止后续处理");
+      cancel.type = "button";
+      cancel.disabled = phase === "running_cancel_requested";
+      cancel.addEventListener("click", () => cancelM6PreviewRun());
+      actions.appendChild(cancel);
+    }
+    if (["failed", "unknown", "running", "running_cancel_requested"].includes(phase)) {
+      const recover = node("button", "studio-secondary-button", "恢复同一预览");
+      recover.type = "button";
+      recover.addEventListener("click", () => recoverM6PreviewRun());
+      actions.appendChild(recover);
+    }
+    if (actions.childElementCount) panel.appendChild(actions);
+    return panel;
+  }
+
+  function m6PreviewPhaseLabel(phase) {
+    return {
+      queued: "已提交",
+      running: "处理中",
+      running_cancel_requested: "停止请求已记录",
+      succeeded: "预览已恢复",
+      failed: "任务失败",
+      unknown: "需要核对",
+      cancelled: "已取消",
+      confirmed: "已确认",
+    }[phase] || "状态恢复";
   }
 
   function planningImportControls() {
@@ -713,23 +770,151 @@ export function createProductShell(options = {}) {
   }
 
   async function previewM6ScriptPlan(sourceText) {
+    const runtime = options.getRuntime?.();
+    if (!runtime) return;
+    const expectedProjectId = currentM6ProjectId();
+    if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+    const clientRequestId = runtime.newM6PreviewClientRequestId?.() || `m6_${Date.now()}`;
+    m6PreviewRun = {
+      run_id: "",
+      project_id: expectedProjectId,
+      client_request_id: clientRequestId,
+      phase: "queued",
+      status: "queued",
+    };
+    m6PreviewRecovering = false;
+    notice = "制作方案已提交；确认前不会改变制作事实。";
+    syncM6RunToAgent(m6PreviewRun);
+    render();
     try {
-      const preview = await options.getRuntime?.().previewM6ScriptPlanAssetBible({
+      const run = await runtime.previewM6ScriptPlanAssetBible({
         source_kind: "idea",
         source_text: sourceText,
-      });
-      const context = currentAgentChatContext();
-      context.context_key = agentChatContextKey(context);
-      const session = agentChatContexts.get(context.context_key);
-      stageM6ScriptPlanCandidateCommand(session, context, preview);
-      projectDrawerOpen = false;
-      setAgentChatExpanded(true);
-      notice = "M6 方案已送入 AI 创作搭档；确认前不会建立制作图。";
+      }, clientRequestId);
+      if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+      await observeM6PreviewRun(run, runtime, expectedProjectId);
     } catch (error) {
-      notice = error?.message || "M6方案生成失败，项目未改变。";
+      if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+      if (error?.status === 0 && error?.clientRequestId) {
+        m6PreviewRecovering = true;
+        notice = "连接已中断，正在恢复同一制作方案预览；不会重复提交。";
+        render();
+        try {
+          const recovered = await runtime.recoverM6ScriptPlanPreviewByClient(error.clientRequestId);
+          if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+          await observeM6PreviewRun(recovered, runtime, expectedProjectId);
+        } catch (recoveryError) {
+          notice = recoveryError?.message || "同一制作方案状态暂时无法读取；项目事实未改变。";
+        }
+      } else {
+        notice = error?.message || "M6方案生成失败，项目未改变。";
+      }
     }
     render();
     requestCanvasSafeAreaUpdate();
+  }
+
+  async function observeM6PreviewRun(initialRun, runtime = options.getRuntime?.(), expectedProjectId = currentM6ProjectId()) {
+    if (!runtime || !initialRun?.run_id || !isM6RunCurrent(initialRun, runtime, expectedProjectId)) return;
+    const generation = ++m6PreviewPollGeneration;
+    let run = initialRun;
+    while (generation === m6PreviewPollGeneration) {
+      if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;
+      m6PreviewRun = run;
+      m6PreviewRecovering = false;
+      syncM6RunToAgent(run);
+      render();
+      requestCanvasSafeAreaUpdate();
+      if (!["queued", "running", "running_cancel_requested"].includes(String(run.phase || ""))) break;
+      await delay(700);
+      try {
+        run = await runtime.loadM6ScriptPlanPreviewRun(run.run_id);
+        if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;
+      } catch (error) {
+        if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+        m6PreviewRecovering = true;
+        notice = error?.status === 0
+          ? "连接已中断，仍在恢复同一制作方案预览。"
+          : (error?.message || "制作方案状态暂时无法读取。");
+        if (error?.status && error.status !== 0) {
+          m6PreviewRecovering = false;
+          render();
+          return;
+        }
+        render();
+        await delay(1200);
+      }
+    }
+    if (generation !== m6PreviewPollGeneration || !isM6RunCurrent(run, runtime, expectedProjectId)) return;
+    m6PreviewRun = run;
+    m6PreviewRecovering = false;
+    syncM6RunToAgent(run);
+    if (run.phase === "succeeded") {
+      stageRecoveredM6Candidate(run);
+      notice = "M6 方案预览已恢复；确认前不会建立制作图。";
+    } else if (run.phase === "failed") {
+      notice = run?.error?.message || "制作方案任务失败；项目事实未改变。";
+    } else if (run.phase === "cancelled") {
+      notice = "制作方案预览已取消；项目事实未改变。";
+    }
+  }
+
+  function stageRecoveredM6Candidate(run) {
+    if (!isM6RunCurrent(run)) return;
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    if (session.pendingCommand?.run_id !== run.run_id) {
+      stageM6ScriptPlanCandidateCommand(session, context, run);
+    }
+    projectDrawerOpen = false;
+    setAgentChatExpanded(true);
+  }
+
+  function syncM6RunToAgent(run) {
+    if (!run?.run_id || !isM6RunCurrent(run)) return;
+    const context = currentAgentChatContext();
+    context.context_key = agentChatContextKey(context);
+    const session = agentChatContexts.get(context.context_key);
+    syncM6PreviewRunSession(session, context, run);
+  }
+
+  async function recoverM6PreviewRun() {
+    if (!m6PreviewRun?.run_id) return;
+    const runtime = options.getRuntime?.();
+    const expectedProjectId = currentM6ProjectId();
+    if (!isM6RunCurrent(m6PreviewRun, runtime, expectedProjectId)) return;
+    m6PreviewRecovering = true;
+    render();
+    try {
+      const run = await runtime.loadM6ScriptPlanPreviewRun(m6PreviewRun.run_id);
+      if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;
+      await observeM6PreviewRun(run, runtime, expectedProjectId);
+    } catch (error) {
+      notice = error?.message || "同一制作方案状态暂时无法读取。";
+    } finally {
+      m6PreviewRecovering = false;
+      render();
+    }
+  }
+
+  async function cancelM6PreviewRun() {
+    if (!m6PreviewRun?.run_id) return;
+    const runtime = options.getRuntime?.();
+    const expectedProjectId = currentM6ProjectId();
+    if (!isM6RunCurrent(m6PreviewRun, runtime, expectedProjectId)) return;
+    try {
+      const run = await runtime.cancelM6ScriptPlanPreviewRun(m6PreviewRun.run_id);
+      if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;
+      m6PreviewRun = run;
+      syncM6RunToAgent(run);
+      notice = run.phase === "cancelled"
+        ? "制作方案预览已取消；项目事实未改变。"
+        : "已记录停止后续处理；当前同步任务可能仍会完成。";
+    } catch (error) {
+      notice = error?.message || "无法更新同一制作方案的停止状态。";
+    }
+    render();
   }
 
   function applyGraphWorkspace(workspace) {
@@ -2916,6 +3101,13 @@ export function createProductShell(options = {}) {
       render();
       requestCanvasSafeAreaUpdate();
     });
+    window.addEventListener("afs:m6-preview-run-updated", (event) => {
+      const run = event.detail?.run;
+      if (!isM6RunCurrent(run) || (m6PreviewRun?.run_id && run.run_id !== m6PreviewRun.run_id)) return;
+      m6PreviewRun = { ...(m6PreviewRun || {}), ...run };
+      syncM6RunToAgent(m6PreviewRun);
+      render();
+    });
     const narrowAgentQuery = responsiveAgentMediaQuery();
     narrowAgentQuery?.addEventListener?.("change", () => {
       syncResponsiveAgentState({ force: true });
@@ -3002,8 +3194,47 @@ export function createProductShell(options = {}) {
   function syncPlanningPanelPreference({ force = false } = {}) {
     const nextKey = currentPlanningPanelPreferenceKey();
     if (!force && planningPanelPreferenceKey === nextKey) return;
+    if (planningPanelPreferenceKey && planningPanelPreferenceKey !== nextKey) {
+      m6PreviewPollGeneration += 1;
+      m6PreviewRun = null;
+      m6PreviewRecovering = false;
+    }
     planningPanelPreferenceKey = nextKey;
     planningPanelOpen = readPlanningPanelPreference(nextKey);
+  }
+
+  function currentM6ProjectId() {
+    return String(snapshot.project?.project_id || "");
+  }
+
+  function isM6RuntimeCurrent(runtime, expectedProjectId = currentM6ProjectId()) {
+    if (!runtime || !expectedProjectId) return false;
+    if (options.isRuntimeCurrent && !options.isRuntimeCurrent(runtime)) return false;
+    return String(runtime.projectId || expectedProjectId) === expectedProjectId
+      && currentM6ProjectId() === expectedProjectId;
+  }
+
+  function isM6RunCurrent(run, runtime = options.getRuntime?.(), expectedProjectId = currentM6ProjectId()) {
+    return Boolean(run?.run_id)
+      && String(run.project_id || "") === expectedProjectId
+      && isM6RuntimeCurrent(runtime, expectedProjectId);
+  }
+
+  async function restoreLatestM6PreviewRun(runtime, expectedProjectId = currentM6ProjectId()) {
+    if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+    try {
+      const run = await runtime?.loadLatestM6ScriptPlanPreviewRun?.();
+      if (!isM6RunCurrent(run, runtime, expectedProjectId)) return;
+      m6PreviewRun = run;
+      syncM6RunToAgent(run);
+      if (run.phase === "succeeded") {
+        stageRecoveredM6Candidate(run);
+      } else if (["queued", "running", "running_cancel_requested"].includes(String(run.phase || ""))) {
+        Promise.resolve().then(() => observeM6PreviewRun(run, runtime, expectedProjectId));
+      }
+    } catch {
+      // No recoverable M6 preview is a normal project state.
+    }
   }
 
   function currentPlanningPanelPreferenceKey() {
@@ -3306,6 +3537,11 @@ export function createProductShell(options = {}) {
         authUser,
         studioState: options.getStudioState?.() || snapshot.studioState,
       };
+      if (activeProjectId) {
+        const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
+        await restoreLatestM6PreviewRun(projectRuntime, activeProjectId);
+        if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
+      }
     } catch (error) {
       if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
@@ -3831,4 +4067,8 @@ function clampPlanningPanelHeight(value) {
 
 function requestCanvasSafeAreaUpdate() {
   requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("afs:canvas-safe-area-changed")));
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }

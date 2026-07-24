@@ -374,6 +374,7 @@ def _candidate_from_provider_payload(
         "provider_lineage": {
             "service_id": SERVER_CODEX_SERVICE_ID,
             "provider": "codex_local",
+            "model": "gpt-5.5",
             "model_surface": "server-codex-login",
             "dispatch_id": dispatch_id,
             "request_id": dispatch_id,

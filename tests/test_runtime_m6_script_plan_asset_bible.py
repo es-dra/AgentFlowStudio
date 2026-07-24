@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import time
 
 from fastapi.testclient import TestClient
+import pytest
 
 from apps.api.runtime_m6_script_plan_asset_bible import (
+    M6PlanningError,
     REVIEW_ROLES,
     build_m6_script_plan_asset_bible,
     validate_m6_candidate,
@@ -61,17 +64,13 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
 
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
-    preview = client.post("/projects/m6-graph/m6/script-plan-asset-bible/preview", json={
-        "source_kind": "idea",
-        "source_text": IDEA_TEXT,
-    })
-    assert preview.status_code == 200, preview.text
-    candidate = preview.json()["candidate"]
+    run = _start_and_wait(client, "m6-graph", IDEA_TEXT, "m6-graph-preview")
+    preview = run["preview"]
 
     confirmed = client.post("/projects/m6-graph/m6/script-plan-asset-bible/confirm", json={
         "expected_graph_version": 0,
-        "idempotency_key": "confirm-m6",
-        "candidate": candidate,
+        "run_id": run["run_id"],
+        "candidate_digest": run["candidate_digest"],
     })
     assert confirmed.status_code == 200, confirmed.text
     graph = confirmed.json()["graph"]
@@ -118,12 +117,8 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     monkeypatch.setattr(runtime_m6_server_codex_planner, "_dispatch_server_codex_structured_plan", fake_dispatch)
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
 
-    first = client.post("/projects/m6-codex/m6/script-plan-asset-bible/preview", json={
-        "source_kind": "script",
-        "source_text": SCRIPT_TEXT,
-    })
-    assert first.status_code == 200, first.text
-    first_payload = first.json()
+    first_run = _start_and_wait(client, "m6-codex", SCRIPT_TEXT, "m6-codex-preview-1", source_kind="script")
+    first_payload = first_run["preview"]
     first_candidate = first_payload["candidate"]
     first_digest = first_payload["candidate_digest"]
     assert first_payload["provider_dispatch_count"] == 1
@@ -135,14 +130,16 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     assert len(calls) == 1
     assert "固定 4x15" in str(calls[0]["prompt"])
 
-    second = client.post("/projects/m6-codex/m6/script-plan-asset-bible/preview", json={
-        "source_kind": "script",
-        "source_text": SCRIPT_TEXT,
-        "parent_candidate_digest": first_digest,
-        "revision_instruction": "第二轮请加深米拉和阿衡的关系压力，并补强罗盘和玻璃杯的连续性锁定。",
-    })
-    assert second.status_code == 200, second.text
-    second_candidate = second.json()["candidate"]
+    second_run = _start_and_wait(
+        client,
+        "m6-codex",
+        SCRIPT_TEXT,
+        "m6-codex-preview-2",
+        source_kind="script",
+        parent_candidate_digest=first_digest,
+        revision_instruction="第二轮请加深米拉和阿衡的关系压力，并补强罗盘和玻璃杯的连续性锁定。",
+    )
+    second_candidate = second_run["preview"]["candidate"]
     assert second_candidate["script_revision"]["revision_number"] == 2
     assert second_candidate["brief"]["lineage"]["parent_candidate_digest"] == first_digest
     assert len(calls) == 2
@@ -150,8 +147,8 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
 
     confirmed = client.post("/projects/m6-codex/m6/script-plan-asset-bible/confirm", json={
         "expected_graph_version": 0,
-        "idempotency_key": "confirm-m6-codex",
-        "candidate": second_candidate,
+        "run_id": second_run["run_id"],
+        "candidate_digest": second_run["candidate_digest"],
     })
     assert confirmed.status_code == 200, confirmed.text
     graph = confirmed.json()["graph"]
@@ -164,40 +161,24 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
 
 
 def test_m6_confirm_rejects_template_gaming_and_unresolved_lineage(tmp_path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     candidate = build_m6_script_plan_asset_bible("m6-bad", {"source_kind": "script", "source_text": SCRIPT_TEXT})["candidate"]
 
     fixed_duration = deepcopy(candidate)
     for shot in fixed_duration["shots"]:
         shot["duration_seconds"] = 6.0
     fixed_duration["sequence"]["target_duration_seconds"] = 6.0 * len(fixed_duration["shots"])
-    response = client.post("/projects/m6-bad/m6/script-plan-asset-bible/confirm", json={
-        "expected_graph_version": 0,
-        "idempotency_key": "bad-fixed",
-        "candidate": fixed_duration,
-    })
-    assert response.status_code == 409
-    assert "fixed equal durations" in response.text
+    with pytest.raises(M6PlanningError, match="fixed equal durations"):
+        validate_m6_candidate(fixed_duration)
 
     unresolved = deepcopy(candidate)
     unresolved["shots"][0]["asset_refs"] = ["missing-asset"]
-    response = client.post("/projects/m6-bad/m6/script-plan-asset-bible/confirm", json={
-        "expected_graph_version": 0,
-        "idempotency_key": "bad-ref",
-        "candidate": unresolved,
-    })
-    assert response.status_code == 409
-    assert "unresolved asset" in response.text
+    with pytest.raises(M6PlanningError, match="unresolved asset"):
+        validate_m6_candidate(unresolved)
 
     promoted = deepcopy(candidate)
     promoted["knowledge_context"]["items"][0]["promotion_state"] = "promoted"
-    response = client.post("/projects/m6-bad/m6/script-plan-asset-bible/confirm", json={
-        "expected_graph_version": 0,
-        "idempotency_key": "bad-knowledge",
-        "candidate": promoted,
-    })
-    assert response.status_code == 409
-    assert "cannot be promoted" in response.text
+    with pytest.raises(M6PlanningError, match="cannot be promoted"):
+        validate_m6_candidate(promoted)
 
 
 def test_m6_preview_requires_named_entities_and_story_beats() -> None:
@@ -210,6 +191,35 @@ def test_m6_preview_requires_named_entities_and_story_beats() -> None:
 
     valid = build_m6_script_plan_asset_bible("m6-direct", {"source_kind": "idea", "source_text": IDEA_TEXT})["candidate"]
     assert validate_m6_candidate(valid)["P0"] == 0
+
+
+def _start_and_wait(
+    client: TestClient,
+    project_id: str,
+    source_text: str,
+    client_request_id: str,
+    *,
+    source_kind: str = "idea",
+    **extra,
+) -> dict[str, object]:
+    response = client.post(
+        f"/projects/{project_id}/m6/script-plan-asset-bible/preview",
+        headers={"X-Client-Request-ID": client_request_id},
+        json={"source_kind": source_kind, "source_text": source_text, **extra},
+    )
+    assert response.status_code == 200, response.text
+    run = response.json()
+    for _ in range(200):
+        if run["phase"] in {"succeeded", "failed", "cancelled"}:
+            break
+        time.sleep(0.01)
+        loaded = client.get(
+            f"/projects/{project_id}/m6/script-plan-asset-bible/preview-runs/{run['run_id']}",
+        )
+        assert loaded.status_code == 200, loaded.text
+        run = loaded.json()
+    assert run["phase"] == "succeeded", run
+    return run
 
 
 def _server_codex_payload() -> dict[str, object]:
