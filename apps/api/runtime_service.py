@@ -50,6 +50,7 @@ from apps.api.runtime_script_core_truth import register_runtime_script_core_trut
 from apps.api.runtime_m3_zero_cost_kernel import register_runtime_m3_zero_cost_kernel_routes
 from apps.api.runtime_film_production_graph import register_runtime_film_production_graph_routes
 from apps.api.runtime_m6_script_plan_asset_bible import register_runtime_m6_script_plan_asset_bible_routes
+from apps.api.runtime_asset_bible import register_runtime_asset_bible_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
@@ -401,6 +402,7 @@ def create_runtime_app(
     register_runtime_m3_zero_cost_kernel_routes(app, store, auth)
     register_runtime_film_production_graph_routes(app, store, auth)
     register_runtime_m6_script_plan_asset_bible_routes(app, store, auth)
+    register_runtime_asset_bible_routes(app, store, auth)
     register_runtime_provider_script_routes(app, store)
     register_runtime_storyboard_routes(app, store)
     register_runtime_shot_asset_plan_routes(app, store)

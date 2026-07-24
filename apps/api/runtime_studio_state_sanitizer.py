@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from apps.api.runtime_studio_state_assets import sanitize_assets
+from apps.api.runtime_studio_state_asset_bible import sanitize_asset_bible
 from apps.api.runtime_studio_state_creator_authoring import sanitize_creator_authoring
 from apps.api.runtime_studio_state_episode_workspace import sanitize_episode_workspace
 from apps.api.runtime_studio_state_params import SAFE_NODE_PARAM_KEYS, sanitize_node_params
@@ -58,6 +59,12 @@ def sanitize_studio_state(value: dict[str, Any], *, project_id: str | None = Non
             project_id=project_id,
             text=_text,
             preview_url=safe_preview_url,
+        ),
+        "assetBible": sanitize_asset_bible(
+            value.get("assetBible"),
+            text=_text,
+            number=_number,
+            reject_forbidden=_reject_forbidden,
         ),
         "episode_workspace": sanitize_episode_workspace(
             value.get("episode_workspace"),

@@ -527,6 +527,15 @@ export function createRuntimeClient(projectId = "") {
     confirmM6ScriptPlanAssetBible(payload) {
       return requestJson(`/projects/${encoded}/m6/script-plan-asset-bible/confirm`, { method: "POST", payload });
     },
+    loadAssetBible() {
+      return requestJson(`/projects/${encoded}/m6/asset-bible`);
+    },
+    previewAssetBibleCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/asset-bible/commands/preview`, { method: "POST", payload });
+    },
+    confirmAssetBibleCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/asset-bible/commands/confirm`, { method: "POST", payload });
+    },
     createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
       return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
         method: "POST",

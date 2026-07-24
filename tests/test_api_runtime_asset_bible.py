@@ -1,0 +1,380 @@
+from __future__ import annotations
+
+from copy import deepcopy
+
+import pytest
+from fastapi.testclient import TestClient
+
+from apps.api.runtime_asset_bible import (
+    build_asset_candidate_set,
+    preview_asset_bible_command_result,
+)
+from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state
+from apps.api.runtime_service import create_runtime_app
+
+
+PROJECT_ID = "codex-clawed-fighter-smoke-20260624-h"
+SOURCE_TEXT = """
+场景一：雨夜天台。林晚握着红绳，和机器人阿虎机器人对峙。
+场景二：楼梯间。林晚把红绳系在栏杆上，阿虎机器人守住出口。
+场景三：清晨街道。林晚收起红绳，阿虎机器人跟在她身后。
+""".strip()
+
+
+def shot_plan() -> dict:
+    scenes = []
+    for scene_index, scene_name in enumerate(("雨夜天台", "楼梯间", "清晨街道"), start=1):
+        shots = []
+        count = 6 if scene_index < 3 else 5
+        for shot_index in range(1, count + 1):
+            shots.append(
+                {
+                    "shot_id": f"shot-{scene_index}-{shot_index}",
+                    "title": f"镜头 {scene_index}-{shot_index}",
+                    "description": f"{scene_name}，林晚握着红绳，阿虎机器人观察她。",
+                    "duration_sec": 8 + shot_index % 3,
+                }
+            )
+        scenes.append(
+            {
+                "scene_id": f"scene-{scene_index}",
+                "name": scene_name,
+                "shots": shots,
+            }
+        )
+    return {
+        "candidate_id": "shot-candidate-current",
+        "scenes": scenes,
+        "total_shots": 17,
+    }
+
+
+def generation_body() -> dict:
+    return {
+        "source_node_id": "story-source",
+        "script_revision_id": "revision-current",
+        "source_text": SOURCE_TEXT,
+        "shot_plan": shot_plan(),
+        "command": {"type": "generate_candidates"},
+    }
+
+
+def generated_bible() -> dict:
+    return preview_asset_bible_command_result(PROJECT_ID, generation_body())["result"]["asset_bible"]
+
+
+def command_preview(bible: dict, command: dict) -> dict:
+    return preview_asset_bible_command_result(
+        PROJECT_ID,
+        {
+            "asset_bible": bible,
+            "command": command,
+        },
+    )
+
+
+def test_candidate_generation_is_zero_provider_preview_with_stable_occurrence_lineage() -> None:
+    first = build_asset_candidate_set(PROJECT_ID, generation_body())
+    second = build_asset_candidate_set(PROJECT_ID, generation_body())
+
+    assert first["candidate_set_id"] == second["candidate_set_id"]
+    assert [item["stable_id"] for item in first["assets"]] == [item["stable_id"] for item in second["assets"]]
+    assert first["scene_count"] == 3
+    assert first["shot_count"] == 17
+    assert {"character", "scene", "prop"} <= {item["asset_type"] for item in first["assets"]}
+    assert all(item["review_state"] == "candidate" for item in first["assets"])
+    assert all(item["needs_confirmation"] is True for item in first["assets"])
+    assert all(item["pending_fields"] for item in first["assets"])
+    assert any(item["occurrences"]["shot_ids"] for item in first["assets"] if item["asset_type"] != "scene")
+
+    preview = preview_asset_bible_command_result(PROJECT_ID, generation_body())
+    assert preview["status"] == "preview"
+    assert preview["requires_confirmation"] is True
+    assert preview["provider_dispatch_count"] == 0
+    assert preview["external_cost_usd"] == 0
+    assert preview["result"]["graph_mutation"] == 0
+    assert preview["impact"]["preserved_on_cancel"] is True
+
+
+def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
+    bible = generated_bible()
+    original_ids = [item["stable_id"] for item in bible["assets"]]
+    original_version = bible["version"]
+
+    for index, stable_id in enumerate(original_ids):
+        action = "reject" if index == len(original_ids) - 1 else "approve"
+        bible = command_preview(bible, {"type": action, "target_id": stable_id})["result"]["asset_bible"]
+
+    approved = next(item for item in bible["assets"] if item["review_state"] == "approved")
+    edited = command_preview(
+        bible,
+        {
+            "type": "edit",
+            "target_id": approved["stable_id"],
+            "patch": {
+                "display_name": f"{approved['display_name']}（确认版）",
+                "positive_traits": ["银灰色表面", "轮廓稳定"],
+                "negative_locks": ["不得改变身份", "不得添加文字"],
+            },
+        },
+    )["result"]["asset_bible"]
+    edited_asset = next(item for item in edited["assets"] if item["stable_id"] == approved["stable_id"])
+    assert edited_asset["review_state"] == "candidate"
+    assert approved["display_name"] in edited_asset["aliases"]
+    assert edited_asset["positive_traits"] == ["银灰色表面", "轮廓稳定"]
+
+    with pytest.raises(ValueError, match="approve or reject"):
+        command_preview(edited, {"type": "lock"})
+
+    edited = command_preview(edited, {"type": "approve", "target_id": approved["stable_id"]})["result"]["asset_bible"]
+    locked = command_preview(edited, {"type": "lock"})["result"]["asset_bible"]
+    assert locked["status"] == "locked"
+    assert locked["locked_revision_id"] == locked["current_revision_id"]
+    assert locked["version"] > original_version
+    assert len(locked["revisions"]) == locked["version"]
+
+
+def test_merge_and_split_preserve_lineage_and_require_exact_occurrence_assignment() -> None:
+    bible = generated_bible()
+    scene_assets = [item for item in bible["assets"] if item["asset_type"] == "scene"]
+    merged = command_preview(
+        bible,
+        {
+            "type": "merge",
+            "target_ids": [scene_assets[0]["stable_id"], scene_assets[1]["stable_id"]],
+            "display_name": "天台与楼梯过渡空间",
+        },
+    )
+    merged_state = merged["result"]["asset_bible"]
+    merged_asset = next(item for item in merged_state["assets"] if item["display_name"] == "天台与楼梯过渡空间")
+    assert set(merged_asset["lineage"]["merged_from_ids"]) == {
+        scene_assets[0]["stable_id"],
+        scene_assets[1]["stable_id"],
+    }
+    assert merged["impact"]["scene_count"] == 2
+
+    source_refs = merged_asset["occurrences"]["scene_ids"]
+    source_shots = merged_asset["occurrences"]["shot_ids"]
+    split = command_preview(
+        merged_state,
+        {
+            "type": "split",
+            "target_id": merged_asset["stable_id"],
+            "names": ["天台区域", "楼梯区域"],
+                "occurrence_assignments": {
+                    "0": {"scene_ids": source_refs[:1], "shot_ids": source_shots[: len(source_shots) // 2]},
+                    "1": {"scene_ids": source_refs[1:], "shot_ids": source_shots[len(source_shots) // 2 :]},
+            },
+        },
+    )["result"]["asset_bible"]
+    children = [item for item in split["assets"] if merged_asset["stable_id"] in item["lineage"]["parent_ids"]]
+    assert {item["display_name"] for item in children} == {"天台区域", "楼梯区域"}
+    assert set().union(*(set(item["occurrences"]["scene_ids"]) for item in children)) == set(source_refs)
+
+    with pytest.raises(ValueError, match="cover every source occurrence"):
+        command_preview(
+            merged_state,
+            {
+                "type": "split",
+                "target_id": merged_asset["stable_id"],
+                "names": ["天台区域", "楼梯区域"],
+                "occurrence_assignments": {
+                    "0": {"scene_ids": source_refs[:1], "shot_ids": []},
+                    "1": {"scene_ids": [], "shot_ids": []},
+                },
+            },
+        )
+
+
+def test_studio_state_roundtrip_preserves_asset_bible_without_accepting_provider_fields() -> None:
+    bible = generated_bible()
+    state = sanitize_studio_state(
+        {
+            "meta": {"projectName": "Clawed Fighter", "canvasName": "主画布"},
+            "nodes": {},
+            "edges": {},
+            "order": [],
+            "assetBible": bible,
+        },
+        project_id=PROJECT_ID,
+    )
+    assert state["assetBible"]["candidate_set"]["shot_count"] == 17
+    assert state["assetBible"]["current_revision_id"] == bible["current_revision_id"]
+    assert state["assetBible"]["assets"][0]["stable_id"] == bible["assets"][0]["stable_id"]
+    assert state["assetBible"]["provider_dispatch_count"] == 0
+
+    unsafe = deepcopy(bible)
+    unsafe["provider_raw"] = {"output": "forbidden"}
+    with pytest.raises(ValueError, match="forbidden"):
+        sanitize_studio_state(
+            {
+                "meta": {},
+                "nodes": {},
+                "edges": {},
+                "order": [],
+                "assetBible": unsafe,
+            },
+            project_id=PROJECT_ID,
+        )
+
+
+def test_api_preview_confirm_retry_and_studio_reload_are_zero_provider_and_idempotent(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    request = {
+        **generation_body(),
+        "requested_at": "2026-07-24T00:00:00Z",
+    }
+    preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["result"]["graph_mutation"] == 0
+    assert not (tmp_path / "runtime" / "projects" / PROJECT_ID / "production_graph.json").exists()
+    assert not (tmp_path / "runtime" / "projects" / PROJECT_ID / "studio_state.json").exists()
+
+    confirm_body = {
+        **request,
+        "preview_digest": preview.json()["preview_digest"],
+        "idempotency_key": "asset-generation-current",
+        "expected_graph_version": 0,
+    }
+    first = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json=confirm_body,
+    )
+    retry = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json=confirm_body,
+    )
+    assert first.status_code == retry.status_code == 200
+    assert first.json()["asset_bible"]["current_revision_id"] == retry.json()["asset_bible"]["current_revision_id"]
+    assert first.json()["asset_bible"]["version"] == retry.json()["asset_bible"]["version"] == 1
+    assert first.json()["provider_dispatch_count"] == retry.json()["provider_dispatch_count"] == 0
+    assert first.json()["external_cost_usd"] == retry.json()["external_cost_usd"] == 0
+
+    saved = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        json={
+            "expected_version": "",
+            "state": {
+                "meta": {"projectName": "Clawed Fighter", "canvasName": "主画布"},
+                "nodes": {},
+                "edges": {},
+                "order": [],
+                "assetBible": first.json()["asset_bible"],
+            },
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    reloaded = client.get(f"/projects/{PROJECT_ID}/studio-state")
+    assert reloaded.status_code == 200
+    restored = reloaded.json()["state"]["assetBible"]
+    assert restored["current_revision_id"] == first.json()["asset_bible"]["current_revision_id"]
+    assert restored["candidate_set"]["shot_count"] == 17
+    assert restored["idempotency_keys"] == ["asset-generation-current"]
+
+
+def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_path) -> None:
+    from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
+    from apps.api.runtime_store import RuntimeStore
+
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    graph_store = ProductionGraphStore(store)
+    graph_store.append(
+        PROJECT_ID,
+        expected_version=0,
+        idempotency_key="seed-story-truth",
+        semantic_digest=canonical_digest({"seed": "story"}),
+        events=[
+            {"type": "node_upserted", "node": {"node_id": "revision-current", "category": "revision", "metadata": {}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-1", "category": "location", "metadata": {}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-1-1", "category": "unit", "metadata": {}}},
+        ],
+    )
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    generate_request = {**generation_body(), "requested_at": "2026-07-24T00:00:00Z"}
+    generated_preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json=generate_request,
+    ).json()
+    generated = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json={
+            **generate_request,
+            "preview_digest": generated_preview["preview_digest"],
+            "idempotency_key": "canonical-assets-v1",
+            "expected_graph_version": 1,
+        },
+    )
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["authority_mode"] == "canonical_production_graph"
+    graph_version = generated.json()["graph_version"]
+    bible = generated.json()["asset_bible"]
+    scene_assets = [item for item in bible["assets"] if item["asset_type"] == "scene"][:2]
+
+    merge_request = {
+        "asset_bible": bible,
+        "requested_at": "2026-07-24T00:01:00Z",
+        "command": {
+            "type": "merge",
+            "target_ids": [item["stable_id"] for item in scene_assets],
+            "display_name": "合并场景",
+        },
+    }
+    merge_preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json=merge_request,
+    ).json()
+    merged = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json={
+            **merge_request,
+            "preview_digest": merge_preview["preview_digest"],
+            "idempotency_key": "canonical-assets-merge",
+            "expected_graph_version": graph_version,
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    graph = graph_store.load(PROJECT_ID)
+    for source in scene_assets:
+        assert graph["nodes"][source["stable_id"]]["state"] == "invalidated"
+        assert all(
+            source["stable_id"] not in {relation["from_id"], relation["to_id"]}
+            for relation in graph["relations"]
+        )
+    restored = client.get(f"/projects/{PROJECT_ID}/m6/asset-bible").json()
+    assert restored["authority_mode"] == "canonical_production_graph"
+    assert restored["asset_bible"]["current_revision_id"] == merged.json()["asset_bible"]["current_revision_id"]
+
+
+def test_split_rejects_duplicate_occurrence_assignment() -> None:
+    candidate = build_asset_candidate_set(PROJECT_ID, generation_body())
+    state = preview_asset_bible_command_result(
+        PROJECT_ID,
+        {
+            **generation_body(),
+            "command": {"type": "generate_candidates"},
+            "requested_at": "2026-07-24T00:00:00Z",
+        },
+    )["result"]["asset_bible"]
+    source = next(item for item in candidate["assets"] if item["occurrences"]["shot_ids"])
+    ref = source["occurrences"]["shot_ids"][0]
+    with pytest.raises(ValueError, match="exactly once"):
+        preview_asset_bible_command_result(
+            PROJECT_ID,
+            {
+                "asset_bible": state,
+                "expected_asset_bible_revision_id": state["current_revision_id"],
+                "command": {
+                    "type": "split",
+                    "target_id": source["stable_id"],
+                    "names": ["资产 A", "资产 B"],
+                    "occurrence_assignments": {
+                        "0": {"scene_ids": source["occurrences"]["scene_ids"], "shot_ids": source["occurrences"]["shot_ids"]},
+                        "1": {"scene_ids": [], "shot_ids": [ref]},
+                    },
+                },
+            },
+        )

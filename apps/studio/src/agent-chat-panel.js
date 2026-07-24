@@ -39,6 +39,8 @@ export function buildAgentChatPanel({
   onResizeStart,
   onOpen,
   onRender,
+  copilot = null,
+  onNextAction,
 } = {}) {
   const aside = el("aside", `studio-agent-chat${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`);
   aside.dataset.contextKey = context?.context_key || "";
@@ -49,6 +51,7 @@ export function buildAgentChatPanel({
 
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
+  if (copilot) body.appendChild(productionCopilot(copilot, onNextAction));
   syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
   const taskReview = currentTaskReview({ store, runtime, onRender });
   if (taskReview) body.appendChild(taskReview);
@@ -83,7 +86,17 @@ function panelHeader({ context, collapsed, onToggleCollapse }) {
 
 function contextStrip(context) {
   const strip = el("section", "agent-context-strip");
-  strip.appendChild(el("span", "agent-context-chip", context?.selected_node_title ? `当前：${context.selected_node_title}` : "当前：画布"));
+  const currentTitle = context?.section === "asset_bible"
+    ? context?.selected_asset_title
+    : context?.section === "storyboard_read_only"
+      ? context?.current_shot_title
+      : context?.selected_node_title;
+  const fallbackTitle = context?.section === "asset_bible"
+    ? "Asset Bible"
+    : context?.section === "storyboard_read_only"
+      ? "故事板"
+      : "画布";
+  strip.appendChild(el("span", "agent-context-chip", `当前：${currentTitle || fallbackTitle}`));
   const screenplay = context?.selected_screenplay_summary || {};
   strip.appendChild(el("span", "agent-context-chip", context?.script_revision_id || screenplay.revision_id ? "剧本可追溯" : "可从任意节点开始"));
   if (context?.selected_edge_id) {
@@ -107,6 +120,38 @@ function contextStrip(context) {
   return strip;
 }
 
+function productionCopilot(copilot, onNextAction) {
+  const wrap = el("section", "agent-production-copilot");
+  wrap.setAttribute("aria-label", "生产阶段与下一动作");
+  wrap.appendChild(el("span", "eyebrow", "生产 Copilot"));
+  const dependencyList = el("div", "agent-production-dependencies");
+  for (const item of copilot.dependencies || []) {
+    dependencyList.appendChild(el("span", item.state === "ready" ? "ready" : "blocked", `${item.state === "ready" ? "已就绪" : "未完成"} · ${item.label}`));
+  }
+  wrap.appendChild(dependencyList);
+  if (copilot.blockers?.length) {
+    wrap.appendChild(el("p", "agent-production-blocker", `阻塞：${copilot.blockers.join("；")}`));
+  }
+  const gate = copilot.gate || {};
+  wrap.appendChild(el(
+    "p",
+    "agent-production-gate",
+    gate.admission === "structure_ready_media_disabled"
+      ? "结构已就绪，但图片/视频媒体能力未启用。"
+      : gate.admission === "ready"
+        ? "结构与媒体准入条件已就绪。"
+        : "媒体准入尚未满足；当前未调用、未计费。",
+  ));
+  const action = copilot.next_valid_action || {};
+  const button = el("button", "studio-primary-button", action.label || "等待下一动作");
+  button.type = "button";
+  button.disabled = action.enabled === false;
+  button.title = action.reason || action.label || "";
+  button.addEventListener("click", () => onNextAction?.(action));
+  wrap.append(button, el("small", "", action.reason || ""));
+  return wrap;
+}
+
 function contextDetails(context) {
   const details = el("details", "agent-context-details");
   details.appendChild(el("summary", "", "上下文范围"));
@@ -123,6 +168,12 @@ function contextDetails(context) {
     list.append(
       el("dt", "", "节点剧本"),
       el("dd", "", `${Number(summary.scene_count || 0)} 场 · ${Number(summary.character_count || 0)} 角色 · ${Number(summary.dialogue_blocks || 0)} 对白 · 版本 ${summary.revision_id || "未命名"}`),
+    );
+  }
+  if (Number(context?.counts?.asset_candidates || 0)) {
+    list.append(
+      el("dt", "", "资产 Bible"),
+      el("dd", "", `${Number(context.counts.asset_candidates)} 项 · ${Number(context.counts.asset_candidates_pending || 0)} 项待确认 · ${context.asset_bible_status === "locked" ? "已锁定" : "审核中"}`),
     );
   }
   if (context?.media_operations) {
@@ -709,7 +760,10 @@ function composer({ session, context, runtime, onOpen, onRender }) {
 }
 
 function contextLabel(context) {
+  if (context?.selected_asset_title) return context.selected_asset_title;
+  if (context?.current_shot_title && context?.section === "storyboard_read_only") return context.current_shot_title;
   if (context?.selected_node_title) return context.selected_node_title;
+  if (context?.section === "asset_bible") return "Asset Bible";
   if (context?.section === "storyboard_read_only") return "故事板只读投影";
   return "画布上下文";
 }

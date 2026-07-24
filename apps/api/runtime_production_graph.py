@@ -240,6 +240,10 @@ def _apply_event(graph: dict[str, Any], event: dict[str, Any]) -> None:
         relation = {key: event.get(key) for key in ("from_id", "to_id", "relation_type")}
         if not all(relation.values()): raise ProductionGraphError("relation event is incomplete")
         if relation not in graph["relations"]: graph["relations"].append(relation)
+    elif event_type == "relation_removed":
+        relation = {key: event.get(key) for key in ("from_id", "to_id", "relation_type")}
+        if not all(relation.values()): raise ProductionGraphError("relation removal is incomplete")
+        graph["relations"] = [item for item in graph["relations"] if item != relation]
     elif event_type == "work_created":
         work_id = str(event.get("work_id") or "")
         if not work_id: raise ProductionGraphError("work event requires work_id")
@@ -296,6 +300,13 @@ def _apply_event(graph: dict[str, Any], event: dict[str, Any]) -> None:
         if not node: raise ProductionGraphError("mutation references unknown node")
         node.setdefault("metadata", {}).update(dict(event.get("patch") or {}))
         node["state"] = "active"
+    elif event_type == "node_state_updated":
+        node = graph["nodes"].get(event.get("node_id"))
+        if not node: raise ProductionGraphError("state update references unknown node")
+        if event.get("state") not in {"active", "invalidated"}:
+            raise ProductionGraphError("unsupported node state")
+        node["state"] = event["state"]
+        node.setdefault("metadata", {}).update(dict(event.get("metadata_patch") or {}))
     else:
         raise ProductionGraphError(f"unsupported graph event {event_type}")
     graph["events"].append(event)
