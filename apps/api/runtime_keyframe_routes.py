@@ -20,6 +20,7 @@ from apps.api.runtime_generation_preflight import (
     preflight_token_matches,
     provider_submit_preflight_requirement,
 )
+from apps.api.runtime_image_admission import enforce_image_admission_keyframe_request
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframe_async import poll_keyframe_generation
 from apps.api.runtime_keyframe_background import submit_background_sync_keyframe_generation
@@ -169,6 +170,24 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
                 )
                 _log_keyframe_rejected(http_request, detail, status_code=409, elapsed_ms=_elapsed_ms(started))
                 raise HTTPException(status_code=409, detail=detail)
+        try:
+            enforce_image_admission_keyframe_request(store, project_id, request)
+        except ValueError as exc:
+            detail = safe_error_detail(
+                "invalid_keyframe_generation",
+                detail_code="image_admission_blocked",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=node_id,
+                action="keyframe_generation",
+                stage="image_admission",
+                status="blocked",
+                retryable=True,
+                details={"reason": str(exc), "provider_calls_started": False},
+            )
+            _log_keyframe_rejected(http_request, detail, status_code=409, elapsed_ms=_elapsed_ms(started))
+            raise HTTPException(status_code=409, detail=detail) from exc
         idempotency = begin_submit_idempotency(
             store,
             project_id=project_id,

@@ -186,7 +186,27 @@ def _image_relay_service_from_legacy(service: dict[str, Any]) -> dict[str, Any]:
     if isinstance(descriptor, dict):
         next_descriptor = dict(descriptor)
         next_descriptor["account_pool_id"] = IMAGE_RELAY_POOL_ID
-        next_descriptor["reference_image_slots"] = max(1, int(next_descriptor.get("reference_image_slots") or 0))
+        trusted_gpt_image_edit = (
+            str(next_service.get("request_format") or "") == "openai_images"
+            and str(next_service.get("model") or "") == "gpt-image-2"
+            and str(next_service.get("edit_endpoint") or "") == "/images/edits"
+        )
+        next_descriptor["reference_image_slots"] = max(
+            4 if trusted_gpt_image_edit else 1,
+            int(next_descriptor.get("reference_image_slots") or 0),
+        )
+        if trusted_gpt_image_edit:
+            next_descriptor["schema_version"] = "provider_descriptor.v0.3"
+            next_descriptor["image_edit_capabilities"] = {
+                "supports_image_edit": True,
+                "supports_true_local_edit": False,
+                "supports_preserve_locks": "prompt_only",
+                "supports_negative_locks": "prompt_only",
+                "fallback_modes": ["provider_full_frame_edit"],
+                "max_reference_images": 4,
+                "input_fidelity_modes": [],
+                "local_edit_truth_label": "provider_full_frame_edit",
+            }
         next_service["descriptor"] = next_descriptor
     return next_service
 

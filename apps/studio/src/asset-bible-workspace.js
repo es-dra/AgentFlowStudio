@@ -86,6 +86,7 @@ export function deriveProductionCopilotState({
   capabilityGates = {},
   section = "canvas",
   selectedAsset = null,
+  imageAdmission = null,
 } = {}) {
   const shotTruth = legacyAppliedStoryboardProjection(studioState);
   const bible = assetBibleProjection(studioState, runtimeAssetBible);
@@ -98,6 +99,9 @@ export function deriveProductionCopilotState({
   const bibleLocked = bible.status === "locked" && Boolean(bible.locked_revision_id);
   const contentReady = bibleLocked && bible.coverage.coverage_pass;
   const imageEnabled = capabilityGates.image === true;
+  const admissionStatus = String(imageAdmission?.status || "empty");
+  const admissionCounts = imageAdmission?.counts || {};
+  const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
   let next = {
     action: "open_script",
     label: "选择当前剧本",
@@ -131,11 +135,62 @@ export function deriveProductionCopilotState({
     };
   } else if (candidatesReady && !bibleLocked) {
     next = { action: "lock_asset_bible", label: "锁定 Asset Bible", reason: "资产审核与镜头覆盖已完成，可以锁定当前版本。", enabled: true };
+  } else if (contentReady && admissionStatus === "empty") {
+    next = {
+      action: "image_admission_ready",
+      label: "准备图片准入",
+      reason: "锁定资产与镜头覆盖已就绪；先审核九项清单和费用硬门，不会调用外部能力。",
+      enabled: true,
+    };
+  } else if (contentReady && mediaLoadFailures > 0) {
+    next = {
+      action: "reload_image_candidate",
+      label: "重新加载候选图片",
+      reason: `${mediaLoadFailures} 个候选图片未能加载；批准已禁用，请先恢复可见预览。`,
+      enabled: true,
+    };
+  } else if (contentReady && Number(admissionCounts.failed || 0) > 0) {
+    next = {
+      action: "recover_image_admission",
+      label: "恢复失败项目",
+      reason: `${Number(admissionCounts.failed)} 个图片项目失败且已隔离；先审阅失败原因和替换影响。`,
+      enabled: true,
+    };
+  } else if (contentReady && Number(admissionCounts.candidate || 0) > 0) {
+    next = {
+      action: "review_image_candidates",
+      label: "审核图片候选",
+      reason: `${Number(admissionCounts.candidate)} 个图片候选待人工查看；批准前不会写入制作图。`,
+      enabled: true,
+    };
+  } else if (contentReady && Number(admissionCounts.processing || 0) > 0) {
+    next = {
+      action: "resume_image_admission",
+      label: "恢复图片任务",
+      reason: `${Number(admissionCounts.processing)} 个任务可继续检查；刷新不会重复发送。`,
+      enabled: true,
+    };
+  } else if (contentReady && admissionStatus === "draft") {
+    next = {
+      action: "review_image_admission",
+      label: "锁定图片清单",
+      reason: "九项清单已编译，锁定后才可占用预算并串行生成。",
+      enabled: true,
+    };
+  } else if (contentReady && admissionStatus === "cancelled") {
+    next = {
+      action: "review_image_admission",
+      label: "审阅已停止批次",
+      reason: "未发送项目已停止；已完成和已拒绝记录仍保留。",
+      enabled: true,
+    };
   } else if (contentReady && !imageEnabled) {
     next = {
       action: "media_gate_closed",
       label: "图片能力未启用",
-      reason: "结构已就绪，但当前环境未开放图片媒体能力。",
+      reason: Number(admissionCounts.approved || 0) > 0
+        ? "已批准图片已写回 Asset Bible / ProductionGraph；当前环境未开放图片媒体能力。"
+        : "结构已就绪，但当前环境未开放图片媒体能力。",
       enabled: false,
     };
   } else if (contentReady) {
@@ -146,7 +201,12 @@ export function deriveProductionCopilotState({
       : !shotReady ? "shot_plan_required"
         : !candidatesReady ? "asset_recognition_ready"
           : !contentReady ? "asset_review"
-            : imageEnabled ? "image_admission_ready" : "media_gate_closed",
+            : admissionStatus === "empty" ? "image_admission_ready"
+              : mediaLoadFailures ? "image_candidate_media_recovery"
+                : Number(admissionCounts.failed || 0) ? "image_admission_recovery"
+                : Number(admissionCounts.candidate || 0) ? "image_candidate_review"
+                  : Number(admissionCounts.processing || 0) ? "image_admission_processing"
+                    : imageEnabled ? "image_admission_ready" : "media_gate_closed",
     dependencies: [
       { key: "script", label: "当前剧本", state: scriptReady ? "ready" : "blocked" },
       { key: "shots", label: "已应用分镜", state: shotReady ? "ready" : "blocked" },
@@ -162,6 +222,8 @@ export function deriveProductionCopilotState({
         `${bible.coverage.unresolved_required} 个必要出现范围未解决（${bible.coverage.unresolved_shot_count} 镜头）`,
       ] : []),
       ...(bible.coverage.alias_collision_count ? [`${bible.coverage.alias_collision_count} 组别名冲突`] : []),
+      ...(mediaLoadFailures ? [`${mediaLoadFailures} 个候选图片加载失败，批准已禁用`] : []),
+      ...(Number(admissionCounts.failed || 0) ? [`${Number(admissionCounts.failed)} 个图片项目失败且已隔离`] : []),
       ...(contentReady && !imageEnabled ? ["内容结构已就绪；图片能力未启用"] : []),
     ],
     gate: {
@@ -169,12 +231,12 @@ export function deriveProductionCopilotState({
       image: imageEnabled,
       video: capabilityGates.video === true,
       admission: contentReady ? (imageEnabled ? "ready" : "structure_ready_media_disabled") : "blocked",
-      cost_state: "not_admitted",
+      cost_state: Number(imageAdmission?.budget?.dispatches_reserved || 0) > 0 ? "estimated_reserved" : "not_admitted",
     },
     next_valid_action: next,
     asset_bible: bible,
-    provider_dispatch_count: 0,
-    external_cost_usd: 0,
+    provider_dispatch_count: Number(imageAdmission?.provider_dispatch_count || 0),
+    external_cost_usd: imageAdmission?.actual_usd ?? null,
   };
 }
 

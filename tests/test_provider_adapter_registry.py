@@ -1170,12 +1170,27 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_i
     service["request_format"] = "openai_images"
     service["quality"] = "low"
     service["output_format"] = "png"
-    service["descriptor"]["reference_image_slots"] = 0
+    service["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "reference_image_slots": 4,
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "supports_true_local_edit": False,
+                "supports_preserve_locks": "prompt_only",
+                "supports_negative_locks": "prompt_only",
+                "fallback_modes": ["provider_full_frame_edit"],
+                "max_reference_images": 4,
+                "input_fidelity_modes": ["low", "high"],
+                "local_edit_truth_label": "provider_full_frame_edit",
+            },
+        }
+    )
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_http.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
     registry = ProviderRegistry.from_store(_store(tmp_path, config))
-    assert registry.descriptor("relay_image").reference_image_slots == 0
+    assert registry.descriptor("relay_image").reference_image_slots == 4
 
     result = registry.dispatch(
         "image",
@@ -1197,11 +1212,114 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_i
     assert "multipart/form-data" in str(captured["content_type"])
     assert 'name="model"' in body and "gpt-image-2" in body
     assert 'name="prompt"' in body and "Change only the metal body surface into plush fabric" in body
-    assert 'name="input_fidelity"' not in body
-    assert 'name="image"; filename="robot-source.png"' in body
+    assert 'name="input_fidelity"' in body and "high" in body
+    assert 'name="image"; filename="reference_001.png"' in body
     assert captured["timeout"] == 120.0
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_openai_images_edit_preserves_reference_order_and_enforces_safe_limits(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    captured: dict[str, str] = {}
+    references = []
+    for index in range(1, 4):
+        path = tmp_path / f"user-name-{index}.png"
+        path.write_bytes(_png_bytes())
+        references.append(path)
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = request.data.decode("latin1")
+        return _JsonResponse({"data": [{"b64_json": base64.b64encode(_png_bytes()).decode("ascii")}]})
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service.update(
+        {
+            "endpoint": "/images/generations",
+            "edit_endpoint": "/images/edits",
+            "model": "gpt-image-2",
+            "request_format": "openai_images",
+        }
+    )
+    service["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "reference_image_slots": 4,
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "supports_true_local_edit": False,
+                "supports_preserve_locks": "prompt_only",
+                "supports_negative_locks": "prompt_only",
+                "fallback_modes": ["provider_full_frame_edit"],
+                "max_reference_images": 4,
+                "input_fidelity_modes": ["low", "high"],
+                "local_edit_truth_label": "provider_full_frame_edit",
+            },
+        }
+    )
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_http.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "test-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    registry.dispatch(
+        "image",
+        "relay_image",
+        ProviderDispatchRequest(
+            prompt="Preserve approved identities and continuity.",
+            output_dir=tmp_path / "run",
+            image_operation="edit",
+            edit_source_image_path=references[0],
+            edit_reference_image_paths=tuple(references),
+            reference_image_paths=tuple(references),
+            image_input_fidelity="high",
+        ),
+    )
+    body = captured["body"]
+    first = body.index('filename="reference_001.png"')
+    second = body.index('filename="reference_002.png"')
+    third = body.index('filename="reference_003.png"')
+    assert first < second < third
+    assert "user-name-" not in body
+
+    too_many = tuple([*references, tmp_path / "four.png", tmp_path / "five.png"])
+    too_many[3].write_bytes(_png_bytes())
+    too_many[4].write_bytes(_png_bytes())
+    with pytest.raises(ModelConfigError, match="reference_image_slots exceeded"):
+        registry.dispatch(
+            "image",
+            "relay_image",
+            ProviderDispatchRequest(
+                prompt="Too many references",
+                output_dir=tmp_path / "blocked-count",
+                image_operation="edit",
+                edit_source_image_path=too_many[0],
+                edit_reference_image_paths=too_many,
+                reference_image_paths=too_many,
+            ),
+        )
+
+    oversized = tmp_path / "oversized.png"
+    oversized.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * (8 * 1024 * 1024))
+    with pytest.raises(ModelGatewayError, match="per-file byte limit"):
+        registry.dispatch(
+            "image",
+            "relay_image",
+            ProviderDispatchRequest(
+                prompt="Oversized reference",
+                output_dir=tmp_path / "blocked-size",
+                image_operation="edit",
+                edit_source_image_path=oversized,
+                edit_reference_image_paths=(oversized,),
+                reference_image_paths=(oversized,),
+            ),
+        )
 
 
 def test_provider_registry_projects_legacy_codex_image_api_relay_to_image_relay(tmp_path) -> None:
@@ -1227,9 +1345,78 @@ def test_provider_registry_projects_legacy_codex_image_api_relay_to_image_relay(
     assert store.account_pools["image_relay_pool"]["accounts"][0]["service_id"] == "image_relay"
     descriptor = registry.descriptor("image_relay")
     assert descriptor.account_pool_id == "image_relay_pool"
-    assert descriptor.reference_image_slots == 1
+    assert descriptor.schema_version == "provider_descriptor.v0.3"
+    assert descriptor.reference_image_slots == 4
+    assert descriptor.image_edit_capabilities.supports_image_edit is True
+    assert descriptor.image_edit_capabilities.max_reference_images == 4
+    assert descriptor.image_edit_capabilities.input_fidelity_modes == []
     with pytest.raises(ModelConfigError, match="Provider service not found: codex_image"):
         registry.descriptor("codex_image")
+
+
+def test_projected_gpt_image_2_relay_uses_edits_ordered_files_and_omits_fixed_fidelity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    captured: dict[str, str] = {}
+    references = []
+    for index in range(1, 3):
+        suffix = ".png" if index == 1 else ".untrusted"
+        path = tmp_path / f"private-reference-{index}{suffix}"
+        path.write_bytes(_png_bytes())
+        references.append(path)
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["body"] = request.data.decode("latin1")
+        captured["content_type"] = request.get_header("Content-type")
+        return _JsonResponse({"data": [{"b64_json": base64.b64encode(_png_bytes()).decode("ascii")}]})
+
+    config = _api_relay_provider_config(include_image=True)
+    config["accounts"]["model_relay"]["base_url"] = "https://api.crazyrouter.com/v1"
+    service = config["services"].pop("relay_image")
+    service.update(
+        {
+            "endpoint": "/images/generations",
+            "request_format": "openai_images",
+            "model": "gpt-image-2",
+        }
+    )
+    service["descriptor"]["account_pool_id"] = "codex_image_pool"
+    service["descriptor"]["reference_image_slots"] = 0
+    config["services"]["codex_image"] = service
+    pool = config["account_pools"].pop("image_pool")
+    pool["accounts"][0]["service_id"] = "codex_image"
+    config["account_pools"]["codex_image_pool"] = pool
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_http.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "test-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+    descriptor = registry.descriptor("image_relay")
+
+    registry.dispatch(
+        "image",
+        "image_relay",
+        ProviderDispatchRequest(
+            prompt="Preserve approved identities and continuity.",
+            output_dir=tmp_path / "run",
+            image_operation="edit",
+            edit_source_image_path=references[0],
+            edit_reference_image_paths=tuple(references),
+            reference_image_paths=tuple(references),
+            image_input_fidelity=None,
+        ),
+    )
+
+    assert descriptor.image_edit_capabilities.input_fidelity_modes == []
+    assert captured["url"] == "https://api.crazyrouter.com/v1/images/edits"
+    assert "multipart/form-data" in captured["content_type"]
+    assert 'name="input_fidelity"' not in captured["body"]
+    first = captured["body"].index('filename="reference_001.png"')
+    second = captured["body"].index('filename="reference_002.png"')
+    assert first < second
+    assert "private-reference-" not in captured["body"]
 
 
 def test_provider_example_config_builds_registry_without_secret_values() -> None:

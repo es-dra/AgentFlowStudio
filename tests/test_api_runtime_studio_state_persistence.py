@@ -414,6 +414,38 @@ def test_projects_list_includes_studio_state_meta_and_preview_url_persists(tmp_p
     assert item["studio_state_meta"]["updated_at"] == "2026-06-13T10:00:00+08:00"
     assert item["studio_state_meta"]["state_version"]
     assert item["studio_state_meta"]["saved_at"]
+    assert item["production_graph_authoritative"] is False
+
+
+def test_projects_list_marks_nonempty_canonical_graph_authoritative(tmp_path) -> None:
+    from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
+    from apps.api.runtime_store import RuntimeStore
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-project-canonical-graph"
+    client.post("/projects", json={"project_id": project_id, "goal": "Canonical graph startup"})
+    graph_store = ProductionGraphStore(RuntimeStore(tmp_path))
+    graph = graph_store.ensure(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-canonical-startup",
+        semantic_digest=canonical_digest({"project_id": project_id, "seed": True}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "asset-001",
+                    "category": "asset",
+                    "metadata": {"label": "Test asset"},
+                },
+            }
+        ],
+    )
+
+    projects = client.get("/projects").json()["projects"]
+    item = next(project for project in projects if project["project_id"] == project_id)
+    assert item["production_graph_authoritative"] is True
 
 
 def test_studio_state_rejects_unsafe_preview_url(tmp_path) -> None:

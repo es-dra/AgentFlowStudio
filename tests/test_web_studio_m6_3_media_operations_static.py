@@ -34,6 +34,8 @@ def test_m6_3_media_operations_stays_inside_canvas_storyboard_shell() -> None:
     assert "isReadOnlyProjectionProject" in controller
     assert "isReadOnlyProjectionProject" in controller_policy
     assert "currentProjectIsReadOnlyProjection" in controller
+    assert "currentProjectHasCanonicalGraphAuthority" in controller
+    assert "summary.production_graph_authoritative === true" in controller_policy
     assert 'projectType === READ_ONLY_PROJECTION_PROJECT_TYPE' in controller_policy
     assert 'persistenceMode: readOnlyProjection ? "production_graph_read_only" : "studio_state"' in controller
     assert "hydrateStartupProject" in main
@@ -53,6 +55,8 @@ def test_m6_3_read_only_evidence_startup_is_named_and_fail_closed() -> None:
     assert 'store.setRuntimePersistenceMode?.("production_graph_read_only")' in startup
     assert "await store.hydrateRuntime(runtime)" in startup
     assert startup.index("currentProjectIsReadOnlyProjection") < startup.index("await store.hydrateRuntime(runtime)")
+    assert "currentProjectHasCanonicalGraphAuthority" in startup
+    assert "if (syncAssets && !readOnlyProjection)" in startup
 
 
 def test_m6_3_media_operations_copy_keeps_cost_recovery_and_nonclaim_boundaries() -> None:

@@ -37,7 +37,10 @@ class ApiRelayAdapter:
             raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
         reference_slots = self.descriptor.reference_image_slots
         if request.image_operation == "edit":
-            reference_slots = max(1, reference_slots)
+            edit = self.descriptor.image_edit_capabilities
+            if not self.descriptor.image_edit_capabilities_present or not edit.supports_image_edit:
+                raise ModelConfigError(f"image edit capability is not declared for {self.service_id}")
+            reference_slots = max(1, min(reference_slots, edit.max_reference_images))
         if len(request.reference_image_paths) > reference_slots:
             raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
         if request.image_operation == "edit":

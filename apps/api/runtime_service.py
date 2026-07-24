@@ -49,6 +49,7 @@ from apps.api.runtime_dynamic_production_plan import register_runtime_dynamic_pr
 from apps.api.runtime_script_core_truth import register_runtime_script_core_truth_routes
 from apps.api.runtime_m3_zero_cost_kernel import register_runtime_m3_zero_cost_kernel_routes
 from apps.api.runtime_film_production_graph import register_runtime_film_production_graph_routes
+from apps.api.runtime_production_graph import GraphIntegrityError, graph_has_authority
 from apps.api.runtime_m6_script_plan_asset_bible import register_runtime_m6_script_plan_asset_bible_routes
 from apps.api.runtime_asset_bible import register_runtime_asset_bible_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
@@ -68,6 +69,7 @@ from apps.api.runtime_external_video_routes import register_runtime_external_vid
 from apps.api.runtime_keyframe_local_edit import register_runtime_keyframe_local_edit_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
+from apps.api.runtime_image_admission import register_runtime_image_admission_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_sprite import register_runtime_sprite_routes
@@ -105,6 +107,11 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
     project_id = str(summary.get("project_id") or "")
     path = store.projects_dir / safe_id(project_id) / "studio_state.json"
     meta: dict[str, Any] = {}
+    production_graph_authoritative = False
+    try:
+        production_graph_authoritative = graph_has_authority(store, project_id)
+    except (GraphIntegrityError, OSError, ValueError):
+        production_graph_authoritative = False
     if path.is_file():
         try:
             payload = read_json(path)
@@ -120,7 +127,11 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
                 }
         except (ValueError, OSError):
             meta = {}
-    return {**summary, "studio_state_meta": meta}
+    return {
+        **summary,
+        "studio_state_meta": meta,
+        "production_graph_authoritative": production_graph_authoritative,
+    }
 
 
 def create_runtime_app(
@@ -407,6 +418,7 @@ def create_runtime_app(
     register_runtime_storyboard_routes(app, store)
     register_runtime_shot_asset_plan_routes(app, store)
     register_runtime_image_asset_routes(app, store)
+    register_runtime_image_admission_routes(app, store, auth)
     register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
     register_runtime_feedback_candidate_routes(app, store)

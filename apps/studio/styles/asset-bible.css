@@ -350,6 +350,149 @@
 .asset-bible-command-review { background: #102630; }
 .asset-bible-failure { background: #2b161a; }
 
+.image-admission-panel {
+  display: grid;
+  flex: 0 1 auto;
+  gap: 12px;
+  max-height: 48vh;
+  overflow: auto;
+  border-bottom: 1px solid var(--product-line);
+  padding: 14px 16px;
+  background: #091820;
+}
+
+.image-admission-head,
+.image-admission-actions,
+.image-admission-item,
+.image-admission-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-admission-head h2 { margin: 3px 0; font-size: 17px; letter-spacing: 0; }
+.image-admission-head p,
+.image-admission-item p,
+.image-admission-empty p,
+.image-admission-capability p,
+.image-admission-error p,
+.image-admission-review p { margin: 0; color: var(--product-muted); font-size: 11px; line-height: 1.45; }
+
+.image-admission-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--product-line);
+}
+
+.image-admission-metrics > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border-right: 1px solid var(--product-line-soft);
+  padding: 9px 10px;
+}
+
+.image-admission-metrics > div:last-child { border-right: 0; }
+.image-admission-metrics span,
+.image-admission-item-kind { color: var(--product-muted); font-size: 10px; }
+.image-admission-metrics strong { font-size: 12px; overflow-wrap: anywhere; }
+
+.image-admission-capability,
+.image-admission-error,
+.image-admission-review,
+.image-admission-empty {
+  display: grid;
+  gap: 5px;
+  border-left: 3px solid #b26d5c;
+  padding: 10px 12px;
+  background: #21191b;
+}
+
+.image-admission-capability.ready { border-color: #2e936b; background: #10231d; }
+.image-admission-error { border-color: #c85c6b; background: #2b161a; }
+.image-admission-review { border-color: var(--product-accent); background: #102630; }
+.image-admission-empty { border-color: #54778c; background: #0d202a; }
+
+.image-admission-list {
+  display: grid;
+  border: 1px solid var(--product-line);
+}
+
+.image-admission-item {
+  min-width: 0;
+  border-bottom: 1px solid var(--product-line-soft);
+  padding: 9px 10px;
+}
+
+.image-admission-item:last-child { border-bottom: 0; }
+.image-admission-item > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.image-admission-item > div:first-child strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.image-admission-item-state { flex: 0 0 auto; color: #b9dfcf; font-size: 11px; }
+.image-admission-item.state-failed .image-admission-item-state,
+.image-admission-item.state-rejected .image-admission-item-state { color: #efb1b8; }
+.image-admission-item-actions { justify-content: flex-end; }
+.image-admission-candidate-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #081219;
+}
+.image-admission-fixture-note { display: block; margin-top: 6px; color: var(--product-muted); }
+.image-admission-candidate-media { display: grid; justify-items: start; gap: 7px; margin-top: 8px; }
+.image-admission-thumbnail-button {
+  width: min(220px, 100%);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--product-line);
+  border-radius: 6px;
+  padding: 0;
+  background: #081219;
+  cursor: zoom-in;
+}
+.image-admission-thumbnail-button:focus-visible { outline: 2px solid var(--product-accent); outline-offset: 2px; }
+.image-admission-media-summary { color: var(--product-muted); }
+.image-admission-media-failure {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  border-left: 3px solid #d96f7a;
+  padding: 9px 10px;
+  background: #21151a;
+  color: #f2c3c8;
+}
+.image-admission-media-failure span { font-size: 11px; line-height: 1.45; }
+.image-admission-viewer {
+  position: fixed;
+  z-index: 140;
+  inset: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  gap: 10px;
+  padding: 28px;
+  background: rgba(2, 8, 12, .94);
+}
+.image-admission-viewer > img {
+  min-width: 0;
+  min-height: 0;
+  max-width: min(1180px, 100%);
+  max-height: calc(100vh - 112px);
+  object-fit: contain;
+}
+.image-admission-viewer-close { position: absolute; top: 18px; right: 18px; }
+.image-admission-viewer-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  color: var(--product-muted);
+  text-align: center;
+}
+.image-admission-viewer-caption strong { color: var(--product-text); }
+.image-admission-viewer-caption small { flex-basis: 100%; }
+
 .agent-production-copilot {
   display: grid;
   gap: 8px;
@@ -380,6 +523,7 @@
 @media (max-width: 1180px) {
   .asset-bible-status-bar { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
   .asset-bible-workspace { grid-template-columns: minmax(240px, .72fr) minmax(320px, 1.28fr); }
+  .image-admission-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -408,6 +552,12 @@
   .asset-occurrence-picker { grid-template-columns: 1fr; }
   .asset-resolution-form { grid-template-columns: 1fr; }
   .asset-bible-status-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .asset-bible-status-bar strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .asset-bible-workspace { display: block; }
   .asset-bible-list { max-height: 42vh; border-right: 0; border-bottom: 1px solid var(--product-line); }
   .asset-bible-detail { overflow: visible; padding: 14px 10px 94px; }
@@ -416,6 +566,14 @@
   .asset-bible-split-fields { grid-template-columns: 1fr; }
   .asset-bible-command-review,
   .asset-bible-failure { padding: 10px; }
+  .image-admission-panel { max-height: none; padding: 12px 10px; overflow: visible; }
+  .image-admission-head { align-items: flex-start; }
+  .image-admission-item { align-items: flex-start; flex-wrap: wrap; }
+  .image-admission-item-actions { width: 100%; justify-content: flex-start; }
+  .image-admission-thumbnail-button { width: 100%; max-height: 240px; }
+  .image-admission-viewer { padding: 56px 12px 16px; }
+  .image-admission-viewer > img { max-height: calc(100vh - 154px); }
+  .image-admission-actions { flex-wrap: wrap; justify-content: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
