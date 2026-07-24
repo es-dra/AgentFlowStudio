@@ -334,7 +334,7 @@ def test_api_preview_confirm_retry_and_studio_reload_are_zero_provider_and_idemp
     confirm_body = {
         **request,
         "preview_digest": preview.json()["preview_digest"],
-        "idempotency_key": "asset-generation-current",
+        "command_id": preview.json()["command_id"],
         "expected_graph_version": 0,
     }
     first = client.post(
@@ -350,6 +350,12 @@ def test_api_preview_confirm_retry_and_studio_reload_are_zero_provider_and_idemp
     assert first.json()["asset_bible"]["version"] == retry.json()["asset_bible"]["version"] == 1
     assert first.json()["provider_dispatch_count"] == retry.json()["provider_dispatch_count"] == 0
     assert first.json()["external_cost_usd"] == retry.json()["external_cost_usd"] == 0
+    mismatched = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json={**confirm_body, "command_id": "asset-command-" + "f" * 32},
+    )
+    assert mismatched.status_code == 422
+    assert "identity does not match" in mismatched.text
 
     saved = client.put(
         f"/projects/{PROJECT_ID}/studio-state",
@@ -370,7 +376,7 @@ def test_api_preview_confirm_retry_and_studio_reload_are_zero_provider_and_idemp
     restored = reloaded.json()["state"]["assetBible"]
     assert restored["current_revision_id"] == first.json()["asset_bible"]["current_revision_id"]
     assert restored["candidate_set"]["shot_count"] == 17
-    assert restored["idempotency_keys"] == ["asset-generation-current"]
+    assert restored["idempotency_keys"] == [preview.json()["command_id"]]
 
 
 def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_path) -> None:
@@ -402,13 +408,25 @@ def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_pat
         json={
             **generate_request,
             "preview_digest": generated_preview["preview_digest"],
-            "idempotency_key": "canonical-assets-v1",
+            "command_id": generated_preview["command_id"],
             "expected_graph_version": 1,
         },
     )
     assert generated.status_code == 200, generated.text
     assert generated.json()["authority_mode"] == "canonical_production_graph"
     graph_version = generated.json()["graph_version"]
+    replayed = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json={
+            **generate_request,
+            "preview_digest": generated_preview["preview_digest"],
+            "command_id": generated_preview["command_id"],
+            "expected_graph_version": 1,
+        },
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["idempotent_replay"] is True
+    assert replayed.json()["graph_version"] == graph_version
     bible = generated.json()["asset_bible"]
     scene_assets = [item for item in bible["assets"] if item["asset_type"] == "scene"][:2]
 

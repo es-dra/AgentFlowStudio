@@ -27,6 +27,11 @@ import {
   imageAdmissionProjection,
   imageAdmissionStateLabel,
 } from "./image-admission-workspace.js";
+import {
+  assetBibleConfirmRecovery,
+  assetBibleConfirmRequest,
+  syncAssetBibleCommandAssistantReceipt,
+} from "./asset-bible-command-recovery.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -50,6 +55,8 @@ export function createProductShell(options = {}) {
   let selectedAssetId = "";
   let assetCommandPreview = null;
   let assetCommandError = "";
+  let assetCommandRecovery = null;
+  let assetCommandConfirmPending = false;
   let lastAssetCommand = null;
   let assetDraft = null;
   let artDirectionDraft = null;
@@ -910,7 +917,7 @@ export function createProductShell(options = {}) {
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
       main.appendChild(buildImageAdmissionPanel());
     }
-    if (assetCommandError) main.appendChild(assetBibleFailure());
+    if (assetCommandError && !assetCommandPreview) main.appendChild(assetBibleFailure());
     if (assetCommandPreview) main.appendChild(assetBibleCommandReview());
     if (assetCreateOpen && view.status !== "locked") main.appendChild(assetBibleCreateForm(view));
     if (!view.counts.total) {
@@ -1477,6 +1484,16 @@ export function createProductShell(options = {}) {
       node("strong", "", assetCommandLabel(command.type)),
       node("p", "", `影响 ${impact.asset_ids?.length || preview.result?.asset_bible?.assets?.length || 0} 个资产 · ${impact.scene_count || 0} 场 · ${impact.shot_count || 0} 镜头；取消不会改变事实。`),
     );
+    if (assetCommandRecovery) {
+      const recovery = node("div", "asset-bible-failure");
+      recovery.setAttribute("role", "alert");
+      recovery.append(
+        node("strong", "", assetCommandRecovery.category),
+        node("p", "", assetCommandRecovery.message),
+        node("small", "", "当前页面事实保持不变；同一命令号用于恢复，成功结果不会重复应用。"),
+      );
+      sectionEl.appendChild(recovery);
+    }
     if (Number.isFinite(Number(impact.unresolved_required_after))) {
       sectionEl.appendChild(node(
         "p",
@@ -1503,11 +1520,21 @@ export function createProductShell(options = {}) {
       ));
     }
     const actions = node("div", "");
-    const confirm = node("button", "studio-primary-button", "确认应用");
+    const confirm = node(
+      "button",
+      "studio-primary-button",
+      assetCommandConfirmPending
+        ? "确认中"
+        : assetCommandRecovery
+          ? "重试同一确认"
+          : "确认应用",
+    );
     confirm.type = "button";
+    confirm.disabled = assetCommandConfirmPending;
     confirm.addEventListener("click", () => void confirmAssetBibleCommand());
     const cancel = node("button", "studio-secondary-button", "取消");
     cancel.type = "button";
+    cancel.disabled = assetCommandConfirmPending;
     cancel.addEventListener("click", cancelAssetBibleCommand);
     actions.append(confirm, cancel);
     sectionEl.appendChild(actions);
@@ -1522,7 +1549,7 @@ export function createProductShell(options = {}) {
       node("p", "", `${assetCommandError} 当前 Asset Bible 和 ProductionGraph 均已保留。`),
     );
     if (lastAssetCommand) {
-      const retry = node("button", "studio-primary-button", "重试同一命令");
+      const retry = node("button", "studio-primary-button", "重新预览同一命令");
       retry.type = "button";
       retry.addEventListener("click", () => void stageAssetBibleCommand(lastAssetCommand));
       sectionEl.appendChild(retry);
@@ -1540,6 +1567,7 @@ export function createProductShell(options = {}) {
     }
     lastAssetCommand = JSON.parse(JSON.stringify(command));
     assetCommandError = "";
+    assetCommandRecovery = null;
     try {
       section = "asset_bible";
       const view = assetBibleView();
@@ -2101,17 +2129,19 @@ export function createProductShell(options = {}) {
 
   async function confirmAssetBibleCommand() {
     const preview = assetCommandPreview;
-    if (!preview) return;
+    if (!preview || assetCommandConfirmPending) return;
+    assetCommandConfirmPending = true;
+    assetCommandError = "";
+    assetCommandRecovery = null;
+    render();
     try {
       const currentFingerprint = agentChatContextFingerprint(currentAgentChatContext());
       if (preview.request?.context_fingerprint !== currentFingerprint) {
         throw new Error("当前对象或版本已变化，请重新预览影响范围。");
       }
-      const response = await options.getRuntime?.().confirmAssetBibleCommand({
-        ...preview.request,
-        preview_digest: preview.preview_digest,
-        expected_graph_version: Number(snapshot.sequenceWorkspace?.graph_version || 0),
-      });
+      const response = await options.getRuntime?.().confirmAssetBibleCommand(
+        assetBibleConfirmRequest(preview, snapshot.sequenceWorkspace?.graph_version),
+      );
       if (response?.authority_mode === "canonical_production_graph") {
         snapshot.runtimeAssetBible = {
           authority_mode: "canonical_production_graph",
@@ -2129,6 +2159,7 @@ export function createProductShell(options = {}) {
         || "";
       assetCommandPreview = null;
       assetCommandError = "";
+      assetCommandRecovery = null;
       mergeAssetIds = new Set();
       assetDraft = null;
       artDirectionDraft = null;
@@ -2139,15 +2170,22 @@ export function createProductShell(options = {}) {
       resolutionReason = "";
       notice = response?.receipt?.summary || "Asset Bible 已更新。";
     } catch (error) {
-      assetCommandError = options.formatError?.(error) || String(error?.message || error || "资产命令确认失败");
-      assetCommandPreview = null;
+      const recovery = assetBibleConfirmRecovery(error);
+      assetCommandRecovery = recovery.preserve_preview ? recovery : null;
+      assetCommandError = recovery.preserve_preview
+        ? recovery.message
+        : options.formatError?.(error) || recovery.message;
+      if (!recovery.preserve_preview) assetCommandPreview = null;
     }
+    assetCommandConfirmPending = false;
     render();
   }
 
   function cancelAssetBibleCommand() {
     assetCommandPreview = null;
     assetCommandError = "";
+    assetCommandRecovery = null;
+    assetCommandConfirmPending = false;
     notice = "资产命令预览已取消；Asset Bible 与 ProductionGraph 未改变。";
     render();
   }
@@ -2616,6 +2654,9 @@ export function createProductShell(options = {}) {
     const context = currentAgentChatContext();
     const copilot = currentCopilotState();
     const session = agentChatContexts.get(agentChatContextKey(context));
+    if (section === "asset_bible") {
+      syncAssetBibleCommandAssistantReceipt(session, assetBibleView());
+    }
     const collapsed = isAgentChatCollapsed();
     return buildAgentChatPanel({
       session,
