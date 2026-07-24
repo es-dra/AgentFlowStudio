@@ -107,7 +107,9 @@ export function assertProjectRequestIdentity(route, method = "GET", payload = nu
   if (isIdentityBoundaryMutation(route, normalizedMethod)) return;
   if (!gate.initialized) throw identityError("project_identity_not_ready");
   if (String(route || "") === "/projects" && normalizedMethod === "POST") {
-    if (gate.status === "project_list_ready" && safeIdentity(payload?.project_id)) return;
+    const creationContextReady = gate.status === "project_list_ready"
+      || (gate.status === "ready" && !gate.read_only);
+    if (creationContextReady && safeIdentity(payload?.project_id)) return;
     throw identityError("project_identity_not_ready");
   }
   const projectId = projectIdForRequest(route, payload);

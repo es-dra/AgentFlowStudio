@@ -27,6 +27,7 @@ def test_project_identity_gate_blocks_mutations_before_fetch() -> None:
           beginProjectIdentityLoad,
           blockProjectIdentity,
           commitProjectIdentity,
+          commitProjectListIdentity,
         } from "./apps/studio/src/project-identity-gate.js";
         import { createRuntimeClient } from "./apps/studio/src/runtime-client.js";
 
@@ -87,9 +88,23 @@ def test_project_identity_gate_blocks_mutations_before_fetch() -> None:
         });
         if (fetchCount !== 0) throw new Error(`blocked project creation reached fetch: ${fetchCount}`);
 
+        commitProjectListIdentity("account-12");
+        await runtimeB.createProject({
+          project_id: "project-from-list",
+          project_type: "studio_creator_authoring",
+          goal: "new project from project list",
+        });
+        if (fetchCount !== 1) throw new Error(`project-list creation did not reach fetch: ${fetchCount}`);
+
         commitProjectIdentity({ projectId: "project-b", accountId: "account-12" });
         await runtimeB.confirmAssetBibleCommand({ command: "lock" });
-        if (fetchCount !== 1) throw new Error(`ready mutation did not reach fetch exactly once: ${fetchCount}`);
+        if (fetchCount !== 2) throw new Error(`ready mutation did not reach fetch exactly once: ${fetchCount}`);
+        await runtimeB.createProject({
+          project_id: "project-new",
+          project_type: "studio_creator_authoring",
+          goal: "new project from ready project",
+        });
+        if (fetchCount !== 3) throw new Error(`ready project creation did not reach fetch: ${fetchCount}`);
 
         window.location.search = "?project=project-a";
         await runtimeB.confirmAssetBibleCommand({ command: "lock" })
@@ -97,7 +112,7 @@ def test_project_identity_gate_blocks_mutations_before_fetch() -> None:
           .catch((error) => {
             if (error.errorCode !== "project_identity_not_ready") throw error;
           });
-        if (fetchCount !== 1) throw new Error(`URL drift changed fetch count: ${fetchCount}`);
+        if (fetchCount !== 3) throw new Error(`URL drift changed fetch count: ${fetchCount}`);
         window.location.search = "?project=project-b";
 
         const runtimeA = createRuntimeClient("project-a");
@@ -106,7 +121,7 @@ def test_project_identity_gate_blocks_mutations_before_fetch() -> None:
           .catch((error) => {
             if (error.errorCode !== "project_identity_not_ready") throw error;
           });
-        if (fetchCount !== 1) throw new Error(`cross-project mutation changed fetch count: ${fetchCount}`);
+        if (fetchCount !== 3) throw new Error(`cross-project mutation changed fetch count: ${fetchCount}`);
 
         commitProjectIdentity({
           projectId: "project-b",
@@ -119,7 +134,7 @@ def test_project_identity_gate_blocks_mutations_before_fetch() -> None:
           .catch((error) => {
             if (error.errorCode !== "project_cache_read_only") throw error;
           });
-        if (fetchCount !== 1) throw new Error(`read-only cache changed fetch count: ${fetchCount}`);
+        if (fetchCount !== 3) throw new Error(`read-only cache changed fetch count: ${fetchCount}`);
         """
     )
 
@@ -133,7 +148,14 @@ def test_store_prepares_only_exact_account_project_cache_and_never_foreign_fallb
         import { webcrypto } from "node:crypto";
 
         const storage = new Map();
-        globalThis.crypto = webcrypto;
+        const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+        if (!globalThis.crypto?.subtle) {
+          Object.defineProperty(globalThis, "crypto", {
+            configurable: true,
+            value: webcrypto,
+          });
+        }
+        try {
         globalThis.localStorage = {
           get length() { return storage.size; },
           key: (index) => [...storage.keys()][index] || null,
@@ -265,6 +287,13 @@ def test_store_prepares_only_exact_account_project_cache_and_never_foreign_fallb
         }
         function hex(value) {
           return [...new Uint8Array(value)].map((item) => item.toString(16).padStart(2, "0")).join("");
+        }
+        } finally {
+          if (originalCryptoDescriptor) {
+            Object.defineProperty(globalThis, "crypto", originalCryptoDescriptor);
+          } else {
+            delete globalThis.crypto;
+          }
         }
         """
     )
