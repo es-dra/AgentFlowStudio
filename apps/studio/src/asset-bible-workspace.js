@@ -12,12 +12,15 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
       ? "legacy_studio_adapter"
       : runtimeAssetBible?.authority_mode || "legacy_studio_adapter";
   const assets = array(bible.assets).map(normalizeAsset).filter(Boolean);
-  const activeAssets = assets.filter((asset) => !["rejected", "split", "merged"].includes(asset.review_state));
+  const activeAssets = assets.filter((asset) => !["rejected", "superseded"].includes(asset.review_state));
+  const historyAssets = assets.filter((asset) => ["rejected", "superseded"].includes(asset.review_state));
+  const coverage = normalizeCoverage(bible.coverage, bible.candidate_set);
   const counts = {
     total: activeAssets.length,
     approved: activeAssets.filter((asset) => asset.review_state === "approved").length,
     candidate: activeAssets.filter((asset) => asset.review_state === "candidate").length,
     rejected: assets.filter((asset) => asset.review_state === "rejected").length,
+    superseded: assets.filter((asset) => asset.review_state === "superseded").length,
     character: activeAssets.filter((asset) => asset.asset_type === "character").length,
     scene: activeAssets.filter((asset) => asset.asset_type === "scene").length,
     prop: activeAssets.filter((asset) => asset.asset_type === "prop").length,
@@ -31,7 +34,10 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
     candidate_set: bible.candidate_set || {},
     assets,
     active_assets: activeAssets,
+    history_assets: historyAssets,
     counts,
+    coverage,
+    resolution_ledger: array(bible.resolution_ledger),
     last_receipt: bible.last_receipt || {},
     raw: bible,
     provider_dispatch_count: 0,
@@ -83,10 +89,14 @@ export function deriveProductionCopilotState({
 } = {}) {
   const shotTruth = legacyAppliedStoryboardProjection(studioState);
   const bible = assetBibleProjection(studioState, runtimeAssetBible);
-  const scriptReady = Boolean(assetBibleSourceContext(studioState)?.script_revision_id);
-  const shotReady = shotTruth.status === "ready";
+  const scriptReady = Boolean(
+    assetBibleSourceContext(studioState)?.script_revision_id
+    || bible.candidate_set?.script_revision_id,
+  );
+  const shotReady = shotTruth.status === "ready" || Number(bible.candidate_set?.shot_count || 0) > 0;
   const candidatesReady = bible.counts.total > 0;
   const bibleLocked = bible.status === "locked" && Boolean(bible.locked_revision_id);
+  const contentReady = bibleLocked && bible.coverage.coverage_pass;
   const imageEnabled = capabilityGates.image === true;
   let next = {
     action: "open_script",
@@ -97,7 +107,7 @@ export function deriveProductionCopilotState({
   if (scriptReady && !shotReady) {
     next = { action: "open_storyboard", label: "拆分分镜", reason: "剧本已就绪，下一步是建立镜头计划。", enabled: true };
   } else if (shotReady && !candidatesReady) {
-    next = { action: "generate_asset_candidates", label: "识别资产候选", reason: "分镜已应用，可执行零 Provider 资产识别。", enabled: true };
+    next = { action: "generate_asset_candidates", label: "识别资产候选", reason: "分镜已应用，可执行本地确定性资产识别，不调用外部能力。", enabled: true };
   } else if (candidatesReady && bible.counts.candidate > 0) {
     next = {
       action: selectedAsset?.review_state === "candidate" ? "approve_selected_asset" : "review_asset_candidates",
@@ -105,41 +115,60 @@ export function deriveProductionCopilotState({
       reason: `仍有 ${bible.counts.candidate} 个候选待确认。`,
       enabled: true,
     };
+  } else if (candidatesReady && bible.coverage.unresolved_required > 0) {
+    next = {
+      action: "resolve_required_occurrences",
+      label: "解决资产引用",
+      reason: `${bible.coverage.unresolved_required} 个必要出现范围尚未解决，涉及 ${bible.coverage.unresolved_shot_count} 个镜头。`,
+      enabled: true,
+    };
+  } else if (candidatesReady && !bible.coverage.coverage_pass) {
+    next = {
+      action: "review_asset_coverage",
+      label: "检查镜头覆盖",
+      reason: `${bible.coverage.shot_covered}/${bible.coverage.shot_total} 镜头已完成资产需求检查。`,
+      enabled: true,
+    };
   } else if (candidatesReady && !bibleLocked) {
-    next = { action: "lock_asset_bible", label: "锁定 Asset Bible", reason: "候选已处理，可以锁定当前版本。", enabled: true };
-  } else if (bibleLocked && !imageEnabled) {
+    next = { action: "lock_asset_bible", label: "锁定 Asset Bible", reason: "资产审核与镜头覆盖已完成，可以锁定当前版本。", enabled: true };
+  } else if (contentReady && !imageEnabled) {
     next = {
       action: "media_gate_closed",
       label: "图片能力未启用",
-      reason: "结构已就绪，但当前 Runtime 未开放图片媒体能力。",
+      reason: "结构已就绪，但当前环境未开放图片媒体能力。",
       enabled: false,
     };
-  } else if (bibleLocked) {
+  } else if (contentReady) {
     next = { action: "image_admission_ready", label: "进入图片准入", reason: "结构与锁定版本已满足图片生产前置条件。", enabled: true };
   }
   return {
     stage: !scriptReady ? "script_required"
       : !shotReady ? "shot_plan_required"
         : !candidatesReady ? "asset_recognition_ready"
-          : !bibleLocked ? "asset_review"
+          : !contentReady ? "asset_review"
             : imageEnabled ? "image_admission_ready" : "media_gate_closed",
     dependencies: [
       { key: "script", label: "当前剧本", state: scriptReady ? "ready" : "blocked" },
       { key: "shots", label: "已应用分镜", state: shotReady ? "ready" : "blocked" },
       { key: "assets", label: "资产候选", state: candidatesReady ? "ready" : "blocked" },
+      { key: "coverage", label: "镜头覆盖", state: bible.coverage.coverage_pass ? "ready" : "blocked" },
       { key: "bible", label: "Bible 锁定", state: bibleLocked ? "ready" : "blocked" },
     ],
     blockers: [
       ...(!scriptReady ? ["缺少当前剧本版本"] : []),
       ...(scriptReady && !shotReady ? ["分镜尚未应用"] : []),
       ...(candidatesReady && bible.counts.candidate ? [`${bible.counts.candidate} 个资产待确认`] : []),
-      ...(bibleLocked && !imageEnabled ? ["图片媒体 gate 关闭"] : []),
+      ...(candidatesReady && bible.coverage.unresolved_required ? [
+        `${bible.coverage.unresolved_required} 个必要出现范围未解决（${bible.coverage.unresolved_shot_count} 镜头）`,
+      ] : []),
+      ...(bible.coverage.alias_collision_count ? [`${bible.coverage.alias_collision_count} 组别名冲突`] : []),
+      ...(contentReady && !imageEnabled ? ["内容结构已就绪；图片能力未启用"] : []),
     ],
     gate: {
       llm: capabilityGates.llm === true,
       image: imageEnabled,
       video: capabilityGates.video === true,
-      admission: bibleLocked ? (imageEnabled ? "ready" : "structure_ready_media_disabled") : "blocked",
+      admission: contentReady ? (imageEnabled ? "ready" : "structure_ready_media_disabled") : "blocked",
       cost_state: "not_admitted",
     },
     next_valid_action: next,
@@ -164,9 +193,41 @@ export function assetReviewLabel(value) {
     candidate: "待确认",
     approved: "已批准",
     rejected: "已拒绝",
-    split: "已拆分",
-    merged: "已合并",
+    superseded: "已取代",
   }[String(value || "")] || "待确认";
+}
+
+export function localizedNegativeLock(value) {
+  return {
+    "no text, captions, watermarks, interface elements, or borders": "禁止添加文字、水印、界面元素或边框",
+    "do not add text/watermark/ui/borders": "禁止添加文字、水印、界面元素或边框",
+    "do not change character identity": "禁止改变角色身份",
+    "do not change identity": "禁止改变角色身份",
+    "do not add unrequested characters": "禁止添加未要求的角色",
+    "do not add chairs or stools unless approved": "未经确认，禁止添加椅子或凳子",
+    "do not add eaves unless approved": "未经确认，禁止添加屋檐元素",
+    "do not add unrequested set pieces": "禁止添加未要求的场景陈设",
+    "do not change prop function": "禁止改变道具功能",
+    "do not duplicate the prop unless scripted": "剧本未要求时，禁止复制该道具",
+    "do not move to a different location": "禁止移动到其他场景",
+  }[String(value || "").trim().toLowerCase()] || String(value || "");
+}
+
+export function pendingFieldLabel(value) {
+  return {
+    positive_traits: "正向视觉特征",
+    visual_identity: "视觉身份",
+    continuity_state: "连续性状态",
+  }[String(value || "")] || "待人工确认属性";
+}
+
+export function assetOccurrenceLabel(candidateSet = {}, kind, id) {
+  if (kind === "scene") {
+    const item = array(candidateSet.scene_index).find((entry) => entry?.scene_id === id);
+    return item ? `场景 ${item.number} · ${item.name}` : "未命名场景";
+  }
+  const item = array(candidateSet.shot_index).find((entry) => entry?.shot_id === id);
+  return item ? `镜头 ${String(item.number).padStart(2, "0")} · ${item.title}` : "未命名镜头";
 }
 
 function normalizeAsset(value) {
@@ -186,6 +247,26 @@ function normalizeAsset(value) {
     negative_locks: array(value.negative_locks),
     pending_fields: array(value.pending_fields),
     source_evidence: array(value.source_evidence),
+    superseded_by_ids: array(value.superseded_by_ids),
+  };
+}
+
+function normalizeCoverage(value = {}, candidateSet = {}) {
+  const shotTotal = Number(value.shot_total ?? candidateSet?.shot_count ?? 0);
+  const sceneTotal = Number(value.scene_total ?? candidateSet?.scene_count ?? 0);
+  return {
+    scene_total: sceneTotal,
+    scene_covered: Number(value.scene_covered || 0),
+    shot_total: shotTotal,
+    shot_covered: Number(value.shot_covered || 0),
+    required_occurrence_total: Number(value.required_occurrence_total || 0),
+    resolved_required: Number(value.resolved_required || 0),
+    unresolved_required: Number(value.unresolved_required || 0),
+    unresolved_scene_count: Number(value.unresolved_scene_count || 0),
+    unresolved_shot_count: Number(value.unresolved_shot_count || 0),
+    unresolved_asset_ids: array(value.unresolved_asset_ids),
+    alias_collision_count: Number(value.alias_collision_count || 0),
+    coverage_pass: value.coverage_pass === true,
   };
 }
 

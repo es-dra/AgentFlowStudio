@@ -9,7 +9,7 @@ TextSanitizer = Callable[[Any, str, int], str]
 NumberSanitizer = Callable[[Any, float], float]
 
 ASSET_TYPES = {"character", "scene", "prop", "wardrobe", "continuity_object"}
-ASSET_STATES = {"candidate", "approved", "rejected", "split", "merged"}
+ASSET_STATES = {"candidate", "approved", "rejected", "superseded"}
 BIBLE_STATES = {"empty", "candidate_review", "locked"}
 
 
@@ -31,6 +31,23 @@ def sanitize_asset_bible(
     revisions = [_revision(item, text=text, number=number) for item in _list(data.get("revisions"))[-24:]]
     revisions = [item for item in revisions if item]
     candidate_set = data.get("candidate_set") if isinstance(data.get("candidate_set"), dict) else {}
+    required_occurrences = [
+        item
+        for item in (
+            _required_occurrence(value, text=text)
+            for value in _list(data.get("required_occurrences"))[:512]
+        )
+        if item
+    ]
+    requirement_ids = {item["requirement_id"] for item in required_occurrences}
+    occurrence_resolutions = [
+        item
+        for item in (
+            _occurrence_resolution(value, text=text)
+            for value in _list(data.get("occurrence_resolutions"))[:512]
+        )
+        if item and item["requirement_id"] in requirement_ids
+    ]
     status = text(data.get("status"), "empty", 40)
     if status not in BIBLE_STATES:
         status = "empty"
@@ -50,10 +67,40 @@ def sanitize_asset_bible(
             "shot_candidate_id": _id(candidate_set.get("shot_candidate_id")),
             "scene_count": max(0, int(number(candidate_set.get("scene_count"), 0))),
             "shot_count": max(0, int(number(candidate_set.get("shot_count"), 0))),
+            "scene_index": [
+                {
+                    "scene_id": _id(item.get("scene_id")),
+                    "name": text(item.get("name"), "场景", 120),
+                    "number": max(1, int(number(item.get("number"), index + 1))),
+                }
+                for index, item in enumerate(_list(candidate_set.get("scene_index"))[:80])
+                if isinstance(item, dict) and _id(item.get("scene_id"))
+            ],
+            "shot_index": [
+                {
+                    "shot_id": _id(item.get("shot_id")),
+                    "scene_id": _id(item.get("scene_id")),
+                    "title": text(item.get("title"), "镜头", 120),
+                    "number": max(1, int(number(item.get("number"), index + 1))),
+                }
+                for index, item in enumerate(_list(candidate_set.get("shot_index"))[:240])
+                if isinstance(item, dict) and _id(item.get("shot_id"))
+            ],
             "source_digest": _digest(candidate_set.get("source_digest")),
             "created_at": text(candidate_set.get("created_at"), "", 80),
         },
         "assets": assets,
+        "required_occurrences": required_occurrences,
+        "occurrence_resolutions": occurrence_resolutions,
+        "resolution_ledger": [
+            item
+            for item in (
+                _ledger_item(value, text=text)
+                for value in _list(data.get("resolution_ledger"))[:512]
+            )
+            if item and item["requirement_id"] in requirement_ids
+        ],
+        "coverage": _coverage(data.get("coverage"), number=number),
         "revisions": revisions,
         "current_revision_id": _id(data.get("current_revision_id")),
         "locked_revision_id": _id(data.get("locked_revision_id")),
@@ -115,7 +162,84 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
             "parent_ids": _ids(data.get("lineage", {}).get("parent_ids") if isinstance(data.get("lineage"), dict) else [], 16),
             "merged_from_ids": _ids(data.get("lineage", {}).get("merged_from_ids") if isinstance(data.get("lineage"), dict) else [], 16),
         },
+        "superseded_by_ids": _ids(data.get("superseded_by_ids"), 16),
     }
+
+
+def _required_occurrence(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    requirement_id = _id(data.get("requirement_id"))
+    source_asset_id = _id(data.get("source_asset_id"))
+    occurrence_kind = text(data.get("occurrence_kind"), "", 16)
+    occurrence_id = _id(data.get("occurrence_id"))
+    asset_type = text(data.get("asset_type"), "", 40)
+    if (
+        not requirement_id
+        or not source_asset_id
+        or occurrence_kind not in {"scene", "shot"}
+        or not occurrence_id
+        or asset_type not in ASSET_TYPES
+    ):
+        return {}
+    return {
+        "requirement_id": requirement_id,
+        "source_asset_id": source_asset_id,
+        "asset_type": asset_type,
+        "occurrence_kind": occurrence_kind,
+        "occurrence_id": occurrence_id,
+    }
+
+
+def _occurrence_resolution(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    requirement_id = _id(data.get("requirement_id"))
+    resolution = text(data.get("resolution"), "assigned", 24)
+    if not requirement_id or resolution not in {"assigned", "not_needed"}:
+        return {}
+    return {
+        "requirement_id": requirement_id,
+        "resolution": resolution,
+        "assigned_asset_id": _id(data.get("assigned_asset_id")),
+        "reason": text(data.get("reason"), "", 240),
+    }
+
+
+def _ledger_item(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
+    base = _required_occurrence(value, text=text)
+    if not base:
+        return {}
+    data = value if isinstance(value, dict) else {}
+    status = text(data.get("status"), "pending", 24)
+    if status not in {"approved", "pending", "rejected", "superseded", "orphaned", "not_needed"}:
+        status = "pending"
+    return {
+        **base,
+        "resolution": text(data.get("resolution"), "assigned", 24),
+        "assigned_asset_id": _id(data.get("assigned_asset_id")),
+        "reason": text(data.get("reason"), "", 240),
+        "status": status,
+        "resolved": data.get("resolved") is True,
+    }
+
+
+def _coverage(value: Any, *, number: NumberSanitizer) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    keys = (
+        "scene_total",
+        "scene_covered",
+        "shot_total",
+        "shot_covered",
+        "required_occurrence_total",
+        "resolved_required",
+        "unresolved_required",
+        "unresolved_scene_count",
+        "unresolved_shot_count",
+        "alias_collision_count",
+    )
+    result = {key: max(0, int(number(data.get(key), 0))) for key in keys}
+    result["unresolved_asset_ids"] = _ids(data.get("unresolved_asset_ids"), 96)
+    result["coverage_pass"] = data.get("coverage_pass") is True
+    return result
 
 
 def _revision(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[str, Any]:

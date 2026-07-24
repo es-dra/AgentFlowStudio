@@ -32,7 +32,8 @@ const bible = {
   version: 2,
   current_revision_id: "asset-bible-r2",
   locked_revision_id: "",
-  candidate_set: { candidate_set_id: "candidate-set", shot_count: 17, scene_count: 3 },
+  candidate_set: { candidate_set_id: "candidate-set", script_revision_id: "script-r1", shot_count: 17, scene_count: 3 },
+  coverage: { shot_total: 17, shot_covered: 17, scene_total: 3, scene_covered: 3, unresolved_required: 1, unresolved_shot_count: 1, coverage_pass: false },
   assets: [
     { stable_id: "asset-character-1", asset_type: "character", display_name: "林晚", review_state: "approved", confidence: .9, aliases: [], occurrences: { scene_ids: ["scene_1"], shot_ids: ["shot_1"] }, positive_traits: [], negative_locks: [], pending_fields: [], source_evidence: [] },
     { stable_id: "asset-prop-1", asset_type: "prop", display_name: "红绳", review_state: "candidate", confidence: .8, aliases: [], occurrences: { scene_ids: ["scene_1"], shot_ids: ["shot_1", "shot_2"] }, positive_traits: [], negative_locks: [], pending_fields: ["visual_identity"], source_evidence: [] },
@@ -53,6 +54,7 @@ console.log(JSON.stringify({ view, copilot, canonical }));
     assert result["copilot"]["next_valid_action"]["action"] in {"open_script", "approve_selected_asset"}
     assert result["canonical"]["authority_mode"] == "canonical_production_graph"
     assert result["canonical"]["status"] == "locked"
+    assert result["canonical"]["coverage"]["coverage_pass"] is False
 
 
 def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path() -> None:
@@ -71,6 +73,12 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "cancelAssetBibleCommand" in shell
     assert "取消不会改变事实" in shell
     assert "当前 Asset Bible 和 ProductionGraph 均已保留" in shell
+    assert "审核与版本历史" in shell
+    assert "预览重分配影响" in shell
+    assert "预览标记为无需" in shell
+    assert 'node("code", "", asset.stable_id)' not in shell
+    assert "assetOccurrenceLabel" in shell
+    assert "localizedNegativeLock" in shell
     assert "/m6/asset-bible/commands/preview" in client
     assert "/m6/asset-bible/commands/confirm" in client
     assert 'section === "asset_bible" ? "asset_bible"' in lifecycle
@@ -84,6 +92,51 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "grid-template-columns: auto minmax(180px, 280px) 276px" in product_styles
     assert "@media (max-width: 760px)" in styles
     assert "@media (prefers-reduced-motion: reduce)" in styles
+
+
+def test_content_coverage_blocks_media_admission_before_runtime_capability() -> None:
+    result = run_node_probe(
+        r'''
+import { assetBibleProjection, deriveProductionCopilotState, localizedNegativeLock, assetOccurrenceLabel } from "./apps/studio/src/asset-bible-workspace.js";
+
+const bible = {
+  schema_version: "afs.asset_bible.v0.1",
+  status: "locked",
+  version: 8,
+  current_revision_id: "asset-bible-r8",
+  locked_revision_id: "asset-bible-r8",
+  candidate_set: {
+    script_revision_id: "script-r8",
+    scene_count: 3,
+    shot_count: 17,
+    scene_index: [{ scene_id: "scene-1", name: "雨夜天台", number: 1 }],
+    shot_index: [{ shot_id: "shot-1", scene_id: "scene-1", title: "悟空发现湿泥", number: 2 }],
+  },
+  assets: [
+    { stable_id: "asset-character-wukong", asset_type: "character", display_name: "孙悟空", review_state: "approved", aliases: ["悟空"], occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] } },
+    { stable_id: "asset-character-bajie", asset_type: "character", display_name: "猪八戒", review_state: "rejected", aliases: ["八戒"], occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] } },
+  ],
+  resolution_ledger: [{ requirement_id: "req-1", source_asset_id: "asset-character-bajie", assigned_asset_id: "asset-character-bajie", occurrence_kind: "shot", occurrence_id: "shot-1", status: "rejected", resolved: false }],
+  coverage: { scene_total: 3, scene_covered: 3, shot_total: 17, shot_covered: 17, unresolved_required: 1, unresolved_shot_count: 1, coverage_pass: false },
+};
+const state = { assetBible: bible, nodes: {}, edges: {}, assets: [] };
+const view = assetBibleProjection(state);
+const copilot = deriveProductionCopilotState({ studioState: state, capabilityGates: { image: false }, section: "asset_bible" });
+console.log(JSON.stringify({
+  view,
+  copilot,
+  lock: localizedNegativeLock("do not change character identity"),
+  occurrence: assetOccurrenceLabel(bible.candidate_set, "shot", "shot-1"),
+}));
+''',
+    )
+    assert result["view"]["counts"]["rejected"] == 1
+    assert len(result["view"]["history_assets"]) == 1
+    assert result["copilot"]["gate"]["admission"] == "blocked"
+    assert result["copilot"]["next_valid_action"]["action"] == "resolve_required_occurrences"
+    assert "必要出现范围" in result["copilot"]["blockers"][0]
+    assert result["lock"] == "禁止改变角色身份"
+    assert result["occurrence"] == "镜头 02 · 悟空发现湿泥"
 
 
 def test_storyboard_context_prefers_current_shot_and_media_progress_is_unambiguous() -> None:

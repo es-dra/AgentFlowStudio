@@ -127,11 +127,29 @@ def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
         command_preview(edited, {"type": "lock"})
 
     edited = command_preview(edited, {"type": "approve", "target_id": approved["stable_id"]})["result"]["asset_bible"]
+    with pytest.raises(ValueError, match="required occurrences unresolved"):
+        command_preview(edited, {"type": "lock"})
+    rejected = next(item for item in edited["assets"] if item["review_state"] == "rejected")
+    unresolved = [
+        item["requirement_id"]
+        for item in edited["resolution_ledger"]
+        if item["assigned_asset_id"] == rejected["stable_id"] and not item["resolved"]
+    ]
+    edited = command_preview(
+        edited,
+        {
+            "type": "mark_not_needed",
+            "requirement_ids": unresolved,
+            "reason": "人工确认该资产在这些镜头中不构成连续性需求",
+        },
+    )["result"]["asset_bible"]
     locked = command_preview(edited, {"type": "lock"})["result"]["asset_bible"]
     assert locked["status"] == "locked"
     assert locked["locked_revision_id"] == locked["current_revision_id"]
     assert locked["version"] > original_version
     assert len(locked["revisions"]) == locked["version"]
+    assert locked["coverage"]["coverage_pass"] is True
+    assert locked["coverage"]["shot_covered"] == locked["coverage"]["shot_total"] == 17
 
 
 def test_merge_and_split_preserve_lineage_and_require_exact_occurrence_assignment() -> None:
@@ -168,8 +186,20 @@ def test_merge_and_split_preserve_lineage_and_require_exact_occurrence_assignmen
         },
     )["result"]["asset_bible"]
     children = [item for item in split["assets"] if merged_asset["stable_id"] in item["lineage"]["parent_ids"]]
+    history = [item for item in split["assets"] if item["review_state"] == "superseded"]
     assert {item["display_name"] for item in children} == {"天台区域", "楼梯区域"}
     assert set().union(*(set(item["occurrences"]["scene_ids"]) for item in children)) == set(source_refs)
+    assert {item["stable_id"] for item in history} >= {
+        scene_assets[0]["stable_id"],
+        scene_assets[1]["stable_id"],
+        merged_asset["stable_id"],
+    }
+    child_ids = {item["stable_id"] for item in children}
+    assert all(
+        item["assigned_asset_id"] in child_ids
+        for item in split["resolution_ledger"]
+        if item["source_asset_id"] in {scene_assets[0]["stable_id"], scene_assets[1]["stable_id"]}
+    )
 
     with pytest.raises(ValueError, match="cover every source occurrence"):
         command_preview(
@@ -378,3 +408,143 @@ def test_split_rejects_duplicate_occurrence_assignment() -> None:
                 },
             },
         )
+
+
+def test_referenced_reject_blocks_lock_until_same_type_reassignment() -> None:
+    bible = generated_bible()
+    characters = [
+        item
+        for item in bible["assets"]
+        if item["asset_type"] == "character" and item["occurrences"]["shot_ids"]
+    ]
+    assert len(characters) >= 2
+    rejected, destination = characters[:2]
+    for asset in list(bible["assets"]):
+        bible = command_preview(
+            bible,
+            {
+                "type": "reject" if asset["stable_id"] == rejected["stable_id"] else "approve",
+                "target_id": asset["stable_id"],
+            },
+        )["result"]["asset_bible"]
+
+    assert rejected["stable_id"] in bible["coverage"]["unresolved_asset_ids"]
+    assert bible["coverage"]["unresolved_required"] > 0
+    assert any(
+        item["status"] == "rejected" and item["assigned_asset_id"] == rejected["stable_id"]
+        for item in bible["resolution_ledger"]
+    )
+    with pytest.raises(ValueError, match="required occurrences unresolved"):
+        command_preview(bible, {"type": "lock"})
+
+    requirement_ids = [
+        item["requirement_id"]
+        for item in bible["resolution_ledger"]
+        if item["assigned_asset_id"] == rejected["stable_id"] and not item["resolved"]
+    ]
+    preview = command_preview(
+        bible,
+        {
+            "type": "reassign_occurrences",
+            "target_id": destination["stable_id"],
+            "requirement_ids": requirement_ids,
+            "reason": "人工确认这些镜头引用同一角色资产",
+        },
+    )
+    assert preview["impact"]["unresolved_required_before"] == len(requirement_ids)
+    assert preview["impact"]["unresolved_required_after"] == 0
+    assert {
+        item["requirement_id"] for item in preview["impact"]["occurrence_resolution_changes"]
+    } == set(requirement_ids)
+    expected_scene_ids = {
+        item["occurrence_id"]
+        for item in bible["resolution_ledger"]
+        if item["requirement_id"] in requirement_ids and item["occurrence_kind"] == "scene"
+    }
+    expected_shot_ids = {
+        item["occurrence_id"]
+        for item in bible["resolution_ledger"]
+        if item["requirement_id"] in requirement_ids and item["occurrence_kind"] == "shot"
+    }
+    assert preview["impact"]["scene_count"] == len(expected_scene_ids)
+    assert preview["impact"]["shot_count"] == len(expected_shot_ids)
+    reassigned = preview["result"]["asset_bible"]
+    assert reassigned["coverage"]["coverage_pass"] is True
+    assert command_preview(reassigned, {"type": "lock"})["result"]["asset_bible"]["status"] == "locked"
+
+
+def test_explicit_not_needed_requires_reason_and_preview_preserves_state() -> None:
+    bible = generated_bible()
+    target = next(item for item in bible["assets"] if item["occurrences"]["shot_ids"])
+    bible = command_preview(bible, {"type": "reject", "target_id": target["stable_id"]})["result"]["asset_bible"]
+    requirement_ids = [
+        item["requirement_id"]
+        for item in bible["resolution_ledger"]
+        if item["assigned_asset_id"] == target["stable_id"] and item["occurrence_kind"] == "shot"
+    ]
+    with pytest.raises(ValueError, match="reviewable reason"):
+        command_preview(
+            bible,
+            {"type": "mark_not_needed", "requirement_ids": requirement_ids, "reason": ""},
+        )
+    preview = command_preview(
+        bible,
+        {
+            "type": "mark_not_needed",
+            "requirement_ids": requirement_ids,
+            "reason": "人工确认这些镜头仅提及背景，不要求资产连续性",
+        },
+    )
+    assert preview["result"]["graph_mutation"] == 0
+    assert preview["impact"]["preserved_on_cancel"] is True
+    assert all(item["reason"] for item in preview["impact"]["occurrence_resolution_changes"])
+
+
+def test_human_review_can_add_missing_asset_with_traced_occurrences() -> None:
+    bible = generated_bible()
+    created = command_preview(
+        bible,
+        {
+            "type": "create_asset",
+            "asset_type": "prop",
+            "display_name": "折叠伞",
+            "aliases": ["雨伞"],
+            "scene_ids": ["scene-1"],
+            "shot_ids": ["shot-1-1", "shot-1-2"],
+            "evidence": "人工审核确认前两个镜头持续使用同一道具",
+        },
+    )
+    state = created["result"]["asset_bible"]
+    asset = next(item for item in state["assets"] if item["display_name"] == "折叠伞")
+    assert asset["aliases"] == ["折叠伞", "雨伞"]
+    assert asset["occurrences"]["shot_ids"] == ["shot-1-1", "shot-1-2"]
+    requirements = [
+        item for item in state["resolution_ledger"] if item["source_asset_id"] == asset["stable_id"]
+    ]
+    assert len(requirements) == 3
+    assert all(item["status"] == "pending" and not item["resolved"] for item in requirements)
+    assert created["impact"]["graph_mutation_before_confirm"] == 0
+
+
+def test_alias_collision_blocks_coverage_and_lock() -> None:
+    bible = generated_bible()
+    characters = [item for item in bible["assets"] if item["asset_type"] == "character"][:2]
+    shared_alias = "同一别名"
+    for character in characters:
+        bible = command_preview(
+            bible,
+            {
+                "type": "edit",
+                "target_id": character["stable_id"],
+                "patch": {"aliases": [*character["aliases"], shared_alias]},
+            },
+        )["result"]["asset_bible"]
+    for asset in list(bible["assets"]):
+        bible = command_preview(
+            bible,
+            {"type": "approve", "target_id": asset["stable_id"]},
+        )["result"]["asset_bible"]
+    assert bible["coverage"]["alias_collision_count"] == 1
+    assert bible["coverage"]["coverage_pass"] is False
+    with pytest.raises(ValueError, match="lock blocked"):
+        command_preview(bible, {"type": "lock"})

@@ -336,7 +336,7 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
   };
   appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
   session.pendingCommand = command;
-  appendMessage(session, { role: "assistant", text: "已生成M6方案预览；确认前不会写入制作图、调用Provider或改变画布事实。" });
+  appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
   return command;
 }
 
@@ -1339,8 +1339,8 @@ function generationPreviewCommand(context, intent) {
     status: "preview",
     title: intent.kind === "video" ? "预览视频生成" : "预览图片生成",
     summary: intent.kind === "video"
-      ? "确认后只记录当前节点的视频生成意图预览；Provider 关闭时不会提交视频任务。"
-      : "确认后只记录当前节点的图片生成意图预览；Provider 关闭时不会提交图片任务。",
+      ? "确认后只记录当前节点的视频生成意图预览；外部视频能力关闭时不会提交任务。"
+      : "确认后只记录当前节点的图片生成意图预览；外部图片能力关闭时不会提交任务。",
     context_key: agentChatContextKey(context),
     project_id: cleanToken(context.project_id, 120),
     node_id: cleanToken(context.selected_node_id, 120),
@@ -1352,7 +1352,7 @@ function generationPreviewCommand(context, intent) {
       storyboard_write: false,
     },
     requires_confirmation: true,
-    provider_label: intent.kind === "video" ? "视频 Provider 当前按 gate 关闭" : "图片 Provider 当前按 gate 关闭",
+    provider_label: intent.kind === "video" ? "外部视频能力当前未启用" : "外部图片能力当前未启用",
     tool_label: "生成命令预览",
     cost_label: "本次不扣费；真实生成前需单独确认",
     remote_dispatch_count: 0,
@@ -1786,7 +1786,7 @@ function executeAgentCommand(command, state) {
 
 function localNodeReceiptSummary(command) {
   if (command.command_type === "revise_selected_node") return "当前节点已新增一个可撤销修订；没有创建新节点。";
-  if (command.command_type === "preview_generation_from_selected") return "生成意图预览已记录；Provider 未启动，也没有产生费用。";
+  if (command.command_type === "preview_generation_from_selected") return "生成意图预览已记录；未调用外部能力，也没有产生费用。";
   return `${command.title}已执行，影响范围：当前节点。`;
 }
 
@@ -2137,7 +2137,7 @@ function m3ContextAgentReceipt(command, response, runtimeReceipt) {
     source_digest: contextPack.source_digest || command.source_digest || "",
     context_pack_id: contextPack.context_pack_id || runtimeReceipt?.context_pack_id || "",
     canonical_truth_digest: contextPack.canonical_truth_digest || "",
-    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，Provider 保持关闭，草案不会写入事实。`,
+    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，外部能力保持关闭，草案不会写入事实。`,
     undo_available: Boolean(runtimeReceipt?.undo_available),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,

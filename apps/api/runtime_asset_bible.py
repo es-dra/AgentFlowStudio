@@ -24,7 +24,18 @@ from apps.api.runtime_studio_state_asset_bible import sanitize_asset_bible
 
 
 SCHEMA_VERSION = "afs.asset_bible.v0.1"
-COMMANDS = {"generate_candidates", "approve", "reject", "edit", "merge", "split", "lock"}
+COMMANDS = {
+    "generate_candidates",
+    "create_asset",
+    "approve",
+    "reject",
+    "edit",
+    "merge",
+    "split",
+    "reassign_occurrences",
+    "mark_not_needed",
+    "lock",
+}
 ASSET_TYPES = {"character", "scene", "prop"}
 
 
@@ -147,6 +158,8 @@ def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[
     source_digest = sha256(source_text.encode("utf-8")).hexdigest()
     shot_candidate_id = _optional_token(shot_plan.get("candidate_id"))
     occurrence_index: dict[tuple[str, str], dict[str, Any]] = {}
+    scene_catalog: list[dict[str, Any]] = []
+    shot_catalog: list[dict[str, Any]] = []
 
     def collect(refs: list[dict[str, Any]], *, scene_id: str = "", shot_id: str = "", evidence: str = "") -> None:
         for ref in refs:
@@ -180,9 +193,10 @@ def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[
     source_refs, _ = normalize_asset_refs_with_diagnostics([], context=source_text, include_inferred=True)
     collect(source_refs, evidence=source_text)
     shot_count = 0
-    for scene_index, scene in enumerate(scenes):
-        scene_id = safe_id(str(scene.get("scene_id") or f"scene-{scene_index + 1}"))
-        scene_name = str(scene.get("name") or scene.get("title") or f"场景 {scene_index + 1}").strip()[:120]
+    for scene_number, scene in enumerate(scenes):
+        scene_id = safe_id(str(scene.get("scene_id") or f"scene-{scene_number + 1}"))
+        scene_name = str(scene.get("name") or scene.get("title") or f"场景 {scene_number + 1}").strip()[:120]
+        scene_catalog.append({"scene_id": scene_id, "name": scene_name, "number": scene_number + 1})
         collect(
             [
                 {
@@ -195,9 +209,18 @@ def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[
             scene_id=scene_id,
             evidence=scene_name,
         )
-        for shot_index, shot in enumerate(item for item in scene.get("shots", []) if isinstance(item, Mapping)):
+        for shot_number, shot in enumerate(item for item in scene.get("shots", []) if isinstance(item, Mapping)):
             shot_count += 1
-            shot_id = safe_id(str(shot.get("shot_id") or f"{scene_id}-shot-{shot_index + 1}"))
+            shot_id = safe_id(str(shot.get("shot_id") or f"{scene_id}-shot-{shot_number + 1}"))
+            shot_title = str(shot.get("title") or f"镜头 {scene_number + 1}-{shot_number + 1}").strip()[:120]
+            shot_catalog.append(
+                {
+                    "shot_id": shot_id,
+                    "scene_id": scene_id,
+                    "title": shot_title,
+                    "number": shot_count,
+                }
+            )
             context = " ".join(
                 str(shot.get(key) or "")
                 for key in ("title", "description", "narrative_purpose", "blocking", "dialogue", "sound")
@@ -224,6 +247,8 @@ def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[
         "shot_candidate_id": shot_candidate_id,
         "scene_count": len(scenes),
         "shot_count": shot_count,
+        "scene_index": scene_catalog,
+        "shot_index": shot_catalog,
         "source_digest": source_digest,
         "created_at": _requested_at(body),
         "assets": assets,
@@ -247,6 +272,8 @@ def _apply_command(
             "version": 1,
             "candidate_set": {key: value for key, value in generated.items() if key != "assets"},
             "assets": generated["assets"],
+            "required_occurrences": _required_occurrences(generated["assets"]),
+            "occurrence_resolutions": [],
             "revisions": [],
             "current_revision_id": "",
             "locked_revision_id": "",
@@ -256,6 +283,7 @@ def _apply_command(
             "provider_dispatch_count": 0,
             "external_cost_usd": 0,
         }
+        result = _refresh_coverage(result)
         return _append_revision(result, command_type, created_at=command_time)
     if not current:
         raise ValueError("asset Bible candidates must be generated first")
@@ -280,25 +308,118 @@ def _apply_command(
         index[target_ids[0]]["needs_confirmation"] = False
     elif command_type == "edit":
         _edit_asset(index[target_ids[0]], command.get("patch"))
+    elif command_type == "create_asset":
+        asset = _create_asset(project_id, command)
+        if asset["stable_id"] in index:
+            raise ValueError("an asset with the same stable identity already exists")
+        assets.append(asset)
+        current["required_occurrences"] = [
+            *current.get("required_occurrences", []),
+            *_required_occurrences([asset]),
+        ]
     elif command_type == "merge":
-        if len(target_ids) < 2 or any(item not in index for item in target_ids):
+        if (
+            len(target_ids) < 2
+            or any(item not in index for item in target_ids)
+            or any(index[item]["review_state"] in {"rejected", "superseded"} for item in target_ids)
+        ):
             raise ValueError("merge requires at least two current assets")
         assets = _merge_assets(project_id, assets, target_ids, command)
+        merged_id = next(
+            item["stable_id"]
+            for item in assets
+            if set(item.get("lineage", {}).get("merged_from_ids", [])) == set(target_ids)
+        )
+        current["occurrence_resolutions"] = _reassign_resolution_targets(
+            current.get("occurrence_resolutions", []),
+            current.get("required_occurrences", []),
+            source_asset_ids=set(target_ids),
+            target_for_requirement=lambda _: merged_id,
+        )
     elif command_type == "split":
         assets = _split_asset(project_id, assets, target_ids[0], command)
+        children = [
+            item for item in assets if target_ids[0] in item.get("lineage", {}).get("parent_ids", [])
+        ]
+        current["occurrence_resolutions"] = _reassign_resolution_targets(
+            current.get("occurrence_resolutions", []),
+            current.get("required_occurrences", []),
+            source_asset_ids={target_ids[0]},
+            target_for_requirement=lambda requirement: _split_target(children, requirement),
+        )
+    elif command_type == "reassign_occurrences":
+        requirement_ids = _command_requirement_ids(command)
+        destination = index.get(target_id)
+        if not destination or destination["review_state"] in {"rejected", "superseded"}:
+            raise ValueError("occurrences must be reassigned to a current asset")
+        requirements_by_id = {
+            item["requirement_id"]: item for item in current.get("required_occurrences", [])
+        }
+        if any(
+            requirements_by_id.get(item, {}).get("asset_type") != destination["asset_type"]
+            for item in requirement_ids
+        ):
+            raise ValueError("occurrences can only be reassigned to an asset of the same type")
+        current["occurrence_resolutions"] = _set_occurrence_resolutions(
+            current.get("occurrence_resolutions", []),
+            current.get("required_occurrences", []),
+            requirement_ids,
+            resolution="assigned",
+            assigned_asset_id=target_id,
+            reason=str(command.get("reason") or "").strip()[:240],
+        )
+    elif command_type == "mark_not_needed":
+        requirement_ids = _command_requirement_ids(command)
+        reason = str(command.get("reason") or "").strip()[:240]
+        if len(reason) < 4:
+            raise ValueError("explicit not-needed resolution requires a reviewable reason")
+        current["occurrence_resolutions"] = _set_occurrence_resolutions(
+            current.get("occurrence_resolutions", []),
+            current.get("required_occurrences", []),
+            requirement_ids,
+            resolution="not_needed",
+            assigned_asset_id="",
+            reason=reason,
+        )
     elif command_type == "lock":
         unresolved = [item["stable_id"] for item in assets if item["review_state"] == "candidate"]
         if unresolved:
             raise ValueError("approve or reject every active candidate before locking")
         if not any(item["review_state"] == "approved" for item in assets):
             raise ValueError("Asset Bible requires at least one approved asset")
+        checked = _refresh_coverage({**current, "assets": assets})
+        coverage = checked["coverage"]
+        if coverage["unresolved_required"] or not coverage["coverage_pass"]:
+            raise ValueError(
+                "Asset Bible lock blocked: "
+                f"{coverage['unresolved_required']} required occurrences unresolved; "
+                f"{coverage['shot_covered']}/{coverage['shot_total']} shots covered"
+            )
         current["status"] = "locked"
         current["locked_at"] = command_time
     result = {**current, "assets": assets, "version": int(current.get("version") or 0) + 1}
+    result = _refresh_coverage(result)
     result = _append_revision(result, command_type, created_at=command_time)
     if command_type == "lock":
         result["locked_revision_id"] = result["current_revision_id"]
     return result
+
+
+def _create_asset(project_id: str, command: Mapping[str, Any]) -> dict[str, Any]:
+    asset_type = str(command.get("asset_type") or "")
+    display_name = str(command.get("display_name") or "").strip()[:120]
+    if asset_type not in ASSET_TYPES or not display_name:
+        raise ValueError("new asset requires a supported type and display name")
+    item = {
+        "asset_type": asset_type,
+        "display_name": display_name,
+        "aliases": {display_name, *[str(item).strip()[:120] for item in command.get("aliases", []) if str(item).strip()]},
+        "scene_ids": {_token(item, "scene_id") for item in command.get("scene_ids", [])},
+        "shot_ids": {_token(item, "shot_id") for item in command.get("shot_ids", [])},
+        "confidence": 1.0,
+        "evidence": [str(command.get("evidence") or "人工审核补充").strip()[:240]],
+    }
+    return _candidate_asset(project_id, item, source_node_id="human-review", revision_id="human-review")
 
 
 def _candidate_asset(
@@ -381,6 +502,215 @@ def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
     ]
 
 
+def _required_occurrences(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    requirements = []
+    for asset in assets:
+        for occurrence_kind, field in (("scene", "scene_ids"), ("shot", "shot_ids")):
+            for occurrence_id in asset.get("occurrences", {}).get(field, []):
+                requirement_id = (
+                    f"asset-requirement-"
+                    f"{canonical_digest({'asset': asset['stable_id'], 'kind': occurrence_kind, 'id': occurrence_id})[:20]}"
+                )
+                requirements.append(
+                    {
+                        "requirement_id": requirement_id,
+                        "source_asset_id": asset["stable_id"],
+                        "asset_type": asset["asset_type"],
+                        "occurrence_kind": occurrence_kind,
+                        "occurrence_id": occurrence_id,
+                    }
+                )
+    return sorted(requirements, key=lambda item: item["requirement_id"])
+
+
+def _resolution_map(
+    resolutions: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    requirement_ids = {item["requirement_id"] for item in requirements}
+    result = {
+        str(item.get("requirement_id")): deepcopy(item)
+        for item in resolutions
+        if str(item.get("requirement_id")) in requirement_ids
+    }
+    for requirement in requirements:
+        result.setdefault(
+            requirement["requirement_id"],
+            {
+                "requirement_id": requirement["requirement_id"],
+                "resolution": "assigned",
+                "assigned_asset_id": requirement["source_asset_id"],
+                "reason": "",
+            },
+        )
+    return result
+
+
+def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
+    requirements = list(state.get("required_occurrences", []))
+    resolutions = _resolution_map(list(state.get("occurrence_resolutions", [])), requirements)
+    assets = {item["stable_id"]: item for item in state.get("assets", [])}
+    ledger = []
+    for requirement in requirements:
+        resolution = resolutions[requirement["requirement_id"]]
+        assigned_id = str(resolution.get("assigned_asset_id") or "")
+        assigned = assets.get(assigned_id)
+        resolution_type = str(resolution.get("resolution") or "assigned")
+        reason = str(resolution.get("reason") or "").strip()
+        if resolution_type == "not_needed" and reason:
+            status = "not_needed"
+            resolved = True
+        elif assigned and assigned.get("review_state") == "approved":
+            status = "approved"
+            resolved = True
+        elif assigned and assigned.get("review_state") == "candidate":
+            status = "pending"
+            resolved = False
+        elif assigned and assigned.get("review_state") == "rejected":
+            status = "rejected"
+            resolved = False
+        elif assigned and assigned.get("review_state") == "superseded":
+            status = "superseded"
+            resolved = False
+        else:
+            status = "orphaned"
+            resolved = False
+        ledger.append(
+            {
+                **requirement,
+                "resolution": resolution_type,
+                "assigned_asset_id": assigned_id,
+                "reason": reason,
+                "status": status,
+                "resolved": resolved,
+            }
+        )
+    candidate_set = state.get("candidate_set", {})
+    scene_catalog = list(candidate_set.get("scene_index", []))
+    shot_catalog = list(candidate_set.get("shot_index", []))
+    scene_ids = {str(item.get("scene_id") or "") for item in scene_catalog if item.get("scene_id")}
+    covered_shots = {
+        str(item.get("shot_id") or "")
+        for item in shot_catalog
+        if item.get("shot_id") and str(item.get("scene_id") or "") in scene_ids
+    }
+    unresolved = [item for item in ledger if not item["resolved"]]
+    unresolved_asset_ids = sorted(
+        {
+            str(item.get("assigned_asset_id") or item.get("source_asset_id") or "")
+            for item in unresolved
+            if item.get("assigned_asset_id") or item.get("source_asset_id")
+        }
+    )
+    active_assets = [
+        item for item in assets.values() if item.get("review_state") not in {"rejected", "superseded"}
+    ]
+    alias_owner: dict[tuple[str, str], str] = {}
+    collisions = set()
+    for asset in active_assets:
+        for alias in {asset.get("display_name", ""), *asset.get("aliases", [])}:
+            key = (str(asset.get("asset_type") or ""), _normalized_name(str(alias)))
+            if not key[1]:
+                continue
+            if key in alias_owner and alias_owner[key] != asset["stable_id"]:
+                collisions.add(key)
+            alias_owner[key] = asset["stable_id"]
+    coverage = {
+        "scene_total": len(scene_catalog),
+        "scene_covered": len(scene_ids),
+        "shot_total": len(shot_catalog),
+        "shot_covered": len(covered_shots),
+        "required_occurrence_total": len(ledger),
+        "resolved_required": len(ledger) - len(unresolved),
+        "unresolved_required": len(unresolved),
+        "unresolved_asset_ids": unresolved_asset_ids,
+        "unresolved_scene_count": len(
+            {item["occurrence_id"] for item in unresolved if item["occurrence_kind"] == "scene"}
+        ),
+        "unresolved_shot_count": len(
+            {item["occurrence_id"] for item in unresolved if item["occurrence_kind"] == "shot"}
+        ),
+        "alias_collision_count": len(collisions),
+        "coverage_pass": (
+            len(scene_catalog) > 0
+            and len(shot_catalog) > 0
+            and len(scene_ids) == len(scene_catalog)
+            and len(covered_shots) == len(shot_catalog)
+            and not unresolved
+            and not collisions
+        ),
+    }
+    return {
+        **state,
+        "occurrence_resolutions": list(resolutions.values()),
+        "resolution_ledger": ledger,
+        "coverage": coverage,
+    }
+
+
+def _command_requirement_ids(command: Mapping[str, Any]) -> list[str]:
+    requirement_ids = [
+        token for item in command.get("requirement_ids", []) if (token := _optional_token(item))
+    ]
+    if not requirement_ids:
+        raise ValueError("occurrence resolution requires at least one requirement")
+    return list(dict.fromkeys(requirement_ids))
+
+
+def _set_occurrence_resolutions(
+    resolutions: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+    requirement_ids: list[str],
+    *,
+    resolution: str,
+    assigned_asset_id: str,
+    reason: str,
+) -> list[dict[str, Any]]:
+    known = {item["requirement_id"] for item in requirements}
+    if any(item not in known for item in requirement_ids):
+        raise ValueError("occurrence resolution references an unknown requirement")
+    current = _resolution_map(resolutions, requirements)
+    for requirement_id in requirement_ids:
+        current[requirement_id] = {
+            "requirement_id": requirement_id,
+            "resolution": resolution,
+            "assigned_asset_id": assigned_asset_id,
+            "reason": reason,
+        }
+    return list(current.values())
+
+
+def _reassign_resolution_targets(
+    resolutions: list[dict[str, Any]],
+    requirements: list[dict[str, Any]],
+    *,
+    source_asset_ids: set[str],
+    target_for_requirement: Any,
+) -> list[dict[str, Any]]:
+    current = _resolution_map(resolutions, requirements)
+    requirement_index = {item["requirement_id"]: item for item in requirements}
+    for requirement_id, resolution in current.items():
+        if resolution.get("resolution") != "assigned":
+            continue
+        if str(resolution.get("assigned_asset_id") or "") not in source_asset_ids:
+            continue
+        resolution["assigned_asset_id"] = target_for_requirement(requirement_index[requirement_id])
+        resolution["reason"] = "由资产合并/拆分确认重绑定"
+    return list(current.values())
+
+
+def _split_target(children: list[dict[str, Any]], requirement: Mapping[str, Any]) -> str:
+    field = "scene_ids" if requirement["occurrence_kind"] == "scene" else "shot_ids"
+    matches = [
+        item["stable_id"]
+        for item in children
+        if requirement["occurrence_id"] in item.get("occurrences", {}).get(field, [])
+    ]
+    if len(matches) != 1:
+        raise ValueError("split must reassign every required occurrence exactly once")
+    return matches[0]
+
+
 def _merge_assets(
     project_id: str,
     assets: list[dict[str, Any]],
@@ -409,7 +739,14 @@ def _merge_assets(
         f"asset-{primary['asset_type']}-{_ascii_slug(primary['display_name'])}-"
         f"{sha256(f'{project_id}:merge:{':'.join(sorted(target_ids))}'.encode()).hexdigest()[:8]}"
     )
-    return [item for item in assets if item["stable_id"] not in target_ids] + [primary]
+    superseded = []
+    for item in selected:
+        historical = deepcopy(item)
+        historical["review_state"] = "superseded"
+        historical["needs_confirmation"] = False
+        historical["superseded_by_ids"] = [primary["stable_id"]]
+        superseded.append(historical)
+    return [item for item in assets if item["stable_id"] not in target_ids] + superseded + [primary]
 
 
 def _split_asset(
@@ -441,16 +778,17 @@ def _split_asset(
             "shot_ids": [token for item in assigned.get("shot_ids", []) if (token := _optional_token(item))],
         }
         children.append(child)
-    assigned_ref_list = [
-        ref
-        for child in children
-        for ref in [*child["occurrences"]["scene_ids"], *child["occurrences"]["shot_ids"]]
-    ]
-    assigned_refs = set(assigned_ref_list)
-    source_refs = set([*source["occurrences"]["scene_ids"], *source["occurrences"]["shot_ids"]])
-    if source_refs and (assigned_refs != source_refs or len(assigned_ref_list) != len(assigned_refs)):
-        raise ValueError("split occurrence assignments must cover every source occurrence exactly once")
-    return [item for item in assets if item["stable_id"] != target_id] + children
+    for field in ("scene_ids", "shot_ids"):
+        assigned_ref_list = [ref for child in children for ref in child["occurrences"][field]]
+        assigned_refs = set(assigned_ref_list)
+        source_refs = set(source["occurrences"][field])
+        if source_refs and (assigned_refs != source_refs or len(assigned_ref_list) != len(assigned_refs)):
+            raise ValueError("split occurrence assignments must cover every source occurrence exactly once")
+    historical = deepcopy(source)
+    historical["review_state"] = "superseded"
+    historical["needs_confirmation"] = False
+    historical["superseded_by_ids"] = [item["stable_id"] for item in children]
+    return [item for item in assets if item["stable_id"] != target_id] + [historical, *children]
 
 
 def _append_revision(state: dict[str, Any], command_type: str, *, created_at: str) -> dict[str, Any]:
@@ -483,15 +821,81 @@ def _impact(before: Mapping[str, Any], after: Mapping[str, Any], command: Mappin
     impacted = [before_assets[item] for item in dict.fromkeys(target_ids) if item in before_assets]
     if str(command.get("type")) == "generate_candidates":
         impacted = list(after.get("assets", []))
-    scene_ids = sorted({ref for item in impacted for ref in item.get("occurrences", {}).get("scene_ids", [])})
-    shot_ids = sorted({ref for item in impacted for ref in item.get("occurrences", {}).get("shot_ids", [])})
+    requirement_ids = {
+        token for item in command.get("requirement_ids", []) if (token := _optional_token(item))
+    }
+    if requirement_ids:
+        impacted_requirements = [
+            item
+            for item in after.get("resolution_ledger", [])
+            if item.get("requirement_id") in requirement_ids
+        ]
+    else:
+        impacted_requirements = [
+            item
+            for item in after.get("resolution_ledger", [])
+            if item.get("source_asset_id") in target_ids
+            or item.get("assigned_asset_id") in target_ids
+        ]
+    scene_ids = (
+        []
+        if requirement_ids
+        else sorted({ref for item in impacted for ref in item.get("occurrences", {}).get("scene_ids", [])})
+    )
+    shot_ids = (
+        []
+        if requirement_ids
+        else sorted({ref for item in impacted for ref in item.get("occurrences", {}).get("shot_ids", [])})
+    )
+    scene_ids = sorted(
+        set(scene_ids)
+        | {
+            item["occurrence_id"]
+            for item in impacted_requirements
+            if item.get("occurrence_kind") == "scene"
+        }
+    )
+    shot_ids = sorted(
+        set(shot_ids)
+        | {
+            item["occurrence_id"]
+            for item in impacted_requirements
+            if item.get("occurrence_kind") == "shot"
+        }
+    )
     return {
-        "asset_ids": sorted({item["stable_id"] for item in impacted}),
+        "asset_ids": sorted(
+            {item["stable_id"] for item in impacted}
+            | {
+                str(item.get("source_asset_id") or "")
+                for item in impacted_requirements
+                if item.get("source_asset_id")
+            }
+            | {
+                str(item.get("assigned_asset_id") or "")
+                for item in impacted_requirements
+                if item.get("assigned_asset_id")
+            }
+        ),
         "scene_ids": scene_ids,
         "shot_ids": shot_ids,
         "scene_count": len(scene_ids),
         "shot_count": len(shot_ids),
         "prompt_candidate_count": len(shot_ids),
+        "requirement_ids": sorted(requirement_ids),
+        "occurrence_resolution_changes": [
+            {
+                "requirement_id": item["requirement_id"],
+                "occurrence_kind": item["occurrence_kind"],
+                "occurrence_id": item["occurrence_id"],
+                "assigned_asset_id": item.get("assigned_asset_id", ""),
+                "status": item.get("status", ""),
+                "reason": item.get("reason", ""),
+            }
+            for item in impacted_requirements
+        ],
+        "unresolved_required_before": int(before.get("coverage", {}).get("unresolved_required") or 0),
+        "unresolved_required_after": int(after.get("coverage", {}).get("unresolved_required") or 0),
         "graph_mutation_before_confirm": 0,
         "preserved_on_cancel": True,
     }
@@ -520,9 +924,19 @@ def _graph_events(
         }
     ]
     graph_nodes = set(graph.get("nodes", {}))
-    current_asset_ids = {str(item["stable_id"]) for item in state.get("assets", [])}
+    current_asset_ids = {
+        str(item["stable_id"])
+        for item in state.get("assets", [])
+        if item.get("review_state") not in {"rejected", "superseded"}
+    }
     previous_asset_ids = {str(item["stable_id"]) for item in previous_state.get("assets", [])}
     removed_asset_ids = sorted((previous_asset_ids - current_asset_ids) & graph_nodes)
+    inactive_asset_ids = {
+        str(item["stable_id"])
+        for item in state.get("assets", [])
+        if item.get("review_state") in {"rejected", "superseded"}
+    }
+    removed_asset_ids = sorted(set(removed_asset_ids) | (inactive_asset_ids & graph_nodes))
     for removed_id in removed_asset_ids:
         for relation in graph.get("relations", []):
             if removed_id not in {relation.get("from_id"), relation.get("to_id")}:
@@ -547,7 +961,7 @@ def _graph_events(
                 "node": {
                     "node_id": asset_id,
                     "category": "resource" if asset["asset_type"] != "character" else "entity",
-                    "state": "active" if asset["review_state"] != "rejected" else "invalidated",
+                    "state": "active" if asset["review_state"] not in {"rejected", "superseded"} else "invalidated",
                     "metadata": {
                         "kind": asset["asset_type"],
                         "display_name": asset["display_name"],
@@ -562,6 +976,8 @@ def _graph_events(
                 },
             }
         )
+        if asset["review_state"] in {"rejected", "superseded"}:
+            continue
         events.append({"type": "relation_upserted", "from_id": bible_id, "to_id": asset_id, "relation_type": "contains"})
         for occurrence_id in [
             *asset.get("occurrences", {}).get("scene_ids", []),
@@ -600,12 +1016,15 @@ def _clean_state(value: Any) -> dict[str, Any]:
 def _receipt(state: Mapping[str, Any], command: Mapping[str, Any], impact: Mapping[str, Any]) -> dict[str, Any]:
     command_type = str(command.get("type") or "")
     summaries = {
-        "generate_candidates": f"已建立 {len(state.get('assets', []))} 个零 Provider 资产候选，等待逐项审核。",
+        "generate_candidates": f"已建立 {len(state.get('assets', []))} 个本地确定性资产候选，未调用外部能力。",
+        "create_asset": "人工补充资产已进入候选审核，出现范围等待确认。",
         "approve": "资产候选已批准，引用关系保持可追溯。",
-        "reject": "资产候选已拒绝，未进入后续媒体准入。",
+        "reject": "资产候选已拒绝；仍被引用的出现范围会阻止锁定，直到完成重分配或明确无需。",
         "edit": "资产候选修订已保存为新版本。",
         "merge": "资产候选已合并，原稳定 ID 保留在线性记录中。",
         "split": "资产候选已拆分，出现范围已重新绑定。",
+        "reassign_occurrences": "资产出现范围已重分配，并保留原始来源追溯。",
+        "mark_not_needed": "所选出现范围已明确标记为无需，并记录审核理由。",
         "lock": "Asset Bible 已锁定；媒体结构准入已就绪。",
     }
     return {
@@ -634,7 +1053,22 @@ def _public_result(state: Mapping[str, Any], *, authority_mode: str) -> dict[str
 
 
 def _safe_command(command: Mapping[str, Any]) -> dict[str, Any]:
-    allowed = {"type", "target_id", "target_ids", "patch", "display_name", "names", "occurrence_assignments"}
+    allowed = {
+        "type",
+        "target_id",
+        "target_ids",
+        "patch",
+        "asset_type",
+        "display_name",
+        "aliases",
+        "scene_ids",
+        "shot_ids",
+        "evidence",
+        "names",
+        "occurrence_assignments",
+        "requirement_ids",
+        "reason",
+    }
     return {key: deepcopy(value) for key, value in command.items() if key in allowed}
 
 
