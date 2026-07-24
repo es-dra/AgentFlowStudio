@@ -101,6 +101,7 @@ export function deriveProductionCopilotState({
   const imageEnabled = capabilityGates.image === true;
   const admissionStatus = String(imageAdmission?.status || "empty");
   const admissionCounts = imageAdmission?.counts || {};
+  const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
   let next = {
     action: "open_script",
     label: "选择当前剧本",
@@ -141,6 +142,13 @@ export function deriveProductionCopilotState({
       reason: "锁定资产与镜头覆盖已就绪；先审核九项清单和费用硬门，不会调用外部能力。",
       enabled: true,
     };
+  } else if (contentReady && mediaLoadFailures > 0) {
+    next = {
+      action: "reload_image_candidate",
+      label: "重新加载候选图片",
+      reason: `${mediaLoadFailures} 个候选图片未能加载；批准已禁用，请先恢复可见预览。`,
+      enabled: true,
+    };
   } else if (contentReady && Number(admissionCounts.failed || 0) > 0) {
     next = {
       action: "recover_image_admission",
@@ -152,7 +160,7 @@ export function deriveProductionCopilotState({
     next = {
       action: "review_image_candidates",
       label: "审核图片候选",
-      reason: `${Number(admissionCounts.candidate)} 个候选等待批准或拒绝；批准前不会写入制作图。`,
+      reason: `${Number(admissionCounts.candidate)} 个图片候选待人工查看；批准前不会写入制作图。`,
       enabled: true,
     };
   } else if (contentReady && Number(admissionCounts.processing || 0) > 0) {
@@ -180,7 +188,9 @@ export function deriveProductionCopilotState({
     next = {
       action: "media_gate_closed",
       label: "图片能力未启用",
-      reason: "结构已就绪，但当前环境未开放图片媒体能力。",
+      reason: Number(admissionCounts.approved || 0) > 0
+        ? "已批准图片已写回 Asset Bible / ProductionGraph；当前环境未开放图片媒体能力。"
+        : "结构已就绪，但当前环境未开放图片媒体能力。",
       enabled: false,
     };
   } else if (contentReady) {
@@ -192,7 +202,8 @@ export function deriveProductionCopilotState({
         : !candidatesReady ? "asset_recognition_ready"
           : !contentReady ? "asset_review"
             : admissionStatus === "empty" ? "image_admission_ready"
-              : Number(admissionCounts.failed || 0) ? "image_admission_recovery"
+              : mediaLoadFailures ? "image_candidate_media_recovery"
+                : Number(admissionCounts.failed || 0) ? "image_admission_recovery"
                 : Number(admissionCounts.candidate || 0) ? "image_candidate_review"
                   : Number(admissionCounts.processing || 0) ? "image_admission_processing"
                     : imageEnabled ? "image_admission_ready" : "media_gate_closed",
@@ -211,6 +222,7 @@ export function deriveProductionCopilotState({
         `${bible.coverage.unresolved_required} 个必要出现范围未解决（${bible.coverage.unresolved_shot_count} 镜头）`,
       ] : []),
       ...(bible.coverage.alias_collision_count ? [`${bible.coverage.alias_collision_count} 组别名冲突`] : []),
+      ...(mediaLoadFailures ? [`${mediaLoadFailures} 个候选图片加载失败，批准已禁用`] : []),
       ...(Number(admissionCounts.failed || 0) ? [`${Number(admissionCounts.failed)} 个图片项目失败且已隔离`] : []),
       ...(contentReady && !imageEnabled ? ["内容结构已就绪；图片能力未启用"] : []),
     ],

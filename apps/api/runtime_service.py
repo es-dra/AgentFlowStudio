@@ -49,6 +49,7 @@ from apps.api.runtime_dynamic_production_plan import register_runtime_dynamic_pr
 from apps.api.runtime_script_core_truth import register_runtime_script_core_truth_routes
 from apps.api.runtime_m3_zero_cost_kernel import register_runtime_m3_zero_cost_kernel_routes
 from apps.api.runtime_film_production_graph import register_runtime_film_production_graph_routes
+from apps.api.runtime_production_graph import GraphIntegrityError, graph_has_authority
 from apps.api.runtime_m6_script_plan_asset_bible import register_runtime_m6_script_plan_asset_bible_routes
 from apps.api.runtime_asset_bible import register_runtime_asset_bible_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
@@ -106,6 +107,11 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
     project_id = str(summary.get("project_id") or "")
     path = store.projects_dir / safe_id(project_id) / "studio_state.json"
     meta: dict[str, Any] = {}
+    production_graph_authoritative = False
+    try:
+        production_graph_authoritative = graph_has_authority(store, project_id)
+    except (GraphIntegrityError, OSError, ValueError):
+        production_graph_authoritative = False
     if path.is_file():
         try:
             payload = read_json(path)
@@ -121,7 +127,11 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
                 }
         except (ValueError, OSError):
             meta = {}
-    return {**summary, "studio_state_meta": meta}
+    return {
+        **summary,
+        "studio_state_meta": meta,
+        "production_graph_authoritative": production_graph_authoritative,
+    }
 
 
 def create_runtime_app(

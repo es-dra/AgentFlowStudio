@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
+from agentflow_studio.model_gateway.image_utils import image_dimensions, image_mime_type_from_bytes
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_auth import RuntimeAuthStore
-from apps.api.runtime_image_assets import image_asset_metadata
+from apps.api.runtime_image_assets import image_asset_file_path, image_asset_metadata
 from apps.api.runtime_production_graph import (
     GraphIdempotencyConflict,
     GraphVersionConflict,
@@ -47,6 +50,11 @@ ASPECT_SIZES = {
     "1:1": "1024x1024",
     "3:4": "960x1280",
     "16:9": "1280x720",
+}
+FIXTURE_MEDIA = {
+    "1:1": "image-admission-review-square.png",
+    "3:4": "image-admission-review-portrait.png",
+    "16:9": "image-admission-review-landscape.png",
 }
 
 
@@ -113,6 +121,9 @@ def register_runtime_image_admission_routes(
                     raise ValueError("image admission preview is stale; review the impact again")
                 result = deepcopy(preview["result"]["manifest"])
                 command = preview["command"]
+                if command["type"] == "record_candidate" and command.get("fixture") is True:
+                    item = _manifest_item(result, command.get("item_id"))
+                    _materialize_fixture_candidate(store, project_id, item)
                 if command["type"] == "approve":
                     result = _approve_to_graph(
                         store,
@@ -478,7 +489,7 @@ def _apply_command(
     elif command_type == "reserve_dispatch":
         _reserve_dispatch(store, project_id, manifest, command, recorded_at=timestamp)
     elif command_type == "record_candidate":
-        _record_candidate(project_id, manifest, command, recorded_at=timestamp)
+        _record_candidate(store, project_id, manifest, command, recorded_at=timestamp)
     elif command_type == "record_job":
         item = _manifest_item(manifest, command.get("item_id"))
         if item.get("state") not in {"reserved", "processing"}:
@@ -506,6 +517,7 @@ def _apply_command(
         item = _manifest_item(manifest, command.get("item_id"))
         if item.get("state") != "candidate" or not item.get("candidate"):
             raise ValueError("only a candidate image can be approved")
+        _assert_candidate_media_available(store, project_id, item)
         item["state"] = "approved"
         _append_receipt(manifest, item, "approved", command, recorded_at=timestamp)
     elif command_type == "reject":
@@ -607,6 +619,7 @@ def _reserve_dispatch(
 
 
 def _record_candidate(
+    store: RuntimeStore,
     project_id: str,
     manifest: dict[str, Any],
     command: Mapping[str, Any],
@@ -620,7 +633,11 @@ def _record_candidate(
         raise ValueError("deterministic media fixtures are disabled")
     if not fixture and item.get("state") not in {"reserved", "processing"}:
         raise ValueError("provider candidate requires an atomic dispatch reservation")
-    candidate = command.get("candidate") if isinstance(command.get("candidate"), Mapping) else {}
+    candidate = (
+        _fixture_candidate(store, project_id, item)
+        if fixture
+        else command.get("candidate") if isinstance(command.get("candidate"), Mapping) else {}
+    )
     image_asset_id = _token(candidate.get("image_asset_id"), "candidate.image_asset_id")
     sha = str(candidate.get("sha256") or "")
     if len(sha) != 64 or any(char not in "0123456789abcdef" for char in sha):
@@ -634,7 +651,7 @@ def _record_candidate(
         raise ValueError("image admission candidates must be PNG or JPEG")
     preview_url = str(candidate.get("preview_url") or "")
     expected_preview = f"/projects/{safe_id(project_id)}/image-assets/{safe_id(image_asset_id)}/preview"
-    if preview_url and preview_url != expected_preview:
+    if preview_url != expected_preview:
         raise ValueError("candidate preview URL is outside the same project image asset route")
     item["candidate"] = {
         "image_asset_id": image_asset_id,
@@ -648,6 +665,121 @@ def _record_candidate(
     }
     item["state"] = "candidate"
     _append_receipt(manifest, item, "candidate_recorded", command, recorded_at=timestamp)
+
+
+def _fixture_candidate(
+    store: RuntimeStore,
+    project_id: str,
+    item: Mapping[str, Any],
+) -> dict[str, Any]:
+    aspect_ratio = str(item.get("aspect_ratio") or "")
+    filename = FIXTURE_MEDIA.get(aspect_ratio)
+    if not filename:
+        raise ValueError("deterministic fixture does not support this aspect ratio")
+    source = _fixture_media_root() / filename
+    if not source.is_file():
+        raise ValueError("deterministic fixture media is unavailable")
+    image_bytes = source.read_bytes()
+    if image_mime_type_from_bytes(image_bytes) != "image/png":
+        raise ValueError("deterministic fixture media must be a valid PNG")
+    dimensions = image_dimensions(image_bytes)
+    expected_width, expected_height = (
+        int(value) for value in str(item.get("size") or "").split("x", maxsplit=1)
+    )
+    if not dimensions or (
+        dimensions["width"],
+        dimensions["height"],
+    ) != (expected_width, expected_height):
+        raise ValueError("deterministic fixture dimensions differ from the locked manifest")
+    sha = hashlib.sha256(image_bytes).hexdigest()
+    asset_id = f"fixture_img_{canonical_digest({'project': project_id, 'item': item.get('item_id'), 'sha': sha})[:16]}"
+    return {
+        "image_asset_id": asset_id,
+        "sha256": sha,
+        "format": "png",
+        "width": dimensions["width"],
+        "height": dimensions["height"],
+        "preview_url": (
+            f"/projects/{safe_id(project_id)}/image-assets/{safe_id(asset_id)}/preview"
+        ),
+        "fixture_source": filename,
+    }
+
+
+def _materialize_fixture_candidate(
+    store: RuntimeStore,
+    project_id: str,
+    item: Mapping[str, Any],
+) -> None:
+    candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+    expected = _fixture_candidate(store, project_id, item)
+    for field in ("image_asset_id", "sha256", "format", "width", "height", "preview_url"):
+        if candidate.get(field) != expected[field]:
+            raise ValueError("deterministic fixture candidate metadata is stale")
+    source = _fixture_media_root() / expected["fixture_source"]
+    image_bytes = source.read_bytes()
+    asset_id = expected["image_asset_id"]
+    asset_dir = (
+        store.projects_dir
+        / safe_id(project_id)
+        / "image_assets"
+        / safe_id(asset_id)
+    ).resolve()
+    asset_dir.relative_to(store.root.resolve())
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    image_path = asset_dir / "source.png"
+    image_path.write_bytes(image_bytes)
+    metadata = {
+        "artifact_type": "agentflow_deterministic_fixture_image_asset",
+        "schema_version": "0.1.0",
+        "project_id": project_id,
+        "asset_id": asset_id,
+        "source_node_id": next(iter(item.get("target_asset_ids") or []), item.get("target_shot_id")),
+        "role": "image_admission_review_fixture",
+        "filename": expected["fixture_source"],
+        "mime_type": "image/png",
+        "file_suffix": ".png",
+        "byte_count": len(image_bytes),
+        "sha256": expected["sha256"],
+        "preview_url": expected["preview_url"],
+        "width": expected["width"],
+        "height": expected["height"],
+        "aspect_ratio": item.get("aspect_ratio"),
+        "fixture": True,
+        "media_bytes_returned_by_api": False,
+        "provider_raw_response_stored": False,
+        "writes_long_term_memory": False,
+        "writes_company_kb": False,
+    }
+    reject_unsafe_payload(metadata)
+    write_json(asset_dir / "image_asset.json", metadata)
+
+
+def _assert_candidate_media_available(
+    store: RuntimeStore,
+    project_id: str,
+    item: Mapping[str, Any],
+) -> None:
+    candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+    asset_id = _token(candidate.get("image_asset_id"), "candidate.image_asset_id")
+    try:
+        metadata = image_asset_metadata(store, project_id, asset_id)
+        image_asset_file_path(store, project_id, asset_id)
+    except (KeyError, ValueError) as exc:
+        raise ValueError("candidate media is missing or unavailable for review") from exc
+    expected = {
+        "sha256": candidate.get("sha256"),
+        "width": candidate.get("width"),
+        "height": candidate.get("height"),
+        "preview_url": candidate.get("preview_url"),
+        "mime_type": "image/jpeg" if candidate.get("format") == "jpeg" else "image/png",
+    }
+    if any(metadata.get(field) != value for field, value in expected.items()):
+        raise ValueError("candidate media is missing or differs from its verified review metadata")
+
+
+def _fixture_media_root() -> Path:
+    return Path(__file__).resolve().parents[2] / "apps" / "studio" / "assets" / "test-fixtures"
 
 
 def _approve_to_graph(

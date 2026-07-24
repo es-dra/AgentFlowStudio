@@ -17,7 +17,7 @@ import {
   reportProjectDeleteClientError,
 } from "./studio-project-runtime-ops.js";
 import {
-  emptyProjectRuntimeClient,
+  emptyProjectRuntimeClient, isCanonicalGraphProject,
   isReadOnlyProjectionProject,
   safeProjectRuntimeError as safeError,
 } from "./studio-project-controller-policy.js";
@@ -98,6 +98,10 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     const runtime = getRuntime();
     const currentId = runtime.projectId || store.get().meta.projectId;
     return isReadOnlyProjectionProject(currentId, projectSummaries);
+  }
+
+  function currentProjectHasCanonicalGraphAuthority() {
+    return isCanonicalGraphProject(getRuntime().projectId || store.get().meta.projectId, projectSummaries);
   }
 
   async function recoverProjectAccessDenied(error = null) {
@@ -235,6 +239,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     ensureAccessibleStartupProject,
     recoverProjectAccessDenied,
     currentProjectIsReadOnlyProjection,
+    currentProjectHasCanonicalGraphAuthority,
     switchProject,
     createNewProject,
     deleteProject,

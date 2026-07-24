@@ -1,6 +1,6 @@
 import { candidatePreviewItems } from "./node-generation-progress.js";
 
-export function imageAdmissionProjection(runtimeValue = null) {
+export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) {
   const manifest = runtimeValue?.manifest && typeof runtimeValue.manifest === "object"
     ? runtimeValue.manifest
     : null;
@@ -9,6 +9,11 @@ export function imageAdmissionProjection(runtimeValue = null) {
   for (const state of ["planned", "reserved", "processing", "candidate", "approved", "rejected", "failed", "cancelled"]) {
     counts[state] = items.filter((item) => item?.state === state).length;
   }
+  counts.media_load_failed = items.filter((item) => {
+    if (!item?.candidate || !["candidate", "approved", "rejected"].includes(item.state)) return false;
+    const key = imageAdmissionMediaKey(item, manifest?.project_id);
+    return !item.candidate.preview_url || mediaStates[key] === "failed";
+  }).length;
   const capability = runtimeValue?.capability || {};
   const budgetContract = manifest?.budget_contract || runtimeValue?.budget_contract || {};
   const budget = manifest?.budget || {
@@ -30,6 +35,17 @@ export function imageAdmissionProjection(runtimeValue = null) {
     actual_usd: manifest?.actual_usd ?? null,
     billing_verification_state: manifest?.billing_verification_state || "unverified",
   };
+}
+
+export function imageAdmissionMediaKey(item, projectId = "") {
+  const candidate = item?.candidate;
+  if (!candidate || typeof candidate !== "object") return "";
+  return [
+    String(projectId || ""),
+    String(item?.item_id || ""),
+    String(candidate.image_asset_id || ""),
+    String(candidate.sha256 || ""),
+  ].join(":");
 }
 
 export function imageAdmissionItemTypeLabel(value) {

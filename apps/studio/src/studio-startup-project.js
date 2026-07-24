@@ -12,9 +12,10 @@ export async function hydrateStartupProject({
 }) {
   await projectController.ensureAccessibleStartupProject();
   if (!hasActiveProject()) return;
-  if (projectController.currentProjectIsReadOnlyProjection?.()) {
+  const readOnlyProjection = projectController.currentProjectIsReadOnlyProjection?.();
+  if (readOnlyProjection) {
     store.setRuntimePersistenceMode?.("production_graph_read_only");
-    return;
+    if (!projectController.currentProjectHasCanonicalGraphAuthority?.()) return;
   }
 
   await store.hydrateRuntime(runtime);
@@ -24,6 +25,7 @@ export async function hydrateStartupProject({
     refreshScriptCoreTruth,
     refreshProductionPlanTruth,
     syncAssets: true,
+    readOnlyProjection,
   });
 }
 
@@ -53,8 +55,9 @@ export async function refreshProjectRuntimeDecorations({
   refreshScriptCoreTruth,
   refreshProductionPlanTruth,
   syncAssets = false,
+  readOnlyProjection = false,
 }) {
-  if (syncAssets) await syncRuntimeAssets(store, runtimeClient);
+  if (syncAssets && !readOnlyProjection) await syncRuntimeAssets(store, runtimeClient);
   await restoreCandidateSelectionsAfterLoad(store, runtimeClient);
   await refreshPendingKeyframeGenerations(store, runtimeClient);
   await refreshScriptCoreTruth(runtimeClient);

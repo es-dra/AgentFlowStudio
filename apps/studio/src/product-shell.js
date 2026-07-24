@@ -22,6 +22,7 @@ import {
   imageAdmissionItemTypeLabel,
   imageAdmissionItemJobId,
   imageAdmissionJobCommand,
+  imageAdmissionMediaKey,
   imageAdmissionProjection,
   imageAdmissionStateLabel,
 } from "./image-admission-workspace.js";
@@ -57,6 +58,9 @@ export function createProductShell(options = {}) {
   let imageAdmissionOpen = false;
   let imageAdmissionPreview = null;
   let imageAdmissionError = "";
+  const imageAdmissionMediaStates = new Map();
+  let imageAdmissionViewer = null;
+  let imageAdmissionViewerReturnKey = "";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -92,6 +96,7 @@ export function createProductShell(options = {}) {
     else root.appendChild(buildWorkspace());
     if (helpOpen && isMobileNavigationLayout()) root.appendChild(buildMobileHelpSheet());
     root.appendChild(buildMobileNav());
+    if (imageAdmissionViewer) root.appendChild(buildImageAdmissionViewer());
   }
 
   function buildHeader() {
@@ -1530,15 +1535,8 @@ export function createProductShell(options = {}) {
         ? `镜头已绑定 · ${referenceCount} 张已批准参考图`
         : `${occurrenceCount} 个镜头出现 · 来源已绑定`,
     ));
-    if (item.candidate?.preview_url) {
-      const image = document.createElement("img");
-      image.className = "image-admission-candidate-preview";
-      image.alt = `${item.label || "图片项目"}候选预览`;
-      image.src = options.getRuntime?.().toMediaUrl(item.candidate.preview_url);
-      main.appendChild(image);
-    } else if (item.candidate?.fixture) {
-      main.appendChild(node("small", "image-admission-fixture-note", "确定性测试候选 · 仅验证审核链，不代表创作质量"));
-    }
+    const media = buildImageAdmissionCandidateMedia(item, view);
+    if (media.element) main.appendChild(media.element);
     const state = node("span", "image-admission-item-state", imageAdmissionStateLabel(item.state));
     row.append(main, state);
     const actions = node("div", "image-admission-item-actions");
@@ -1564,21 +1562,14 @@ export function createProductShell(options = {}) {
       actions.appendChild(resumePoll);
     }
     if (view.capability.fixture_mode && item.state === "planned") {
-      const fixture = node("button", "studio-secondary-button", "载入测试候选");
-      const fixtureFailure = node("button", "studio-secondary-button", "模拟失败");
+      const fixture = node("button", "studio-secondary-button", "载入零费用测试候选");
+      const fixtureFailure = node("button", "studio-secondary-button", "模拟零费用任务失败");
       fixture.type = "button";
       fixtureFailure.type = "button";
       fixture.addEventListener("click", () => void stageImageAdmissionCommand({
         type: "record_candidate",
         item_id: item.item_id,
         fixture: true,
-        candidate: {
-          image_asset_id: `fixture-${item.item_id}`,
-          sha256: deterministicHex(item.item_id),
-          format: "png",
-          width: Number(String(item.size || "").split("x")[0] || 1024),
-          height: Number(String(item.size || "").split("x")[1] || 1024),
-        },
       }));
       fixtureFailure.addEventListener("click", () => void stageImageAdmissionCommand({
         type: "record_failure",
@@ -1589,9 +1580,11 @@ export function createProductShell(options = {}) {
       actions.append(fixture, fixtureFailure);
     }
     if (item.state === "candidate") {
-      const approve = node("button", "studio-primary-button", "预览批准");
-      const reject = node("button", "studio-secondary-button", "预览拒绝");
+      const approve = node("button", "studio-primary-button", "批准候选");
+      const reject = node("button", "studio-secondary-button", "拒绝候选");
       approve.type = reject.type = "button";
+      approve.disabled = !media.canApprove;
+      approve.title = media.canApprove ? "批准当前已查看的图片候选" : "候选图片成功加载后才能批准";
       approve.addEventListener("click", () => void stageImageAdmissionCommand({ type: "approve", item_id: item.item_id }));
       reject.addEventListener("click", () => void stageImageAdmissionCommand({ type: "reject", item_id: item.item_id, reason: "人工审核未通过" }));
       actions.append(approve, reject);
@@ -1604,6 +1597,138 @@ export function createProductShell(options = {}) {
     }
     if (actions.childElementCount) row.appendChild(actions);
     return row;
+  }
+
+  function buildImageAdmissionCandidateMedia(item, view) {
+    const candidate = item.candidate;
+    if (!candidate || !["candidate", "approved", "rejected"].includes(item.state)) {
+      return { element: null, canApprove: false };
+    }
+    const key = imageAdmissionMediaKey(item, view.manifest?.project_id);
+    const previewUrl = String(candidate.preview_url || "");
+    const state = !previewUrl ? "failed" : imageAdmissionMediaStates.get(key) || "loading";
+    const media = node("section", `image-admission-candidate-media state-${state}`);
+    media.setAttribute("aria-label", `${item.label || "图片项目"}候选媒体`);
+    if (candidate.fixture) {
+      media.appendChild(node("small", "image-admission-fixture-note", "测试候选 · 零费用本地证据 · 不代表创作质量"));
+    }
+    if (state === "failed") {
+      const failure = node("div", "image-admission-media-failure");
+      failure.setAttribute("role", "alert");
+      failure.append(
+        node("strong", "", "候选图片加载失败"),
+        node("span", "", "批准已禁用；可重新加载，不会发起生成或占用预算。"),
+      );
+      const retry = node("button", "studio-secondary-button", "重新加载图片");
+      retry.type = "button";
+      retry.addEventListener("click", () => {
+        imageAdmissionMediaStates.delete(key);
+        render();
+      });
+      failure.appendChild(retry);
+      media.appendChild(failure);
+      return { element: media, canApprove: false };
+    }
+    const open = node("button", "image-admission-thumbnail-button");
+    open.type = "button";
+    open.disabled = state !== "loaded";
+    open.setAttribute("aria-label", `查看${item.label || "图片项目"}候选大图`);
+    open.dataset.admissionMediaKey = key;
+    const image = document.createElement("img");
+    image.className = "image-admission-candidate-preview";
+    image.alt = `${item.label || "图片项目"}候选缩略图`;
+    image.src = options.getRuntime?.().toMediaUrl(previewUrl);
+    image.addEventListener("load", () => updateImageAdmissionMediaState(key, "loaded"));
+    image.addEventListener("error", () => updateImageAdmissionMediaState(key, "failed"));
+    open.appendChild(image);
+    open.addEventListener("click", () => openImageAdmissionViewer(item, key));
+    const meta = node(
+      "small",
+      "image-admission-media-summary",
+      state === "loaded"
+        ? `图片已加载 · ${candidate.width}×${candidate.height} · 来源与当前清单绑定`
+        : "正在验证本地候选图片…",
+    );
+    const viewLarge = node("button", "studio-secondary-button image-admission-view-button", "查看大图");
+    viewLarge.type = "button";
+    viewLarge.disabled = state !== "loaded";
+    viewLarge.dataset.admissionMediaKey = key;
+    viewLarge.addEventListener("click", () => openImageAdmissionViewer(item, key));
+    media.append(open, meta, viewLarge);
+    return { element: media, canApprove: state === "loaded" };
+  }
+
+  function updateImageAdmissionMediaState(key, state) {
+    if (!key || imageAdmissionMediaStates.get(key) === state) return;
+    imageAdmissionMediaStates.set(key, state);
+    render();
+  }
+
+  function openImageAdmissionViewer(item, key) {
+    if (imageAdmissionMediaStates.get(key) !== "loaded") return;
+    imageAdmissionViewer = {
+      key,
+      label: item.label || "图片候选",
+      previewUrl: item.candidate.preview_url,
+      width: item.candidate.width,
+      height: item.candidate.height,
+      fixture: item.candidate.fixture === true,
+    };
+    imageAdmissionViewerReturnKey = key;
+    render();
+    requestAnimationFrame(() => {
+      document.querySelector(".image-admission-viewer-close")?.focus();
+    });
+  }
+
+  function closeImageAdmissionViewer() {
+    const returnKey = imageAdmissionViewerReturnKey;
+    imageAdmissionViewer = null;
+    render();
+    requestAnimationFrame(() => {
+      const target = [...document.querySelectorAll("[data-admission-media-key]")]
+        .find((element) => element.dataset.admissionMediaKey === returnKey);
+      target?.focus();
+    });
+  }
+
+  function buildImageAdmissionViewer() {
+    const overlay = node("div", "image-admission-viewer");
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", `${imageAdmissionViewer.label}大图查看器`);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) closeImageAdmissionViewer();
+    });
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeImageAdmissionViewer();
+      }
+    });
+    const close = node("button", "studio-icon-button image-admission-viewer-close");
+    close.type = "button";
+    close.setAttribute("aria-label", "关闭大图");
+    close.title = "关闭大图";
+    close.innerHTML = icon("x", 18);
+    close.addEventListener("click", closeImageAdmissionViewer);
+    const image = document.createElement("img");
+    image.alt = `${imageAdmissionViewer.label}完整候选图片`;
+    image.src = options.getRuntime?.().toMediaUrl(imageAdmissionViewer.previewUrl);
+    image.addEventListener("error", () => {
+      imageAdmissionMediaStates.set(imageAdmissionViewer.key, "failed");
+      closeImageAdmissionViewer();
+    });
+    const caption = node("div", "image-admission-viewer-caption");
+    caption.append(
+      node("strong", "", imageAdmissionViewer.label),
+      node("span", "", `${imageAdmissionViewer.width}×${imageAdmissionViewer.height} · 完整图片`),
+    );
+    if (imageAdmissionViewer.fixture) {
+      caption.appendChild(node("small", "", "零费用本地测试候选 · 不代表创作质量"));
+    }
+    overlay.append(close, image, caption);
+    return overlay;
   }
 
   function buildImageAdmissionReview() {
@@ -1665,6 +1790,8 @@ export function createProductShell(options = {}) {
       imageAdmissionError = "";
       notice = confirmedCommand.type === "reserve_dispatch"
         ? "额度已原子占用，正在发送单项生成请求。"
+        : confirmedCommand.type === "approve"
+          ? "图片候选已批准并写回 Asset Bible / ProductionGraph；可继续查看已批准图片。"
         : "图片准入清单已更新；未调用外部能力。";
       render();
       if (confirmedCommand.type === "reserve_dispatch") {
@@ -2384,6 +2511,7 @@ export function createProductShell(options = {}) {
     if ([
       "image_admission_ready",
       "media_gate_closed",
+      "reload_image_candidate",
       "recover_image_admission",
       "review_image_candidates",
       "resume_image_admission",
@@ -3063,7 +3191,10 @@ export function createProductShell(options = {}) {
     return assetBibleProjection(snapshot.studioState || {}, snapshot.runtimeAssetBible);
   }
   function imageAdmissionView() {
-    return imageAdmissionProjection(snapshot.imageAdmission);
+    return imageAdmissionProjection(
+      snapshot.imageAdmission,
+      Object.fromEntries(imageAdmissionMediaStates),
+    );
   }
   function selectedAsset() {
     const view = assetBibleView();
@@ -3247,16 +3378,6 @@ function userLabel(user) {
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-}
-
-function deterministicHex(value) {
-  let seed = 2166136261;
-  const text = String(value || "fixture");
-  for (let index = 0; index < text.length; index += 1) {
-    seed ^= text.charCodeAt(index);
-    seed = Math.imul(seed, 16777619) >>> 0;
-  }
-  return seed.toString(16).padStart(8, "0").repeat(8);
 }
 
 function node(tag, className = "", text = "") {

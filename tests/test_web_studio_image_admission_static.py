@@ -76,6 +76,37 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
     assert result["billing_verification_state"] == "unverified"
 
 
+def test_image_admission_projection_marks_missing_or_failed_candidate_media() -> None:
+    script = f"""
+      import {{ imageAdmissionMediaKey, imageAdmissionProjection }} from {json.dumps(WORKSPACE.as_uri())};
+      const item = {{
+        item_id: "image-item-a",
+        state: "candidate",
+        candidate: {{
+          image_asset_id: "image-a",
+          sha256: "a".repeat(64),
+          preview_url: "/projects/project-a/image-assets/image-a/preview",
+        }},
+      }};
+      const key = imageAdmissionMediaKey(item, "project-a");
+      const failed = imageAdmissionProjection({{
+        manifest: {{ project_id: "project-a", items: [item] }},
+      }}, {{ [key]: "failed" }});
+      const missing = imageAdmissionProjection({{
+        manifest: {{
+          project_id: "project-a",
+          items: [{{ ...item, candidate: {{ ...item.candidate, preview_url: "" }} }}],
+        }},
+      }});
+      console.log(JSON.stringify({{ failed, missing }}));
+    """
+    completed = subprocess.run(["node", "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
+    result = json.loads(completed.stdout)
+
+    assert result["failed"]["counts"]["media_load_failed"] == 1
+    assert result["missing"]["counts"]["media_load_failed"] == 1
+
+
 def test_image_admission_generation_requires_complete_verified_media_evidence() -> None:
     script = f"""
       import {{ imageAdmissionGenerationResult }} from {json.dumps(WORKSPACE.as_uri())};
@@ -135,6 +166,32 @@ def test_image_admission_mobile_layout_has_no_forced_horizontal_tracks() -> None
     assert ".image-admission-item { align-items: flex-start; flex-wrap: wrap; }" in styles
     assert ".image-admission-item-actions { width: 100%; justify-content: flex-start; }" in styles
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in styles
+    assert ".image-admission-thumbnail-button { width: 100%; max-height: 240px; }" in styles
+    assert "object-fit: contain" in styles
+
+
+def test_image_candidate_review_requires_loaded_thumbnail_and_accessible_viewer() -> None:
+    shell = PRODUCT_SHELL.read_text(encoding="utf-8")
+
+    for marker in (
+        "候选图片成功加载后才能批准",
+        "批准候选",
+        "拒绝候选",
+        "查看大图",
+        "候选图片加载失败",
+        "载入零费用测试候选",
+        "测试候选 · 零费用本地证据 · 不代表创作质量",
+        'event.key === "Escape"',
+        'setAttribute("role", "dialog")',
+        'setAttribute("aria-modal", "true")',
+        'document.querySelector(".image-admission-viewer-close")?.focus()',
+        "dataset.admissionMediaKey",
+    ):
+        assert marker in shell
+    assert '"预览批准"' not in shell
+    assert '"预览拒绝"' not in shell
+    assert "approve.disabled = !media.canApprove" in shell
+    assert "imageAdmissionMediaStates.set(key, state)" in shell
 
 
 def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_gate() -> None:
@@ -169,7 +226,27 @@ def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_
           actual_usd: null,
         }},
       }});
-      console.log(JSON.stringify({{ failed, review }}));
+      const mediaFailure = deriveProductionCopilotState({{
+        ...base,
+        imageAdmission: {{
+          status: "locked",
+          counts: {{ failed: 1, candidate: 1, media_load_failed: 1 }},
+          budget: {{ dispatches_reserved: 0 }},
+          provider_dispatch_count: 0,
+          actual_usd: null,
+        }},
+      }});
+      const approved = deriveProductionCopilotState({{
+        ...base,
+        imageAdmission: {{
+          status: "locked",
+          counts: {{ failed: 0, candidate: 0, processing: 0, approved: 1, media_load_failed: 0 }},
+          budget: {{ dispatches_reserved: 0 }},
+          provider_dispatch_count: 0,
+          actual_usd: null,
+        }},
+      }});
+      console.log(JSON.stringify({{ failed, review, mediaFailure, approved }}));
     """
     completed = subprocess.run(["node", "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
     result = json.loads(completed.stdout)
@@ -181,3 +258,9 @@ def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_
     assert result["failed"]["gate"]["cost_state"] == "estimated_reserved"
     assert result["review"]["stage"] == "image_candidate_review"
     assert result["review"]["next_valid_action"]["action"] == "review_image_candidates"
+    assert result["review"]["next_valid_action"]["reason"] == "2 个图片候选待人工查看；批准前不会写入制作图。"
+    assert result["mediaFailure"]["stage"] == "image_candidate_media_recovery"
+    assert result["mediaFailure"]["next_valid_action"]["action"] == "reload_image_candidate"
+    assert "批准已禁用" in result["mediaFailure"]["next_valid_action"]["reason"]
+    assert result["approved"]["stage"] == "media_gate_closed"
+    assert "已批准图片已写回 Asset Bible / ProductionGraph" in result["approved"]["next_valid_action"]["reason"]

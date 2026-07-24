@@ -16,7 +16,13 @@ export function emptyProjectRuntimeClient() {
 export function isReadOnlyProjectionProject(projectId, projectSummaries = []) {
   const summary = projectSummaries.find((item) => item?.project_id === projectId) || {};
   const projectType = String(summary.project_type || "");
-  return projectType === READ_ONLY_PROJECTION_PROJECT_TYPE;
+  return summary.production_graph_authoritative === true
+    || projectType === READ_ONLY_PROJECTION_PROJECT_TYPE;
+}
+
+export function isCanonicalGraphProject(projectId, projectSummaries = []) {
+  const summary = projectSummaries.find((item) => item?.project_id === projectId) || {};
+  return summary.production_graph_authoritative === true;
 }
 
 export function safeProjectRuntimeError(error) {

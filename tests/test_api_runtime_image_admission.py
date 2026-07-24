@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.image_utils import image_dimensions
 from apps.api.runtime_image_admission import compile_image_admission_manifest
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
@@ -366,25 +367,89 @@ def test_deterministic_fixture_candidate_review_history_and_cancel_semantics(tmp
     assert failed["state"] == "failed"
     assert fixture_failure["provider_dispatch_count"] == 0
     assert fixture_failure["budget"]["dispatches_reserved"] == 0
-    candidate = {
-        "image_asset_id": "fixture-image-a",
-        "sha256": "a" * 64,
-        "format": "png",
+    preview = _command(
+        client,
+        {"type": "record_candidate", "item_id": item["item_id"], "fixture": True},
+        source,
+        confirm=False,
+    )
+    preview_item = next(entry for entry in preview["result"]["manifest"]["items"] if entry["item_id"] == item["item_id"])
+    preview_candidate = preview_item["candidate"]
+    fixture_dir = (
+        tmp_path
+        / "runtime"
+        / "projects"
+        / PROJECT_ID
+        / "image_assets"
+        / preview_candidate["image_asset_id"]
+    )
+    assert not fixture_dir.exists()
+
+    confirmed = _command(
+        client,
+        {"type": "record_candidate", "item_id": item["item_id"], "fixture": True},
+        source,
+    )["result"]["manifest"]
+    confirmed_item = next(entry for entry in confirmed["items"] if entry["item_id"] == item["item_id"])
+    confirmed_candidate = confirmed_item["candidate"]
+    assert confirmed_candidate == preview_candidate
+    assert fixture_dir.joinpath("source.png").is_file()
+    preview_response = client.get(confirmed_candidate["preview_url"])
+    assert preview_response.status_code == 200
+    assert preview_response.headers["content-type"].startswith("image/png")
+    assert image_dimensions(preview_response.content) == {
         "width": 960,
         "height": 1280,
+        "aspect_ratio": "960:1280",
     }
-    _command(
-        client,
-        {"type": "record_candidate", "item_id": item["item_id"], "fixture": True, "candidate": candidate},
-        source,
-    )
     _command(client, {"type": "reject", "item_id": item["item_id"], "reason": "identity mismatch"}, source)
     _command(client, {"type": "replace", "item_id": item["item_id"], "reason": "review replacement"}, source)
     cancelled = _command(client, {"type": "cancel_batch"}, source)["result"]["manifest"]
-    assert cancelled["history"][0]["candidate"]["sha256"] == "a" * 64
+    assert cancelled["history"][0]["candidate"]["sha256"] == confirmed_candidate["sha256"]
     assert cancelled["cancel_semantics"]["in_flight_cancelled"] == 0
     assert cancelled["provider_dispatch_count"] == 0
     assert cancelled["actual_usd"] is None
+
+
+def test_candidate_media_missing_blocks_server_side_approval(tmp_path, monkeypatch) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("AFS_ALLOW_DETERMINISTIC_MEDIA_FIXTURES", "true")
+    manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    item = next(entry for entry in manifest["items"] if entry["item_type"] == "character_design")
+    candidate_manifest = _command(
+        client,
+        {"type": "record_candidate", "item_id": item["item_id"], "fixture": True},
+        source,
+    )["result"]["manifest"]
+    candidate_item = next(entry for entry in candidate_manifest["items"] if entry["item_id"] == item["item_id"])
+    candidate = candidate_item["candidate"]
+    source_path = (
+        tmp_path
+        / "runtime"
+        / "projects"
+        / PROJECT_ID
+        / "image_assets"
+        / candidate["image_asset_id"]
+        / "source.png"
+    )
+    source_path.unlink()
+
+    response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "approve",
+                "item_id": item["item_id"],
+                "idempotency_key": "approve-missing-media",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert "candidate media is missing" in response.json()["detail"]["details"]["raw_detail"]
+    restored = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    assert next(entry for entry in restored["items"] if entry["item_id"] == item["item_id"])["state"] == "candidate"
 
 
 def test_approve_writes_exactly_once_to_existing_production_graph(tmp_path, monkeypatch) -> None:
