@@ -64,6 +64,10 @@ class CorpusCase:
     regression_tags: tuple[str, ...] = ()
 
 
+class TransportInterrupted(RuntimeError):
+    pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", default="/tmp/afs-m6-1-server-codex-real-llm")
@@ -73,6 +77,11 @@ def main() -> int:
     run_root = Path(args.output_root).resolve() / time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     run_root.mkdir(parents=True, exist_ok=True)
     runtime_root = Path(args.runtime_root).resolve() if args.runtime_root else run_root / "runtime"
+    invocation_id = canonical_digest({
+        "run_root": str(run_root),
+        "started_ns": time.time_ns(),
+        "pid": os.getpid(),
+    })[:20]
     provider_config = run_root / "provider_config.json"
     provider_config.write_text(json.dumps(_server_codex_provider_config(), ensure_ascii=False, indent=2), encoding="utf-8")
     env = _candidate_env(runtime_root=runtime_root, provider_config=provider_config, output_root=run_root / "provider_outputs")
@@ -106,7 +115,7 @@ def main() -> int:
                 report = _blocked_report(run_root, "candidate runtime gates are not LLM-only", {"health": health})
                 print(json.dumps(report, ensure_ascii=False, sort_keys=True))
                 return 1
-            smoke = _run_smoke(base_url, run_root)
+            smoke = _run_smoke(base_url, run_root, invocation_id=invocation_id)
             cases = []
             dispatch_count += int(smoke["provider_dispatch_count"])
             for case in corpus_cases():
@@ -114,7 +123,13 @@ def main() -> int:
                     report = _blocked_report(run_root, "provider request budget exhausted before all cases", {"dispatch_count": dispatch_count})
                     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
                     return 1
-                result = _run_case(base_url, run_root, case, current_dispatch_count=dispatch_count)
+                result = _run_case(
+                    base_url,
+                    run_root,
+                    case,
+                    current_dispatch_count=dispatch_count,
+                    invocation_id=invocation_id,
+                )
                 dispatch_count += int(result["provider_dispatch_count"])
                 cases.append(result)
             report = _final_report(
@@ -291,9 +306,17 @@ def _run_tiny_structured_dispatch(run_root: Path) -> dict[str, Any]:
     return safe
 
 
-def _run_smoke(base_url: str, run_root: Path) -> dict[str, Any]:
+def _run_smoke(base_url: str, run_root: Path, *, invocation_id: str) -> dict[str, Any]:
     case = corpus_cases()[0]
-    preview = _preview(base_url, "m6-1-smoke", case.source_kind, case.source_text, "", "")
+    preview = _preview(
+        base_url,
+        "m6-1-smoke",
+        case.source_kind,
+        case.source_text,
+        "",
+        "",
+        invocation_id=invocation_id,
+    )
     candidate = preview["candidate"]
     scores = _score_candidate(candidate, graph_digest="")
     if scores["P0"] or scores["P1"]:
@@ -309,26 +332,57 @@ def _run_smoke(base_url: str, run_root: Path) -> dict[str, Any]:
     return safe
 
 
-def _run_case(base_url: str, run_root: Path, case: CorpusCase, *, current_dispatch_count: int) -> dict[str, Any]:
+def _run_case(
+    base_url: str,
+    run_root: Path,
+    case: CorpusCase,
+    *,
+    current_dispatch_count: int,
+    invocation_id: str,
+) -> dict[str, Any]:
     case_dir = run_root / "cases" / case.case_id
     case_dir.mkdir(parents=True, exist_ok=True)
     project_id = f"m6-1-{case.case_id}"
-    first = _preview(base_url, project_id, case.source_kind, case.source_text, "", "")
+    first = _preview(
+        base_url,
+        project_id,
+        case.source_kind,
+        case.source_text,
+        "",
+        "",
+        invocation_id=invocation_id,
+    )
     first_digest = str(first["candidate_digest"])
     first_scores = _score_candidate(first["candidate"], graph_digest="")
     feedback = _revision_feedback(case, first_scores, first_digest)
-    second = _preview(base_url, project_id, case.source_kind, case.source_text, feedback, first_digest)
+    second = _preview(
+        base_url,
+        project_id,
+        case.source_kind,
+        case.source_text,
+        feedback,
+        first_digest,
+        invocation_id=invocation_id,
+    )
     second_scores = _score_candidate(second["candidate"], graph_digest="")
     retry_used = False
     if (second_scores["P0"] or second_scores["P1"]) and current_dispatch_count + 3 <= MAX_PROVIDER_REQUESTS:
         retry_used = True
         feedback = _revision_feedback(case, second_scores, first_digest, retry=True)
-        second = _preview(base_url, project_id, case.source_kind, case.source_text, feedback, first_digest)
+        second = _preview(
+            base_url,
+            project_id,
+            case.source_kind,
+            case.source_text,
+            feedback,
+            first_digest,
+            invocation_id=invocation_id,
+        )
         second_scores = _score_candidate(second["candidate"], graph_digest="")
     if second_scores["P0"] or second_scores["P1"]:
         write_json(case_dir / "failed_candidate.json", _safe_case_artifact(case, first, second, first_scores, second_scores))
         raise RuntimeError(f"{case.case_id} failed strict review: {second_scores['issues'][:5]}")
-    confirmed = _confirm(base_url, project_id, second["candidate"])
+    confirmed = _confirm(base_url, project_id, second)
     workspace = _get_json(base_url, f"projects/{project_id}/m5/sequence-workspace")
     graph_digest = str(confirmed["graph"]["graph_digest"])
     second_scores = _score_candidate(second["candidate"], graph_digest=graph_digest, workspace=workspace)
@@ -373,6 +427,8 @@ def _preview(
     source_text: str,
     revision_instruction: str,
     parent_candidate_digest: str,
+    *,
+    invocation_id: str,
 ) -> dict[str, Any]:
     body = {
         "source_kind": source_kind,
@@ -383,31 +439,72 @@ def _preview(
         body["revision_instruction"] = revision_instruction
     if parent_candidate_digest:
         body["parent_candidate_digest"] = parent_candidate_digest
-    payload = _post_json(base_url, f"projects/{project_id}/m6/script-plan-asset-bible/preview", body)
+    client_request_id = f"m6-real-{canonical_digest({'invocation_id': invocation_id, 'project_id': project_id, 'body': body})[:24]}"
+    try:
+        run = _post_json(
+            base_url,
+            f"projects/{project_id}/m6/script-plan-asset-bible/preview",
+            body,
+            headers={"X-Client-Request-ID": client_request_id},
+        )
+    except TransportInterrupted:
+        run = _get_json(
+            base_url,
+            f"projects/{project_id}/m6/script-plan-asset-bible/preview-runs/by-client/{client_request_id}",
+        )
+    deadline = time.monotonic() + 900
+    while str(run.get("phase") or "") in {"queued", "running", "running_cancel_requested"}:
+        if time.monotonic() >= deadline:
+            raise RuntimeError("durable preview run did not reach a terminal phase within 900 seconds")
+        time.sleep(0.25)
+        run = _get_json(
+            base_url,
+            f"projects/{project_id}/m6/script-plan-asset-bible/preview-runs/{run['run_id']}",
+        )
+    if str(run.get("phase") or "") != "succeeded":
+        error = run.get("error") if isinstance(run.get("error"), dict) else {}
+        raise RuntimeError(
+            f"durable preview run ended as {run.get('phase')}: "
+            f"{error.get('category') or 'preview_not_available'}"
+        )
+    payload = run.get("preview")
+    if not isinstance(payload, dict):
+        raise RuntimeError("durable preview run response missing stored preview")
     candidate = payload.get("candidate")
     if not isinstance(candidate, dict):
         raise RuntimeError("preview response missing candidate")
-    return payload
+    return {
+        **payload,
+        "run_id": run["run_id"],
+        "expected_graph_version": int(run.get("expected_graph_version") or 0),
+    }
 
 
-def _confirm(base_url: str, project_id: str, candidate: dict[str, Any]) -> dict[str, Any]:
-    return _post_json(
-        base_url,
-        f"projects/{project_id}/m6/script-plan-asset-bible/confirm",
-        {
-            "expected_graph_version": 0,
-            "idempotency_key": f"confirm-{project_id}",
-            "candidate": candidate,
-        },
-    )
+def _confirm(base_url: str, project_id: str, preview: dict[str, Any]) -> dict[str, Any]:
+    path = f"projects/{project_id}/m6/script-plan-asset-bible/confirm"
+    payload = {
+        "run_id": preview["run_id"],
+        "candidate_digest": preview["candidate_digest"],
+        "expected_graph_version": int(preview["expected_graph_version"]),
+    }
+    try:
+        return _post_json(base_url, path, payload)
+    except TransportInterrupted:
+        return _post_json(base_url, path, payload)
 
 
-def _post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _post_json(
+    base_url: str,
+    path: str,
+    payload: dict[str, Any],
+    *,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         urljoin(base_url, path),
         data=data,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={"Content-Type": "application/json", "Accept": "application/json", **(headers or {})},
         method="POST",
     )
     try:
@@ -416,8 +513,8 @@ def _post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, A
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")[:1200]
         raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"HTTP request failed for {path}: {exc}") from exc
+    except (URLError, TimeoutError, ConnectionError) as exc:
+        raise TransportInterrupted(f"HTTP transport interrupted for {path}: {type(exc).__name__}") from exc
 
 
 def _get_json(base_url: str, path: str) -> dict[str, Any]:
