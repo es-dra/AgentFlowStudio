@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_asset_bible import (
+    _dedupe_evidence,
     build_asset_candidate_set,
     preview_asset_bible_command_result,
 )
@@ -217,6 +218,181 @@ def test_rerecognition_preview_preserves_approved_assets_and_creates_history() -
     assert preview["impact"]["preserved_on_cancel"] is True
     assert preview["result"]["provider_dispatch_count"] == 0
     assert preview["result"]["external_cost_usd"] == 0
+
+
+def test_rerecognition_refreshes_approved_evidence_monotonically_and_remains_lockable(
+    tmp_path,
+) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    bible = _generated_bible()
+    for asset in bible["assets"]:
+        _complete_visual(asset)
+    bible = _command(
+        bible,
+        {
+            "type": "set_art_direction",
+            "art_direction": {
+                "visual_style": "写实动作片",
+                "medium": "电影摄影，真实材质",
+                "palette": "低饱和冷色与暖光点缀",
+                "lighting": "主体面部清晰的侧逆光",
+            },
+        },
+    )["result"]["asset_bible"]
+    for asset in list(bible["assets"]):
+        bible = _command(
+            bible,
+            {"type": "approve", "target_id": asset["stable_id"]},
+        )["result"]["asset_bible"]
+
+    target = next(
+        item
+        for item in bible["assets"]
+        if item["asset_type"] == "scene" and len(item["occurrences"]["shot_ids"]) > 1
+    )
+    canonical_scene_ids = list(target["occurrences"]["scene_ids"])
+    canonical_shot_ids = list(target["occurrences"]["shot_ids"])
+    shot_a = canonical_shot_ids[0]
+    preserved_review = {
+        field: deepcopy(target[field])
+        for field in (
+            "visual_identity",
+            "positive_traits",
+            "negative_locks",
+            "continuity_states",
+            "review_state",
+        )
+    }
+    target["occurrences"]["shot_ids"] = [shot_a]
+    target["source_evidence"] = [
+        {
+            "source_type": "occurrence_ledger",
+            "source_id": target["stable_id"],
+            "scene_ids": canonical_scene_ids,
+            "shot_ids": [shot_a],
+            "excerpt": "已应用分镜中的场景与镜头出现范围",
+        }
+    ]
+
+    request = {**_body(command_type="regenerate_candidates"), "asset_bible": bible}
+    preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    confirm = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
+        json={
+            **request,
+            "preview_digest": preview.json()["preview_digest"],
+            "idempotency_key": "approved-evidence-a-to-a-b",
+        },
+    )
+    assert confirm.status_code == 200, confirm.text
+    refreshed = confirm.json()["asset_bible"]
+    saved = client.put(
+        f"/projects/{PROJECT_ID}/studio-state",
+        json={
+            "expected_version": "",
+            "state": {
+                "meta": {"projectName": "来源证据刷新测试", "canvasName": "主画布"},
+                "nodes": {},
+                "edges": {},
+                "order": [],
+                "assetBible": refreshed,
+            },
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    restored = client.get(f"/projects/{PROJECT_ID}/studio-state").json()["state"]["assetBible"]
+    retained = next(
+        item for item in restored["assets"] if item["stable_id"] == target["stable_id"]
+    )
+    ledger = next(
+        item
+        for item in retained["source_evidence"]
+        if item["source_type"] == "occurrence_ledger"
+        and item["source_id"] == target["stable_id"]
+    )
+    assert retained["occurrences"]["shot_ids"] == canonical_shot_ids
+    assert ledger["scene_ids"] == canonical_scene_ids
+    assert ledger["shot_ids"] == canonical_shot_ids
+    assert set(ledger["shot_ids"]) & set(retained["occurrences"]["shot_ids"]) == set(
+        canonical_shot_ids
+    )
+    assert {
+        field: retained[field]
+        for field in (
+            "visual_identity",
+            "positive_traits",
+            "negative_locks",
+            "continuity_states",
+            "review_state",
+        )
+    } == preserved_review
+    assert restored["coverage"]["missing_source_evidence_shot_count"] == 0
+    assert restored["recognition_quality"]["status"] == "pass"
+    locked = _command(restored, {"type": "lock"})["result"]["asset_bible"]
+    assert locked["status"] == "locked"
+    assert locked["provider_dispatch_count"] == 0
+    assert locked["external_cost_usd"] == 0
+
+
+def test_evidence_dedupe_is_bounded_and_noncanonical_ranges_do_not_create_coverage() -> None:
+    values = [
+        {
+            "source_type": "occurrence_ledger",
+            "source_id": "asset-scene-a",
+            "scene_ids": ["scene-a"],
+            "shot_ids": ["shot-a"],
+            "excerpt": "已应用分镜中的场景与镜头出现范围",
+        },
+        {
+            "source_type": "occurrence_ledger",
+            "source_id": "asset-scene-a",
+            "scene_ids": ["scene-a", "../invalid-scene"],
+            "shot_ids": ["shot-a", "shot-b", "../invalid-shot"],
+            "excerpt": "已应用分镜中的场景与镜头出现范围",
+        },
+        *[
+            {
+                "source_type": "script_revision",
+                "source_id": f"revision-{index:02d}",
+                "scene_ids": [],
+                "shot_ids": [],
+                "excerpt": f"evidence-{index:02d}",
+            }
+            for index in range(20)
+        ],
+    ]
+    first = _dedupe_evidence(values)
+    second = _dedupe_evidence(list(reversed(values)))
+    assert first == second
+    assert len(first) == 12
+    ledger = first[0]
+    assert ledger["scene_ids"] == ["scene-a"]
+    assert ledger["shot_ids"] == ["shot-a", "shot-b"]
+
+    bible = _generated_bible()
+    for asset in bible["assets"]:
+        asset["occurrences"] = {"scene_ids": [], "shot_ids": []}
+        asset["source_evidence"] = []
+    target = bible["assets"][0]
+    target["occurrences"] = {"scene_ids": ["scene-field"], "shot_ids": ["scene-field-shot-1"]}
+    target["source_evidence"] = deepcopy(first[:1])
+    target["source_evidence"][0]["shot_ids"] = [
+        "scene-field-shot-1",
+        "scene-field-shot-2",
+        "../invalid-shot",
+    ]
+    _complete_visual(target)
+    refreshed = _command(
+        bible,
+        {"type": "approve", "target_id": target["stable_id"]},
+    )["result"]["asset_bible"]
+    assert refreshed["coverage"]["asset_shot_covered"] == 1
+    assert refreshed["coverage"]["missing_source_evidence_shot_count"] == 16
+    assert refreshed["recognition_quality"]["status"] == "blocked"
 
 
 def test_rerecognition_confirm_is_idempotent_and_reload_preserves_quality(tmp_path) -> None:

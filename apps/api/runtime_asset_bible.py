@@ -601,7 +601,6 @@ def _reconcile_recognition_assets(
                 float(retained.get("confidence") or 0),
                 float(generated.get("confidence") or 0),
             )
-            retained["continuity_states"] = deepcopy(generated.get("continuity_states", []))
             reconciled.append(retained)
             matched_previous.update(item["stable_id"] for item in matches)
             delta["retained_asset_ids"].append(retained["stable_id"])
@@ -674,19 +673,60 @@ def _asset_identity_overlap(left: Mapping[str, Any], right: Mapping[str, Any]) -
 
 
 def _dedupe_evidence(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    seen = set()
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
     for value in values:
-        key = (
-            str(value.get("source_type") or ""),
-            str(value.get("source_id") or ""),
-            str(value.get("excerpt") or ""),
-        )
-        if key in seen:
+        if not isinstance(value, Mapping):
             continue
-        seen.add(key)
-        result.append(deepcopy(value))
-    return result[:12]
+        key = (
+            str(value.get("source_type") or "").strip()[:40],
+            _strict_stable_id(value.get("source_id")),
+            str(value.get("excerpt") or "").strip()[:240],
+        )
+        evidence = grouped.setdefault(
+            key,
+            {
+                "source_type": key[0],
+                "source_id": key[1],
+                "excerpt": key[2],
+                "scene_ids": set(),
+                "shot_ids": set(),
+            },
+        )
+        evidence["scene_ids"].update(_strict_stable_ids(value.get("scene_ids"), limit=80))
+        evidence["shot_ids"].update(_strict_stable_ids(value.get("shot_ids"), limit=160))
+    result = []
+    for key in sorted(
+        grouped,
+        key=lambda item: (
+            0 if item[0] == "occurrence_ledger" else 1,
+            item,
+        ),
+    )[:12]:
+        evidence = grouped[key]
+        result.append(
+            {
+                "source_type": evidence["source_type"],
+                "source_id": evidence["source_id"],
+                "excerpt": evidence["excerpt"],
+                "scene_ids": sorted(evidence["scene_ids"])[:80],
+                "shot_ids": sorted(evidence["shot_ids"])[:160],
+            }
+        )
+    return result
+
+
+def _strict_stable_id(value: Any) -> str:
+    raw = str(value or "").strip()
+    return raw if raw and safe_id(raw) == raw else ""
+
+
+def _strict_stable_ids(value: Any, *, limit: int) -> set[str]:
+    values = value if isinstance(value, list) else []
+    return {
+        token
+        for item in values[:limit]
+        if (token := _strict_stable_id(item))
+    }
 
 
 def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
