@@ -76,6 +76,30 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
     assert result["billing_verification_state"] == "unverified"
 
 
+def test_generation_request_uses_the_locked_prompt_contract_without_frontend_recompile() -> None:
+    script = f"""
+      import {{ imageAdmissionGenerationRequest }} from {json.dumps(WORKSPACE.as_uri())};
+      const item = {{
+        item_id: "item-a",
+        target_asset_ids: ["asset-a"],
+        aspect_ratio: "3:4",
+        reference_media_ids: [],
+        prompt_contract: {{
+          provider_prompt: "【生成目标】锁定提示\\n【资产身份】已确认身份",
+          art_direction: {{ visual_style: "写实动作片" }},
+        }},
+      }};
+      console.log(JSON.stringify(imageAdmissionGenerationRequest(item, "manifest-a", "2026-07-24T00:00:00Z")));
+    """
+    completed = subprocess.run(["node", "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
+    result = json.loads(completed.stdout)
+
+    assert result["prompt_text"] == "【生成目标】锁定提示\n【资产身份】已确认身份"
+    assert result["style"] == "写实动作片"
+    assert result["candidate_count"] == 1
+    assert result["node_parameters"]["disable_provider_retry"] is True
+
+
 def test_image_admission_projection_marks_missing_or_failed_candidate_media() -> None:
     script = f"""
       import {{ imageAdmissionMediaKey, imageAdmissionProjection }} from {json.dumps(WORKSPACE.as_uri())};
@@ -204,7 +228,15 @@ def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_
         candidate_set: {{ script_revision_id: "script-r1", shot_count: 17, scene_count: 3 }},
         coverage: {{ coverage_pass: true, quality_pass: true, shot_total: 17, shot_covered: 17, unresolved_required: 0 }},
         recognition_quality: {{ status: "pass", issues: [] }},
-        assets: [{{ stable_id: "asset-a", asset_type: "character", display_name: "角色", review_state: "approved", occurrences: {{ scene_ids: [], shot_ids: [] }} }}],
+        art_direction: {{
+          visual_style: "写实动作片", medium: "电影摄影", palette: "低饱和冷色", lighting: "侧逆光", confirmed_at: "2026-07-24T00:00:00Z"
+        }},
+        assets: [{{
+          stable_id: "asset-a", asset_type: "character", display_name: "角色", review_state: "approved",
+          visual_identity: "已确认角色轮廓与配色", positive_traits: ["稳定辨识特征"], pending_fields: [],
+          continuity_states: [{{ label: "造型连续", status: "confirmed" }}],
+          occurrences: {{ scene_ids: [], shot_ids: [] }}
+        }}],
       }};
       const base = {{ studioState: {{ assetBible: bible, nodes: {{}} }}, capabilityGates: {{ image: false }}, section: "asset_bible" }};
       const failed = deriveProductionCopilotState({{

@@ -73,6 +73,7 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "cancelAssetBibleCommand" in shell
     assert "取消不会改变事实" in shell
     assert "当前 Asset Bible 和 ProductionGraph 均已保留" in shell
+    assert 'asset.review_state === "approved" ? "已人工确认" : "仍需人工确认"' in shell
     assert "审核与版本历史" in shell
     assert "预览重分配影响" in shell
     assert "预览标记为无需" in shell
@@ -116,8 +117,14 @@ const bible = {
     scene_index: [{ scene_id: "scene-1", name: "雨夜天台", number: 1 }],
     shot_index: [{ shot_id: "shot-1", scene_id: "scene-1", title: "悟空发现湿泥", number: 2 }],
   },
+  art_direction: { visual_style: "写实动作片", medium: "电影摄影", palette: "低饱和冷色", lighting: "侧逆光", confirmed_at: "2026-07-24T00:00:00Z" },
   assets: [
-    { stable_id: "asset-character-wukong", asset_type: "character", display_name: "孙悟空", review_state: "approved", aliases: ["悟空"], occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] } },
+    {
+      stable_id: "asset-character-wukong", asset_type: "character", display_name: "孙悟空", review_state: "approved", aliases: ["悟空"],
+      visual_identity: "金色毛发、锁子甲与明确面部轮廓", positive_traits: ["身份稳定"], pending_fields: [],
+      continuity_states: [{ label: "当前场次造型连续", status: "confirmed" }],
+      occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] }
+    },
     { stable_id: "asset-character-bajie", asset_type: "character", display_name: "猪八戒", review_state: "rejected", aliases: ["八戒"], occurrences: { scene_ids: ["scene-1"], shot_ids: ["shot-1"] } },
   ],
   resolution_ledger: [{ requirement_id: "req-1", source_asset_id: "asset-character-bajie", assigned_asset_id: "asset-character-bajie", occurrence_kind: "shot", occurrence_id: "shot-1", status: "rejected", resolved: false }],

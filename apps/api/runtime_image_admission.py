@@ -28,6 +28,7 @@ from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payloa
 
 
 SCHEMA_VERSION = "afs.image_admission_manifest.v0.1"
+PROMPT_CONTRACT_VERSION = "afs.image_prompt_contract.v0.1"
 SERVICE_ID = "image_relay"
 LEGACY_SERVICE_ID = "codex_image"
 MODEL_ID = "gpt-image-2"
@@ -216,6 +217,8 @@ def compile_image_admission_manifest(
         for item in bible.get("assets", [])
         if isinstance(item, Mapping) and item.get("review_state") == "approved"
     ]
+    _assert_assets_creatively_ready(active)
+    art_direction = _art_direction_contract(source.get("art_direction"), require_complete=True)
     characters = [item for item in active if item["asset_type"] == "character"]
     scenes = [item for item in active if item["asset_type"] == "scene"]
     props = [item for item in active if item["asset_type"] == "prop"]
@@ -226,12 +229,27 @@ def compile_image_admission_manifest(
     if len(props) < 2:
         raise ValueError("at least two approved prop assets are required")
     candidate_set = bible.get("candidate_set") if isinstance(bible.get("candidate_set"), Mapping) else {}
+    shot_grounding = source.get("shot_grounding") if isinstance(source.get("shot_grounding"), Mapping) else {}
     scene_index = sorted(
-        [dict(item) for item in candidate_set.get("scene_index", []) if isinstance(item, Mapping)],
+        [
+            dict(item)
+            for item in (
+                shot_grounding.get("scenes")
+                or candidate_set.get("scene_index", [])
+            )
+            if isinstance(item, Mapping)
+        ],
         key=lambda item: (int(item.get("number") or 9999), str(item.get("scene_id") or "")),
     )
     shot_index = sorted(
-        [dict(item) for item in candidate_set.get("shot_index", []) if isinstance(item, Mapping)],
+        [
+            dict(item)
+            for item in (
+                shot_grounding.get("shots")
+                or candidate_set.get("shot_index", [])
+            )
+            if isinstance(item, Mapping)
+        ],
         key=lambda item: (int(item.get("number") or 9999), str(item.get("shot_id") or "")),
     )
     if not scene_index or len(shot_index) < 3:
@@ -267,10 +285,34 @@ def compile_image_admission_manifest(
     source_fingerprint = canonical_digest(_source_fingerprint_payload(source))
     items: list[dict[str, Any]] = []
     for asset in sorted(characters, key=lambda item: item["stable_id"]):
-        items.append(_asset_item(asset, "character_design", "3:4", source_fingerprint))
-    items.append(_asset_item(primary_scenes[0], "scene_plate", "16:9", source_fingerprint))
+        items.append(
+            _asset_item(
+                asset,
+                "character_design",
+                "3:4",
+                source_fingerprint,
+                art_direction=art_direction,
+            )
+        )
+    items.append(
+        _asset_item(
+            primary_scenes[0],
+            "scene_plate",
+            "16:9",
+            source_fingerprint,
+            art_direction=art_direction,
+        )
+    )
     for asset in selected_props:
-        items.append(_asset_item(asset, "prop_design", "1:1", source_fingerprint))
+        items.append(
+            _asset_item(
+                asset,
+                "prop_design",
+                "1:1",
+                source_fingerprint,
+                art_direction=art_direction,
+            )
+        )
     for role, shot in zip(("opening", "continuity_pressure", "closing_relation"), selected_shots, strict=True):
         shot_id = str(shot.get("shot_id") or "")
         reference_assets = [
@@ -285,6 +327,12 @@ def compile_image_admission_manifest(
                 role,
                 sorted(set(reference_assets)),
                 source_fingerprint,
+                art_direction=art_direction,
+                reference_assets=[
+                    item
+                    for item in active
+                    if item["stable_id"] in reference_assets
+                ],
                 negative_locks=sorted(
                     {
                         lock
@@ -305,6 +353,12 @@ def compile_image_admission_manifest(
         "version": 1,
         "source": {key: value for key, value in source.items() if key != "asset_bible"},
         "source_fingerprint": source_fingerprint,
+        "art_direction": art_direction,
+        "creative_grounding": {
+            "status": "ready",
+            "prompt_contract_version": PROMPT_CONTRACT_VERSION,
+            "source_fingerprint": source_fingerprint,
+        },
         "items": items,
         "budget_contract": contract,
         "provider_contract": {
@@ -455,6 +509,7 @@ def enforce_image_admission_keyframe_request(
         item_id=str(binding.get("item_id") or ""),
         reservation_token=str(binding.get("reservation_token") or ""),
     )
+    _assert_manifest_creative_ready(validated["manifest"])
     item = validated["item"]
     if request.candidate_count != 1:
         raise ValueError("image admission requires one independent candidate per dispatch")
@@ -462,6 +517,14 @@ def enforce_image_admission_keyframe_request(
         raise ValueError("image admission must use the locked image relay service")
     if request.aspect_ratio != item.get("aspect_ratio"):
         raise ValueError("keyframe request aspect ratio differs from the locked manifest")
+    prompt_contract = item.get("prompt_contract") if isinstance(item.get("prompt_contract"), Mapping) else {}
+    expected_prompt = str(prompt_contract.get("provider_prompt") or "")
+    if not expected_prompt or request.prompt_text != expected_prompt:
+        raise ValueError("image request prompt differs from the locked creative grounding contract")
+    if canonical_digest(expected_prompt) != prompt_contract.get("provider_prompt_digest"):
+        raise ValueError("image request prompt contract digest is invalid")
+    if request.style != validated["manifest"].get("art_direction", {}).get("visual_style"):
+        raise ValueError("image request style differs from the locked art direction")
     if list(request.asset_refs or []) != list(item.get("reference_media_ids") or []):
         raise ValueError("keyframe request references differ from the locked manifest")
     expected_node_id = item.get("target_shot_id") or next(iter(item.get("target_asset_ids") or []), item["item_id"])
@@ -490,6 +553,7 @@ def _apply_command(
             raise ValueError("only a draft image admission manifest can be locked")
         if len(manifest.get("items", [])) != 9:
             raise ValueError("image admission manifest must contain nine items")
+        _assert_manifest_creative_ready(manifest)
         manifest["status"] = "locked"
         manifest["locked_at"] = timestamp
         _append_receipt(manifest, {"item_id": "manifest"}, "manifest_locked", command, recorded_at=timestamp)
@@ -579,6 +643,7 @@ def _reserve_dispatch(
 ) -> None:
     if manifest.get("status") != "locked":
         raise ValueError("image admission manifest must be locked before dispatch")
+    _assert_manifest_creative_ready(manifest)
     if not _gate_open():
         raise ValueError("图片能力未启用；未发送任何外部请求")
     item = _manifest_item(manifest, command.get("item_id"))
@@ -938,6 +1003,15 @@ def _source_contract(project_id: str, value: Any) -> dict[str, Any]:
     if not bible:
         raise ValueError("image admission source requires Asset Bible state")
     candidate_set = bible.get("candidate_set") if isinstance(bible.get("candidate_set"), Mapping) else {}
+    art_direction = _art_direction_contract(bible.get("art_direction"), require_complete=False)
+    submitted_art_direction = _art_direction_contract(source.get("art_direction"), require_complete=False)
+    if any(submitted_art_direction.get(field) for field in ("visual_style", "medium", "palette", "lighting")):
+        if submitted_art_direction != art_direction:
+            raise ValueError("image admission art direction must match the persisted Asset Bible truth")
+    shot_grounding = _shot_grounding_contract(
+        source.get("shot_grounding"),
+        candidate_set=candidate_set,
+    )
     return {
         "project_id": project_id,
         "authority_mode": str(source.get("authority_mode") or "legacy_studio_adapter"),
@@ -951,6 +1025,8 @@ def _source_contract(project_id: str, value: Any) -> dict[str, Any]:
         "candidate_set_id": _token(candidate_set.get("candidate_set_id"), "candidate_set_id"),
         "shot_candidate_id": _token(candidate_set.get("shot_candidate_id"), "shot_candidate_id"),
         "script_revision_id": _token(candidate_set.get("script_revision_id"), "script_revision_id"),
+        "art_direction": art_direction,
+        "shot_grounding": shot_grounding,
         "asset_bible": deepcopy(dict(bible)),
     }
 
@@ -966,6 +1042,8 @@ def _source_fingerprint_payload(source: Mapping[str, Any]) -> dict[str, Any]:
         "script_revision_id": source["script_revision_id"],
         "asset_digest": canonical_digest(bible.get("assets", [])),
         "coverage_digest": canonical_digest(bible.get("coverage", {})),
+        "art_direction_digest": canonical_digest(source.get("art_direction", {})),
+        "shot_grounding_digest": canonical_digest(source.get("shot_grounding", {})),
     }
 
 
@@ -995,8 +1073,45 @@ def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "stable_id": _token(value.get("stable_id"), "asset.stable_id"),
         "display_name": str(value.get("display_name") or "待确认资产")[:120],
+        "aliases": sorted(
+            {
+                str(item).strip()[:120]
+                for item in value.get("aliases", [])
+                if str(item).strip()
+            }
+        ),
         "asset_type": asset_type,
         "importance": str(value.get("importance") or ""),
+        "visual_identity": str(value.get("visual_identity") or "").strip()[:600],
+        "positive_traits": [
+            str(item).strip()[:160]
+            for item in value.get("positive_traits", [])
+            if str(item).strip()
+        ][:24],
+        "continuity_states": [
+            {
+                "state_id": str(item.get("state_id") or "")[:160],
+                "label": str(item.get("label") or "").strip()[:160],
+                "status": str(item.get("status") or "")[:40],
+                "scene_ids": [
+                    _token(scene_id, "continuity scene")
+                    for scene_id in item.get("scene_ids", [])
+                ],
+                "shot_ids": [
+                    _token(shot_id, "continuity shot")
+                    for shot_id in item.get("shot_ids", [])
+                ],
+            }
+            for item in value.get("continuity_states", [])
+            if isinstance(item, Mapping) and str(item.get("label") or "").strip()
+        ][:16],
+        "pending_fields": sorted(
+            {
+                str(item).strip()[:80]
+                for item in value.get("pending_fields", [])
+                if str(item).strip()
+            }
+        ),
         "occurrences": {
             "scene_ids": sorted({_token(item, "scene occurrence") for item in occurrences.get("scene_ids", [])}),
             "shot_ids": sorted({_token(item, "shot occurrence") for item in occurrences.get("shot_ids", [])}),
@@ -1008,9 +1123,16 @@ def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _asset_item(asset: Mapping[str, Any], item_type: str, aspect: str, source_fingerprint: str) -> dict[str, Any]:
+def _asset_item(
+    asset: Mapping[str, Any],
+    item_type: str,
+    aspect: str,
+    source_fingerprint: str,
+    *,
+    art_direction: Mapping[str, Any],
+) -> dict[str, Any]:
     stable_id = str(asset["stable_id"])
-    return {
+    item = {
         "item_id": f"admit-{item_type}-{canonical_digest(stable_id)[:10]}",
         "item_type": item_type,
         "label": asset["display_name"],
@@ -1020,6 +1142,7 @@ def _asset_item(asset: Mapping[str, Any], item_type: str, aspect: str, source_fi
         "size": ASPECT_SIZES[aspect],
         "candidate_count": 1,
         "negative_locks": asset["negative_locks"],
+        "asset_grounding": _asset_grounding(asset),
         "source_evidence": asset["source_evidence"],
         "occurrence_references": deepcopy(asset["occurrences"]),
         "reference_asset_ids": [],
@@ -1027,6 +1150,8 @@ def _asset_item(asset: Mapping[str, Any], item_type: str, aspect: str, source_fi
         "source_fingerprint": source_fingerprint,
         "state": "planned",
     }
+    item["prompt_contract"] = _prompt_contract(item, art_direction=art_direction)
+    return item
 
 
 def _keyframe_item(
@@ -1035,10 +1160,13 @@ def _keyframe_item(
     reference_asset_ids: list[str],
     source_fingerprint: str,
     *,
+    art_direction: Mapping[str, Any],
+    reference_assets: list[Mapping[str, Any]],
     negative_locks: list[str],
 ) -> dict[str, Any]:
     shot_id = _token(shot.get("shot_id"), "shot_id")
-    return {
+    shot_grounding = _shot_item_grounding(shot)
+    item = {
         "item_id": f"admit-shot-keyframe-{canonical_digest({'shot': shot_id, 'role': role})[:10]}",
         "item_type": "shot_keyframe",
         "label": str(shot.get("title") or f"镜头 {shot.get('number') or ''}")[:120],
@@ -1049,6 +1177,11 @@ def _keyframe_item(
         "size": ASPECT_SIZES["16:9"],
         "candidate_count": 1,
         "negative_locks": negative_locks,
+        "shot_grounding": shot_grounding,
+        "reference_asset_grounding": [
+            _asset_grounding(asset)
+            for asset in sorted(reference_assets, key=lambda value: str(value["stable_id"]))
+        ],
         "source_evidence": [{"shot_id": shot_id, "scene_id": str(shot.get("scene_id") or "")}],
         "occurrence_references": {
             "scene_ids": [str(shot.get("scene_id") or "")],
@@ -1059,6 +1192,299 @@ def _keyframe_item(
         "source_fingerprint": source_fingerprint,
         "state": "planned",
     }
+    item["prompt_contract"] = _prompt_contract(item, art_direction=art_direction)
+    return item
+
+
+def _assert_assets_creatively_ready(assets: list[Mapping[str, Any]]) -> None:
+    if not assets:
+        raise ValueError("image admission requires approved assets")
+    blockers = []
+    for asset in assets:
+        pending = {
+            str(item)
+            for item in asset.get("pending_fields", [])
+            if str(item) in {"positive_traits", "visual_identity", "continuity_state"}
+        }
+        continuity_ready = any(
+            item.get("status") == "confirmed" and str(item.get("label") or "").strip()
+            for item in asset.get("continuity_states", [])
+            if isinstance(item, Mapping)
+        )
+        missing = []
+        if "visual_identity" in pending or not str(asset.get("visual_identity") or "").strip():
+            missing.append("视觉身份")
+        if "positive_traits" in pending or not asset.get("positive_traits"):
+            missing.append("正向视觉特征")
+        if "continuity_state" in pending or not continuity_ready:
+            missing.append("连续性状态")
+        if missing:
+            blockers.append(f"{asset.get('display_name') or '待确认资产'}：{'、'.join(missing)}")
+    if blockers:
+        raise ValueError("图片准入创意依据不完整：" + "；".join(blockers[:9]))
+
+
+def _art_direction_contract(value: Any, *, require_complete: bool) -> dict[str, Any]:
+    data = value if isinstance(value, Mapping) else {}
+    labels = {
+        "visual_style": "视觉风格",
+        "medium": "媒介与质感",
+        "palette": "色彩方案",
+        "lighting": "光线规则",
+    }
+    result = {
+        field: str(data.get(field) or "").strip()[:240]
+        for field in labels
+    }
+    confirmed_at = str(data.get("confirmed_at") or "")[:80]
+    result.update(
+        {
+            "status": "confirmed" if all(result.values()) and confirmed_at else "pending",
+            "source": "human_review",
+            "confirmed_at": confirmed_at,
+        }
+    )
+    if require_complete and result["status"] != "confirmed":
+        missing = [label for field, label in labels.items() if not result[field]]
+        raise ValueError(
+            "图片准入需要先审核并确认统一美术方向"
+            + (f"：缺少{'、'.join(missing)}" if missing else "")
+        )
+    return result
+
+
+def _shot_grounding_contract(value: Any, *, candidate_set: Mapping[str, Any]) -> dict[str, Any]:
+    data = value if isinstance(value, Mapping) else {}
+    known_scenes = {
+        str(item.get("scene_id") or "")
+        for item in candidate_set.get("scene_index", [])
+        if isinstance(item, Mapping)
+    }
+    known_shots = {
+        str(item.get("shot_id") or "")
+        for item in candidate_set.get("shot_index", [])
+        if isinstance(item, Mapping)
+    }
+    scenes = []
+    for item in data.get("scenes", []):
+        if not isinstance(item, Mapping):
+            continue
+        scene_id = _token(item.get("scene_id"), "shot grounding scene_id")
+        if known_scenes and scene_id not in known_scenes:
+            raise ValueError("shot grounding contains a scene outside the locked candidate set")
+        scenes.append(
+            {
+                "scene_id": scene_id,
+                "name": str(item.get("name") or item.get("title") or "")[:160],
+                "number": int(item.get("number") or len(scenes) + 1),
+                "description": str(item.get("description") or "")[:600],
+            }
+        )
+    shots = []
+    for item in data.get("shots", []):
+        if not isinstance(item, Mapping):
+            continue
+        shot_id = _token(item.get("shot_id"), "shot grounding shot_id")
+        scene_id = _token(item.get("scene_id"), "shot grounding shot scene_id")
+        if known_shots and shot_id not in known_shots:
+            raise ValueError("shot grounding contains a shot outside the locked candidate set")
+        if known_scenes and scene_id not in known_scenes:
+            raise ValueError("shot grounding shot belongs to an unknown scene")
+        shots.append(_shot_item_grounding({**item, "shot_id": shot_id, "scene_id": scene_id}))
+    if not scenes:
+        scenes = [
+            {
+                "scene_id": _token(item.get("scene_id"), "candidate scene_id"),
+                "name": str(item.get("name") or "")[:160],
+                "number": int(item.get("number") or index + 1),
+                "description": str(item.get("description") or "")[:600],
+            }
+            for index, item in enumerate(candidate_set.get("scene_index", []))
+            if isinstance(item, Mapping)
+        ]
+    if not shots:
+        shots = [
+            _shot_item_grounding(item)
+            for item in candidate_set.get("shot_index", [])
+            if isinstance(item, Mapping)
+        ]
+    return {
+        "scenes": sorted(scenes, key=lambda item: (item["number"], item["scene_id"])),
+        "shots": sorted(shots, key=lambda item: (item["number"], item["shot_id"])),
+    }
+
+
+def _shot_item_grounding(shot: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "shot_id": _token(shot.get("shot_id"), "shot_id"),
+        "scene_id": _token(shot.get("scene_id"), "shot scene_id"),
+        "number": int(shot.get("number") or 0),
+        "title": str(shot.get("title") or "")[:160],
+        "purpose": str(shot.get("purpose") or shot.get("narrative_purpose") or "")[:400],
+        "shot_size": str(shot.get("shot_size") or "")[:80],
+        "composition": str(shot.get("composition") or "")[:240],
+        "camera_angle": str(shot.get("camera_angle") or "")[:160],
+        "movement": str(shot.get("movement") or shot.get("camera_motion") or "")[:240],
+        "action": str(shot.get("action") or shot.get("description") or "")[:400],
+        "dialogue": str(shot.get("dialogue") or "")[:400],
+        "emotion": str(shot.get("emotion") or "")[:240],
+        "continuity_cues": [
+            str(item).strip()[:160]
+            for item in shot.get("continuity_cues", [])
+            if str(item).strip()
+        ][:16],
+    }
+
+
+def _asset_grounding(asset: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "stable_id": asset["stable_id"],
+        "display_name": asset["display_name"],
+        "asset_type": asset["asset_type"],
+        "aliases": list(asset.get("aliases", [])),
+        "visual_identity": asset["visual_identity"],
+        "positive_traits": list(asset["positive_traits"]),
+        "continuity_states": deepcopy(asset["continuity_states"]),
+        "negative_locks": list(asset["negative_locks"]),
+        "pending_fields": list(asset["pending_fields"]),
+        "source_evidence": deepcopy(asset["source_evidence"]),
+        "occurrences": deepcopy(asset["occurrences"]),
+    }
+
+
+def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any]) -> dict[str, Any]:
+    grounding = item.get("asset_grounding") if isinstance(item.get("asset_grounding"), Mapping) else {}
+    references = [
+        value for value in item.get("reference_asset_grounding", []) if isinstance(value, Mapping)
+    ]
+    shot = item.get("shot_grounding") if isinstance(item.get("shot_grounding"), Mapping) else {}
+    item_type_label = {
+        "character_design": "角色设定",
+        "scene_plate": "场景净板",
+        "prop_design": "核心道具",
+        "shot_keyframe": "镜头关键帧",
+    }.get(str(item.get("item_type") or ""), "图片项目")
+    sections = [
+        ("生成目标", f"{item['label']}（{item_type_label}），独立单图，尺寸 {item['size']}。"),
+        (
+            "统一美术方向",
+            "；".join(
+                [
+                    f"视觉风格：{art_direction['visual_style']}",
+                    f"媒介与质感：{art_direction['medium']}",
+                    f"色彩方案：{art_direction['palette']}",
+                    f"光线规则：{art_direction['lighting']}",
+                ]
+            ),
+        ),
+    ]
+    if grounding:
+        sections.extend(
+            [
+                (
+                    "资产身份",
+                    "；".join(
+                        [
+                            f"名称：{grounding['display_name']}",
+                            f"别名：{'、'.join(grounding['aliases']) or '无'}",
+                            f"视觉身份：{grounding['visual_identity']}",
+                            f"正向特征：{'、'.join(grounding['positive_traits'])}",
+                        ]
+                    ),
+                ),
+                (
+                    "保持一致",
+                    "；".join(
+                        item["label"]
+                        for item in grounding["continuity_states"]
+                        if item.get("status") == "confirmed"
+                    ),
+                ),
+            ]
+        )
+    if shot:
+        sections.append(
+            (
+                "镜头依据",
+                "；".join(
+                    [
+                        f"镜头：{shot['title'] or '未提供'}",
+                        f"叙事目的：{shot['purpose'] or '未提供'}",
+                        f"景别：{shot['shot_size'] or '未提供'}",
+                        f"构图：{shot['composition'] or '未提供'}",
+                        f"机位：{shot['camera_angle'] or '未提供'}",
+                        f"运动：{shot['movement'] or '未提供'}",
+                        f"动作：{shot['action'] or '未提供'}",
+                        f"对白：{shot['dialogue'] or '未提供'}",
+                        f"情绪：{shot['emotion'] or '未提供'}",
+                        f"连续性提示：{'、'.join(shot['continuity_cues']) or '未提供'}",
+                    ]
+                ),
+            )
+        )
+    if references:
+        sections.append(
+            (
+                "引用资产",
+                "；".join(
+                    f"{ref['display_name']}：{ref['visual_identity']}；正向特征{'、'.join(ref['positive_traits'])}；"
+                    f"连续性{'、'.join(state['label'] for state in ref['continuity_states'] if state.get('status') == 'confirmed')}"
+                    for ref in references
+                ),
+            )
+        )
+    sections.append(
+        (
+            "禁止项",
+            "；".join(_localized_negative_lock(value) for value in item.get("negative_locks", []))
+            or "无额外禁止项",
+        )
+    )
+    provider_prompt = "\n".join(f"【{title}】{content}" for title, content in sections)
+    return {
+        "schema_version": PROMPT_CONTRACT_VERSION,
+        "art_direction": deepcopy(dict(art_direction)),
+        "sections": [{"title": title, "content": content} for title, content in sections],
+        "provider_prompt": provider_prompt,
+        "provider_prompt_digest": canonical_digest(provider_prompt),
+    }
+
+
+def _localized_negative_lock(value: Any) -> str:
+    raw = str(value or "").strip()
+    return {
+        "no text, captions, watermarks, interface elements, or borders": "禁止添加文字、水印、界面元素或边框",
+        "do not add text/watermark/ui/borders": "禁止添加文字、水印、界面元素或边框",
+        "do not change character identity": "禁止改变角色身份",
+        "do not change identity": "禁止改变角色身份",
+        "do not add unrequested characters": "禁止添加未要求的角色",
+        "do not add chairs or stools unless approved": "未经确认，禁止添加椅子或凳子",
+        "do not add eaves unless approved": "未经确认，禁止添加屋檐元素",
+        "do not add unrequested set pieces": "禁止添加未要求的场景陈设",
+        "do not change prop function": "禁止改变道具功能",
+        "do not duplicate the prop unless scripted": "剧本未要求时，禁止复制该道具",
+        "do not move to a different location": "禁止移动到其他场景",
+    }.get(raw.lower(), raw)
+
+
+def _assert_manifest_creative_ready(manifest: Mapping[str, Any]) -> None:
+    _art_direction_contract(manifest.get("art_direction"), require_complete=True)
+    items = manifest.get("items", [])
+    if len(items) != 9:
+        raise ValueError("image admission creative grounding requires nine items")
+    for item in items:
+        prompt = item.get("prompt_contract") if isinstance(item.get("prompt_contract"), Mapping) else {}
+        provider_prompt = str(prompt.get("provider_prompt") or "")
+        if (
+            prompt.get("schema_version") != PROMPT_CONTRACT_VERSION
+            or not provider_prompt
+            or canonical_digest(provider_prompt) != prompt.get("provider_prompt_digest")
+            or item.get("source_fingerprint") != manifest.get("source_fingerprint")
+        ):
+            raise ValueError("image admission creative grounding is incomplete or stale")
+        if item.get("item_type") == "shot_keyframe":
+            if not item.get("shot_grounding") or not item.get("reference_asset_grounding"):
+                raise ValueError("keyframe creative grounding requires shot facts and approved asset references")
 
 
 def _asset_rank(asset: Mapping[str, Any]) -> tuple[int, int]:

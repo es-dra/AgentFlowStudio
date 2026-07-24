@@ -73,6 +73,34 @@ def command_preview(bible: dict, command: dict) -> dict:
     )
 
 
+def complete_visual_review(bible: dict) -> dict:
+    for asset in list(bible["assets"]):
+        bible = command_preview(
+            bible,
+            {
+                "type": "edit",
+                "target_id": asset["stable_id"],
+                "patch": {
+                    "visual_identity": f"{asset['display_name']} 的轮廓、材质与主色已由人工确认",
+                    "positive_traits": [f"保持 {asset['display_name']} 的稳定辨识特征"],
+                    "continuity_states": ["当前场次造型与持有物保持一致"],
+                },
+            },
+        )["result"]["asset_bible"]
+    return command_preview(
+        bible,
+        {
+            "type": "set_art_direction",
+            "art_direction": {
+                "visual_style": "写实动作片",
+                "medium": "电影摄影，真实材质",
+                "palette": "低饱和冷色与暖光点缀",
+                "lighting": "主体面部清晰的侧逆光",
+            },
+        },
+    )["result"]["asset_bible"]
+
+
 def test_candidate_generation_is_zero_provider_preview_with_stable_occurrence_lineage() -> None:
     first = build_asset_candidate_set(PROJECT_ID, generation_body())
     second = build_asset_candidate_set(PROJECT_ID, generation_body())
@@ -96,8 +124,27 @@ def test_candidate_generation_is_zero_provider_preview_with_stable_occurrence_li
     assert preview["impact"]["preserved_on_cancel"] is True
 
 
-def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
+def test_visual_identity_and_art_direction_fail_closed_before_approval_and_lock() -> None:
     bible = generated_bible()
+    target = bible["assets"][0]
+    with pytest.raises(ValueError, match="仍缺少视觉身份、正向视觉特征、连续性状态"):
+        command_preview(bible, {"type": "approve", "target_id": target["stable_id"]})
+
+    bible = complete_visual_review(bible)
+    for asset in list(bible["assets"]):
+        bible = command_preview(
+            bible,
+            {"type": "approve", "target_id": asset["stable_id"]},
+        )["result"]["asset_bible"]
+    assert bible["art_direction"]["status"] == "confirmed"
+    assert bible["art_direction"]["source"] == "human_review"
+    locked = command_preview(bible, {"type": "lock"})["result"]["asset_bible"]
+    assert locked["status"] == "locked"
+    assert locked["art_direction"]["visual_style"] == "写实动作片"
+
+
+def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
+    bible = complete_visual_review(generated_bible())
     original_ids = [item["stable_id"] for item in bible["assets"]]
     original_version = bible["version"]
 
@@ -113,7 +160,9 @@ def test_approve_reject_edit_and_lock_create_versioned_revisions() -> None:
             "target_id": approved["stable_id"],
             "patch": {
                 "display_name": f"{approved['display_name']}（确认版）",
+                "visual_identity": approved["visual_identity"],
                 "positive_traits": ["银灰色表面", "轮廓稳定"],
+                "continuity_states": ["当前场次造型与持有物保持一致"],
                 "negative_locks": ["不得改变身份", "不得添加文字"],
             },
         },
@@ -217,7 +266,7 @@ def test_merge_and_split_preserve_lineage_and_require_exact_occurrence_assignmen
 
 
 def test_studio_state_roundtrip_preserves_asset_bible_without_accepting_provider_fields() -> None:
-    bible = generated_bible()
+    bible = complete_visual_review(generated_bible())
     state = sanitize_studio_state(
         {
             "meta": {"projectName": "Clawed Fighter", "canvasName": "主画布"},
@@ -231,6 +280,10 @@ def test_studio_state_roundtrip_preserves_asset_bible_without_accepting_provider
     assert state["assetBible"]["candidate_set"]["shot_count"] == 17
     assert state["assetBible"]["current_revision_id"] == bible["current_revision_id"]
     assert state["assetBible"]["assets"][0]["stable_id"] == bible["assets"][0]["stable_id"]
+    assert state["assetBible"]["assets"][0]["visual_identity"] == bible["assets"][0]["visual_identity"]
+    assert state["assetBible"]["assets"][0]["continuity_states"][0]["status"] == "confirmed"
+    assert state["assetBible"]["art_direction"]["status"] == "confirmed"
+    assert state["assetBible"]["art_direction"]["visual_style"] == "写实动作片"
     assert state["assetBible"]["provider_dispatch_count"] == 0
 
     unsafe = deepcopy(bible)
@@ -411,7 +464,7 @@ def test_split_rejects_duplicate_occurrence_assignment() -> None:
 
 
 def test_referenced_reject_blocks_lock_until_same_type_reassignment() -> None:
-    bible = generated_bible()
+    bible = complete_visual_review(generated_bible())
     characters = [
         item
         for item in bible["assets"]
@@ -527,7 +580,7 @@ def test_human_review_can_add_missing_asset_with_traced_occurrences() -> None:
 
 
 def test_alias_collision_blocks_coverage_and_lock() -> None:
-    bible = generated_bible()
+    bible = complete_visual_review(generated_bible())
     characters = [item for item in bible["assets"] if item["asset_type"] == "character"][:2]
     shared_alias = "同一别名"
     for character in characters:

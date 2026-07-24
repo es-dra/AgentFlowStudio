@@ -85,6 +85,21 @@ def _command(bible: dict, command: dict) -> dict:
     )
 
 
+def _complete_visual(asset: dict) -> None:
+    asset["visual_identity"] = f"{asset['display_name']} 的轮廓、材质与主色已确认"
+    asset["positive_traits"] = [f"保持 {asset['display_name']} 的稳定辨识特征"]
+    asset["continuity_states"] = [
+        {
+            "state_id": f"continuity-{asset['stable_id']}",
+            "label": "当前场次造型与持有物保持一致",
+            "status": "confirmed",
+            "scene_ids": asset["occurrences"]["scene_ids"],
+            "shot_ids": asset["occurrences"]["shot_ids"],
+        }
+    ]
+    asset["pending_fields"] = []
+
+
 def test_recognition_clusters_aliases_and_propagates_scene_descendants_stably() -> None:
     first = recognize_asset_occurrences(SCRIPT, [SCRIPT], _shot_plan()["scenes"])
     second = recognize_asset_occurrences(SCRIPT, [SCRIPT], _shot_plan()["scenes"])
@@ -139,6 +154,7 @@ def test_quality_gate_blocks_missing_anchor_and_image_manifest() -> None:
     removed = next(item for item in bible["assets"] if item["display_name"] == "九齿钉耙")
     bible["assets"] = [item for item in bible["assets"] if item["stable_id"] != removed["stable_id"]]
     for asset in bible["assets"]:
+        _complete_visual(asset)
         asset["review_state"] = "approved"
         asset["needs_confirmation"] = False
     preview = _command(bible, {"type": "approve", "target_id": bible["assets"][0]["stable_id"]})
@@ -165,6 +181,7 @@ def test_quality_gate_blocks_missing_anchor_and_image_manifest() -> None:
 def test_rerecognition_preview_preserves_approved_assets_and_creates_history() -> None:
     bible = _generated_bible()
     approved = next(item for item in bible["assets"] if item["display_name"] == "孙悟空")
+    _complete_visual(approved)
     bible = _command(
         bible,
         {"type": "approve", "target_id": approved["stable_id"]},

@@ -82,6 +82,21 @@ def sanitize_asset_bible(
                     "scene_id": _id(item.get("scene_id")),
                     "title": text(item.get("title"), "镜头", 120),
                     "number": max(1, int(number(item.get("number"), index + 1))),
+                    "description": text(item.get("description"), "", 600),
+                    "purpose": text(item.get("purpose"), "", 400),
+                    "shot_size": text(item.get("shot_size"), "", 80),
+                    "composition": text(item.get("composition"), "", 240),
+                    "camera_angle": text(item.get("camera_angle"), "", 160),
+                    "movement": text(item.get("movement"), "", 240),
+                    "action": text(item.get("action"), "", 400),
+                    "dialogue": text(item.get("dialogue"), "", 400),
+                    "emotion": text(item.get("emotion"), "", 240),
+                    "continuity_cues": _texts(
+                        item.get("continuity_cues"),
+                        text=text,
+                        limit=16,
+                        length=240,
+                    ),
                 }
                 for index, item in enumerate(_list(candidate_set.get("shot_index"))[:240])
                 if isinstance(item, dict) and _id(item.get("shot_id"))
@@ -146,6 +161,7 @@ def sanitize_asset_bible(
                 "history_asset_ids",
             )
         },
+        "art_direction": _art_direction(data.get("art_direction"), text=text),
         "revisions": revisions,
         "current_revision_id": _id(data.get("current_revision_id")),
         "locked_revision_id": _id(data.get("locked_revision_id")),
@@ -173,6 +189,7 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
         "asset_type": asset_type,
         "display_name": text(data.get("display_name"), "待确认资产", 120),
         "aliases": _texts(data.get("aliases"), text=text, limit=20, length=120),
+        "visual_identity": text(data.get("visual_identity"), "", 600),
         "review_state": review_state,
         "confidence": max(0.0, min(1.0, number(data.get("confidence"), 0))),
         "needs_confirmation": data.get("needs_confirmation") is not False,
@@ -208,6 +225,23 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
             "merged_from_ids": _ids(data.get("lineage", {}).get("merged_from_ids") if isinstance(data.get("lineage"), dict) else [], 16),
         },
         "superseded_by_ids": _ids(data.get("superseded_by_ids"), 16),
+    }
+
+
+def _art_direction(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    fields = {
+        "visual_style": text(data.get("visual_style"), "", 240),
+        "medium": text(data.get("medium"), "", 240),
+        "palette": text(data.get("palette"), "", 240),
+        "lighting": text(data.get("lighting"), "", 240),
+    }
+    complete = all(fields.values())
+    return {
+        **fields,
+        "status": "confirmed" if complete and data.get("status") == "confirmed" else "pending",
+        "source": "human_review" if data.get("source") == "human_review" else "",
+        "confirmed_at": text(data.get("confirmed_at"), "", 80) if complete else "",
     }
 
 

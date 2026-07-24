@@ -8,6 +8,7 @@ import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
 import {
   assetBibleProjection,
   assetBibleSourceContext,
+  assetVisualBlockers,
   assetOccurrenceLabel,
   assetReviewLabel,
   assetTypeLabel,
@@ -51,6 +52,7 @@ export function createProductShell(options = {}) {
   let assetCommandError = "";
   let lastAssetCommand = null;
   let assetDraft = null;
+  let artDirectionDraft = null;
   let assetCreateOpen = false;
   let assetCreateDraft = { asset_type: "prop", display_name: "", aliases: "", scene_ids: [], shot_ids: [], evidence: "" };
   let resolutionReason = "";
@@ -869,11 +871,17 @@ export function createProductShell(options = {}) {
       lock.disabled = view.status === "locked"
         || view.counts.candidate > 0
         || !view.counts.approved
+        || view.active_assets.some((asset) => assetVisualBlockers(asset).length)
+        || view.art_direction.status !== "confirmed"
         || view.recognition_quality.status !== "pass"
         || !view.coverage.coverage_pass
         || Boolean(assetCommandPreview);
       lock.title = view.counts.candidate
         ? `仍有 ${view.counts.candidate} 个候选待确认`
+        : view.active_assets.some((asset) => assetVisualBlockers(asset).length)
+          ? "仍有资产缺少视觉身份、正向特征或连续性状态"
+          : view.art_direction.status !== "confirmed"
+            ? "请先审核并确认统一美术方向"
         : view.recognition_quality.status !== "pass"
           ? `识别质量门有 ${view.recognition_quality.issues.length} 项阻塞`
         : view.coverage.unresolved_required
@@ -898,6 +906,7 @@ export function createProductShell(options = {}) {
     main.appendChild(header);
     main.appendChild(assetBibleStatusBar(view, source));
     if (view.counts.total) main.appendChild(assetBibleQualityGate(view));
+    if (view.counts.total) main.appendChild(assetBibleArtDirection(view));
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
       main.appendChild(buildImageAdmissionPanel());
     }
@@ -975,6 +984,65 @@ export function createProductShell(options = {}) {
       retry.addEventListener("click", () => void stageAssetBibleCommand({ type: "regenerate_candidates" }));
       sectionEl.appendChild(retry);
     }
+    return sectionEl;
+  }
+
+  function assetBibleArtDirection(view) {
+    const sectionEl = node(
+      "section",
+      `asset-bible-art-direction ${view.art_direction.status === "confirmed" ? "confirmed" : "pending"}`,
+    );
+    sectionEl.setAttribute("aria-live", "polite");
+    sectionEl.append(
+      node("strong", "", view.art_direction.status === "confirmed" ? "统一美术方向已确认" : "统一美术方向待确认"),
+      node("p", "", "该版本会冻结到图片准入清单，并用于界面预览与实际请求的同一提示合同。"),
+    );
+    if (view.status === "locked") {
+      const summary = node("dl", "asset-bible-art-direction-summary");
+      for (const [label, key] of [
+        ["视觉风格", "visual_style"],
+        ["媒介与质感", "medium"],
+        ["色彩方案", "palette"],
+        ["光线规则", "lighting"],
+      ]) summary.append(node("dt", "", label), node("dd", "", view.art_direction[key] || "未确认"));
+      sectionEl.appendChild(summary);
+      return sectionEl;
+    }
+    if (!artDirectionDraft) artDirectionDraft = { ...view.art_direction };
+    const form = node("form", "asset-bible-art-direction-form");
+    for (const [label, key, placeholder] of [
+      ["视觉风格", "visual_style", "例如：写实古装动作片"],
+      ["媒介与质感", "medium", "例如：电影摄影，真实皮肤与织物"],
+      ["色彩方案", "palette", "例如：低饱和青绿与暖金点缀"],
+      ["光线规则", "lighting", "例如：黄昏侧逆光，人物面部可辨"],
+    ]) {
+      const wrap = node("label", "");
+      wrap.appendChild(node("span", "", label));
+      const input = document.createElement("input");
+      input.value = artDirectionDraft[key] || "";
+      input.placeholder = placeholder;
+      input.required = true;
+      input.addEventListener("input", () => { artDirectionDraft[key] = input.value; });
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+    }
+    const submit = node("button", "studio-secondary-button", "预览美术方向");
+    submit.type = "submit";
+    submit.disabled = Boolean(assetCommandPreview);
+    form.appendChild(submit);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void stageAssetBibleCommand({
+        type: "set_art_direction",
+        art_direction: {
+          visual_style: artDirectionDraft.visual_style,
+          medium: artDirectionDraft.medium,
+          palette: artDirectionDraft.palette,
+          lighting: artDirectionDraft.lighting,
+        },
+      });
+    });
+    sectionEl.appendChild(form);
     return sectionEl;
   }
 
@@ -1074,7 +1142,11 @@ export function createProductShell(options = {}) {
       ]) {
         const button = node("button", className, label);
         button.type = "button";
-        button.disabled = Boolean(assetCommandPreview);
+        const visualBlockers = type === "approve" ? assetVisualBlockers(asset) : [];
+        button.disabled = Boolean(assetCommandPreview) || visualBlockers.length > 0;
+        button.title = visualBlockers.length
+          ? `请先补全${visualBlockers.join("、")}；不能把缺字段候选标为已批准`
+          : `${label}当前资产`;
         button.addEventListener("click", () => void stageAssetBibleCommand({ type, target_id: asset.stable_id }));
         actions.appendChild(button);
       }
@@ -1083,14 +1155,21 @@ export function createProductShell(options = {}) {
     if (actions.childElementCount) head.appendChild(actions);
     detail.appendChild(head);
     const metrics = node("dl", "asset-bible-metrics");
+    const confidenceReview = asset.review_state === "approved" ? "已人工确认" : "仍需人工确认";
     for (const [label, value] of [
-      ["可信度", `${Math.round(Number(asset.confidence || 0) * 100)}% · 仍需人工确认`],
+      ["可信度", `${Math.round(Number(asset.confidence || 0) * 100)}% · ${confidenceReview}`],
       ["出现", `${asset.occurrences.scene_ids.length} 场 · ${asset.occurrences.shot_ids.length} 镜头`],
       ["别名", asset.aliases.join("、") || "无"],
       ["待确认", asset.pending_fields.map(pendingFieldLabel).join("、") || "无"],
     ]) metrics.append(node("dt", "", label), node("dd", "", value));
     detail.appendChild(metrics);
+    detail.appendChild(assetTagSection("视觉身份", asset.visual_identity ? [asset.visual_identity] : [], "尚未确认视觉身份"));
     detail.appendChild(assetTagSection("正向特征", asset.positive_traits, "尚未确认正向视觉特征"));
+    detail.appendChild(assetTagSection(
+      "连续性状态",
+      asset.continuity_states.filter((item) => item?.status === "confirmed").map((item) => item.label),
+      "尚未确认连续性状态",
+    ));
     detail.appendChild(assetTagSection("禁改项", asset.negative_locks.map(localizedNegativeLock), "尚未设置禁改项"));
     detail.appendChild(assetOccurrenceSection(asset, view));
     if (view.status !== "locked") detail.appendChild(assetResolutionSection(asset, view));
@@ -1304,6 +1383,8 @@ export function createProductShell(options = {}) {
         display_name: asset.display_name,
         aliases: asset.aliases.join("、"),
         positive_traits: asset.positive_traits.join("、"),
+        visual_identity: asset.visual_identity,
+        continuity_states: asset.continuity_states.map((item) => item?.label).filter(Boolean).join("、"),
         negative_locks: asset.negative_locks.join("、"),
         split_name_a: `${asset.display_name} A`,
         split_name_b: `${asset.display_name} B`,
@@ -1314,7 +1395,9 @@ export function createProductShell(options = {}) {
     const fields = [
       ["display_name", "名称", "text"],
       ["aliases", "别名（顿号分隔）", "text"],
+      ["visual_identity", "视觉身份", "text"],
       ["positive_traits", "正向特征（顿号分隔）", "text"],
+      ["continuity_states", "连续性状态（顿号分隔）", "text"],
       ["negative_locks", "禁改项（顿号分隔）", "text"],
     ];
     for (const [key, label, type] of fields) {
@@ -1372,7 +1455,9 @@ export function createProductShell(options = {}) {
         patch: {
           display_name: assetDraft.display_name,
           aliases: splitList(assetDraft.aliases),
+          visual_identity: assetDraft.visual_identity,
           positive_traits: splitList(assetDraft.positive_traits),
+          continuity_states: splitList(assetDraft.continuity_states),
           negative_locks: splitList(assetDraft.negative_locks),
         },
       });
@@ -1478,11 +1563,42 @@ export function createProductShell(options = {}) {
 
   function imageAdmissionSource() {
     const view = assetBibleView();
+    const source = assetBibleSourceContext(snapshot.studioState || {});
+    const scenes = [];
+    const shots = [];
+    for (const [sceneIndex, scene] of (source?.shot_plan?.scenes || []).entries()) {
+      const sceneId = String(scene.scene_id || "");
+      scenes.push({
+        scene_id: sceneId,
+        name: String(scene.name || scene.title || ""),
+        number: Number(scene.number || sceneIndex + 1),
+        description: String(scene.description || ""),
+      });
+      for (const [shotIndex, shot] of (scene.shots || []).entries()) {
+        shots.push({
+          shot_id: String(shot.shot_id || ""),
+          scene_id: sceneId,
+          number: Number(shot.number || shots.length + 1),
+          title: String(shot.title || `镜头 ${shotIndex + 1}`),
+          purpose: String(shot.narrative_purpose || shot.purpose || ""),
+          shot_size: String(shot.shot_size || ""),
+          composition: String(shot.composition || ""),
+          camera_angle: String(shot.camera_angle || ""),
+          movement: String(shot.movement || shot.camera_motion || ""),
+          action: String(shot.action || shot.description || ""),
+          dialogue: String(shot.dialogue || ""),
+          emotion: String(shot.emotion || ""),
+          continuity_cues: Array.isArray(shot.continuity_cues) ? shot.continuity_cues : [],
+        });
+      }
+    }
     return {
       authority_mode: view.authority_mode,
       production_graph_version: Number(snapshot.sequenceWorkspace?.graph_version || 0),
       production_graph_digest: String(snapshot.sequenceWorkspace?.graph_digest || ""),
       studio_state_version: String(snapshot.studioState?.meta?.stateVersion || ""),
+      art_direction: view.art_direction,
+      shot_grounding: { scenes, shots },
       asset_bible: view.raw || {},
     };
   }
@@ -1497,7 +1613,7 @@ export function createProductShell(options = {}) {
       node("span", "eyebrow", "九项代表集 · 费用硬门"),
       node("h2", "", "图片准入"),
       node("p", "", view.status === "empty"
-        ? "先审核角色、场景、道具与关键帧清单；确认前不会调用外部能力。"
+        ? "先审核资产视觉身份、统一美术方向与镜头依据；确认前不会调用外部能力。"
         : `清单 ${view.manifest?.version || 1} · ${view.items.length} 项 · ${view.budget_contract.disclosure || "公开估算，非最终账单"}`),
     );
     const close = node("button", "studio-icon-button");
@@ -1592,6 +1708,7 @@ export function createProductShell(options = {}) {
         ? `镜头已绑定 · ${referenceCount} 张已批准参考图`
         : `${occurrenceCount} 个镜头出现 · 来源已绑定`,
     ));
+    main.appendChild(buildImageAdmissionGrounding(item));
     const media = buildImageAdmissionCandidateMedia(item, view);
     if (media.element) main.appendChild(media.element);
     const state = node("span", "image-admission-item-state", imageAdmissionStateLabel(item.state));
@@ -1654,6 +1771,26 @@ export function createProductShell(options = {}) {
     }
     if (actions.childElementCount) row.appendChild(actions);
     return row;
+  }
+
+  function buildImageAdmissionGrounding(item) {
+    const sectionEl = node("section", "image-admission-grounding");
+    const prompt = item.prompt_contract || {};
+    const sections = Array.isArray(prompt.sections) ? prompt.sections : [];
+    for (const title of ["生成目标", "统一美术方向", "资产身份", "保持一致", "镜头依据", "引用资产", "禁止项"]) {
+      const entry = sections.find((item) => item?.title === title);
+      if (!entry?.content) continue;
+      const row = node("div", "");
+      row.append(node("span", "", title === "生成目标" ? "生成内容依据" : title), node("p", "", entry.content));
+      sectionEl.appendChild(row);
+    }
+    const evidence = node("details", "");
+    evidence.append(
+      node("summary", "", "来源与费用"),
+      node("p", "", `${item.size} · 单项估算 $${imageAdmissionView().budget_contract.unit_estimate_usd || "0.0377"} · 公开估算，非最终账单`),
+    );
+    sectionEl.appendChild(evidence);
+    return sectionEl;
   }
 
   function buildImageAdmissionCandidateMedia(item, view) {
@@ -1994,6 +2131,7 @@ export function createProductShell(options = {}) {
       assetCommandError = "";
       mergeAssetIds = new Set();
       assetDraft = null;
+      artDirectionDraft = null;
       if (preview.command?.type === "create_asset") {
         assetCreateOpen = false;
         assetCreateDraft = { asset_type: "prop", display_name: "", aliases: "", scene_ids: [], shot_ids: [], evidence: "" };
@@ -2582,7 +2720,13 @@ export function createProductShell(options = {}) {
       showAssetBible();
       return;
     }
-    if (["review_asset_candidates", "resolve_required_occurrences", "review_asset_coverage"].includes(action.action)) {
+    if ([
+      "review_asset_candidates",
+      "resolve_required_occurrences",
+      "review_asset_coverage",
+      "complete_asset_visual_identity",
+      "set_art_direction",
+    ].includes(action.action)) {
       showAssetBible();
       return;
     }
@@ -3390,6 +3534,7 @@ function assetCommandLabel(value) {
     generate_candidates: "建立本地确定性资产候选",
     regenerate_candidates: "重新识别并预览替换",
     create_asset: "补充人工审核资产",
+    set_art_direction: "确认统一美术方向",
     approve: "批准资产候选",
     reject: "拒绝资产候选",
     edit: "编辑资产候选",

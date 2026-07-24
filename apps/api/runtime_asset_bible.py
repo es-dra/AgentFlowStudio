@@ -28,6 +28,7 @@ COMMANDS = {
     "generate_candidates",
     "regenerate_candidates",
     "create_asset",
+    "set_art_direction",
     "approve",
     "reject",
     "edit",
@@ -38,6 +39,7 @@ COMMANDS = {
     "lock",
 }
 ASSET_TYPES = {"character", "scene", "prop"}
+ART_DIRECTION_FIELDS = ("visual_style", "medium", "palette", "lighting")
 
 
 def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -293,6 +295,7 @@ def _apply_command(
             "assets": generated["assets"],
             "required_occurrences": _required_occurrences(generated["assets"]),
             "occurrence_resolutions": [],
+            "art_direction": {},
             "revisions": [],
             "current_revision_id": "",
             "locked_revision_id": "",
@@ -325,7 +328,14 @@ def _apply_command(
     index = {item["stable_id"]: item for item in assets}
     if command_type in {"approve", "reject", "edit", "split"} and (len(target_ids) != 1 or target_ids[0] not in index):
         raise ValueError("asset Bible command requires one current asset")
-    if command_type == "approve":
+    if command_type == "set_art_direction":
+        current["art_direction"] = _art_direction(
+            command.get("art_direction"),
+            confirmed_at=command_time,
+            require_complete=True,
+        )
+    elif command_type == "approve":
+        _assert_asset_visual_ready(index[target_ids[0]])
         index[target_ids[0]]["review_state"] = "approved"
         index[target_ids[0]]["needs_confirmation"] = False
     elif command_type == "reject":
@@ -433,6 +443,17 @@ def _apply_command(
                 f"{coverage['unresolved_required']} required occurrences unresolved; "
                 f"{coverage['shot_covered']}/{coverage['shot_total']} shots covered"
             )
+        visual_blockers = [
+            f"{item['display_name']}：{'、'.join(_asset_visual_blockers(item))}"
+            for item in assets
+            if item.get("review_state") == "approved" and _asset_visual_blockers(item)
+        ]
+        if visual_blockers:
+            raise ValueError(
+                "Asset Bible lock blocked: 视觉身份资料未完成："
+                + "；".join(visual_blockers[:8])
+            )
+        _art_direction(current.get("art_direction"), require_complete=True)
         current["status"] = "locked"
         current["locked_at"] = command_time
     result = {**current, "assets": assets, "version": int(current.get("version") or 0) + 1}
@@ -505,9 +526,10 @@ def _candidate_asset(
                 "shot_ids": shot_ids,
             }
         ],
+        "visual_identity": "",
         "positive_traits": [],
         "negative_locks": list(profile.get("negative_locks") or []),
-        "pending_fields": ["positive_traits", "visual_identity"],
+        "pending_fields": ["positive_traits", "visual_identity", "continuity_state"],
         "source_evidence": [
             {
                 "source_type": "applied_shot_plan" if shot_ids else "script_revision",
@@ -666,15 +688,120 @@ def _edit_asset(asset: dict[str, Any], patch: Any) -> None:
         if asset["display_name"] not in asset["aliases"]:
             asset["aliases"].append(asset["display_name"])
         asset["display_name"] = name
-    for field in ("aliases", "positive_traits", "negative_locks"):
+    for field in ("aliases", "negative_locks"):
         if field in data:
             values = [str(item).strip()[:160] for item in data.get(field, []) if str(item).strip()]
             asset[field] = list(dict.fromkeys(values))[:24]
+    if "visual_identity" in data:
+        asset["visual_identity"] = str(data.get("visual_identity") or "").strip()[:600]
+    if "positive_traits" in data:
+        values = [str(item).strip()[:160] for item in data.get("positive_traits", []) if str(item).strip()]
+        asset["positive_traits"] = list(dict.fromkeys(values))[:24]
+    if "continuity_states" in data:
+        labels = [
+            str(item.get("label") if isinstance(item, Mapping) else item).strip()[:160]
+            for item in data.get("continuity_states", [])
+            if str(item.get("label") if isinstance(item, Mapping) else item).strip()
+        ]
+        asset["continuity_states"] = [
+            {
+                "state_id": f"continuity-{asset['stable_id']}-{index + 1}",
+                "label": label,
+                "status": "confirmed",
+                "scene_ids": list(asset.get("occurrences", {}).get("scene_ids", [])),
+                "shot_ids": list(asset.get("occurrences", {}).get("shot_ids", [])),
+            }
+            for index, label in enumerate(dict.fromkeys(labels))
+        ][:16]
     asset["review_state"] = "candidate"
     asset["needs_confirmation"] = True
-    asset["pending_fields"] = [
-        field for field in asset.get("pending_fields", []) if field not in {"positive_traits", "visual_identity"}
-    ]
+    pending = set(asset.get("pending_fields", []))
+    for field, ready in (
+        ("positive_traits", bool(asset.get("positive_traits"))),
+        ("visual_identity", bool(str(asset.get("visual_identity") or "").strip())),
+        (
+            "continuity_state",
+            any(
+                item.get("status") == "confirmed" and str(item.get("label") or "").strip()
+                for item in asset.get("continuity_states", [])
+            ),
+        ),
+    ):
+        if ready:
+            pending.discard(field)
+        else:
+            pending.add(field)
+    asset["pending_fields"] = sorted(pending)
+
+
+def _asset_visual_blockers(asset: Mapping[str, Any]) -> list[str]:
+    blockers = []
+    pending = {
+        str(item)
+        for item in asset.get("pending_fields", [])
+        if str(item) in {"positive_traits", "visual_identity", "continuity_state"}
+    }
+    if "visual_identity" in pending or not str(asset.get("visual_identity") or "").strip():
+        blockers.append("视觉身份")
+    if "positive_traits" in pending or not asset.get("positive_traits"):
+        blockers.append("正向视觉特征")
+    continuity_ready = any(
+        isinstance(item, Mapping)
+        and item.get("status") == "confirmed"
+        and str(item.get("label") or "").strip()
+        for item in asset.get("continuity_states", [])
+    )
+    if "continuity_state" in pending or not continuity_ready:
+        blockers.append("连续性状态")
+    return blockers
+
+
+def _assert_asset_visual_ready(asset: Mapping[str, Any]) -> None:
+    blockers = _asset_visual_blockers(asset)
+    if blockers:
+        raise ValueError(
+            f"资产“{asset.get('display_name') or '待确认资产'}”仍缺少"
+            f"{'、'.join(blockers)}；请先编辑并预览影响"
+        )
+
+
+def _art_direction(
+    value: Any,
+    *,
+    confirmed_at: str = "",
+    require_complete: bool = False,
+) -> dict[str, Any]:
+    data = value if isinstance(value, Mapping) else {}
+    result = {
+        field: str(data.get(field) or "").strip()[:240]
+        for field in ART_DIRECTION_FIELDS
+    }
+    result.update(
+        {
+            "status": "confirmed" if all(result.values()) else "pending",
+            "source": "human_review",
+            "confirmed_at": str(data.get("confirmed_at") or confirmed_at or "")[:80],
+        }
+    )
+    if require_complete and (
+        result["status"] != "confirmed"
+        or not result["confirmed_at"]
+    ):
+        missing = [
+            {
+                "visual_style": "视觉风格",
+                "medium": "媒介与质感",
+                "palette": "色彩方案",
+                "lighting": "光线规则",
+            }[field]
+            for field in ART_DIRECTION_FIELDS
+            if not result[field]
+        ]
+        raise ValueError(
+            "统一美术方向尚未确认"
+            + (f"：缺少{'、'.join(missing)}" if missing else "")
+        )
+    return result
 
 
 def _required_occurrences(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1113,6 +1240,7 @@ def _append_revision(state: dict[str, Any], command_type: str, *, created_at: st
         "status": state.get("status", "candidate_review"),
         "created_at": created_at,
         "command_type": command_type,
+        "art_direction": deepcopy(state.get("art_direction", {})),
         "asset_snapshot": [
             {
                 "stable_id": item["stable_id"],
@@ -1304,6 +1432,7 @@ def _graph_events(
                         "display_name": asset["display_name"],
                         "aliases": asset["aliases"],
                         "review_state": asset["review_state"],
+                        "visual_identity": asset.get("visual_identity", ""),
                         "continuity_states": asset["continuity_states"],
                         "positive_traits": asset["positive_traits"],
                         "negative_locks": asset["negative_locks"],
@@ -1359,6 +1488,7 @@ def _receipt(state: Mapping[str, Any], command: Mapping[str, Any], impact: Mappi
             "个当前资产；已批准事实保留，旧候选进入历史，未调用外部能力。"
         ),
         "create_asset": "人工补充资产已进入候选审核，出现范围等待确认。",
+        "set_art_direction": "统一美术方向已确认并写入 Asset Bible 当前版本。",
         "approve": "资产候选已批准，引用关系保持可追溯。",
         "reject": "资产候选已拒绝；仍被引用的出现范围会阻止锁定，直到完成重分配或明确无需。",
         "edit": "资产候选修订已保存为新版本。",
@@ -1405,6 +1535,7 @@ def _safe_command(command: Mapping[str, Any]) -> dict[str, Any]:
         "scene_ids",
         "shot_ids",
         "evidence",
+        "art_direction",
         "names",
         "occurrence_assignments",
         "requirement_ids",
