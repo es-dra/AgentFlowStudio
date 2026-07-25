@@ -103,6 +103,7 @@ export function deriveProductionCopilotState({
   imageAdmission = null,
   mediaOperations = null,
   productionGraph = null,
+  planningRun = null,
 } = {}) {
   const shotTruth = legacyAppliedStoryboardProjection(studioState);
   const bible = assetBibleProjection(studioState, runtimeAssetBible);
@@ -185,6 +186,35 @@ export function deriveProductionCopilotState({
     assetBibleSourceContext(studioState)?.script_revision_id
     || bible.candidate_set?.script_revision_id,
   );
+  const planningPhase = String(planningRun?.phase || "");
+  if (!scriptReady && ["failed", "unknown"].includes(planningPhase)) {
+    return {
+      stage: "plan_recovery_required",
+      dependencies: [
+        { key: "script", label: "制作方案", state: "pending" },
+        { key: "project", label: "现有项目内容", state: "ready" },
+      ],
+      blockers: ["制作方案需要检查；现有项目内容未改变"],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: capabilityGates.image === true,
+        video: capabilityGates.video === true,
+        admission: "blocked",
+        cost_state: "not_admitted",
+      },
+      next_valid_action: {
+        action: "recover_plan_preview",
+        label: "恢复制作方案",
+        reason: "查看同一任务的失败状态和原始输入，不会再次提交文本任务。",
+        enabled: Boolean(planningRun?.run_id),
+      },
+      ready_summary: "制作方案未通过检查，现有项目内容未改变。",
+      needs_input: "检查失败原因并恢复同一预览。",
+      asset_bible: bible,
+      provider_dispatch_count: Number(planningRun?.dispatch_count || 0),
+      external_cost_usd: planningRun?.cost?.actual_usd ?? null,
+    };
+  }
   const shotReady = shotTruth.status === "ready" || Number(bible.candidate_set?.shot_count || 0) > 0;
   const candidatesReady = bible.counts.total > 0;
   const visualBlockers = bible.active_assets

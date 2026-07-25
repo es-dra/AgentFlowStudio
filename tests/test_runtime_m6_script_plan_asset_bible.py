@@ -38,6 +38,13 @@ SCRIPT_TEXT = """
 米拉决定不再追逐信号源，而是把镜头留在三人的沉默上，让真相成为下一场戏的压力。
 """
 
+EXPLICIT_NAME_BRIEF = (
+    "夏岚在海边档案馆整理一支银色录音笔。"
+    "保持角色名称“夏岚”、场景名称“海边档案馆”、道具名称“银色录音笔”不变；"
+    "规划3个连续镜头，总时长约25秒。"
+    "不要新增其他人物、场景或道具；制作参考必须明确标为辅助内容。"
+)
+
 
 def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles() -> None:
     idea = build_m6_script_plan_asset_bible("m6-idea", {"source_kind": "idea", "source_text": IDEA_TEXT})
@@ -103,6 +110,36 @@ Anderson走进Andromeda Hall，把钥匙放在桌面上。
     assert candidate["m6_scope_review"]["fail_closed"]["status"] == "pass"
 
 
+def test_m6_explicit_name_declarations_are_canonical_authority() -> None:
+    candidate = build_m6_script_plan_asset_bible(
+        "m6-explicit-name-authority",
+        {"source_kind": "idea", "source_text": EXPLICIT_NAME_BRIEF},
+    )["candidate"]
+
+    scope = candidate["m6_scope_review"]
+    assert scope["canonical"] == {
+        "characters": ["夏岚"],
+        "scenes": ["海边档案馆"],
+        "props": ["银色录音笔"],
+    }
+    assert scope["candidate_canonical"] == scope["canonical"]
+    assert scope["fail_closed"]["status"] == "pass"
+
+
+def test_m6_explicit_name_declarations_preserve_adversarial_names_and_ignore_forbidden_examples() -> None:
+    source = (
+        "保持角色名称“和也”和“Anderson”、场景名称“Andromeda Hall”、"
+        "道具名称“红与蓝徽章”不变。"
+        "不要新增角色名称“路人”，不得添加场景名称“备用房间”，禁止使用道具名称“样例钥匙”。"
+    )
+
+    scope = runtime_m6_server_codex_planner.m6_source_canonical_scope(source)
+
+    assert scope["characters"] == ["和也", "Anderson"]
+    assert scope["scenes"] == ["Andromeda Hall"]
+    assert scope["props"] == ["红与蓝徽章"]
+
+
 def test_m6_server_codex_prompt_preserves_non_chinese_canonical_names() -> None:
     source = """
 角色：和也、Anderson
@@ -129,6 +166,65 @@ def test_m6_server_codex_prompt_preserves_non_chinese_canonical_names() -> None:
     assert "不得翻译、音译或改写 canonical 名称" in prompt
     assert "角色、场景、镜头和资产名称必须是中文专名" not in prompt
     assert "禁止英文污染" not in prompt
+
+
+def test_m6_server_codex_accepts_explicit_name_brief_with_exact_canonical_scope(monkeypatch) -> None:
+    payload = _single_scope_server_codex_payload("夏岚", "海边档案馆", "银色录音笔")
+    calls: list[str] = []
+
+    def fake_dispatch(*, prompt, output_dir, schema, schema_digest):
+        calls.append(prompt)
+        return {"provider_calls_started": True, "structured_output": payload}
+
+    monkeypatch.setattr(runtime_m6_server_codex_planner, "_dispatch_server_codex_structured_plan", fake_dispatch)
+    preview = runtime_m6_server_codex_planner.build_m6_server_codex_script_plan_asset_bible(
+        "m6-explicit-server-codex",
+        {"source_kind": "idea", "source_text": EXPLICIT_NAME_BRIEF},
+    )
+
+    candidate = preview["candidate"]
+    assert preview["validation"]["verdict"] == "PASS"
+    assert candidate["m6_scope_review"]["canonical"] == {
+        "characters": ["夏岚"],
+        "scenes": ["海边档案馆"],
+        "props": ["银色录音笔"],
+    }
+    assert candidate["m6_scope_review"]["fail_closed"]["status"] == "pass"
+    assert "夏岚" in calls[0] and "海边档案馆" in calls[0] and "银色录音笔" in calls[0]
+
+
+def test_m6_explicit_name_brief_still_fails_closed_on_addition_rename_and_omission() -> None:
+    mutations = []
+
+    extra_character = _single_scope_server_codex_payload("夏岚", "海边档案馆", "银色录音笔")
+    extra_character["characters"].append(
+        {**deepcopy(extra_character["characters"][0]), "display_name": "未授权访客"}
+    )
+    mutations.append(extra_character)
+
+    renamed_scene = _single_scope_server_codex_payload("夏岚", "海边档案馆", "银色录音笔")
+    renamed_scene["scenes"][0]["name"] = "模型改名场景"
+    mutations.append(renamed_scene)
+
+    missing_prop = _single_scope_server_codex_payload("夏岚", "海边档案馆", "银色录音笔")
+    missing_prop["assets"] = [row for row in missing_prop["assets"] if row["kind"] != "prop"]
+    for shot in missing_prop["shots"]:
+        shot["asset_indexes"] = [1]
+    mutations.append(missing_prop)
+
+    for payload in mutations:
+        with pytest.raises(M6PlanningError, match="canonical scope drift failed closed"):
+            runtime_m6_server_codex_planner._candidate_from_provider_payload(
+                project_id="m6-explicit-drift",
+                body={"source_kind": "idea", "source_text": EXPLICIT_NAME_BRIEF},
+                payload=payload,
+                source_digest="a" * 64,
+                dispatch_id="m6_explicit_drift",
+                schema_digest="b" * 64,
+                prompt_chars=1000,
+                parent_candidate_digest="",
+                revision_instruction="",
+            )
 
 
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
@@ -620,3 +716,42 @@ def _server_codex_payload() -> dict[str, object]:
             },
         ],
     }
+
+
+def _single_scope_server_codex_payload(character: str, scene: str, prop: str) -> dict[str, object]:
+    payload = deepcopy(_server_codex_payload())
+    payload["title"] = f"{character}的档案修复"
+    payload["logline"] = f"{character}在{scene}完成{prop}修复，并把连续动作拆成可拍镜头。"
+    payload["characters"] = [
+        {
+            **payload["characters"][0],
+            "display_name": character,
+            "goal": f"在限定时间内完成{prop}修复。",
+            "relationship_arc": "单人行动不引入其他人物关系。",
+        }
+    ]
+    payload["scenes"] = [
+        {
+            **payload["scenes"][0],
+            "name": scene,
+            "space": f"{scene}的既有空间范围。",
+        }
+    ]
+    payload["assets"] = [
+        {
+            **payload["assets"][0],
+            "name": prop,
+            "kind": "prop",
+        },
+        {
+            **payload["assets"][3],
+            "name": f"{character}、{scene}与{prop}连续性参考",
+            "kind": "reference_set",
+        },
+    ]
+    payload["structure"]["scene_count"] = 1
+    for shot in payload["shots"]:
+        shot["scene_index"] = 1
+        shot["character_indexes"] = [1]
+        shot["asset_indexes"] = [1, 2]
+    return payload

@@ -20,15 +20,15 @@ from studio_asset_context_browser_qa_support import chrome_path, free_port, runt
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STAMP = int(time.time())
 PROJECT_ID = f"m6-browser-script-bible-{STAMP}"
+FAILED_PROJECT_ID = f"m6-browser-failed-plan-{STAMP}"
 VIEWPORTS = ({"width": 1920, "height": 1080}, {"width": 1440, "height": 900})
 SOURCE_TEXT = """
-角色：林澈、唐予。场景：夜晚旧剪辑室、清晨屋顶。道具：场记板、旧镜头。特写：林澈手背的伤痕、时间线上的红色标记。
-风格：克制写实冷暖对照。时间：夜晚到清晨。光线：剪辑室屏幕冷光与屋顶晨光。季节：初秋。连续性：旧镜头始终在唐予手边。
-目标：林澈想证明被删掉的素材能救回影片。冲突：唐予担心返工会拖垮拍摄预算。关系：两人从互相指责转为共同承担。变化：林澈从逃避失误转为主动承认。
-林澈盯着屏幕里的断帧，低声说“如果这一秒还在，结尾就不是谎言”。
-唐予把场记板放到桌边，要求他在十分钟内给出能拍的重做方案。
-两人带着旧镜头上到屋顶，晨光压住城市噪声，林澈终于说出自己删错素材的真相。
-唐予没有责备，只把红色标记改成新的拍摄任务，让林澈先拍自己的手和那支旧镜头。
+夏岚在海边档案馆整理一支银色录音笔。
+保持角色名称“夏岚”、场景名称“海边档案馆”、道具名称“银色录音笔”不变；规划3个连续镜头，总时长约25秒。
+不要新增其他人物、场景或道具；制作参考必须明确标为辅助内容。
+第一镜建立档案馆窗边的工作台和录音笔原始状态。
+第二镜让夏岚清理磁头并确认录音仍可读取。
+第三镜以录音笔恢复播放和夏岚停止动作收束。
 """
 
 
@@ -68,12 +68,16 @@ def parse_args() -> argparse.Namespace:
 
 def seed_project(runtime_root: Path) -> None:
     client = runtime_test_client(runtime_root)
-    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "灯种黎明短片制作"})
-    if created.status_code not in {200, 409}:
-        raise AssertionError(created.text)
-    saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": studio_state(PROJECT_ID)})
-    if saved.status_code != 200:
-        raise AssertionError(saved.text)
+    for project_id, goal in (
+        (PROJECT_ID, "灯种黎明短片制作"),
+        (FAILED_PROJECT_ID, "制作方案恢复验收"),
+    ):
+        created = client.post("/projects", json={"project_id": project_id, "goal": goal})
+        if created.status_code not in {200, 409}:
+            raise AssertionError(created.text)
+        saved = client.put(f"/projects/{project_id}/studio-state", json={"state": studio_state(project_id)})
+        if saved.status_code != 200:
+            raise AssertionError(saved.text)
 
 
 def studio_state(project_id: str) -> dict[str, Any]:
@@ -115,6 +119,22 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=not headed, executable_path=chrome_path(), args=["--proxy-server=direct://", "--proxy-bypass-list=*"])
         try:
+            recovery = browser.new_page(viewport=VIEWPORTS[0])
+            configure(recovery, repo, timeout_ms, console_errors, response_errors)
+            results["failed-plan-refresh-recovery-1920x1080"] = assert_failed_plan_refresh_recovery(
+                recovery,
+                base_url,
+                screenshot_dir,
+            )
+            screenshots["failed-plan-refresh-recovery-1920x1080"] = str(
+                (screenshot_dir / "failed-plan-refresh-recovery-1920x1080.png").resolve()
+            )
+            recovery.screenshot(
+                path=screenshots["failed-plan-refresh-recovery-1920x1080"],
+                full_page=True,
+            )
+            recovery.close()
+
             first = browser.new_page(viewport=VIEWPORTS[0])
             configure(first, repo, timeout_ms, console_errors, response_errors)
             first.goto(f"{base_url}/studio/?project={PROJECT_ID}&stage=canvas&qa=m6-preview", wait_until="domcontentloaded")
@@ -157,6 +177,96 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
     }
 
 
+def assert_failed_plan_refresh_recovery(page: Page, base_url: str, screenshot_dir: Path) -> dict[str, Any]:
+    route_state = {"failed": False, "fake_preview_submits": 0}
+    failed_run = {
+        "schema_version": "afs.m6.preview_run.v0.1",
+        "run_id": "failed-preview-run",
+        "project_id": FAILED_PROJECT_ID,
+        "client_request_id": "failed-preview-client",
+        "phase": "failed",
+        "status": "failed",
+        "dispatch_count": 1,
+        "candidate_digest": "",
+        "error": {
+            "category": "planning_rejected",
+            "message": "制作方案未通过结构校验；制作事实未改变。",
+        },
+        "cost": {
+            "contract_estimated_usd": 0,
+            "provider_reported_external_cost_usd": 0,
+            "actual_usd": None,
+        },
+    }
+
+    def latest_handler(route) -> None:
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(failed_run if route_state["failed"] else {"status": "empty", "run": None}),
+        )
+
+    def run_handler(route) -> None:
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(failed_run))
+
+    def preview_handler(route) -> None:
+        route_state["failed"] = True
+        route_state["fake_preview_submits"] += 1
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(failed_run))
+
+    page.route(
+        f"**/projects/{FAILED_PROJECT_ID}/m6/script-plan-asset-bible/preview-runs/latest",
+        latest_handler,
+    )
+    page.route(
+        f"**/projects/{FAILED_PROJECT_ID}/m6/script-plan-asset-bible/preview-runs/failed-preview-run",
+        run_handler,
+    )
+    page.route(
+        f"**/projects/{FAILED_PROJECT_ID}/m6/script-plan-asset-bible/preview",
+        preview_handler,
+    )
+    page.goto(
+        f"{base_url}/studio/?project={FAILED_PROJECT_ID}&stage=canvas&qa=m6-failed-refresh",
+        wait_until="domcontentloaded",
+    )
+    page.wait_for_selector(".graph-canvas-status.planning-required")
+    page.get_by_role("button", name="制作方案").click()
+    page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
+    page.get_by_role("button", name="生成剧本制作方案").click()
+    expect(page.get_by_role("button", name="恢复同一预览")).to_be_visible()
+    page.get_by_label("输入想法或已有剧本").fill("这是失败后尚未提交的新草稿。")
+    page.reload(wait_until="domcontentloaded")
+
+    expect(page.get_by_label("输入想法或已有剧本")).to_have_value(SOURCE_TEXT)
+    expect(page.get_by_role("button", name="恢复同一预览")).to_be_visible()
+    agent = page.locator(".agent-production-copilot")
+    expect(agent).to_contain_text("制作方案未通过检查")
+    expect(agent).to_contain_text("检查失败原因并恢复同一预览")
+    expect(agent.get_by_role("button", name="恢复制作方案")).to_be_visible()
+    expect(agent).not_to_contain_text("项目已创建，可以从一个想法开始")
+    expect(agent.get_by_role("button", name="输入创作想法")).to_have_count(0)
+    agent.get_by_role("button", name="恢复制作方案").click()
+    expect(page.get_by_role("button", name="恢复同一预览")).to_be_visible()
+    expect(page.get_by_label("输入想法或已有剧本")).to_have_value(SOURCE_TEXT)
+    page.get_by_role("tab", name="故事板").click()
+    screenplay = page.get_by_role("button", name="脚本与对白")
+    expect(screenplay).to_be_disabled()
+    expect(screenplay).to_have_attribute("title", "先完成制作方案并建立场景")
+    page.get_by_role("tab", name="画布").click()
+    if route_state["fake_preview_submits"] != 1:
+        raise AssertionError("failed-plan recovery dispatched a new provider preview")
+    return {
+        "fake_preview_submit_count": 1,
+        "source_draft_restored_after_refresh": True,
+        "source_matches_failed_run_submission": True,
+        "durable_run_recovery_visible": True,
+        "copilot_recovery_action_consistent": True,
+        "empty_storyboard_script_action_disabled": True,
+        "new_provider_dispatch_count": 0,
+    }
+
+
 def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -> dict[str, Any]:
     page.wait_for_selector(".graph-canvas-status.planning-required")
     plan_status = page.locator(".graph-canvas-status.planning-required")
@@ -178,12 +288,9 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
         "内容补充",
         "资产用途",
         "影响的镜头与引用",
-        "林澈",
-        "唐予",
-        "夜晚旧剪辑室",
-        "清晨屋顶",
-        "场记板",
-        "旧镜头",
+        "夏岚",
+        "海边档案馆",
+        "银色录音笔",
         "主要道具",
         "制作参考",
         "道具清单",
@@ -215,7 +322,7 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
     if workspace["status"] != "ready" or workspace["graph_digest"] != workspace["storyboard"]["graph_digest"]:
         raise AssertionError("M6 confirmation did not produce one graph projection")
-    if len(workspace["sequence"]["shots"]) < 2 or len(workspace["sequence"]["characters"]) < 2:
+    if len(workspace["sequence"]["shots"]) < 2 or len(workspace["sequence"]["characters"]) < 1:
         raise AssertionError("M6 graph is missing shots or named characters")
     return {
         "planning_required": True,

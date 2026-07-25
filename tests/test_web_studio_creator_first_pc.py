@@ -107,6 +107,59 @@ def test_empty_project_canvas_and_agent_offer_the_same_enabled_next_action() -> 
     assert '|| "未命名项目"' in display_name
 
 
+def test_failed_plan_projects_offer_same_run_recovery_instead_of_starting_over() -> None:
+    module_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
+    script = f"""
+      import {{ deriveProductionCopilotState }} from {json.dumps(module_uri)};
+      const result = deriveProductionCopilotState({{
+        studioState: {{
+          nodes: {{ idea: {{ id: "idea", type: "text", content: "已有创作想法" }} }},
+          production: {{}},
+        }},
+        capabilityGates: {{ llm: true, image: false, video: false }},
+        section: "canvas",
+        planningRun: {{
+          run_id: "failed-plan-run",
+          phase: "failed",
+          dispatch_count: 1,
+          error: {{ message: "制作方案未通过结构校验；制作事实未改变。" }},
+        }},
+      }});
+      console.log(JSON.stringify(result));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["stage"] == "plan_recovery_required"
+    assert result["ready_summary"] == "制作方案未通过检查，现有项目内容未改变。"
+    assert result["needs_input"] == "检查失败原因并恢复同一预览。"
+    assert result["next_valid_action"] == {
+        "action": "recover_plan_preview",
+        "label": "恢复制作方案",
+        "reason": "查看同一任务的失败状态和原始输入，不会再次提交文本任务。",
+        "enabled": True,
+    }
+    assert result["provider_dispatch_count"] == 1
+    assert result["external_cost_usd"] is None
+
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    assert 'action.action === "recover_plan_preview"' in shell
+    assert "writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText)" in shell
+    assert "writeM6SourceDraft(currentM6SubmittedSourceKey(), m6SourceText)" in shell
+    assert "readM6SourceDraft(currentM6SubmittedSourceKey())" in shell
+    assert ': readM6SourceDraft(currentM6SourceDraftKey())' in shell
+    assert "sessionStorage" in shell
+    version_bar = shell.split("function buildVersionBar()", 1)[1].split("function buildAgentChat()", 1)[0]
+    assert "script.disabled = !sceneAvailable" in version_bar
+    assert "先完成制作方案并建立场景" in version_bar
+
+
 def test_media_result_context_offers_review_instead_of_starting_over() -> None:
     module_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
     script = f"""

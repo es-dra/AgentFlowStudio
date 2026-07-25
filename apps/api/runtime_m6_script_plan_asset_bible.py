@@ -247,11 +247,12 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
         "parent_candidate_digest": body.get("parent_candidate_digest") or "",
     })
     segments = _source_segments(source_text)
-    cast = _extract_named_characters(source_text)
-    scenes = _extract_scenes(source_text)
-    props = _extract_list_after_labels(source_text, ("道具", "props", "prop"))
-    closeups = _extract_list_after_labels(source_text, ("特写", "closeups", "closeup"))
-    styles = _extract_list_after_labels(source_text, ("风格", "视觉风格", "style"))
+    source_scope = m6_source_canonical_scope(source_text)
+    cast = source_scope["characters"]
+    scenes = source_scope["scenes"]
+    props = source_scope["props"]
+    closeups = source_scope["closeups"]
+    styles = source_scope["styles"]
     if len(cast) < 1:
         raise M6PlanningError("M6 preview requires at least one named character in the idea or script.")
     if len(scenes) < 1:
@@ -593,7 +594,10 @@ def m6_source_canonical_scope(source_text: str) -> dict[str, list[str]]:
     return {
         "characters": _extract_named_characters(text),
         "scenes": _extract_scenes(text),
-        "props": _extract_list_after_labels(text, ("道具", "props", "prop")),
+        "props": _dedupe(
+            _extract_list_after_labels(text, ("道具", "props", "prop"))
+            + _extract_declared_names(text, ("道具名称", "道具名", "prop name", "prop names"))
+        )[:12],
         "closeups": _extract_list_after_labels(text, ("特写", "closeups", "closeup")),
         "styles": _extract_list_after_labels(text, ("风格", "视觉风格", "style")),
     }
@@ -996,7 +1000,13 @@ def _source_segments(text: str) -> list[str]:
 
 
 def _extract_named_characters(text: str) -> list[str]:
-    values = _extract_list_after_labels(text, ("角色", "人物", "characters", "cast"))
+    values = _dedupe(
+        _extract_list_after_labels(text, ("角色", "人物", "characters", "cast"))
+        + _extract_declared_names(
+            text,
+            ("角色名称", "角色名", "人物名称", "人物名", "character name", "character names"),
+        )
+    )
     if values:
         return values[:12]
     matches = re.findall(r"([\u4e00-\u9fff]{2,4})(?:说|问|看|走|跑|递|打开|发现|决定|进入|握住|停下)", text)
@@ -1006,7 +1016,13 @@ def _extract_named_characters(text: str) -> list[str]:
 
 
 def _extract_scenes(text: str) -> list[str]:
-    values = _extract_list_after_labels(text, ("场景", "地点", "locations", "scenes"))
+    values = _dedupe(
+        _extract_list_after_labels(text, ("场景", "地点", "locations", "scenes"))
+        + _extract_declared_names(
+            text,
+            ("场景名称", "场景名", "地点名称", "地点名", "scene name", "scene names", "location name", "location names"),
+        )
+    )
     if values:
         return values[:12]
     values.extend(re.findall(r"(?:在|进入|回到)([\u4e00-\u9fffA-Za-z0-9·\- ]{2,24})(?:里|内|上|下|前|后|，|。|；|;|,)", text))
@@ -1025,6 +1041,47 @@ def _extract_list_after_labels(text: str, labels: tuple[str, ...]) -> list[str]:
             if part.strip(" 、,，/")
         )
     return _dedupe([_clean_label(item) for item in rows if _clean_label(item)])
+
+
+def _extract_declared_names(text: str, labels: tuple[str, ...]) -> list[str]:
+    rows: list[str] = []
+    label_pattern = "|".join(re.escape(label) for label in sorted(labels, key=len, reverse=True))
+    declaration = re.compile(rf"(?:{label_pattern})\s*(?:是|为|[:：])?\s*", re.I)
+    separator = re.compile(r"\s*(?:[、,，/]|和|与|\band\b)\s*", re.I)
+    for match in declaration.finditer(text):
+        prefix = text[max(0, match.start() - 24):match.start()]
+        if re.search(r"(?:不要|不得|禁止|避免).{0,8}(?:新增|添加|使用|采用)", prefix):
+            continue
+        if re.search(r"(?:do not|don't|must not).{0,24}(?:add|use)", prefix, re.I):
+            continue
+        cursor = match.end()
+        while len(rows) < 12:
+            quoted = _quoted_value_at(text, cursor)
+            if quoted is None:
+                break
+            value, cursor = quoted
+            cleaned = _clean_label(value)
+            if cleaned:
+                rows.append(cleaned)
+            joined = separator.match(text, cursor)
+            if joined is None:
+                break
+            cursor = joined.end()
+    return _dedupe(rows)
+
+
+def _quoted_value_at(text: str, start: int) -> tuple[str, int] | None:
+    cursor = start
+    while cursor < len(text) and text[cursor].isspace():
+        cursor += 1
+    pairs = {"“": "”", '"': '"', "「": "」", "『": "』", "'": "'"}
+    closing = pairs.get(text[cursor:cursor + 1])
+    if closing is None:
+        return None
+    end = text.find(closing, cursor + 1)
+    if end < 0:
+        return None
+    return text[cursor + 1:end], end + 1
 
 
 def _field_from_source(text: str, labels: tuple[str, ...], default_text: str) -> str:
