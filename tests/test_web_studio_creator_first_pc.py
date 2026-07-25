@@ -155,6 +155,8 @@ def test_failed_plan_projects_offer_same_run_recovery_instead_of_starting_over()
     assert "readM6SourceDraft(currentM6SubmittedSourceKey())" in shell
     assert ': readM6SourceDraft(currentM6SourceDraftKey())' in shell
     assert "sessionStorage" in shell
+    assert 'planningPanelPreferenceKey !== "afs:m6:plan-panel:studio"' in shell
+    assert "enteringLoadedProject && m6SourceDraftDirty && m6SourceText" in shell
     version_bar = shell.split("function buildVersionBar()", 1)[1].split("function buildAgentChat()", 1)[0]
     assert "script.disabled = !sceneAvailable" in version_bar
     assert "先完成制作方案并建立场景" in version_bar

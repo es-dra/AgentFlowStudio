@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 from typing import Any, Literal, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
@@ -209,7 +210,9 @@ def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: Runt
 
 
 class M6PlanningError(ValueError):
-    pass
+    def __init__(self, message: str, *, validator_code: str = "") -> None:
+        super().__init__(message)
+        self.validator_code = validator_code
 
 
 def _server_codex_m6_enabled() -> bool:
@@ -402,12 +405,16 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
         if not set(shot.get("asset_refs") or []) <= asset_ids:
             findings.append(_finding("P0", "shot_asset_ref", f"shot {shot.get('shot_id')} has unresolved asset refs"))
     durations = [round(float(shot.get("duration_seconds") or 0), 2) for shot in shots]
-    if len(durations) > 1 and len(set(durations)) == 1:
-        findings.append(_finding("P0", "dynamic_duration", "multi-shot plans cannot use fixed equal durations"))
     if len(durations) == 4 and set(durations) == {15.0}:
         findings.append(_finding("P0", "fixed_profile", "4x15 profile is forbidden for M6 planning"))
     if len(durations) == 10 and set(durations) == {6.0}:
         findings.append(_finding("P0", "fixed_profile", "10x6 profile is forbidden for M6 planning"))
+    if len(durations) > 1 and len(set(durations)) == 1 and _has_repeated_shot_timing_semantics(shots):
+        findings.append(_finding(
+            "P0",
+            "dynamic_duration",
+            "equal-duration shots require distinct intent, narrative purpose, and duration rationale",
+        ))
     sequence = candidate.get("sequence") if isinstance(candidate.get("sequence"), Mapping) else {}
     total = round(sum(durations), 2)
     if round(float(sequence.get("target_duration_seconds") or 0), 2) != total:
@@ -435,7 +442,10 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     p0 = sum(item["severity"] == "P0" for item in findings)
     p1 = sum(item["severity"] == "P1" for item in findings)
     if findings:
-        raise M6PlanningError("; ".join(f"{item['severity']}:{item['surface']}:{item['issue']}" for item in findings[:6]))
+        raise M6PlanningError(
+            "; ".join(f"{item['severity']}:{item['surface']}:{item['issue']}" for item in findings[:6]),
+            validator_code=f"candidate_{findings[0]['surface']}",
+        )
     scope_review = candidate.get("m6_scope_review") if isinstance(candidate.get("m6_scope_review"), Mapping) else {}
     return {
         "verdict": "PASS",
@@ -452,6 +462,26 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
             "production_aids": len(scope_review.get("production_aids") or []),
         },
     }
+
+
+def _has_repeated_shot_timing_semantics(shots: list[Mapping[str, Any]]) -> bool:
+    for key in ("intent", "narrative_purpose", "content_driven_duration_reason"):
+        values = [_normalized_semantic_text(shot.get(key)) for shot in shots]
+        if any(not value for value in values) or len(set(values)) != len(shots):
+            return True
+        if any(
+            SequenceMatcher(None, left, right, autojunk=False).ratio() >= 0.8
+            for index, left in enumerate(values)
+            for right in values[index + 1:]
+        ):
+            return True
+    return False
+
+
+def _normalized_semantic_text(value: Any) -> str:
+    text = str(value or "").casefold()
+    text = re.sub(r"(?:第|镜头)\s*[0-9一二三四五六七八九十]+\s*(?:个|号|段|镜头|阶段|步|幕|场)?", "", text)
+    return re.sub(r"[\W_]+", "", text, flags=re.UNICODE)
 
 
 def _character_row(project_key: str, candidate_key: str, index: int, name: str, source_text: str) -> dict[str, Any]:

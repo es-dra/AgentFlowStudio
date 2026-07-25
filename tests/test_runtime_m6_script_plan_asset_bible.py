@@ -193,6 +193,115 @@ def test_m6_server_codex_accepts_explicit_name_brief_with_exact_canonical_scope(
     assert "夏岚" in calls[0] and "海边档案馆" in calls[0] and "银色录音笔" in calls[0]
 
 
+def test_m6_server_codex_accepts_content_distinct_equal_durations_with_source_timing_contract() -> None:
+    source = (
+        "程遥在山顶气象站校准一枚黑色风向标。"
+        "保持角色名称“程遥”、场景名称“山顶气象站”、道具名称“黑色风向标”不变；"
+        "规划3个连续镜头，总时长约21秒。不要新增其他人物、场景或道具。"
+    )
+    payload = _single_scope_server_codex_payload("程遥", "山顶气象站", "黑色风向标")
+    timing_semantics = [
+        ("建立气象站工作台与风向标的初始方位。", "交代空间、人物和待修道具的起始状态。", "需要完整看清方位读数与人物检查动作。"),
+        ("程遥拆开轴承并清除阻塞的砂粒。", "呈现修复难点以及道具状态的可见变化。", "拆解、清理和复查必须在一个连续动作内完成。"),
+        ("重新安装风向标并确认指针恢复转动。", "以修复结果收束行动并建立后续连续性。", "需要保留指针启动和人物确认反应的时间。"),
+    ]
+    for shot, (intent, purpose, reason) in zip(payload["shots"], timing_semantics, strict=True):
+        shot["duration_seconds"] = 7
+        shot["intent"] = intent
+        shot["narrative_purpose"] = purpose
+        shot["content_driven_duration_reason"] = reason
+
+    candidate = runtime_m6_server_codex_planner._candidate_from_provider_payload(
+        project_id="m6-equal-content-driven",
+        body={"source_kind": "idea", "source_text": source},
+        payload=payload,
+        source_digest="a" * 64,
+        dispatch_id="m6_equal_content_driven",
+        schema_digest="b" * 64,
+        prompt_chars=1000,
+        parent_candidate_digest="",
+        revision_instruction="",
+    )
+
+    assert validate_m6_candidate(candidate)["verdict"] == "PASS"
+    assert [shot["duration_seconds"] for shot in candidate["shots"]] == [7, 7, 7]
+    assert candidate["sequence"]["dynamic_policy"]["source_timing_contract"] == {
+        "source_authority": "user_supplied_timing_scope",
+        "requested_shot_count": 3,
+        "requested_total_duration_seconds": 21.0,
+        "duration_tolerance_seconds": 2.1,
+        "approximate_total_duration": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("source", "message", "validator_code"),
+    [
+        (
+            "规划4个连续镜头，总时长约21秒。",
+            "shot count does not match source",
+            "source_shot_count_mismatch",
+        ),
+        (
+            "规划3个连续镜头，总时长约36秒。",
+            "total duration does not match source",
+            "source_total_duration_mismatch",
+        ),
+    ],
+)
+def test_m6_server_codex_timing_contract_fails_closed_on_wrong_count_or_total(
+    source: str,
+    message: str,
+    validator_code: str,
+) -> None:
+    brief = (
+        "程遥在山顶气象站校准一枚黑色风向标。"
+        "保持角色名称“程遥”、场景名称“山顶气象站”、道具名称“黑色风向标”不变；"
+        f"{source}不要新增其他人物、场景或道具。"
+    )
+    payload = _single_scope_server_codex_payload("程遥", "山顶气象站", "黑色风向标")
+    timing_semantics = [
+        ("建立风向标初始方位。", "交代起始状态。", "需要看清方位读数。"),
+        ("拆开轴承清除砂粒。", "呈现修复难点。", "需要保留拆解过程。"),
+        ("重新安装并确认转动。", "收束修复行动。", "需要看到启动反应。"),
+    ]
+    for shot, (intent, purpose, reason) in zip(payload["shots"], timing_semantics, strict=True):
+        shot["duration_seconds"] = 7
+        shot["intent"] = intent
+        shot["narrative_purpose"] = purpose
+        shot["content_driven_duration_reason"] = reason
+
+    with pytest.raises(M6PlanningError, match=message) as captured:
+        runtime_m6_server_codex_planner._candidate_from_provider_payload(
+            project_id="m6-source-timing-drift",
+            body={"source_kind": "idea", "source_text": brief},
+            payload=payload,
+            source_digest="a" * 64,
+            dispatch_id="m6_source_timing_drift",
+            schema_digest="b" * 64,
+            prompt_chars=1000,
+            parent_candidate_digest="",
+            revision_instruction="",
+        )
+    assert captured.value.validator_code == validator_code
+
+
+def test_m6_source_timing_contract_is_general_and_ignores_ordinal_shot_mentions() -> None:
+    english = runtime_m6_server_codex_planner._source_timing_contract(
+        "Plan 5 continuous shots with a total duration of about 42 seconds."
+    )
+    chinese = runtime_m6_server_codex_planner._source_timing_contract(
+        "安排7个分镜，总时长70秒；第3镜头与第 4 镜头都需要保留动作反应。"
+    )
+
+    assert english["requested_shot_count"] == 5
+    assert english["requested_total_duration_seconds"] == 42.0
+    assert english["approximate_total_duration"] is True
+    assert chinese["requested_shot_count"] == 7
+    assert chinese["requested_total_duration_seconds"] == 70.0
+    assert chinese["approximate_total_duration"] is False
+
+
 def test_m6_explicit_name_brief_still_fails_closed_on_addition_rename_and_omission() -> None:
     mutations = []
 
@@ -417,6 +526,7 @@ def test_m6_server_codex_scope_drift_fails_closed_before_candidate_or_graph_writ
     assert run["phase"] == "failed", run
     assert run["error"]["category"] == "planning_rejected"
     assert run["error"]["message"] == "制作方案未通过结构校验；制作事实未改变。"
+    assert run["error"]["validator_code"] == "canonical_scope_drift"
     assert run["candidate_digest"] == ""
     run_dir = runtime_root / "projects" / "m6-drift" / "m6_preview_runs" / run["run_id"]
     assert not (run_dir / "candidate.json").exists()
@@ -426,12 +536,48 @@ def test_m6_server_codex_scope_drift_fails_closed_before_candidate_or_graph_writ
 def test_m6_confirm_rejects_template_gaming_and_unresolved_lineage(tmp_path) -> None:
     candidate = build_m6_script_plan_asset_bible("m6-bad", {"source_kind": "script", "source_text": SCRIPT_TEXT})["candidate"]
 
-    fixed_duration = deepcopy(candidate)
-    for shot in fixed_duration["shots"]:
+    content_driven_equal_duration = deepcopy(candidate)
+    for shot in content_driven_equal_duration["shots"]:
         shot["duration_seconds"] = 6.0
-    fixed_duration["sequence"]["target_duration_seconds"] = 6.0 * len(fixed_duration["shots"])
-    with pytest.raises(M6PlanningError, match="fixed equal durations"):
-        validate_m6_candidate(fixed_duration)
+        shot["narrative_purpose"] = f"围绕“{shot['intent']}”完成该动作的独立叙事结果。"
+        shot["content_driven_duration_reason"] = f"“{shot['intent']}”需要保留完整动作和人物反应。"
+    content_driven_equal_duration["sequence"]["target_duration_seconds"] = 6.0 * len(
+        content_driven_equal_duration["shots"]
+    )
+    assert validate_m6_candidate(content_driven_equal_duration)["verdict"] == "PASS"
+
+    repeated_template = deepcopy(content_driven_equal_duration)
+    for shot in repeated_template["shots"]:
+        shot["intent"] = "重复的模板镜头意图"
+        shot["narrative_purpose"] = "重复的模板叙事目的"
+        shot["content_driven_duration_reason"] = "重复的模板时长理由"
+    with pytest.raises(M6PlanningError, match="equal-duration shots require distinct"):
+        validate_m6_candidate(repeated_template)
+
+    numbered_template = deepcopy(content_driven_equal_duration)
+    for index, shot in enumerate(numbered_template["shots"], start=1):
+        shot["intent"] = f"镜头{index}重复同一个模板意图"
+        shot["narrative_purpose"] = f"第{index}个阶段重复同一个叙事目的"
+        shot["content_driven_duration_reason"] = f"第{index}步重复同一个时长理由"
+    with pytest.raises(M6PlanningError, match="equal-duration shots require distinct"):
+        validate_m6_candidate(numbered_template)
+
+    low_information_variation = deepcopy(content_driven_equal_duration)
+    labels = "甲乙丙丁戊己庚辛壬癸"
+    for label, shot in zip(labels, low_information_variation["shots"], strict=False):
+        shot["intent"] = f"重复同一个镜头意图，仅使用标签{label}区分"
+        shot["narrative_purpose"] = f"重复同一个叙事目的，仅使用标签{label}区分"
+        shot["content_driven_duration_reason"] = f"重复同一个时长理由，仅使用标签{label}区分"
+    with pytest.raises(M6PlanningError, match="equal-duration shots require distinct"):
+        validate_m6_candidate(low_information_variation)
+
+    fixed_profile = deepcopy(candidate)
+    fixed_profile["shots"] = fixed_profile["shots"][:4]
+    for shot in fixed_profile["shots"]:
+        shot["duration_seconds"] = 15.0
+    fixed_profile["sequence"]["target_duration_seconds"] = 60.0
+    with pytest.raises(M6PlanningError, match="4x15 profile is forbidden"):
+        validate_m6_candidate(fixed_profile)
 
     unresolved = deepcopy(candidate)
     unresolved["shots"][0]["asset_refs"] = ["missing-asset"]
