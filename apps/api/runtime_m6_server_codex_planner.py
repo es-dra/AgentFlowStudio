@@ -299,14 +299,14 @@ schema_digest: {schema_digest}
 	- 用户 canonical identity 是最高权威。下列名称必须按原文逐字保留，不能翻译、改名、替换、合并、补别名或提升模型自创名称：
 	{canonical_clause}
 	- 角色必须有目标、冲突、关系、变化、外观、服装、年龄、比例、标志特征、禁止变化项；用户 canonical 名称保留原始字符和语言，新生成的非 canonical 名称与创作说明使用中文，不得用英文单词加数字的占位名。
-	- 禁止把字段写成“占位”“说明”“待定”“无”“未知”或只有标点；必须从用户文本中生成具体角色、场景、道具、特写和关系。
+	- 禁止把字段写成“占位”“说明”“待定”“无”“未知”或只有标点；必须从用户文本中生成具体角色、场景、道具和关系。
 - 场景必须有空间、时间、光线、季节、连续性、动作、节奏、情绪、视觉表达、对白或声音。
 - 镜头 3 到 7 个，数量和时长由内容决定；禁止固定 4x15、10x6、固定镜头数或关键词模板。
 - 单个镜头 duration_seconds 必须在 3 到 18 秒之间，总时长保持可执行；不要把一个复杂动作塞进超长单镜头。
 - 每镜头必须有景别、机位、运动、调度、声音、转场、叙事目的、内容驱动时长理由。
 - scene_index、character_indexes、asset_indexes 全部从一开始编号，最小值是 1，绝不能输出 0。
 	- assets 必须包含每一个用户 canonical prop，kind 只能为 prop，名称必须逐字等于 canonical props；如用户没有 canonical prop，不得自创 prop。
-	- closeup、reference_set、style 只能作为 production aid；它们可以补充制作判断，但不得伪装成 prop，不得增加 canonical 角色/场景/道具数量。
+	- closeup、reference_set、style 是按需 production aid；仅在内容确实需要时创建，可以为空。存在时不得伪装成 prop，不得增加 canonical 角色/场景/道具数量。
 	- asset_indexes 必须引用 assets 数组中真实存在的 1-based 序号，不得越界。
 - 必须覆盖权利边界、时间/摘要闭环、关系深度、制片可执行性；禁止媒体兜底或图片/视频承诺。
 - 除用户 canonical 名称、原文引述和 schema 代码值外，所有新生成的创作说明用中文；不得翻译、音译或改写 canonical 名称。
@@ -363,11 +363,6 @@ def _candidate_from_provider_payload(
         }
         for index, row in enumerate(_rows(payload, "assets"), start=1)
     ]
-    if not any(row["kind"] == "reference_set" for row in assets):
-        raise M6PlanningError(
-            "server_codex output must include at least one ReferenceSet asset",
-            validator_code="production_aid_reference_set_missing",
-        )
     shots = []
     for index, row in enumerate(_rows(payload, "shots"), start=1):
         scene = _by_one_based_index(scenes, int(row.get("scene_index") or 0), "scene_index")

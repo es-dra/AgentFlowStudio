@@ -162,6 +162,54 @@ def test_failed_plan_projects_offer_same_run_recovery_instead_of_starting_over()
     assert "先完成制作方案并建立场景" in version_bar
 
 
+def test_plan_in_progress_projects_do_not_offer_the_idle_start_action() -> None:
+    module_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
+    script = f"""
+      import {{ deriveProductionCopilotState }} from {json.dumps(module_uri)};
+      const result = deriveProductionCopilotState({{
+        studioState: {{
+          nodes: {{ idea: {{ id: "idea", type: "text", content: "已有创作想法" }} }},
+          production: {{}},
+        }},
+        capabilityGates: {{ llm: true, image: false, video: false }},
+        section: "canvas",
+        planningRun: {{
+          run_id: "active-plan-run",
+          phase: "running",
+          dispatch_count: 1,
+        }},
+      }});
+      console.log(JSON.stringify(result));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["stage"] == "plan_in_progress"
+    assert result["ready_summary"] == "制作方案正在准备。"
+    assert result["needs_input"] == "当前无需重复提交创作想法。"
+    assert result["next_valid_action"] == {
+        "action": "view_plan_progress",
+        "label": "查看制作进度",
+        "reason": "制作方案正在准备；可以查看同一任务的进度。",
+        "enabled": True,
+    }
+    assert result["provider_dispatch_count"] == 1
+    assert result["external_cost_usd"] is None
+    assert "项目已创建，可以从一个想法开始" not in json.dumps(result, ensure_ascii=False)
+    assert "输入创作想法" not in json.dumps(result, ensure_ascii=False)
+
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    assert 'action.action === "view_plan_progress"' in shell
+    assert 'document.querySelector(".m6-preview-run-status")?.focus()' in shell
+    assert "panel.tabIndex = -1" in shell
+
+
 def test_media_result_context_offers_review_instead_of_starting_over() -> None:
     module_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
     script = f"""

@@ -6,6 +6,7 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
+from apps.api.runtime_film_production_graph import compile_film_candidate
 from apps.api.runtime_m6_script_plan_asset_bible import (
     M6PlanningError,
     REVIEW_ROLES,
@@ -164,6 +165,8 @@ def test_m6_server_codex_prompt_preserves_non_chinese_canonical_names() -> None:
     assert "canonical scenes（必须逐字保留且不得改名）: 和平广场、Andromeda Hall" in prompt
     assert "用户 canonical 名称保留原始字符和语言" in prompt
     assert "不得翻译、音译或改写 canonical 名称" in prompt
+    assert "按需 production aid" in prompt
+    assert "可以为空" in prompt
     assert "角色、场景、镜头和资产名称必须是中文专名" not in prompt
     assert "禁止英文污染" not in prompt
 
@@ -232,6 +235,40 @@ def test_m6_server_codex_accepts_content_distinct_equal_durations_with_source_ti
         "duration_tolerance_seconds": 2.1,
         "approximate_total_duration": True,
     }
+
+
+def test_m6_server_codex_accepts_no_optional_production_aids_without_synthesizing_them() -> None:
+    source = (
+        "顾言在城市天文台修复一枚白铜星盘。"
+        "保持角色名称“顾言”、场景名称“城市天文台”、道具名称“白铜星盘”不变；"
+        "规划3个连续镜头，总时长约25秒。不要新增其他人物、场景或道具。"
+    )
+    payload = _single_scope_server_codex_payload("顾言", "城市天文台", "白铜星盘")
+    payload["assets"] = [row for row in payload["assets"] if row["kind"] == "prop"]
+    for shot in payload["shots"]:
+        shot["asset_indexes"] = [1]
+
+    candidate = runtime_m6_server_codex_planner._candidate_from_provider_payload(
+        project_id="m6-no-optional-production-aids",
+        body={"source_kind": "idea", "source_text": source},
+        payload=payload,
+        source_digest="c" * 64,
+        dispatch_id="m6_no_optional_production_aids",
+        schema_digest="d" * 64,
+        prompt_chars=1000,
+        parent_candidate_digest="",
+        revision_instruction="",
+    )
+
+    assert validate_m6_candidate(candidate)["verdict"] == "PASS"
+    assert [row["name"] for row in candidate["assets"]] == ["白铜星盘"]
+    assert candidate["asset_bible"]["prop_refs"]
+    assert candidate["asset_bible"]["closeup_refs"] == []
+    assert candidate["asset_bible"]["reference_set_refs"] == []
+    assert candidate["asset_bible"]["style_refs"] == []
+    assert candidate["asset_bible"]["production_aid_refs"] == []
+    assert candidate["m6_scope_review"]["production_aids"] == []
+    assert compile_film_candidate("m6-no-optional-production-aids", candidate)
 
 
 @pytest.mark.parametrize(

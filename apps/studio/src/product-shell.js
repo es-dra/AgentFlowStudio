@@ -660,6 +660,7 @@ export function createProductShell(options = {}) {
   function buildM6PreviewRunStatus() {
     const phase = String(m6PreviewRun?.phase || "queued");
     const panel = node("section", `m6-preview-run-status phase-${phase}`);
+    panel.tabIndex = -1;
     panel.setAttribute("role", "status");
     panel.setAttribute("aria-live", "polite");
     const copy = m6PreviewRecovering
@@ -2950,6 +2951,14 @@ export function createProductShell(options = {}) {
 
   function handleCopilotAction(action) {
     if (!action?.action) return;
+    if (action.action === "view_plan_progress") {
+      showCanvas();
+      setPlanningPanelOpen(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      requestAnimationFrame(() => document.querySelector(".m6-preview-run-status")?.focus());
+      return;
+    }
     if (action.action === "recover_plan_preview") {
       showCanvas();
       setPlanningPanelOpen(true);

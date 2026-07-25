@@ -187,6 +187,37 @@ export function deriveProductionCopilotState({
     || bible.candidate_set?.script_revision_id,
   );
   const planningPhase = String(planningRun?.phase || "");
+  if (!scriptReady && ["queued", "running", "running_cancel_requested"].includes(planningPhase)) {
+    const stopping = planningPhase === "running_cancel_requested";
+    return {
+      stage: "plan_in_progress",
+      dependencies: [
+        { key: "script", label: "制作方案", state: "pending" },
+        { key: "project", label: "现有项目内容", state: "ready" },
+      ],
+      blockers: [],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: capabilityGates.image === true,
+        video: capabilityGates.video === true,
+        admission: "planning_in_progress",
+        cost_state: "not_admitted",
+      },
+      next_valid_action: {
+        action: "view_plan_progress",
+        label: "查看制作进度",
+        reason: stopping
+          ? "停止请求已记录；查看同一任务的最新状态。"
+          : "制作方案正在准备；可以查看同一任务的进度。",
+        enabled: true,
+      },
+      ready_summary: stopping ? "正在停止制作方案任务。" : "制作方案正在准备。",
+      needs_input: stopping ? "等待当前任务返回最终状态。" : "当前无需重复提交创作想法。",
+      asset_bible: bible,
+      provider_dispatch_count: Number(planningRun?.dispatch_count || 0),
+      external_cost_usd: planningRun?.cost?.actual_usd ?? null,
+    };
+  }
   if (!scriptReady && ["failed", "unknown"].includes(planningPhase)) {
     return {
       stage: "plan_recovery_required",
