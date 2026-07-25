@@ -1857,8 +1857,8 @@ export function createProductShell(options = {}) {
     const head = node("div", "image-admission-head");
     const copy = node("div", "");
     copy.append(
-      node("span", "eyebrow", "九项代表集 · 费用硬门"),
-      node("h2", "", "图片准入"),
+      node("span", "eyebrow", "首张图片 · 单次费用硬门"),
+      node("h2", "", "准备首张图片"),
       node("p", "", view.status === "empty"
         ? "先审核资产视觉身份、统一美术方向与镜头依据；确认前不会调用外部能力。"
         : `清单 ${view.manifest?.version || 1} · ${view.items.length} 项 · ${view.budget_contract.disclosure || "公开估算，非最终账单"}`),
@@ -1887,8 +1887,8 @@ export function createProductShell(options = {}) {
     if (view.status === "empty") {
       const empty = node("div", "image-admission-empty");
       empty.append(
-        node("strong", "", "编译不可变九项清单"),
-        node("p", "", "3 个角色、1 个主场景、2 个核心道具、3 个镜头关键帧；选择只依据资产类型、出现范围与镜头顺序。"),
+        node("strong", "", "创建首张图片清单"),
+        node("p", "", "清单来自已确认的角色、场景、道具和分镜；这里只做预览，不会调用外部能力。"),
       );
       const prepare = node("button", "studio-primary-button", "预览准入清单");
       prepare.type = "button";
@@ -1900,7 +1900,7 @@ export function createProductShell(options = {}) {
     const metrics = node("div", "image-admission-metrics");
     for (const [label, value] of [
       ["公开单价", `$${view.budget_contract.unit_estimate_usd || "0.0377"} / 张`],
-      ["硬上限", `$${view.budget_contract.max_estimated_usd || "0.3500"} · ${view.budget_contract.max_dispatches || 9} 次`],
+      ["本轮硬上限", `$${view.budget_contract.max_estimated_usd || "0.0377"} · ${view.budget_contract.max_dispatches || 1} 次`],
       ["已占用", `${view.budget.dispatches_reserved || 0} 次 · $${view.budget.estimated_reserved_usd || "0.0000"}`],
       ["实际账单", view.actual_usd == null ? "未核验" : `$${view.actual_usd}`],
     ]) {
@@ -1909,13 +1909,21 @@ export function createProductShell(options = {}) {
       metrics.appendChild(item);
     }
     panel.appendChild(metrics);
-    const blocker = node("div", view.capability.keyframe_continuity_ready ? "image-admission-capability ready" : "image-admission-capability");
+    const imageGateOpen = snapshot.mediaGates?.image === true;
+    const continuityReady = view.capability.keyframe_continuity_ready === true;
+    const blocker = node("div", continuityReady ? "image-admission-capability ready" : "image-admission-capability");
     blocker.append(
-      node("strong", "", view.capability.keyframe_continuity_ready ? "参考图编辑合同已声明" : "关键帧连续性被阻断"),
-      node("p", "", view.capability.keyframe_continuity_ready
-        ? `最多 ${view.capability.reference_image_slots || 0} 张同项目已批准参考媒体；有引用时只走图片编辑接口。`
-        : view.capability.blocker || "当前图片适配器未声明参考图能力。"),
-      node("p", "", snapshot.mediaGates?.image ? "图片能力已启用；每次发送前仍需占用预算。" : "图片能力未启用；当前不会发送任何外部请求。"),
+      node("strong", "", !imageGateOpen
+        ? "图片能力尚未开启"
+        : continuityReady
+          ? "参考图保持一致已准备"
+          : "图片服务尚未准备好"),
+      node("p", "", !imageGateOpen
+        ? "开启前不会发送图片请求或占用费用。"
+        : continuityReady
+          ? `关键帧可使用最多 ${view.capability.reference_image_slots || 0} 张当前项目已批准参考图。`
+          : "当前服务还不能保证参考图连续性，关键帧暂不可生成。"),
+      node("p", "", imageGateOpen ? "每次发送前仍需确认并占用本轮预算。" : "当前不会发送任何外部请求。"),
     );
     panel.appendChild(blocker);
     const list = node("div", "image-admission-list");
@@ -1961,7 +1969,12 @@ export function createProductShell(options = {}) {
     const state = node("span", "image-admission-item-state", imageAdmissionStateLabel(item.state));
     row.append(main, state);
     const actions = node("div", "image-admission-item-actions");
-    if (snapshot.mediaGates?.image && view.status === "locked" && item.state === "planned") {
+    if (
+      snapshot.mediaGates?.image
+      && view.status === "locked"
+      && item.state === "planned"
+      && Number(view.budget?.remaining_dispatches || 0) > 0
+    ) {
       const generate = node("button", "studio-primary-button", "预览生成");
       generate.type = "button";
       generate.addEventListener("click", () => void stageImageAdmissionCommand({

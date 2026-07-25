@@ -116,6 +116,7 @@ import {
 const preview = {
   command_id: "asset-command-1234",
   preview_digest: "a".repeat(64),
+  expected_graph_version: 8,
   request: {
     command: { type: "set_art_direction" },
     requested_at: "2026-07-24T14:00:00Z",
@@ -124,6 +125,7 @@ const preview = {
 };
 const requestA = assetBibleConfirmRequest(preview, 7);
 const requestB = assetBibleConfirmRequest(preview, 7);
+const legacyRequest = assetBibleConfirmRequest({ ...preview, expected_graph_version: undefined }, 7);
 const network = assetBibleConfirmRecovery({
   status: 0,
   errorCode: "network_connection_interrupted",
@@ -135,12 +137,13 @@ const timeout = assetBibleConfirmRecovery({
   cause: { name: "AbortError" },
 });
 const stale = assetBibleConfirmRecovery({ status: 409, message: "stale" });
-console.log(JSON.stringify({ requestA, requestB, network, timeout, stale }));
+console.log(JSON.stringify({ requestA, requestB, legacyRequest, network, timeout, stale }));
 ''',
     )
     assert result["requestA"] == result["requestB"]
     assert result["requestA"]["command_id"] == "asset-command-1234"
-    assert result["requestA"]["expected_graph_version"] == 7
+    assert result["requestA"]["expected_graph_version"] == 8
+    assert result["legacyRequest"]["expected_graph_version"] == 7
     assert result["network"]["preserve_preview"] is True
     assert result["network"]["retryable"] is True
     assert result["timeout"]["category"] == "确认超时"

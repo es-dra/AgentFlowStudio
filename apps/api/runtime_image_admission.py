@@ -235,12 +235,8 @@ def compile_image_admission_manifest(
     characters = [item for item in active if item["asset_type"] == "character"]
     scenes = [item for item in active if item["asset_type"] == "scene"]
     props = [item for item in active if item["asset_type"] == "prop"]
-    if len(characters) != 3:
-        raise ValueError("three approved character assets must be selected explicitly before manifest lock")
     if not scenes:
         raise ValueError("at least one approved scene asset is required")
-    if len(props) < 2:
-        raise ValueError("at least two approved prop assets are required")
     shot_grounding = source.get("shot_grounding") if isinstance(source.get("shot_grounding"), Mapping) else {}
     scene_index = sorted(
         [
@@ -264,36 +260,19 @@ def compile_image_admission_manifest(
         ],
         key=lambda item: (int(item.get("number") or 9999), str(item.get("shot_id") or "")),
     )
-    if not scene_index or len(shot_index) < 3:
+    if not scene_index or not shot_index:
         raise ValueError("applied shot plan must provide stable scene and shot indexes")
-    primary_scene_id = str(scene_index[0].get("scene_id") or "")
-    primary_scenes = [
-        item for item in scenes if primary_scene_id in item["occurrences"]["scene_ids"]
-    ]
-    if len(primary_scenes) != 1:
-        raise ValueError("primary scene selection is ambiguous and requires confirmation")
-    ranked_props = sorted(
-        props,
-        key=lambda item: (
-            -len(item["occurrences"]["shot_ids"]),
-            -len(item["occurrences"]["scene_ids"]),
-            item["stable_id"],
-        ),
-    )
-    if len(ranked_props) > 2 and _asset_rank(ranked_props[1]) == _asset_rank(ranked_props[2]):
-        raise ValueError("core prop selection is ambiguous and requires confirmation")
-    selected_props = ranked_props[:2]
-    first_shot = shot_index[0]
-    last_shot = shot_index[-1]
-    middle = shot_index[1:-1]
-    pressure_shot = max(
-        middle,
-        key=lambda shot: (
-            _shot_reference_count(active, str(shot.get("shot_id") or "")),
-            -int(shot.get("number") or 0),
-        ),
-    )
-    selected_shots = [first_shot, pressure_shot, last_shot]
+    if len(shot_index) <= 3:
+        selected_shots = shot_index
+    else:
+        pressure_shot = max(
+            shot_index[1:-1],
+            key=lambda shot: (
+                _shot_reference_count(active, str(shot.get("shot_id") or "")),
+                -int(shot.get("number") or 0),
+            ),
+        )
+        selected_shots = [shot_index[0], pressure_shot, shot_index[-1]]
     source_fingerprint = canonical_digest(_source_fingerprint_payload(source))
     items: list[dict[str, Any]] = []
     for asset in sorted(characters, key=lambda item: item["stable_id"]):
@@ -306,16 +285,17 @@ def compile_image_admission_manifest(
                 art_direction=art_direction,
             )
         )
-    items.append(
-        _asset_item(
-            primary_scenes[0],
-            "scene_plate",
-            "16:9",
-            source_fingerprint,
-            art_direction=art_direction,
+    for asset in sorted(scenes, key=lambda item: item["stable_id"]):
+        items.append(
+            _asset_item(
+                asset,
+                "scene_plate",
+                "16:9",
+                source_fingerprint,
+                art_direction=art_direction,
+            )
         )
-    )
-    for asset in selected_props:
+    for asset in sorted(props, key=lambda item: item["stable_id"]):
         items.append(
             _asset_item(
                 asset,
@@ -325,7 +305,14 @@ def compile_image_admission_manifest(
                 art_direction=art_direction,
             )
         )
-    for role, shot in zip(("opening", "continuity_pressure", "closing_relation"), selected_shots, strict=True):
+    shot_roles = (
+        ["single_shot"]
+        if len(selected_shots) == 1
+        else ["opening", "closing_relation"]
+        if len(selected_shots) == 2
+        else ["opening", "continuity_pressure", "closing_relation"]
+    )
+    for role, shot in zip(shot_roles, selected_shots, strict=True):
         shot_id = str(shot.get("shot_id") or "")
         reference_assets = [
             item["stable_id"]
@@ -355,8 +342,8 @@ def compile_image_admission_manifest(
                 ),
             )
         )
-    if len(items) != 9 or len({item["item_id"] for item in items}) != 9:
-        raise ValueError("image admission compiler must produce nine unique items")
+    if not items or len({item["item_id"] for item in items}) != len(items):
+        raise ValueError("image admission compiler must produce unique items")
     contract = budget_contract()
     capability = image_admission_capability()
     manifest_contract = {
@@ -371,6 +358,14 @@ def compile_image_admission_manifest(
             "prompt_contract_version": PROMPT_CONTRACT_VERSION,
             "source_fingerprint": source_fingerprint,
             "source_evidence_summary": source_traceability,
+        },
+        "selection_summary": {
+            "canonical_character_count": len(characters),
+            "canonical_scene_count": len(scenes),
+            "canonical_prop_count": len(props),
+            "applied_shot_count": len(shot_index),
+            "representative_shot_count": len(selected_shots),
+            "item_count": len(items),
         },
         "items": items,
         "budget_contract": contract,
@@ -427,14 +422,23 @@ def load_image_admission_manifest(store: RuntimeStore, project_id: str) -> dict[
 
 def budget_contract() -> dict[str, Any]:
     unit = _money_env("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0377")
-    maximum = _money_env("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.3500")
-    if unit <= 0 or maximum <= 0:
+    configured_maximum = _money_env("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.3500")
+    configured_program_maximum = _money_env("AFS_MEDIA_PROGRAM_MAX_USD", "50.0000")
+    program_maximum = min(configured_program_maximum, Decimal("50.0000"))
+    maximum = min(unit, configured_maximum, program_maximum)
+    if (
+        unit <= 0
+        or configured_maximum < unit
+        or configured_program_maximum <= 0
+        or program_maximum < unit
+    ):
         raise ValueError("image admission pricing must be positive")
     return {
         "currency": "USD",
         "unit_estimate_usd": _money(unit),
-        "max_dispatches": 9,
+        "max_dispatches": 1,
         "max_estimated_usd": _money(maximum),
+        "program_max_usd": _money(program_maximum),
         "concurrency": 1,
         "candidate_count": 1,
         "auto_retry": 0,
@@ -579,8 +583,9 @@ def _apply_command(
     if command_type == "lock":
         if manifest.get("status") != "draft":
             raise ValueError("only a draft image admission manifest can be locked")
-        if len(manifest.get("items", [])) != 9:
-            raise ValueError("image admission manifest must contain nine items")
+        items = manifest.get("items", [])
+        if not items or len({str(item.get("item_id") or "") for item in items}) != len(items):
+            raise ValueError("image admission manifest must contain unique items")
         _assert_manifest_creative_ready(manifest)
         manifest["status"] = "locked"
         manifest["locked_at"] = timestamp
@@ -693,9 +698,9 @@ def _reserve_dispatch(
         str(contract["unit_estimate_usd"])
     )
     if dispatches + 1 > int(contract["max_dispatches"]):
-        raise ValueError("image admission dispatch cap reached; new authorization required")
+        raise ValueError("首张图片本轮仅允许发送一次")
     if next_cost > Decimal(str(contract["max_estimated_usd"])):
-        raise ValueError("image admission estimated USD cap reached; new authorization required")
+        raise ValueError("首张图片本轮费用估算已达到硬上限")
     ordinal = dispatches + 1
     token = canonical_digest(
         {
@@ -1540,9 +1545,27 @@ def _localized_negative_lock(value: Any) -> str:
 
 def _assert_manifest_creative_ready(manifest: Mapping[str, Any]) -> None:
     _art_direction_contract(manifest.get("art_direction"), require_complete=True)
+    persisted_budget = (
+        manifest.get("budget_contract")
+        if isinstance(manifest.get("budget_contract"), Mapping)
+        else {}
+    )
+    current_budget = budget_contract()
+    budget_fields = (
+        "currency",
+        "unit_estimate_usd",
+        "max_dispatches",
+        "max_estimated_usd",
+        "program_max_usd",
+        "concurrency",
+        "candidate_count",
+        "auto_retry",
+    )
+    if any(persisted_budget.get(field) != current_budget[field] for field in budget_fields):
+        raise ValueError("图片清单费用合同已更新，请重新预览清单")
     items = manifest.get("items", [])
-    if len(items) != 9:
-        raise ValueError("image admission creative grounding requires nine items")
+    if not items:
+        raise ValueError("image admission creative grounding requires at least one item")
     for item in items:
         prompt = item.get("prompt_contract") if isinstance(item.get("prompt_contract"), Mapping) else {}
         provider_prompt = str(prompt.get("provider_prompt") or "")
@@ -1556,15 +1579,6 @@ def _assert_manifest_creative_ready(manifest: Mapping[str, Any]) -> None:
         if item.get("item_type") == "shot_keyframe":
             if not item.get("shot_grounding") or not item.get("reference_asset_grounding"):
                 raise ValueError("keyframe creative grounding requires shot facts and approved asset references")
-
-
-def _asset_rank(asset: Mapping[str, Any]) -> tuple[int, int]:
-    return (
-        len(asset["occurrences"]["shot_ids"]),
-        len(asset["occurrences"]["scene_ids"]),
-    )
-
-
 def _shot_reference_count(assets: list[Mapping[str, Any]], shot_id: str) -> int:
     return sum(shot_id in item["occurrences"]["shot_ids"] for item in assets)
 

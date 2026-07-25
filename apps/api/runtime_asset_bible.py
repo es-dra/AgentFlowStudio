@@ -177,6 +177,7 @@ def preview_asset_bible_command_result(
     payload = {
         "schema_version": SCHEMA_VERSION,
         "status": "preview",
+        "expected_graph_version": int(graph.get("version") or 0) if graph else 0,
         "context_fingerprint": _optional_token(body.get("context_fingerprint")),
         "command": _safe_command(command),
         "impact": impact,

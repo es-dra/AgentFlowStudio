@@ -470,8 +470,8 @@ export function deriveProductionCopilotState({
   } else if (contentReady && admissionStatus === "empty") {
     next = {
       action: "image_admission_ready",
-      label: "准备图片准入",
-      reason: "锁定资产与镜头覆盖已就绪；先审核九项清单和费用硬门，不会调用外部能力。",
+      label: "准备首张图片",
+      reason: "锁定资产与镜头覆盖已就绪；先审核首张图片清单和单次费用硬门，不会调用外部能力。",
       enabled: true,
     };
   } else if (contentReady && mediaLoadFailures > 0) {
@@ -506,7 +506,7 @@ export function deriveProductionCopilotState({
     next = {
       action: "review_image_admission",
       label: "锁定图片清单",
-      reason: "九项清单已编译，锁定后才可占用预算并串行生成。",
+      reason: "首张图片清单已编译，锁定后才可占用一次预算并生成。",
       enabled: true,
     };
   } else if (contentReady && admissionStatus === "cancelled") {

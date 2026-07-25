@@ -6,11 +6,17 @@ export function assetBibleConfirmRequest(preview, graphVersion = 0) {
   if (!commandId || !previewDigest || !preview?.request) {
     throw new Error("资产命令预览缺少可恢复确认信息，请重新预览。");
   }
+  const previewGraphVersion = Number(preview?.expected_graph_version);
   return {
     ...preview.request,
     preview_digest: previewDigest,
     command_id: commandId,
-    expected_graph_version: Math.max(0, Number(graphVersion || 0)),
+    expected_graph_version: Math.max(
+      0,
+      Number.isFinite(previewGraphVersion)
+        ? previewGraphVersion
+        : Number(graphVersion || 0),
+    ),
   };
 }
 
