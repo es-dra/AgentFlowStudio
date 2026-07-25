@@ -222,7 +222,7 @@ export function createProductShell(options = {}) {
     menu.setAttribute("aria-label", "使用指南");
     menu.append(
       node("strong", "", "AFS 能做什么"),
-      node("p", "", "从任意节点开始：在同一画布里从想法、剧本、镜头、角色、参考图、图片或视频开始；需要改写、拆分、生成或恢复时先预览影响，再确认写入制作图。"),
+      node("p", "", "从想法、剧本、镜头、角色、参考图、图片或视频开始；需要改写、拆分或生成时，先查看完整影响，再决定是否保存。"),
     );
     const list = node("ul", "");
     for (const item of [
@@ -586,20 +586,16 @@ export function createProductShell(options = {}) {
 
   function buildCompactPlanSurface(status) {
     status.append(
-      node("strong", "", "可自由开始"),
-      node("span", "", "先创建想法、剧本、参考图、角色、图片或视频；需要结构化方案时再展开。"),
+      node("strong", "", "从一个想法开始"),
+      node("span", "", "描述故事、角色或一个画面，画布与 AI 创作搭档会一起继续。"),
     );
     const actions = node("div", "plan-compact-actions");
-    const expand = node("button", "studio-secondary-button", "展开制作方案");
-    expand.type = "button";
-    expand.setAttribute("aria-expanded", "false");
-    expand.addEventListener("click", () => {
-      setPlanningPanelOpen(true);
-      render();
-      requestCanvasSafeAreaUpdate();
-      requestAnimationFrame(() => document.querySelector(".m6-script-plan-entry textarea")?.focus());
+    const start = node("button", "studio-secondary-button", "输入创作想法");
+    start.type = "button";
+    start.addEventListener("click", () => {
+      requestAnimationFrame(() => document.querySelector(".canvas-empty-onboarding textarea")?.focus());
     });
-    actions.appendChild(expand);
+    actions.appendChild(start);
     status.appendChild(actions);
     return status;
   }
@@ -610,7 +606,7 @@ export function createProductShell(options = {}) {
     head.append(
       node("span", "eyebrow", "制作方案草案"),
       node("strong", "", "先预览，再确认"),
-      node("span", "", "只有生成草案或导入方案后才进入确认；确认前不会建立制作图。"),
+      node("span", "", "生成草案或导入方案后会先显示完整内容；确认前不会保存到项目。"),
     );
     const controls = node("div", "graph-plan-controls");
     const collapse = node("button", "studio-text-button", "收起");
@@ -663,14 +659,14 @@ export function createProductShell(options = {}) {
     const copy = m6PreviewRecovering
       ? "正在恢复同一制作方案预览，不会再次提交文本任务。"
       : {
-          queued: "已提交制作方案；确认前不会改变制作事实。",
+          queued: "已提交制作方案；确认前项目内容不会改变。",
           running: "制作方案处理中。连接中断后仍可恢复同一任务。",
           running_cancel_requested: "已请求停止后续处理；当前同步任务可能仍会完成。",
-          succeeded: "预览已恢复并可审阅；确认前 ProductionGraph 不变。",
-          failed: m6PreviewRun?.error?.message || "制作方案未完成；原项目事实已保留。",
+          succeeded: "预览已恢复并可审阅；确认前项目内容不会改变。",
+          failed: m6PreviewRun?.error?.message || "制作方案需要处理；原项目内容已保留。",
           unknown: m6PreviewRun?.error?.message || "文本任务状态需要人工核对；系统不会自动再次提交。",
-          cancelled: "预览已取消；ProductionGraph 未改变。",
-          confirmed: "制作方案已确认并写入 ProductionGraph。",
+          cancelled: "预览已取消；项目内容没有改变。",
+          confirmed: "制作方案已确认并保存。",
         }[phase] || "正在读取同一制作方案任务状态。";
     panel.appendChild(node("strong", "", m6PreviewRecovering ? "正在恢复" : m6PreviewPhaseLabel(phase)));
     panel.appendChild(node("p", "", copy));
@@ -807,7 +803,7 @@ export function createProductShell(options = {}) {
           notice = recoveryError?.message || "同一制作方案状态暂时无法读取；项目事实未改变。";
         }
       } else {
-        notice = error?.message || "M6方案生成失败，项目未改变。";
+        notice = error?.message || "制作方案生成失败，项目内容没有改变。";
       }
     }
     render();
@@ -851,7 +847,7 @@ export function createProductShell(options = {}) {
     syncM6RunToAgent(run);
     if (run.phase === "succeeded") {
       stageRecoveredM6Candidate(run);
-      notice = "M6 方案预览已恢复；确认前不会建立制作图。";
+      notice = "制作方案预览已恢复；确认前不会保存到项目。";
     } else if (run.phase === "failed") {
       notice = run?.error?.message || "制作方案任务失败；项目事实未改变。";
     } else if (run.phase === "cancelled") {
@@ -868,6 +864,7 @@ export function createProductShell(options = {}) {
       stageM6ScriptPlanCandidateCommand(session, context, run);
     }
     projectDrawerOpen = false;
+    setPlanningPanelOpen(false);
     setAgentChatExpanded(true);
   }
 
@@ -1028,7 +1025,7 @@ export function createProductShell(options = {}) {
     const header = node("header", "asset-bible-header");
     const title = node("div", "");
     title.append(
-      node("span", "eyebrow", "唯一 ProductionGraph · 资产连续性"),
+      node("span", "eyebrow", "角色 · 场景 · 道具 · 制作参考"),
       node("h1", "", "Asset Bible"),
       node(
         "p",
@@ -1133,22 +1130,15 @@ export function createProductShell(options = {}) {
     const bar = node("section", "asset-bible-status-bar");
     bar.setAttribute("aria-live", "polite");
     const items = [
-      ["剧本版本", source?.script_revision_id ? "已就绪" : "未识别"],
-      ["分镜", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待应用"],
-      ["资产", view.counts.total ? `${view.counts.total} 当前 · ${view.counts.rejected + view.counts.superseded} 历史` : "待识别"],
-      ["Bible", view.status === "locked" ? "已锁定" : view.counts.total ? "审核中" : "未建立"],
-      ["覆盖", view.counts.total ? `${view.coverage.shot_covered}/${view.coverage.shot_total} 镜头 · ${view.coverage.unresolved_required} 未解决` : "待识别"],
-      ["识别质量", view.counts.total
-        ? view.recognition_quality.status === "pass"
-          ? "已通过"
-          : `${view.recognition_quality.issues.length} 项阻塞`
-        : "待识别"],
-      ["媒体准入", imageAdmissionView().status === "locked"
-        ? (snapshot.mediaGates?.image ? "清单已锁定 · 可受控生成" : "清单已锁定 · 图片能力未启用")
-        : view.status === "locked" && view.coverage.coverage_pass ? "结构就绪 · 待审核清单" : "内容审核未通过"],
-      ["费用", imageAdmissionView().status === "empty"
-        ? "未调用 · 未计费"
-        : `${imageAdmissionView().budget.estimated_reserved_usd || "0.0000"} USD 已占用估算`],
+      ["剧本", source?.script_revision_id ? "已选择" : "待选择"],
+      ["镜头", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待安排"],
+      ["创作资产", view.counts.total ? `${view.counts.approved}/${view.counts.total} 已确认` : "待整理"],
+      ["美术方向", view.art_direction.status === "confirmed" ? "已确认" : "待确认"],
+      ["图片", imageAdmissionView().counts.approved
+        ? `${imageAdmissionView().counts.approved} 张已确认`
+        : imageAdmissionView().counts.candidate
+          ? `${imageAdmissionView().counts.candidate} 张待审看`
+          : "尚未生成"],
     ];
     for (const [label, value] of items) {
       const item = node("div", "");
@@ -1679,7 +1669,7 @@ export function createProductShell(options = {}) {
     sectionEl.setAttribute("role", "status");
     sectionEl.setAttribute("aria-live", "polite");
     sectionEl.append(
-      node("span", "eyebrow", "命令预览"),
+      node("span", "eyebrow", "保存前预览"),
       node("strong", "", assetCommandLabel(command.type)),
       node("p", "", `影响 ${impact.asset_ids?.length || preview.result?.asset_bible?.assets?.length || 0} 个资产 · ${impact.scene_count || 0} 场 · ${impact.shot_count || 0} 镜头；取消不会改变事实。`),
     );
@@ -1744,8 +1734,8 @@ export function createProductShell(options = {}) {
     const sectionEl = node("section", "asset-bible-failure");
     sectionEl.setAttribute("role", "alert");
     sectionEl.append(
-      node("strong", "", "资产任务未完成"),
-      node("p", "", `${assetCommandError} 当前 Asset Bible 和 ProductionGraph 均已保留。`),
+      node("strong", "", "这一步需要处理"),
+      node("p", "", `${assetCommandError} 当前资产内容已保留。`),
     );
     if (lastAssetCommand) {
       const retry = node("button", "studio-primary-button", "重新预览同一命令");
@@ -2161,7 +2151,7 @@ export function createProductShell(options = {}) {
       node("strong", "", willDispatch ? "确认占用一次额度并生成" : "确认图片准入变更"),
       node("p", "", willDispatch
         ? `确认后将先占用第 ${preview.impact?.dispatches_reserved_after || 0} 次额度，再串行发送这一项；失败也占用次数，不会自动重试。`
-        : `影响 ${preview.impact?.item_count || 0} 项；确认前外部调用 0，制作事实写入 0。`),
+        : `将影响 ${preview.impact?.item_count || 0} 项；现在仅供预览，确认后才会保存。`),
     );
     const actions = node("div", "image-admission-actions");
     const cancel = node("button", "studio-secondary-button", "取消");
@@ -2212,7 +2202,7 @@ export function createProductShell(options = {}) {
       notice = confirmedCommand.type === "reserve_dispatch"
         ? "额度已原子占用，正在发送单项生成请求。"
         : confirmedCommand.type === "approve"
-          ? "图片候选已批准并写回 Asset Bible / ProductionGraph；可继续查看已批准图片。"
+          ? "图片候选已确认并保存到当前项目；可以继续查看已确认图片。"
         : "图片准入清单已更新；未调用外部能力。";
       render();
       if (confirmedCommand.type === "reserve_dispatch") {
@@ -2300,7 +2290,7 @@ export function createProductShell(options = {}) {
         item_id: item.item_id,
         candidate: result.candidate,
       });
-      notice = "单项候选已生成，等待批准；尚未写入 ProductionGraph。";
+      notice = "单项候选已生成，等待你审看；确认后才会保存到项目。";
       return;
     }
     const jobId = result.job_id;
@@ -2322,7 +2312,7 @@ export function createProductShell(options = {}) {
   function cancelImageAdmissionCommand() {
     imageAdmissionPreview = null;
     imageAdmissionError = "";
-    notice = "图片准入预览已取消；清单、预算与 ProductionGraph 均未改变。";
+    notice = "图片清单预览已取消；项目与预算没有改变。";
     render();
   }
 
@@ -2385,7 +2375,7 @@ export function createProductShell(options = {}) {
     assetCommandError = "";
     assetCommandRecovery = null;
     assetCommandConfirmPending = false;
-    notice = "资产命令预览已取消；Asset Bible 与 ProductionGraph 未改变。";
+    notice = "资产更改预览已取消；项目内容没有改变。";
     render();
   }
 
@@ -2931,6 +2921,24 @@ export function createProductShell(options = {}) {
 
   function handleCopilotAction(action) {
     if (!action?.action) return;
+    if (action.action === "start_idea") {
+      showCanvas();
+      requestAnimationFrame(() => {
+        const input = document.querySelector(".canvas-empty-onboarding textarea");
+        if (input) input.focus();
+        else document.querySelector(".agent-chat-composer textarea")?.focus();
+      });
+      return;
+    }
+    if (action.action === "review_current_shot") {
+      showStoryboard();
+      requestAnimationFrame(() => {
+        const video = document.querySelector(".media-viewer video");
+        video?.focus();
+        void video?.play?.().catch(() => {});
+      });
+      return;
+    }
     if (action.action === "generate_asset_candidates") {
       void stageAssetBibleCommand({ type: "generate_candidates" });
       return;
@@ -3106,6 +3114,7 @@ export function createProductShell(options = {}) {
       if (!isM6RunCurrent(run) || (m6PreviewRun?.run_id && run.run_id !== m6PreviewRun.run_id)) return;
       m6PreviewRun = { ...(m6PreviewRun || {}), ...run };
       syncM6RunToAgent(m6PreviewRun);
+      if (run.phase === "cancelled") setPlanningPanelOpen(true);
       render();
     });
     const narrowAgentQuery = responsiveAgentMediaQuery();
@@ -3167,7 +3176,7 @@ export function createProductShell(options = {}) {
       }
     }
     if (isNarrowAgentLayout() && !mobileAgentOpen) {
-      agentCollapsed = true;
+      agentCollapsed = isNarrowAgentLayout();
     }
   }
 
@@ -3183,7 +3192,7 @@ export function createProductShell(options = {}) {
   }
 
   function isPlanningPanelExpanded() {
-    return Boolean(planningPanelOpen || String(m6SourceText || "").trim());
+    return Boolean(planningPanelOpen);
   }
 
   function setPlanningPanelOpen(open) {
@@ -3558,7 +3567,7 @@ export function createProductShell(options = {}) {
       if (previousIdentity !== nextIdentity) agentChatContexts.clear();
       section = "canvas";
       mobileAgentOpen = false;
-      agentCollapsed = true;
+      agentCollapsed = isNarrowAgentLayout();
     }
     if (!document.getElementById("app")?.classList.contains("product-mode")) return;
     if (options.render === false || options.deferRender === true) {
@@ -3777,6 +3786,7 @@ export function createProductShell(options = {}) {
       section,
       selectedAsset: section === "asset_bible" ? selectedAsset() : null,
       imageAdmission: imageAdmissionView(),
+      mediaOperations: mediaOperationsReady() ? mediaOperationsView() : null,
     });
   }
   function hasStoryFacts() { return shotModel().length > 0; }

@@ -305,7 +305,7 @@ def _report(
         "run_root": str(run_root),
         "provider_services": {
             "image": {"service_id": "image_relay", "provider": "api_relay", "model": "gpt-image-2"},
-            "video": {"service_id": "seedance_i2v", "provider": "volc_seedance", "model": "doubao-seedance-2-0-fast"},
+            "video": {"service_id": "seedance_i2v", "provider": "volc_seedance", "model": "doubao-seedance-2-0"},
         },
         "budget": budget or {"budget_cap_usd": budget_usd},
         "paid_smoke": smoke,

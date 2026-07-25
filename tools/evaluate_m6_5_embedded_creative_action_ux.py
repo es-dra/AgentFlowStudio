@@ -86,10 +86,10 @@ SOURCE_CONTRACTS = (
     {
         "severity": "P1",
         "scope": "ai_panel",
-        "issue": "AI panel still defaults to raw metadata and receipt stack",
+        "issue": "AI panel does not keep creator context primary and diagnostics progressively disclosed",
         "path": "apps/studio/src/agent-chat-panel.js",
-        "must_include": ("agent-context-chip", "agent-context-details", "活动记录"),
-        "must_exclude": ("<strong>Agent Chat</strong>", "已记录到当前上下文"),
+        "must_include": ("agent-current-context", "项目与制作详情", "诊断信息", "活动记录"),
+        "must_exclude": ("agent-context-chip", "<strong>Agent Chat</strong>", "已记录到当前上下文"),
     },
 )
 

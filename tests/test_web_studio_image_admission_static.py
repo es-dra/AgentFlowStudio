@@ -32,7 +32,7 @@ def test_image_admission_uses_preview_confirm_runtime_command_path() -> None:
     assert "confirmImageAdmissionCommand" in shell
     assert "/m6/image-admission/commands/preview" in client
     assert "/m6/image-admission/commands/confirm" in client
-    assert "确认前外部调用 0，制作事实写入 0" in shell
+    assert "现在仅供预览，确认后才会保存" in shell
     assert "公开估算，非最终账单" in shell
     assert "preflightKeyframe(request)" in shell
     assert "generateKeyframe({" in shell

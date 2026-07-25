@@ -33,7 +33,7 @@ function greetingReply(context) {
   return [
     "你好，我是 AI 创作搭档。",
     target,
-    "问问题时我会直接回答；要改动画布或准备生成时，我会先给出目标、范围、费用和影响预览，确认前不会改动 ProductionGraph。",
+    "问问题时我会直接回答；要修改项目或开始生成时，我会先列清内容、影响和费用，由你确认后再保存或发送。",
   ].join("");
 }
 
@@ -76,7 +76,7 @@ function edgeReply(context) {
 
 function generalQuestionReply(message, context) {
   const scope = context.selected_node_title ? `当前问题会结合「${context.selected_node_title}」回答。` : "当前没有选中具体对象，我先按整个画布回答。";
-  return `${scope}我可以解释节点、连线、下一步、费用与恢复状态；如果你想实际改动画布，请说清目标和范围，我会先给命令预览而不是直接写入。`;
+  return `${scope}我可以解释节点、连线、下一步、费用与恢复状态；如果你想实际修改，请说清目标和范围，我会先展示更改内容，再由你决定是否保存。`;
 }
 
 function openEndedReply(context) {

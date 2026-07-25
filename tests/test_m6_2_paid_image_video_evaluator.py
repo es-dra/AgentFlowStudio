@@ -67,7 +67,7 @@ def _write_smoke(run_root: Path) -> None:
             "video_retry_fail": {"status": "FAIL", "provider": "volc_seedance", "safe_error": {"message": "safety blocked"}},
             "video_safe_reference": {
                 "status": "PASS",
-                "model": "doubao-seedance-2-0-fast",
+                "model": "doubao-seedance-2-0",
                 "outputs": [{"duration_sec": 5.0}],
             },
         },

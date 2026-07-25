@@ -276,7 +276,7 @@ export function stageProductionGraphCommand(session, context, { action, title, s
   };
   appendMessage(session, { role: "user", text: command.title });
   session.pendingCommand = command;
-  appendMessage(session, { role: "assistant", text: "已生成制作图命令预览；确认前不会改变制作事实。" });
+  appendMessage(session, { role: "assistant", text: "更改内容已准备好；请先查看影响，确认前项目不会改变。" });
   return command;
 }
 
@@ -321,15 +321,15 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
   const roles = Array.isArray(validation.review_roles) ? validation.review_roles.length : 0;
   const scopeImpact = m6ScopeImpact(candidate);
   if (!session || candidate.m6_schema_version !== "afs.m6.script_plan_asset_bible.v0.1" || !characters || !scenes || !shots || roles < 6) {
-    throw new Error("M6候选需要专业剧本、动态分镜、资产Bible和六视角审核合同");
+    throw new Error("制作方案缺少完整的剧本、动态分镜、资产清单或审核结果");
   }
   const command = {
     schema_version: SCHEMA_VERSION,
     command_id: `command_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     command_type: "m6_script_plan_asset_bible",
     graph_action: "confirm_m6_script_plan_asset_bible",
-    title: "确认M6剧本制作方案",
-    summary: `确认后写入同一ProductionGraph：${characters} 个角色、${scenes} 个场景、${shots} 个动态镜头、${roles} 个审核视角；范围影响逐项列出。`,
+    title: "确认制作方案",
+    summary: `现在仅供预览。确认后会保存 ${characters} 个角色、${scenes} 个场景和 ${shots} 个动态镜头；所有新建、改名、补充、用途和关联都会逐项列出。`,
     status: "preview",
     execution_mode: "runtime",
     context_key: context?.context_key || agentChatContextKey(context),
@@ -345,15 +345,15 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
     provider_dispatch_count: Number(preview?.dispatch_count || previewPayload?.provider_dispatch_count || 0),
   };
   if (runId) {
-    appendM6RunMessage(session, runId, "user", "生成M6剧本制作方案", "submitted");
+    appendM6RunMessage(session, runId, "user", "生成制作方案", "submitted");
   } else {
-    appendMessage(session, { role: "user", text: "生成M6剧本制作方案" });
+    appendMessage(session, { role: "user", text: "生成制作方案" });
   }
   session.pendingCommand = command;
   if (runId) {
     syncM6PreviewRunSession(session, context, preview);
   } else {
-    appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
+    appendMessage(session, { role: "assistant", text: "制作方案已生成。现在仅供预览；请核对全部内容，确认后才会保存到项目。" });
   }
   return command;
 }
@@ -432,11 +432,11 @@ export function syncM6PreviewRunSession(session, context, run) {
     queued: "制作方案已提交；确认前不会改变制作事实。",
     running: "制作方案处理中。即使浏览器连接中断，也会恢复同一任务，不会重复提交。",
     running_cancel_requested: "已记录停止后续处理的请求；当前同步文本任务可能仍在完成，不会虚假显示已取消。",
-    succeeded: "制作方案预览已恢复；请先审阅，确认前不会写入 ProductionGraph。",
+    succeeded: "制作方案预览已恢复；请先审阅，确认前不会保存到项目。",
     failed: errorMessage || "制作方案任务失败；已保留原项目事实，可查看同一任务的失败状态。",
     unknown: errorMessage || "文本任务状态需要人工核对；系统不会自动再次提交。",
-    cancelled: "制作方案预览已取消；ProductionGraph 未改变。",
-    confirmed: "制作方案已确认并写入唯一 ProductionGraph；刷新后仍可恢复本次确认回执。",
+    cancelled: "制作方案预览已取消；项目内容没有改变。",
+    confirmed: "制作方案已确认并保存；刷新后仍可恢复本次确认记录。",
   }[phase] || "制作方案状态正在恢复；不会重复提交。";
   return appendM6RunMessage(session, runId, "assistant", copy, phase, context);
 }
@@ -484,7 +484,7 @@ export function submitAgentChatMessage(session, rawText, context) {
       role: command.status === "blocked" ? "assistant" : "assistant",
       text: command.status === "blocked"
         ? command.error_message
-        : "已生成命令预览；确认前不会改变画布事实。",
+        : "更改内容已准备好；确认前画布不会改变。",
     });
     return { status: command.status, command };
   }
@@ -563,7 +563,7 @@ export function cancelAgentCommand(session) {
   if (!session?.pendingCommand) return null;
   const command = session.pendingCommand;
   session.pendingCommand = null;
-  appendMessage(session, { role: "assistant", text: "命令预览已取消，画布未改变。" });
+  appendMessage(session, { role: "assistant", text: "本次更改已取消，画布没有改变。" });
   return command;
 }
 
@@ -730,10 +730,10 @@ export async function executePendingAgentCommandWithRuntime(session, store, runt
 function productionGraphAgentReceipt(command, runtimeReceipt = {}) {
   const actionSummaries = {
     confirm_candidate: "可信制作方案已建立为唯一制作图版本；画布与故事板将同步刷新。",
-    confirm_m6_script_plan_asset_bible: "M6剧本、动态拆镜与资产Bible已写入同一制作图；画布、故事板与AI 创作搭档将同步消费。",
+    confirm_m6_script_plan_asset_bible: "剧本、动态分镜和资产清单已保存；画布、故事板、资产 Bible 与 AI 创作搭档会同步显示。",
     mutate: "局部修改已确认；仅证据关联的下游对象进入待处理，未关联产物继续保留。",
-    select_candidate: "候选版本已选定并写入制作图版本记录。",
-    review_decision: command.payload?.state === "approved" ? "专业审核已通过并写入制作图。" : "专业审核已退回，原候选与证据仍保留。",
+    select_candidate: "候选版本已选定并保存。",
+    review_decision: command.payload?.state === "approved" ? "专业审核已通过并保存。" : "专业审核已退回，原候选与证据仍保留。",
     redo_rejected: "返工任务已创建；原候选、审核记录与版本历史均保留。",
     delivery_state: "交付清单状态已更新，媒体、权利与来源仍需逐项核验。",
   };
@@ -927,7 +927,7 @@ function emptySession(contextKey) {
     messages: [
       {
         role: "assistant",
-        text: "我会基于当前画布上下文生成命令预览；确认前不改变事实。",
+        text: "我会先展示本次更改的内容和影响；确认前画布不会改变。",
         placeholder_id: AGENT_COMMAND_PREVIEW_PLACEHOLDER_ID,
         context_key: contextKey,
       },
@@ -1596,7 +1596,7 @@ function relationTypeLabel(value) {
 
 function runtimeCommand({ context, commandType, title, summary, requiresScriptRevision = true }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再执行写入命令。", context);
+    return blockedCommand(commandType, title, "请切回画布后再保存这项更改。", context);
   }
   if (requiresScriptRevision && (!context.script_revision_id || !context.script_source_digest)) {
     return blockedCommand(commandType, title, "请先创建或刷新剧本版本，再执行核心资产命令。", context);
@@ -1827,7 +1827,7 @@ function coreAssetCommand({ context, commandType, title, summary, patch, allowMi
 
 function commandForSelectedNode({ context, commandType, title, summary, after, allowEmptyTitle = false }) {
   if (context?.section === "storyboard_read_only") {
-    return blockedCommand(commandType, title, "故事板是只读投影。请切回画布后再预览和确认写入命令。", context);
+    return blockedCommand(commandType, title, "请切回画布查看并确认这项更改。", context);
   }
   const nodeId = cleanToken(context.selected_node_id, 120);
   if (!nodeId) {
@@ -2291,7 +2291,7 @@ function m3ContextAgentReceipt(command, response, runtimeReceipt) {
     source_digest: contextPack.source_digest || command.source_digest || "",
     context_pack_id: contextPack.context_pack_id || runtimeReceipt?.context_pack_id || "",
     canonical_truth_digest: contextPack.canonical_truth_digest || "",
-    summary: `精准上下文包已锁定；知识引用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条，外部能力保持关闭，草案不会写入事实。`,
+    summary: `创作上下文已准备；采用 ${Number(contextPack.relevant_knowledge_refs?.length || 0)} 条相关参考，草案确认前不会保存。`,
     undo_available: Boolean(runtimeReceipt?.undo_available),
     runtime_receipt_id: runtimeReceipt?.receipt_id || "",
     storyboard_write: false,

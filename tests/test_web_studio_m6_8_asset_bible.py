@@ -77,7 +77,7 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "assetCommandConfirmPending" in shell
     assert "cancelAssetBibleCommand" in shell
     assert "取消不会改变事实" in shell
-    assert "当前 Asset Bible 和 ProductionGraph 均已保留" in shell
+    assert "当前资产内容已保留" in shell
     assert 'asset.review_state === "approved" ? "已人工确认" : "仍需人工确认"' in shell
     assert "审核与版本历史" in shell
     assert "预览重分配影响" in shell
@@ -93,8 +93,9 @@ def test_single_shell_asset_bible_and_agent_share_runtime_preview_confirm_path()
     assert "selected_asset_id" in lifecycle
     assert "productionCopilot" in panel
     assert 'context?.section === "asset_bible"' in panel
-    assert '当前：${currentTitle || fallbackTitle}' in panel
-    assert "结构已就绪，但图片/视频媒体能力未启用" in panel
+    assert '"正在制作"' in panel
+    assert "currentTitle || fallbackTitle" in panel
+    assert "创作内容已准备，图片与视频能力暂未开启" in panel
     product_styles = (ROOT / "apps/studio/styles/product-shell.css").read_text(encoding="utf-8")
     assert "grid-template-columns: auto minmax(220px, 320px) 276px" in product_styles
     assert "grid-template-columns: auto minmax(180px, 280px) 276px" in product_styles

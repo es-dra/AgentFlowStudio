@@ -10,6 +10,7 @@ from agentflow_studio.model_gateway.image_utils import image_dimensions
 from apps.api.runtime_image_admission import (
     compile_image_admission_manifest,
     enforce_image_admission_keyframe_request,
+    image_admission_capability,
 )
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
@@ -18,6 +19,48 @@ from apps.api.runtime_store import RuntimeStore
 
 PROJECT_ID = "m6-9-image-admission-test"
 REQUESTED_AT = "2026-07-24T06:00:00Z"
+
+
+@pytest.mark.parametrize(
+    ("configured_model", "configured", "exact_model"),
+    [
+        ("gpt-image-2", True, True),
+        ("image2", False, False),
+        ("gpt-image-1", False, False),
+    ],
+)
+def test_image_admission_requires_exact_image2_callable_model(
+    monkeypatch,
+    configured_model,
+    configured,
+    exact_model,
+) -> None:
+    descriptor = SimpleNamespace(
+        reference_image_slots=4,
+        image_edit_capabilities_present=True,
+        image_edit_capabilities=SimpleNamespace(
+            supports_image_edit=True,
+            max_reference_images=4,
+            input_fidelity_modes=[],
+        ),
+    )
+    registry = SimpleNamespace(
+        descriptor=lambda service_id: descriptor,
+        store=SimpleNamespace(service=lambda service_id: {"model": configured_model}),
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_image_admission.load_provider_registry",
+        lambda: registry,
+    )
+
+    capability = image_admission_capability()
+
+    assert capability["configured"] is configured
+    assert capability["exact_model"] is exact_model
+    assert capability["model"] == "gpt-image-2"
+    assert capability["keyframe_continuity_ready"] is configured
+    if not configured:
+        assert capability["blocker"] == "图片服务没有绑定本次要求的精确模型"
 
 
 def _asset(
@@ -497,6 +540,15 @@ def test_generation_job_binding_survives_reload_without_another_reservation(tmp_
 def test_locked_prompt_contract_is_the_only_dispatch_prompt(tmp_path, monkeypatch) -> None:
     client, source = _compiled_locked_client(tmp_path, monkeypatch)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setattr(
+        "apps.api.runtime_image_admission.image_admission_capability",
+        lambda: {
+            "configured": True,
+            "exact_model": True,
+            "keyframe_continuity_ready": True,
+            "blocker": "",
+        },
+    )
     manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
     item = next(entry for entry in manifest["items"] if entry["item_type"] == "character_design")
     reserved = _command(

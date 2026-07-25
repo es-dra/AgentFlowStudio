@@ -169,35 +169,37 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
     page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
     page.get_by_role("button", name="生成剧本制作方案").click()
     preview = page.locator(".agent-command-preview")
-    expect(preview).to_contain_text("确认M6剧本制作方案")
+    expect(preview).to_contain_text("确认制作方案")
     expect(preview).to_contain_text("动态镜头")
     for token in (
-        "范围影响清单",
-        "新增",
-        "改名",
-        "扩写",
-        "分类",
-        "关联",
+        "本次方案包含",
+        "新建内容",
+        "名称变化",
+        "内容补充",
+        "资产用途",
+        "影响的镜头与引用",
         "林澈",
         "唐予",
         "夜晚旧剪辑室",
         "清晨屋顶",
         "场记板",
         "旧镜头",
-        "规范道具 canonical_prop",
-        "生产辅助 production_aid",
-        "Asset Bible 道具引用",
-        "Asset Bible 辅助引用",
+        "主要道具",
+        "制作参考",
+        "道具清单",
+        "制作参考清单",
     ):
         expect(preview).to_contain_text(token)
-    expect(preview).to_contain_text("改名 0")
-    expect(preview.locator(".agent-m6-scope-group").filter(has_text="改名")).to_contain_text("无")
+    expect(preview).to_contain_text("名称变化 0")
+    expect(preview.locator(".agent-m6-scope-group").filter(has_text="名称变化")).to_contain_text("无")
     preview_text = preview.inner_text()
-    if "生产辅助 production_aid" not in preview_text or "规范道具 canonical_prop" not in preview_text:
-        raise AssertionError("confirmation card does not expose canonical/prod-aid classification")
+    if "制作参考" not in preview_text or "主要道具" not in preview_text:
+        raise AssertionError("confirmation card does not expose creator-readable asset classifications")
+    if any(token in preview_text for token in ("canonical_prop", "production_aid", "ProductionGraph", "M6")):
+        raise AssertionError("confirmation card leaks internal classification or graph vocabulary")
     preview_screenshot = str((screenshot_dir / "m6-confirmation-card-1920x1080.png").resolve())
     page.screenshot(path=preview_screenshot, full_page=True)
-    page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
+    page.locator(".agent-command-preview").get_by_role("button", name="确认并保存").click()
     page.wait_for_selector(".graph-canvas-status.ready")
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
     if workspace["status"] != "ready" or workspace["graph_digest"] != workspace["storyboard"]["graph_digest"]:

@@ -1712,7 +1712,7 @@ def _seedance_provider_config() -> dict:
                 "auth_type": "api_key",
                 "base_url": "https://relay.test",
                 "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
-                "default_models": {"video": "doubao-seedance-2-0-fast"},
+                "default_models": {"video": "doubao-seedance-2-0"},
             }
         },
         "account_pools": {
@@ -1738,7 +1738,7 @@ def _seedance_provider_config() -> dict:
                 "account_ref": "volc_seedance_relay",
                 "capability": "video",
                 "endpoint": "/volc/v1/contents/generations/tasks",
-                "model": "doubao-seedance-2-0-fast",
+                "model": "doubao-seedance-2-0",
                 "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
                 "reference_roles": ["first_frame", "last_frame"],
                 "watermark": False,

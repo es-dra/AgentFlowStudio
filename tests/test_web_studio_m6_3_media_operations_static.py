@@ -76,7 +76,9 @@ def test_m6_3_media_operations_copy_keeps_cost_recovery_and_nonclaim_boundaries(
         "生成调用",
     ):
         assert marker in shell
-    assert "媒体制作" in agent_chat
+    assert "正在制作" in agent_chat
+    assert "制作详情" in agent_chat
+    assert "媒体制作" not in agent_chat
     assert "从已确认脚本、分镜和资产 Bible 只读投影" in agent_chat
     assert "idempotency_key" not in shell
     for forbidden in (

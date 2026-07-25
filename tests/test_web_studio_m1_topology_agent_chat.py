@@ -20,9 +20,10 @@ def test_m1_topology_defaults_to_canvas_and_keeps_storyboard_read_only_deferred(
     assert "studio-agent-chat" in styles
     assert "studio-unified-workspace.canvas-empty-project" in styles
     assert "0 场景 · 0 镜头 · 尚未创建故事事实" in shell
-    assert "0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头" in (
-        STUDIO_ROOT / "src" / "agent-chat-panel.js"
-    ).read_text(encoding="utf-8")
+    panel = (STUDIO_ROOT / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
+    assert "agent-current-context" in panel
+    assert "正在制作" in panel
+    assert "agent-context-chip" not in panel
     assert 'storyboard_mode: "read_only_deferred"' in lifecycle
     assert 'context?.section === "storyboard_read_only"' in lifecycle
     assert "故事板当前只读取画布确认后的事实" in shell
@@ -42,7 +43,7 @@ def test_agent_chat_panel_is_not_static_and_executes_confirmed_canvas_commands()
         "undoAgentReceipt",
         "recordAgentCommandError",
         "store.set((state) => executePendingAgentCommand(session, state))",
-        "确认执行",
+        "确认更改",
         "执行回执",
         "撤销",
     ):
