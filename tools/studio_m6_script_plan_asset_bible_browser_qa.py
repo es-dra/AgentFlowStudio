@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
 
 def seed_project(runtime_root: Path) -> None:
     client = runtime_test_client(runtime_root)
-    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "M6专业剧本到资产Bible制作图"})
+    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "灯种黎明短片制作"})
     if created.status_code not in {200, 409}:
         raise AssertionError(created.text)
     saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": studio_state(PROJECT_ID)})
@@ -78,7 +78,7 @@ def seed_project(runtime_root: Path) -> None:
 
 def studio_state(project_id: str) -> dict[str, Any]:
     return {
-        "meta": {"projectId": project_id, "projectName": "M6专业剧本项目", "canvasName": "制作画布", "seq": 1, "updated_at": ""},
+        "meta": {"projectId": project_id, "projectName": "灯种黎明", "canvasName": "制作画布", "seq": 1, "updated_at": ""},
         "viewport": {"x": 0, "y": 0, "scale": 1},
         "nodes": {
             "seed_brief": {
@@ -89,8 +89,8 @@ def studio_state(project_id: str) -> dict[str, Any]:
                 "y": 110,
                 "w": 300,
                 "h": 220,
-                "prompt": "等待M6专业剧本制作方案确认。",
-                "content": "等待M6专业剧本制作方案确认。",
+                "prompt": "等待制作方案确认。",
+                "content": "等待制作方案确认。",
                 "status": "draft",
                 "params": {},
                 "collapsed": False,
