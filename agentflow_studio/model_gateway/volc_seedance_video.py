@@ -188,7 +188,15 @@ def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderD
             payload[key] = bool(service.get(key))
     extra_body = service.get("extra_body")
     if isinstance(extra_body, dict):
-        payload.update(extra_body)
+        for raw_key, value in extra_body.items():
+            if value in (None, "", []):
+                continue
+            key = str(raw_key)
+            if key in payload:
+                if value != payload[key]:
+                    raise ModelConfigError(f"Seedance extra_body cannot override request field: {key}")
+                continue
+            payload[key] = value
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
 
 

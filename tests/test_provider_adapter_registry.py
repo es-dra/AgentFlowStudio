@@ -12,6 +12,7 @@ import pytest
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
+from agentflow_studio.model_gateway.provider_api_relay_images import openai_images_payload
 from agentflow_studio.model_gateway import openai_compatible
 from agentflow.algorithms.provider_gate_manifest import required_gate_for
 
@@ -1110,6 +1111,39 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
     assert "r2.dev" not in json.dumps(result, ensure_ascii=False)
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("image_operation", ["generate", "edit"])
+def test_openai_images_extra_body_cannot_override_exact_request_model(tmp_path, image_operation: str) -> None:
+    source_image = tmp_path / "source.png"
+    source_image.write_bytes(_png_bytes())
+    request = ProviderDispatchRequest(
+        prompt="Preserve the canonical production state.",
+        output_dir=tmp_path / "run",
+        image_operation=image_operation,
+        edit_source_image_path=source_image if image_operation == "edit" else None,
+    )
+
+    with pytest.raises(ModelConfigError, match="extra_body cannot override request field: model"):
+        openai_images_payload(
+            service={"extra_body": {"model": "gpt-image-2-preview"}},
+            model="gpt-image-2",
+            request=request,
+        )
+
+
+def test_openai_images_extra_body_allows_same_model_and_new_extension_fields(tmp_path) -> None:
+    payload = openai_images_payload(
+        service={"extra_body": {"model": "gpt-image-2", "background": "opaque"}},
+        model="gpt-image-2",
+        request=ProviderDispatchRequest(
+            prompt="Preserve the canonical production state.",
+            output_dir=tmp_path / "run",
+        ),
+    )
+
+    assert payload["model"] == "gpt-image-2"
+    assert payload["background"] == "opaque"
 
 
 def test_provider_registry_reports_openai_images_download_timeout_stage(tmp_path, monkeypatch) -> None:

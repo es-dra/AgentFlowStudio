@@ -139,6 +139,44 @@ def test_seedance_video_rejects_fast_or_alias_model_before_network(tmp_path, mon
     assert network_calls == 0
 
 
+def test_seedance_video_rejects_extra_body_model_override_before_network(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+    network_calls = 0
+
+    def forbidden_urlopen(*args, **kwargs):
+        nonlocal network_calls
+        network_calls += 1
+        raise AssertionError("extra_body model override must fail before network")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", forbidden_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(
+            _seedance_provider_config(
+                tmp_path,
+                extra_body={"model": "doubao-seedance-2-0-fast"},
+            )
+        )
+    )
+
+    with pytest.raises(ModelGatewayError, match="extra_body cannot override request field: model"):
+        registry.dispatch(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+    assert network_calls == 0
+
+
 def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
     first = tmp_path / "first.png"
     first.write_bytes(PNG_BYTES)
@@ -430,7 +468,12 @@ def _upload_image(client: TestClient, project_id: str, role: str) -> str:
     return response.json()["asset"]["asset_id"]
 
 
-def _seedance_provider_config(tmp_path, *, model: str = "doubao-seedance-2-0") -> str:
+def _seedance_provider_config(
+    tmp_path,
+    *,
+    model: str = "doubao-seedance-2-0",
+    extra_body: dict[str, object] | None = None,
+) -> str:
     payload = {
         "schema_version": "company_provider_secrets.local.v2",
         "accounts": {
@@ -495,6 +538,8 @@ def _seedance_provider_config(tmp_path, *, model: str = "doubao-seedance-2-0") -
             }
         },
     }
+    if extra_body is not None:
+        payload["services"]["seedance_i2v"]["extra_body"] = extra_body
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return str(path)

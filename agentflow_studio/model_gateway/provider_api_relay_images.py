@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.image_utils import image_dimensions, image_extension
 
 if TYPE_CHECKING:
@@ -43,9 +43,7 @@ def openai_images_payload(*, service: dict[str, Any], model: str, request: Provi
     }
     extra_body = service.get("extra_body")
     if isinstance(extra_body, dict):
-        for key, value in extra_body.items():
-            if value not in (None, "", []):
-                payload[str(key)] = value
+        _merge_extra_body(payload, extra_body)
     return payload
 
 
@@ -77,9 +75,7 @@ def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request:
         fields["input_fidelity"] = configured_fidelity
     extra_body = service.get("extra_body")
     if isinstance(extra_body, dict):
-        for key, value in extra_body.items():
-            if value not in (None, "", []):
-                fields[str(key)] = value
+        _merge_extra_body(fields, extra_body)
     field_name = str(service.get("edit_image_field_name") or "image")
     return {
         "__transport": "multipart",
@@ -87,6 +83,18 @@ def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request:
         "fields": fields,
         "files": [_image_file_part(field_name, path, index) for index, path in enumerate(image_paths, start=1)],
     }
+
+
+def _merge_extra_body(payload: dict[str, Any], extra_body: dict[str, Any]) -> None:
+    for raw_key, value in extra_body.items():
+        if value in (None, "", []):
+            continue
+        key = str(raw_key)
+        if key in payload:
+            if value != payload[key]:
+                raise ModelConfigError(f"Image relay extra_body cannot override request field: {key}")
+            continue
+        payload[key] = value
 
 
 def _edit_endpoint(service: dict[str, Any]) -> str:

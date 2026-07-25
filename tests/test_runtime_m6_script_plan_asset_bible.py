@@ -103,6 +103,34 @@ Anderson走进Andromeda Hall，把钥匙放在桌面上。
     assert candidate["m6_scope_review"]["fail_closed"]["status"] == "pass"
 
 
+def test_m6_server_codex_prompt_preserves_non_chinese_canonical_names() -> None:
+    source = """
+角色：和也、Anderson
+场景：和平广场、Andromeda Hall
+道具：红与蓝徽章
+和也在和平广场等待，Anderson随后进入。
+两人在Andromeda Hall交接红与蓝徽章。
+"""
+
+    prompt = runtime_m6_server_codex_planner._server_codex_prompt(
+        project_id="m6-multilingual-canonical",
+        source_kind="script",
+        source_text=source,
+        requested_language="zh-CN",
+        revision_instruction="",
+        parent_candidate_digest="",
+        schema_digest="a" * 64,
+        dispatch_id="m6_multilingual_test",
+    )
+
+    assert "canonical characters（必须逐字保留且不得增删）: 和也、Anderson" in prompt
+    assert "canonical scenes（必须逐字保留且不得改名）: 和平广场、Andromeda Hall" in prompt
+    assert "用户 canonical 名称保留原始字符和语言" in prompt
+    assert "不得翻译、音译或改写 canonical 名称" in prompt
+    assert "角色、场景、镜头和资产名称必须是中文专名" not in prompt
+    assert "禁止英文污染" not in prompt
+
+
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     run = _start_and_wait(client, "m6-graph", IDEA_TEXT, "m6-graph-preview")
