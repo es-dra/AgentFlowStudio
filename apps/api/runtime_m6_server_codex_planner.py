@@ -465,7 +465,7 @@ def _candidate_from_provider_payload(
         },
         "sequence": {
             "sequence_id": f"{project_key}-m6-sequence-{candidate_key}",
-            "name": "M6 服务器本地真实文本规划序列",
+            "name": f"{_text(payload.get('title'))[:96] or '未命名制作方案'} · 制作序列",
             "target_duration_seconds": round(sum(durations), 2),
             "dynamic_policy": {
                 "shot_count_decided_by_content": True,

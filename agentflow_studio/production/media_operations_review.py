@@ -329,7 +329,7 @@ def _assets(workspace: dict[str, Any], *, project_id: str, run_id: str) -> dict[
             "negative_locks": list(DEFAULT_MEDIA_NEGATIVE_LOCKS),
             "style": _text(assets.get("style_bible"), ""),
         },
-        "continuity_warning": "改动角色服装、空间光线、核心道具或 ReferenceSet 前需先预览影响；未确认不会写入制作图。",
+        "continuity_warning": "改动角色服装、空间光线、核心道具或制作参考前，先预览对当前镜头的影响；确认前不会保存更改。",
     }
 
 
@@ -458,12 +458,12 @@ def _commands(shots: list[dict[str, Any]], redo: dict[str, Any]) -> list[dict[st
 def _journey(workspace: dict[str, Any], cost: dict[str, Any], recovery: dict[str, Any]) -> list[dict[str, str]]:
     shot_count = len(workspace.get("shots") or [])
     return [
-        {"label": "剧本与修订", "state": "completed", "detail": "已读取 M6.1 revision2 的真实剧本与谱系"},
-        {"label": "结构与拆镜", "state": "completed", "detail": f"内容驱动 {shot_count} 个镜头；不是固定模板"},
-        {"label": "资产 Bible", "state": "completed", "detail": "角色、场景、ReferenceSet 与禁止变化项已确认"},
-        {"label": "生成与复用", "state": "completed", "detail": f"复用参考避免 {cost['avoided_dispatches_from_reference_reuse']} 次重复生成"},
-        {"label": "QA 与恢复", "state": "warning" if recovery["state"] == "recovered_with_attention" else "completed", "detail": _next_action(_classification("", {}), recovery)},
-        {"label": "交付候选", "state": "in_progress", "detail": "可审片；仍需 Owner 人工判断"},
+        {"label": "故事稿", "state": "completed", "detail": "已加载确认过的剧本和最新修改"},
+        {"label": "镜头设计", "state": "completed", "detail": f"{shot_count} 个镜头已按剧情顺序整理"},
+        {"label": "角色与场景", "state": "completed", "detail": "角色、场景、参考素材和连续性要求已确认"},
+        {"label": "画面制作", "state": "completed", "detail": "已复用确认过的参考素材，保持画面连续"},
+        {"label": "审片检查", "state": "warning" if recovery["state"] == "recovered_with_attention" else "completed", "detail": _next_action(_classification("", {}), recovery)},
+        {"label": "等待采用", "state": "in_progress", "detail": "镜头已可审看，采用前仍需人工确认"},
     ]
 
 
@@ -488,8 +488,8 @@ def _classification(project_id: str, ledger: dict[str, Any]) -> str:
 
 def _next_action(classification: str, recovery: dict[str, Any]) -> str:
     if recovery.get("state") == "recovered_with_attention" or classification == "RECOVERY_EVIDENCE_NOT_COUNTED":
-        return "查看恢复记录，确认不会重复扣费后再决定是否局部重做。"
-    return "从故事板选择镜头，审看片段、资产锁和增量成本。"
+        return "查看上次生成情况，确认没有重复生成后，再决定是否重做当前镜头。"
+    return "从故事板选择镜头，审看片段并确认角色、场景和道具是否连续。"
 
 
 def _safe_action(value: str) -> str:

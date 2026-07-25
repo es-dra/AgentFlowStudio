@@ -249,6 +249,18 @@ def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
         "uses_existing_paid_evidence": True,
         "production_provider_gates_expected_closed": True,
     }
+    creator_copy = json.dumps(
+        {
+            "next_action": review["stage"]["next_action"],
+            "journey": review["journey"],
+            "continuity_warning": review["assets"]["continuity_warning"],
+        },
+        ensure_ascii=False,
+    )
+    assert not any(
+        token in creator_copy
+        for token in ("M6", "revision2", "Owner", "ReferenceSet", "ProductionGraph")
+    )
     assert review["commands"][0]["paid_until_confirmed"] is False
     assert "not_human_creative_acceptance" in review["advanced_evidence"]["non_claims"]
     assert not any(token in serialized.lower() for token in ("/home/", "/tmp/", "/var/", "api_key", "authorization", "bearer", "secret", ".mp4", ".png"))

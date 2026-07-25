@@ -4,6 +4,7 @@ import { findNextProductionTarget, productContextKey } from "./product-shell-con
 import { buildAgentChatPanel } from "./agent-chat-panel.js";
 import { agentChatContextFingerprint, agentChatContextKey, agentChatContextSnapshot, createAgentChatContextStore, stageM6ScriptPlanCandidateCommand, stageProductionGraphCandidateCommand, stageProductionGraphCommand, submitAgentChatMessageWithRuntime, syncM6PreviewRunSession } from "./agent-chat-lifecycle.js";
 import { applyProductionGraphCanvasProjection, productionGraphAgentContext, productionGraphWorkspaceProjection } from "./production-graph-workspace-projection.js";
+import { fitVisibleCanvasViewport } from "./canvas-safe-area.js";
 import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
 import {
   assetBibleProjection,
@@ -524,10 +525,10 @@ export function createProductShell(options = {}) {
       const ops = mediaOperationsView();
       status.className = "graph-canvas-status ready media-canvas-status";
       status.append(
-        node("strong", "", "媒体审片候选"),
-        node("span", "", `${ops.summary?.ready_shot_count || 0}/${ops.summary?.shot_count || 0} 镜头可审 · 估算 $${Number(ops.cost?.conservative_estimated_usd || 0).toFixed(2)} · ${ops.stage?.next_action || "进入故事板审片"}`),
+        node("strong", "", "镜头已可审看"),
+        node("span", "", `${ops.summary?.ready_shot_count || 0}/${ops.summary?.shot_count || 0} 镜头可审看 · ${ops.stage?.next_action || "进入故事板审片"}`),
       );
-      const review = node("button", "studio-text-button", "进入故事板审片");
+      const review = node("button", "studio-text-button", "查看故事板");
       review.type = "button";
       review.addEventListener("click", showStoryboard);
       status.appendChild(review);
@@ -918,7 +919,13 @@ export function createProductShell(options = {}) {
     const store = options.getStore?.();
     const ready = productionGraphWorkspaceProjection(workspace).status === "ready";
     store?.setRuntimePersistenceMode?.(ready ? "production_graph_read_only" : "studio_state");
-    store?.set?.((state) => applyProductionGraphCanvasProjection(state, workspace), { history: false, persist: false });
+    store?.set?.((state) => {
+      applyProductionGraphCanvasProjection(state, workspace);
+      if (ready) {
+        const viewport = fitVisibleCanvasViewport(state.nodes, 110);
+        if (viewport) state.viewport = viewport;
+      }
+    }, { history: false, persist: false });
   }
 
   async function previewGraphMutation(nodeId, patch, title) {
@@ -2385,25 +2392,25 @@ export function createProductShell(options = {}) {
     panel.setAttribute("aria-label", "媒体制作进度");
     const head = node("div", "media-canvas-overview-head");
     head.append(
-      node("span", "eyebrow", "媒体制作进度"),
+      node("span", "eyebrow", "制作进度"),
       node("h1", "", ops.script?.title || "制作审片候选"),
-      node("p", "", ops.stage?.next_action || "进入故事板审片，复核镜头、资产、费用与恢复状态。"),
+      node("p", "", ops.stage?.next_action || "进入故事板，审看当前镜头。"),
     );
     const metrics = buildMetricGrid([
       ["场景", ops.summary?.scene_count],
       ["镜头", ops.summary?.shot_count],
-      ["可审片", ops.summary?.ready_shot_count],
-      ["估算", `$${Number(ops.cost?.conservative_estimated_usd || 0).toFixed(2)}`],
+      ["可审看", ops.summary?.ready_shot_count],
+      ["时长", `${Number(ops.summary?.duration_sec || 0).toFixed(1)}s`],
     ]);
     const actions = node("div", "media-canvas-overview-actions");
-    const review = node("button", "studio-primary-button", "进入故事板审片");
+    const review = node("button", "studio-primary-button", "查看故事板");
     review.type = "button";
     review.addEventListener("click", showStoryboard);
-    const evidence = node("button", "studio-secondary-button", "查看证据摘要");
+    const evidence = node("button", "studio-secondary-button", "查看制作详情");
     evidence.type = "button";
     evidence.addEventListener("click", () => {
       showStoryboard();
-      requestAnimationFrame(() => document.querySelector(".media-evidence-drawer summary")?.focus());
+      requestAnimationFrame(() => document.querySelector(".media-creator-details summary")?.focus());
     });
     actions.append(review, evidence);
     panel.append(head, metrics, actions);
@@ -2495,20 +2502,31 @@ export function createProductShell(options = {}) {
     const sectionEl = node("section", "storyboard-content media-operations-workspace");
     const heading = node("div", "media-ops-heading");
     const copy = node("div", "");
-    copy.innerHTML = `<span class="eyebrow">生产审片</span><h1>${escapeHtml(ops.script?.title || snapshot.project?.name || "制作审片")}</h1><p>${escapeHtml(ops.script?.logline || ops.stage?.next_action || "复核当前制作媒体、资产连续性与交付候选。")}</p>`;
+    copy.innerHTML = `<span class="eyebrow">镜头审看</span><h1>${escapeHtml(ops.script?.title || snapshot.project?.name || "制作审片")}</h1><p>${escapeHtml(ops.script?.logline || ops.stage?.next_action || "审看当前镜头和画面连续性。")}</p>`;
     const next = node("div", "media-next-action");
     next.append(node("span", "", "下一步"), node("strong", "", ops.stage?.next_action || "选择镜头继续审片"));
     heading.append(copy, next);
-    sectionEl.append(heading, buildMediaJourney(ops), buildMediaShotSelector());
+    sectionEl.append(heading, buildMediaShotSelector());
 
     const layout = node("div", "media-ops-layout");
     layout.append(buildMediaPreviewPanel(scene, shot, media), buildMediaSidePanel(ops, media));
     sectionEl.appendChild(layout);
 
-    const lower = node("div", "media-ops-lower");
-    lower.append(buildAssetContinuityPanel(ops, media), buildCostAndRecoveryPanel(ops, media), buildFinalReviewPanel(ops));
-    sectionEl.appendChild(lower);
-    sectionEl.appendChild(buildMediaEvidenceDrawer(ops));
+    const creatorDetails = node("details", "media-creator-details");
+    creatorDetails.appendChild(node("summary", "", "制作详情"));
+    const creatorDetailsBody = node("div", "media-creator-details-body");
+    const lower = node("div", "media-ops-lower creator-detail-grid");
+    lower.append(buildAssetContinuityPanel(ops, media), buildFinalReviewPanel(ops));
+    creatorDetailsBody.append(buildMediaJourney(ops), lower);
+    creatorDetails.appendChild(creatorDetailsBody);
+    sectionEl.appendChild(creatorDetails);
+
+    const diagnostics = node("details", "media-diagnostics-details");
+    diagnostics.appendChild(node("summary", "", "诊断信息"));
+    const diagnosticsBody = node("div", "media-diagnostics-details-body");
+    diagnosticsBody.append(buildCostAndRecoveryPanel(ops, media), buildMediaEvidenceDrawer(ops));
+    diagnostics.appendChild(diagnosticsBody);
+    sectionEl.appendChild(diagnostics);
     return sectionEl;
   }
 
@@ -2621,7 +2639,7 @@ export function createProductShell(options = {}) {
 
   function buildAssetContinuityPanel(ops, media) {
     const panel = node("section", "media-ops-panel asset-continuity-panel");
-    panel.append(node("span", "eyebrow", "资产连续性"), node("h2", "", "Bible 与复用锁"));
+    panel.append(node("span", "eyebrow", "连续性"), node("h2", "", "角色、场景与道具"));
     const lock = node("p", "media-warning-line", ops.assets?.continuity_warning || "资产变更前需预览影响。");
     panel.appendChild(lock);
     const grid = node("div", "asset-lock-grid");
@@ -2668,7 +2686,7 @@ export function createProductShell(options = {}) {
 
   function buildFinalReviewPanel(ops) {
     const panel = node("section", "media-ops-panel final-review-panel");
-    panel.append(node("span", "eyebrow", "最终审片"), node("h2", "", "序列预览与交付边界"));
+    panel.append(node("span", "eyebrow", "整段预览"), node("h2", "", "交付检查"));
     const media = node("div", "final-media-pair");
     const videoUrl = safePreview(ops.final_review?.video_url || "");
     const sheetUrl = safePreview(ops.final_review?.contact_sheet_url || "");
@@ -2690,13 +2708,13 @@ export function createProductShell(options = {}) {
     const readiness = node("ul", "final-readiness-list");
     for (const item of (ops.final_review?.readiness || [])) readiness.appendChild(node("li", item.state || "", `${item.label} · ${readinessLabel(item.state)}`));
     panel.appendChild(readiness);
-    panel.appendChild(node("p", "media-boundary-copy", "这是 Owner review candidate；不是人工验收、媒体商业质量验证或公开发布。"));
+    panel.appendChild(node("p", "media-boundary-copy", "这一版可供审看；最终采用前仍需要人工确认画面质量。"));
     return panel;
   }
 
   function buildMediaEvidenceDrawer(ops) {
     const details = node("details", "media-evidence-drawer");
-    const summary = node("summary", "", "高级证据");
+    const summary = node("summary", "", "技术证据");
     const list = node("dl", "media-evidence-list");
     const evidence = ops.advanced_evidence || {};
     for (const [label, value] of [
@@ -3787,6 +3805,7 @@ export function createProductShell(options = {}) {
       selectedAsset: section === "asset_bible" ? selectedAsset() : null,
       imageAdmission: imageAdmissionView(),
       mediaOperations: mediaOperationsReady() ? mediaOperationsView() : null,
+      productionGraph: productionGraphWorkspaceProjection(snapshot.sequenceWorkspace),
     });
   }
   function hasStoryFacts() { return shotModel().length > 0; }

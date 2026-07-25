@@ -58,6 +58,8 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
         assert {row["role"] for row in candidate["review_requirements"]} == set(REVIEW_ROLES)
         assert candidate["provider_dispatch_count"] == 0
         assert candidate["cost_usd"] == 0
+        assert candidate["brief"]["title"] in candidate["sequence"]["name"]
+        assert "M6" not in candidate["sequence"]["name"]
         assert all(item["promotion_state"] != "promoted" for item in candidate["knowledge_context"]["items"])
         assert all(shot["shot_size"] and shot["camera_movement"] and shot["narrative_purpose"] for shot in candidate["shots"])
         prop_assets = [row for row in candidate["assets"] if row["kind"] == "prop"]
@@ -144,6 +146,8 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     assert first_candidate["provider_lineage"]["provider"] == "codex_local"
     assert first_candidate["provider_lineage"]["provider_calls_started"] is True
     assert first_candidate["provider_lineage"]["provider_raw_response_stored"] is False
+    assert first_candidate["brief"]["title"] in first_candidate["sequence"]["name"]
+    assert "M6" not in first_candidate["sequence"]["name"]
     assert first_payload["validation"]["provider_dispatch_count"] == 1
     assert first_candidate["m6_scope_review"]["canonical"]["characters"] == ["米拉", "陶", "阿衡"]
     assert first_candidate["m6_scope_review"]["canonical"]["scenes"] == ["傍晚观测台", "雨后的信号室", "地下水泵间"]

@@ -314,7 +314,7 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
         },
         "sequence": {
             "sequence_id": sequence_id,
-            "name": "M6专业剧本制作序列",
+            "name": f"{_title_from_source(source_text)} · 制作序列",
             "target_duration_seconds": round(sum(float(shot["duration_seconds"]) for shot in shot_rows), 2),
             "dynamic_policy": {
                 "source_segment_count": len(segments),
@@ -1101,7 +1101,7 @@ def _narrative_purpose(index: int, total: int) -> str:
 
 def _title_from_source(text: str) -> str:
     first = _source_segments(text)[0] if _source_segments(text) else text
-    return re.sub(r"\s+", "", first)[:32] or "M6专业剧本候选"
+    return re.sub(r"\s+", "", first)[:32] or "未命名制作方案"
 
 
 def _logline(segments: list[str]) -> str:

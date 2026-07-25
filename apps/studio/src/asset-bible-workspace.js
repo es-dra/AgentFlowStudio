@@ -102,6 +102,7 @@ export function deriveProductionCopilotState({
   selectedAsset = null,
   imageAdmission = null,
   mediaOperations = null,
+  productionGraph = null,
 } = {}) {
   const shotTruth = legacyAppliedStoryboardProjection(studioState);
   const bible = assetBibleProjection(studioState, runtimeAssetBible);
@@ -140,6 +141,44 @@ export function deriveProductionCopilotState({
       asset_bible: bible,
       provider_dispatch_count: Number(mediaOperations.advanced_evidence?.provider_dispatch_count || 0),
       external_cost_usd: mediaOperations.cost?.conservative_estimated_usd ?? null,
+    };
+  }
+  const graphReady = productionGraph?.status === "ready" && array(productionGraph.shots).length > 0;
+  if (graphReady && bible.counts.total === 0) {
+    const summary = productionGraph.summary || {};
+    const shotCount = array(productionGraph.shots).length;
+    const assetCount = Number(summary.characters || 0)
+      + Number(summary.locations || 0)
+      + Number(summary.props || 0)
+      + Number(summary.referenceSets || 0)
+      + Number(summary.productionAids || 0);
+    const nextReason = "先审看镜头顺序、时长和画面意图，再继续资产与图片制作。";
+    return {
+      stage: "production_plan_ready",
+      dependencies: [
+        { key: "script", label: "当前剧本", state: "ready" },
+        { key: "shots", label: "已应用分镜", state: "ready" },
+        { key: "assets", label: "角色、场景与道具", state: assetCount > 0 ? "ready" : "pending" },
+      ],
+      blockers: [],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: capabilityGates.image === true,
+        video: capabilityGates.video === true,
+        admission: "structure_ready_media_disabled",
+        cost_state: "not_admitted",
+      },
+      next_valid_action: {
+        action: "open_storyboard",
+        label: section === "storyboard" ? "审看当前镜头" : "查看故事板",
+        reason: nextReason,
+        enabled: true,
+      },
+      ready_summary: `制作方案已保存：${Number(summary.characters || 0)} 个角色、${Number(summary.locations || 0)} 个场景、${shotCount} 个镜头。`,
+      needs_input: nextReason,
+      asset_bible: bible,
+      provider_dispatch_count: 0,
+      external_cost_usd: null,
     };
   }
   const scriptReady = Boolean(

@@ -147,6 +147,88 @@ def test_media_result_context_offers_review_instead_of_starting_over() -> None:
     assert "mediaOperations: mediaOperationsReady() ? mediaOperationsView() : null" in shell
 
 
+def test_confirmed_production_graph_offers_storyboard_review_and_has_no_overlapping_projection_nodes() -> None:
+    copilot_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
+    projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    script = f"""
+      import {{ deriveProductionCopilotState }} from {json.dumps(copilot_uri)};
+      import {{ applyProductionGraphCanvasProjection, productionGraphWorkspaceProjection }} from {json.dumps(projection_uri)};
+      const records = (prefix, count) => Array.from({{ length: count }}, (_, index) => ({{
+        node_id: `${{prefix}}-${{index + 1}}`,
+        state: "active",
+        metadata: {{ title: `${{prefix}} ${{index + 1}}` }},
+      }}));
+      const workspace = {{
+        status: "ready",
+        graph_version: 3,
+        graph_digest: "graph-digest",
+        storyboard: {{ graph_version: 3, graph_digest: "graph-digest" }},
+        sequence: {{
+          script_revisions: records("script", 1),
+          sequences: records("sequence", 1),
+          characters: records("character", 3),
+          scenes: records("scene", 2),
+          props: records("prop", 2),
+          reference_sets: records("reference", 4),
+          production_aids: records("aid", 3),
+          shots: records("shot", 5),
+          dependencies: [],
+          tasks: [],
+          candidates: [],
+          selections: [],
+          reviews: [],
+          delivery_plan: [],
+          version_history: [],
+        }},
+      }};
+      const state = {{
+        nodes: {{ source: {{ id: "source", x: 80, y: 80, w: 280, h: 190, params: {{}} }} }},
+        edges: {{}},
+        order: ["source"],
+        selection: {{ nodeIds: [], edgeId: null }},
+        production: {{}},
+      }};
+      applyProductionGraphCanvasProjection(state, workspace);
+      const projected = Object.values(state.nodes).filter((node) => node.params?.productionGraphProjection);
+      for (let index = 0; index < projected.length; index += 1) {{
+        for (let other = index + 1; other < projected.length; other += 1) {{
+          const a = projected[index];
+          const b = projected[other];
+          const overlaps = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+          if (overlaps) throw new Error(`overlap:${{a.id}}:${{b.id}}`);
+        }}
+      }}
+      const graph = productionGraphWorkspaceProjection(workspace);
+      const copilot = deriveProductionCopilotState({{
+        studioState: {{}},
+        capabilityGates: {{ llm: true, image: false, video: false }},
+        section: "canvas",
+        productionGraph: graph,
+      }});
+      console.log(JSON.stringify({{
+        projectedCount: projected.length,
+        minimumY: Math.min(...projected.map((node) => node.y)),
+        sourceBottom: state.nodes.source.y + state.nodes.source.h,
+        copilot,
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["projectedCount"] == 18
+    assert result["minimumY"] > result["sourceBottom"]
+    assert result["copilot"]["stage"] == "production_plan_ready"
+    assert result["copilot"]["ready_summary"] == "制作方案已保存：3 个角色、2 个场景、5 个镜头。"
+    assert result["copilot"]["next_valid_action"]["action"] == "open_storyboard"
+    assert result["copilot"]["next_valid_action"]["label"] == "查看故事板"
+
+
 def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection() -> None:
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     projection = (STUDIO / "src" / "production-graph-workspace-projection.js").read_text(encoding="utf-8")

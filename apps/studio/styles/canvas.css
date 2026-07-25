@@ -99,9 +99,18 @@
   position: absolute;
   top: -22px; left: 2px;
   display: flex; align-items: center; gap: 5px;
+  width: calc(100% - 4px);
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 12px;
   white-space: nowrap;
+}
+.node-title > svg,
+.node-title > .ref-badge { flex: 0 0 auto; }
+.node-title > span:not(.ref-badge) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .node-float-action {

@@ -222,8 +222,39 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
     body = page.locator("body").inner_text()
     if any(token in body for token in ("schema_version", "graph_digest", "m6-character-", "m6-script-plan-layout")):
         raise AssertionError("raw graph internals leaked into Studio copy")
+    projected_layout = page.locator('.node[data-node-id^="production_graph_"]').evaluate_all(
+        """
+        nodes => nodes.map((node) => {
+          const rect = node.getBoundingClientRect();
+          const title = node.querySelector(".node-title");
+          const titleRect = title?.getBoundingClientRect();
+          return {
+            id: node.dataset.nodeId,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            titleWithinNode: !titleRect || titleRect.right <= rect.right + 1,
+            text: node.innerText,
+          };
+        })
+        """
+    )
+    for index, node in enumerate(projected_layout):
+        if not node["titleWithinNode"]:
+            raise AssertionError(f"projected node title overflows its card: {node['id']}")
+        if any(token in node["text"] for token in ("输入故事", "上传或连接")):
+            raise AssertionError(f"projected node leaks an editor placeholder: {node['id']}")
+        for other in projected_layout[index + 1 :]:
+            overlap_width = min(node["right"], other["right"]) - max(node["left"], other["left"])
+            overlap_height = min(node["bottom"], other["bottom"]) - max(node["top"], other["top"])
+            if overlap_width > 1 and overlap_height > 1:
+                raise AssertionError(f"projected nodes overlap: {node['id']} and {other['id']}")
     ensure_agent_visible(page)
-    expect(page.locator(".studio-agent-chat")).to_be_visible()
+    agent = page.locator(".studio-agent-chat")
+    expect(agent).to_be_visible()
+    expect(agent).to_contain_text("制作方案已保存")
+    expect(agent.get_by_role("button", name="查看故事板")).to_be_visible()
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_selector(".storyboard-shot")
     if page.locator(".storyboard-shot").count() < 2:
@@ -233,8 +264,12 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
     return {
         "canvas_graph_nodes": True,
+        "canvas_graph_nodes_do_not_overlap": True,
+        "canvas_graph_titles_contained": True,
+        "canvas_graph_placeholders_absent": True,
         "storyboard_graph_shots": True,
         "agent_chat_fixed": True,
+        "agent_next_action_matches_graph": True,
         "graph_digest_parity": workspace["graph_digest"] == workspace["storyboard"]["graph_digest"],
         "provider_dispatch_count": workspace.get("provider_dispatch_count", 0),
         "cost_usd": workspace.get("cost_usd", 0),
