@@ -73,7 +73,8 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
     def preview_asset_bible_command(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
         require_access(request, project_id)
         try:
-            preview = preview_asset_bible_command_result(project_id, body)
+            graph = graph_store.load(project_id) if graph_has_authority(store, project_id) else None
+            preview = preview_asset_bible_command_result(project_id, body, graph=graph)
             reject_unsafe_payload(preview)
             return preview
         except ValueError as exc:
@@ -116,7 +117,7 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
                     )
                 reject_unsafe_payload(replay)
                 return replay
-            preview = preview_asset_bible_command_result(project_id, body)
+            preview = preview_asset_bible_command_result(project_id, body, graph=graph)
             if not supplied_digest or supplied_digest != preview["preview_digest"]:
                 raise ValueError("asset Bible preview is stale; review the impact again")
             if supplied_command_id and supplied_command_id != preview["command_id"]:
@@ -160,13 +161,18 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def preview_asset_bible_command_result(project_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
+def preview_asset_bible_command_result(
+    project_id: str,
+    body: Mapping[str, Any],
+    *,
+    graph: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     command = body.get("command") if isinstance(body.get("command"), Mapping) else {}
     command_type = str(command.get("type") or "")
     if command_type not in COMMANDS:
         raise ValueError("unsupported asset Bible command")
     current = _clean_state(body.get("asset_bible"))
-    result = _apply_command(project_id, current, command, body)
+    result = _apply_command(project_id, current, command, body, graph=graph)
     impact = _impact(current, result, command)
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -262,16 +268,245 @@ def build_asset_candidate_set(project_id: str, body: Mapping[str, Any]) -> dict[
     }
 
 
+def build_graph_asset_candidate_set(
+    project_id: str,
+    graph: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project confirmed canonical graph assets without re-inferring from prose."""
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), Mapping) else {}
+    relations = [
+        dict(item)
+        for item in graph.get("relations", [])
+        if isinstance(item, Mapping)
+    ]
+    active = {
+        str(node_id): dict(node)
+        for node_id, node in nodes.items()
+        if isinstance(node, Mapping) and node.get("state", "active") == "active"
+    }
+    revision_ids = sorted(
+        node_id
+        for node_id, node in active.items()
+        if node.get("category") == "revision"
+    )
+    if len(revision_ids) != 1:
+        raise ValueError("asset candidates require exactly one active canonical script revision")
+    source_node_ids = {
+        str(item.get("to_id") or "")
+        for item in relations
+        if item.get("relation_type") == "derived_from"
+        and str(item.get("from_id") or "") in revision_ids
+    }
+    canonical_records = [
+        (node_id, active[node_id])
+        for node_id in sorted(source_node_ids)
+        if node_id in active
+        and active[node_id].get("category") in {"entity", "location", "resource"}
+    ]
+    scene_ids = {
+        node_id
+        for node_id, node in canonical_records
+        if node.get("category") == "location"
+    }
+    shot_ids = {
+        str(item.get("to_id") or "")
+        for item in relations
+        if item.get("relation_type") == "contains"
+        and str(item.get("from_id") or "") in scene_ids
+        and str(item.get("to_id") or "") in active
+        and active[str(item.get("to_id") or "")].get("category") == "unit"
+    }
+    if not scene_ids or not shot_ids:
+        raise ValueError("asset candidates require confirmed scenes and shots")
+
+    shots_by_scene = {
+        scene_id: sorted(
+            str(item.get("to_id") or "")
+            for item in relations
+            if item.get("relation_type") == "contains"
+            and str(item.get("from_id") or "") == scene_id
+            and str(item.get("to_id") or "") in shot_ids
+        )
+        for scene_id in scene_ids
+    }
+    required_shots = {
+        node_id: sorted(
+            str(item.get("to_id") or "")
+            for item in relations
+            if item.get("relation_type") == "required_by"
+            and str(item.get("from_id") or "") == node_id
+            and str(item.get("to_id") or "") in shot_ids
+        )
+        for node_id, _node_value in canonical_records
+    }
+    shot_scene = {
+        shot_id: scene_id
+        for scene_id, scene_shots in shots_by_scene.items()
+        for shot_id in scene_shots
+    }
+
+    items: list[dict[str, Any]] = []
+    for node_id, node in canonical_records:
+        metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+        category = str(node.get("category") or "")
+        kind = str(metadata.get("kind") or "")
+        classification = str(metadata.get("classification") or "")
+        if category == "resource" and (
+            kind != "prop" or classification == "production_aid"
+        ):
+            continue
+        asset_type = {
+            "entity": "character",
+            "location": "scene",
+            "resource": "prop",
+        }.get(category, "")
+        display_name = str(
+            metadata.get("display_name")
+            or metadata.get("name")
+            or ""
+        ).strip()
+        if not asset_type or not display_name:
+            raise ValueError("confirmed canonical graph assets require stable names")
+        occurrence_shots = (
+            shots_by_scene.get(node_id, [])
+            if asset_type == "scene"
+            else required_shots.get(node_id, [])
+        )
+        occurrence_scenes = (
+            [node_id]
+            if asset_type == "scene"
+            else sorted({shot_scene[shot_id] for shot_id in occurrence_shots})
+        )
+        items.append(
+            {
+                "stable_id": node_id,
+                "asset_type": asset_type,
+                "display_name": display_name,
+                "aliases": {
+                    display_name,
+                    *[
+                        str(alias).strip()
+                        for alias in metadata.get("aliases", [])
+                        if str(alias).strip()
+                    ],
+                },
+                "scene_ids": set(occurrence_scenes),
+                "shot_ids": set(occurrence_shots),
+                "confidence": 1.0,
+                "evidence": _graph_asset_evidence(metadata, display_name),
+            }
+        )
+    if not items:
+        raise ValueError("confirmed canonical graph contains no reviewable assets")
+
+    assets = [
+        _candidate_asset(
+            project_id,
+            item,
+            source_node_id=revision_ids[0],
+            revision_id=revision_ids[0],
+        )
+        for item in items
+    ]
+    scene_index = [
+        {
+            "scene_id": scene_id,
+            "name": str(active[scene_id].get("metadata", {}).get("name") or ""),
+            "number": index,
+        }
+        for index, scene_id in enumerate(sorted(scene_ids), start=1)
+    ]
+    shot_index = [
+        {
+            "shot_id": shot_id,
+            "scene_id": shot_scene[shot_id],
+            "title": str(
+                active[shot_id].get("metadata", {}).get("title")
+                or active[shot_id].get("metadata", {}).get("intent")
+                or f"镜头 {index}"
+            ),
+            "number": index,
+            "description": str(active[shot_id].get("metadata", {}).get("blocking") or "")[:600],
+            "purpose": str(active[shot_id].get("metadata", {}).get("narrative_purpose") or "")[:400],
+            "shot_size": str(active[shot_id].get("metadata", {}).get("shot_size") or "")[:80],
+            "camera_angle": str(active[shot_id].get("metadata", {}).get("camera_angle") or "")[:160],
+            "movement": str(active[shot_id].get("metadata", {}).get("camera_movement") or "")[:240],
+            "action": str(active[shot_id].get("metadata", {}).get("blocking") or "")[:400],
+            "dialogue": "",
+            "emotion": "",
+            "continuity_cues": [],
+        }
+        for index, shot_id in enumerate(sorted(shot_ids), start=1)
+    ]
+    anchors = [
+        {
+            "anchor_id": f"anchor-{item['stable_id']}",
+            "asset_type": item["asset_type"],
+            "display_name": item["display_name"],
+            "aliases": sorted(item["aliases"]),
+            "scene_ids": sorted(item["scene_ids"]),
+            "shot_ids": sorted(item["shot_ids"]),
+            "ambiguity": "",
+            "source_asset_id": item["stable_id"],
+        }
+        for item in items
+    ]
+    graph_digest = str(graph.get("graph_digest") or "")
+    return {
+        "candidate_set_id": f"asset-candidates-{canonical_digest({'project': project_id, 'graph': graph_digest})[:16]}",
+        "version": 1,
+        "source_node_id": revision_ids[0],
+        "script_revision_id": revision_ids[0],
+        "shot_candidate_id": graph_digest[:64],
+        "scene_count": len(scene_index),
+        "shot_count": len(shot_index),
+        "scene_index": scene_index,
+        "shot_index": shot_index,
+        "required_asset_anchors": anchors,
+        "recognition_ambiguities": [],
+        "source_digest": graph_digest,
+        "source_graph_version": int(graph.get("version") or 0),
+        "source_graph_digest": graph_digest,
+        "source_graph_asset_ids": sorted(item["stable_id"] for item in items),
+        "assets": assets,
+    }
+
+
+def _graph_asset_evidence(metadata: Mapping[str, Any], display_name: str) -> list[str]:
+    values: list[str] = []
+    for key in (
+        "appearance",
+        "goal",
+        "wardrobe",
+        "space",
+        "action",
+        "lighting",
+        "visual_expression",
+        "style",
+        "applicable_scope",
+    ):
+        value = str(metadata.get(key) or "").strip()
+        if value and value not in values:
+            values.append(value[:240])
+    return values[:4] or [f"{display_name} 来自已确认制作方案"]
+
+
 def _apply_command(
     project_id: str,
     current: dict[str, Any],
     command: Mapping[str, Any],
     body: Mapping[str, Any],
+    *,
+    graph: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     command_type = str(command.get("type") or "")
     command_time = _requested_at(body)
     if command_type in {"generate_candidates", "regenerate_candidates"}:
-        generated = build_asset_candidate_set(project_id, body)
+        generated = (
+            build_graph_asset_candidate_set(project_id, graph)
+            if graph is not None
+            else build_asset_candidate_set(project_id, body)
+        )
         if command_type == "regenerate_candidates":
             if not current:
                 raise ValueError("asset Bible candidates must be generated before re-recognition")
@@ -510,9 +745,14 @@ def _candidate_asset(
 ) -> dict[str, Any]:
     asset_type = str(item["asset_type"])
     label = str(item["display_name"])
+    supplied_stable_id = str(item.get("stable_id") or "")
     stable_id = (
-        f"asset-{asset_type}-{_ascii_slug(label)}-"
-        f"{sha256(f'{project_id}:{asset_type}:{_normalized_name(label)}'.encode()).hexdigest()[:8]}"
+        _token(supplied_stable_id, "stable_id")
+        if supplied_stable_id
+        else (
+            f"asset-{asset_type}-{_ascii_slug(label)}-"
+            f"{sha256(f'{project_id}:{asset_type}:{_normalized_name(label)}'.encode()).hexdigest()[:8]}"
+        )
     )
     profile = build_asset_profile_plan(
         [
@@ -1440,6 +1680,11 @@ def _graph_events(
         }
     ]
     graph_nodes = set(graph.get("nodes", {}))
+    source_graph_asset_ids = {
+        str(item)
+        for item in state.get("candidate_set", {}).get("source_graph_asset_ids", [])
+        if str(item) in graph_nodes
+    }
     current_asset_ids = {
         str(item["stable_id"])
         for item in state.get("assets", [])
@@ -1453,7 +1698,7 @@ def _graph_events(
         if item.get("review_state") in {"rejected", "superseded"}
     }
     removed_asset_ids = sorted(set(removed_asset_ids) | (inactive_asset_ids & graph_nodes))
-    for removed_id in removed_asset_ids:
+    for removed_id in sorted(set(removed_asset_ids) - source_graph_asset_ids):
         for relation in graph.get("relations", []):
             if removed_id not in {relation.get("from_id"), relation.get("to_id")}:
                 continue
@@ -1471,29 +1716,51 @@ def _graph_events(
         )
     for asset in state.get("assets", []):
         asset_id = str(asset["stable_id"])
-        events.append(
-            {
-                "type": "node_upserted",
-                "node": {
+        asset_metadata = {
+            "kind": asset["asset_type"],
+            "display_name": asset["display_name"],
+            "aliases": asset["aliases"],
+            "review_state": asset["review_state"],
+            "visual_identity": asset.get("visual_identity", ""),
+            "continuity_states": asset["continuity_states"],
+            "positive_traits": asset["positive_traits"],
+            "negative_locks": asset["negative_locks"],
+            "source_evidence": asset["source_evidence"],
+            "asset_bible_revision_id": state.get("current_revision_id", ""),
+        }
+        if asset_id in source_graph_asset_ids:
+            events.append(
+                {
+                    "type": "node_metadata_updated",
                     "node_id": asset_id,
-                    "category": "resource" if asset["asset_type"] != "character" else "entity",
-                    "state": "active" if asset["review_state"] not in {"rejected", "superseded"} else "invalidated",
-                    "metadata": {
-                        "kind": asset["asset_type"],
-                        "display_name": asset["display_name"],
-                        "aliases": asset["aliases"],
-                        "review_state": asset["review_state"],
-                        "visual_identity": asset.get("visual_identity", ""),
-                        "continuity_states": asset["continuity_states"],
-                        "positive_traits": asset["positive_traits"],
-                        "negative_locks": asset["negative_locks"],
-                        "source_evidence": asset["source_evidence"],
-                        "asset_bible_revision_id": state.get("current_revision_id", ""),
+                    "patch": {
+                        **asset_metadata,
+                        "asset_bible_review_state": asset["review_state"],
                     },
-                },
-            }
-        )
+                }
+            )
+        else:
+            events.append(
+                {
+                    "type": "node_upserted",
+                    "node": {
+                        "node_id": asset_id,
+                        "category": "resource" if asset["asset_type"] != "character" else "entity",
+                        "state": "active" if asset["review_state"] not in {"rejected", "superseded"} else "invalidated",
+                        "metadata": asset_metadata,
+                    },
+                }
+            )
         if asset["review_state"] in {"rejected", "superseded"}:
+            if asset_id in source_graph_asset_ids:
+                events.append(
+                    {
+                        "type": "relation_removed",
+                        "from_id": bible_id,
+                        "to_id": asset_id,
+                        "relation_type": "contains",
+                    }
+                )
             continue
         events.append({"type": "relation_upserted", "from_id": bible_id, "to_id": asset_id, "relation_type": "contains"})
         for occurrence_id in [

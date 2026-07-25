@@ -128,6 +128,15 @@ def sanitize_asset_bible(
                 if isinstance(item, dict)
             ],
             "source_digest": _digest(candidate_set.get("source_digest")),
+            "source_graph_version": max(
+                0,
+                int(number(candidate_set.get("source_graph_version"), 0)),
+            ),
+            "source_graph_digest": _digest(candidate_set.get("source_graph_digest")),
+            "source_graph_asset_ids": _ids(
+                candidate_set.get("source_graph_asset_ids"),
+                96,
+            ),
             "created_at": text(candidate_set.get("created_at"), "", 80),
         },
         "assets": assets,

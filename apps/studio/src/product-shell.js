@@ -1037,7 +1037,7 @@ export function createProductShell(options = {}) {
     main.id = "product-main";
     main.tabIndex = -1;
     const view = assetBibleView();
-    const source = assetBibleSourceContext(snapshot.studioState || {});
+    const source = assetBibleSourceContext(snapshot.studioState || {}, snapshot.sequenceWorkspace);
     const header = node("header", "asset-bible-header");
     const title = node("div", "");
     title.append(
@@ -1148,7 +1148,11 @@ export function createProductShell(options = {}) {
     const items = [
       ["剧本", source?.script_revision_id ? "已选择" : "待选择"],
       ["镜头", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待安排"],
-      ["创作资产", view.counts.total ? `${view.counts.approved}/${view.counts.total} 已确认` : "待整理"],
+      ["创作资产", view.counts.total
+        ? `${view.counts.approved}/${view.counts.total} 已确认`
+        : source?.canonical_assets?.length
+          ? `${source.canonical_assets.length} 项来源已确认`
+          : "待整理"],
       ["美术方向", view.art_direction.status === "confirmed" ? "已确认" : "待确认"],
       ["图片", imageAdmissionView().counts.approved
         ? `${imageAdmissionView().counts.approved} 张已确认`
@@ -1268,6 +1272,16 @@ export function createProductShell(options = {}) {
         ? `将读取当前剧本版本和 ${source.scene_count} 场 / ${source.shot_count} 镜头，仅识别角色、场景、道具及连续性待确认项。`
         : "先在 Canvas 完成剧本并应用拆镜；预览、失败或已取消的分镜不会进入 Asset Bible。",
     ));
+    if (source?.canonical_assets?.length) {
+      const sourceFacts = node("ul", "asset-bible-source-facts");
+      for (const [type, label] of [["character", "角色"], ["scene", "场景"], ["prop", "道具"]]) {
+        const names = source.canonical_assets
+          .filter((item) => item.asset_type === type)
+          .map((item) => item.display_name);
+        if (names.length) sourceFacts.appendChild(node("li", "", `${label}：${names.join("、")}`));
+      }
+      wrap.appendChild(sourceFacts);
+    }
     const facts = node("ul", "");
     for (const text of ["不会调用外部文本、图片或视频能力", "候选不是最终审美结论", "确认前不会写入项目事实"]) {
       facts.appendChild(node("li", "", text));
@@ -1764,7 +1778,7 @@ export function createProductShell(options = {}) {
 
   async function stageAssetBibleCommand(command) {
     if (assetCommandPreview) return;
-    const source = assetBibleSourceContext(snapshot.studioState || {});
+    const source = assetBibleSourceContext(snapshot.studioState || {}, snapshot.sequenceWorkspace);
     if (["generate_candidates", "regenerate_candidates"].includes(command.type) && !source) {
       assetCommandError = "缺少已应用的剧本和分镜上下文。";
       render();
@@ -1796,7 +1810,7 @@ export function createProductShell(options = {}) {
 
   function imageAdmissionSource() {
     const view = assetBibleView();
-    const source = assetBibleSourceContext(snapshot.studioState || {});
+    const source = assetBibleSourceContext(snapshot.studioState || {}, snapshot.sequenceWorkspace);
     const scenes = [];
     const shots = [];
     for (const [sceneIndex, scene] of (source?.shot_plan?.scenes || []).entries()) {

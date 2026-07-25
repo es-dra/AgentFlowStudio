@@ -48,7 +48,10 @@ export function assetBibleProjection(studioState = {}, runtimeAssetBible = null)
   };
 }
 
-export function assetBibleSourceContext(studioState = {}) {
+export function assetBibleSourceContext(studioState = {}, sequenceWorkspace = null) {
+  const graphSource = productionGraphAssetBibleSourceContext(sequenceWorkspace);
+  if (sequenceWorkspace?.status === "ready") return graphSource;
+  if (graphSource) return graphSource;
   const projection = legacyAppliedStoryboardProjection(studioState);
   if (projection.status !== "ready") return null;
   const sourceNode = studioState.nodes?.[projection.source_node_id];
@@ -91,6 +94,121 @@ export function assetBibleSourceContext(studioState = {}) {
     scene_count: projection.scene_count,
     shot_count: projection.shot_count,
     duration_sec: projection.duration_sec,
+  };
+}
+
+export function productionGraphAssetBibleSourceContext(workspace = null) {
+  if (!workspace || workspace.status !== "ready") return null;
+  const graphVersion = Number(workspace.graph_version || 0);
+  const graphDigest = String(workspace.graph_digest || "");
+  if (
+    !graphVersion
+    || !graphDigest
+    || Number(workspace.storyboard?.graph_version || 0) !== graphVersion
+    || String(workspace.storyboard?.graph_digest || "") !== graphDigest
+  ) return null;
+
+  const sequence = workspace.sequence || {};
+  const active = (value) => array(value).filter((item) => item?.state !== "invalidated");
+  const revisions = active(sequence.script_revisions);
+  if (revisions.length !== 1) return null;
+  const relations = array(sequence.dependencies);
+  const revisionId = String(revisions[0].node_id || "");
+  const sourceNodeIds = new Set(
+    relations
+      .filter((relation) => relation.relation_type === "derived_from"
+        && String(relation.from_id || "") === revisionId)
+      .map((relation) => String(relation.to_id || "")),
+  );
+  const scenes = active(sequence.scenes).filter(
+    (item) => sourceNodeIds.has(String(item.node_id || "")),
+  );
+  const sceneIds = new Set(scenes.map((item) => String(item.node_id || "")));
+  const shots = active(sequence.shots).filter((shot) => relations.some(
+    (relation) => relation.relation_type === "contains"
+      && sceneIds.has(String(relation.from_id || ""))
+      && String(relation.to_id || "") === String(shot.node_id || ""),
+  ));
+  if (!scenes.length || !shots.length) return null;
+  const shotsByScene = new Map(
+    scenes.map((scene) => [
+      String(scene.node_id || ""),
+      shots.filter((shot) => relations.some(
+        (relation) => relation.relation_type === "contains"
+          && String(relation.from_id || "") === String(scene.node_id || "")
+          && String(relation.to_id || "") === String(shot.node_id || ""),
+      )),
+    ]),
+  );
+  if ([...shotsByScene.values()].flat().length !== shots.length) return null;
+
+  const shotPlan = {
+    candidate_id: graphDigest,
+    source_graph_version: graphVersion,
+    source_graph_digest: graphDigest,
+    scenes: scenes.map((scene, sceneIndex) => ({
+      scene_id: String(scene.node_id || ""),
+      name: String(scene.metadata?.name || ""),
+      number: sceneIndex + 1,
+      description: String(scene.metadata?.space || scene.metadata?.action || ""),
+      shots: (shotsByScene.get(String(scene.node_id || "")) || []).map((shot, shotIndex) => ({
+        shot_id: String(shot.node_id || ""),
+        number: shotIndex + 1,
+        title: String(shot.metadata?.title || shot.metadata?.intent || `镜头 ${shotIndex + 1}`),
+        description: String(shot.metadata?.blocking || shot.metadata?.intent || ""),
+        duration_sec: Number(shot.metadata?.duration_seconds || 0),
+        narrative_purpose: String(shot.metadata?.narrative_purpose || ""),
+        shot_size: String(shot.metadata?.shot_size || ""),
+        camera_angle: String(shot.metadata?.camera_angle || ""),
+        camera_movement: String(shot.metadata?.camera_movement || ""),
+        blocking: String(shot.metadata?.blocking || ""),
+        sound: String(shot.metadata?.sound || ""),
+        transition: String(shot.metadata?.transition || ""),
+      })),
+    })),
+    total_shots: shots.length,
+  };
+  const canonicalAssets = [
+    ...active(sequence.characters)
+      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .map((item) => sourceAsset(item, "character")),
+    ...scenes.map((item) => sourceAsset(item, "scene")),
+    ...active(sequence.props)
+      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .map((item) => sourceAsset(item, "prop")),
+  ].filter((item) => item.display_name);
+  return {
+    authority_mode: "canonical_production_graph",
+    source_node_id: revisionId,
+    script_revision_id: revisionId,
+    shot_candidate_id: graphDigest,
+    shot_plan: shotPlan,
+    scene_count: scenes.length,
+    shot_count: shots.length,
+    duration_sec: shots.reduce(
+      (total, shot) => total + Number(shot.metadata?.duration_seconds || 0),
+      0,
+    ),
+    canonical_assets: canonicalAssets,
+    production_aids: active(sequence.production_aids)
+      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .map((item) => ({
+        source_node_id: String(item.node_id || ""),
+        display_name: String(item.metadata?.name || item.metadata?.display_name || ""),
+        classification: "production_aid",
+      })),
+    graph_version: graphVersion,
+    graph_digest: graphDigest,
+    provider_dispatch_count: 0,
+    external_cost_usd: 0,
+  };
+}
+
+function sourceAsset(item, assetType) {
+  return {
+    source_node_id: String(item?.node_id || ""),
+    asset_type: assetType,
+    display_name: String(item?.metadata?.display_name || item?.metadata?.name || ""),
   };
 }
 
@@ -148,12 +266,44 @@ export function deriveProductionCopilotState({
   if (graphReady && bible.counts.total === 0) {
     const summary = productionGraph.summary || {};
     const shotCount = array(productionGraph.shots).length;
+    if (Number(summary.scriptRevisions || 0) !== 1) {
+      return {
+        stage: "production_plan_revision_conflict",
+        dependencies: [
+          { key: "script", label: "当前剧本", state: "pending" },
+          { key: "shots", label: "已应用分镜", state: "ready" },
+          { key: "assets", label: "角色、场景与道具", state: "pending" },
+        ],
+        blockers: ["制作方案版本需要确认"],
+        gate: {
+          llm: capabilityGates.llm === true,
+          image: capabilityGates.image === true,
+          video: capabilityGates.video === true,
+          admission: "blocked",
+          cost_state: "not_admitted",
+        },
+        next_valid_action: {
+          action: "resolve_script_revision",
+          label: "等待版本确认",
+          reason: "当前存在多个已应用剧本版本，确认唯一版本后才能整理资产。",
+          enabled: false,
+        },
+        ready_summary: "制作方案版本需要确认，现有项目内容未改变。",
+        needs_input: "确认唯一的已应用剧本版本。",
+        asset_bible: bible,
+        provider_dispatch_count: 0,
+        external_cost_usd: null,
+      };
+    }
     const assetCount = Number(summary.characters || 0)
       + Number(summary.locations || 0)
       + Number(summary.props || 0)
       + Number(summary.referenceSets || 0)
       + Number(summary.productionAids || 0);
-    const nextReason = "先审看镜头顺序、时长和画面意图，再继续资产与图片制作。";
+    const assetBibleOpen = section === "asset_bible";
+    const nextReason = assetBibleOpen
+      ? "基于已保存的角色、场景、道具和镜头建立可审核资产候选。"
+      : "先审看镜头顺序、时长和画面意图，再继续资产与图片制作。";
     return {
       stage: "production_plan_ready",
       dependencies: [
@@ -170,8 +320,12 @@ export function deriveProductionCopilotState({
         cost_state: "not_admitted",
       },
       next_valid_action: {
-        action: "open_storyboard",
-        label: section === "storyboard" ? "审看当前镜头" : "查看故事板",
+        action: assetBibleOpen ? "generate_asset_candidates" : "open_storyboard",
+        label: assetBibleOpen
+          ? "识别资产候选"
+          : section === "storyboard"
+            ? "审看当前镜头"
+            : "查看故事板",
         reason: nextReason,
         enabled: true,
       },
