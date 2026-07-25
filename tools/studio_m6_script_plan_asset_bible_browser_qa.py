@@ -470,15 +470,62 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
     page.wait_for_selector(".storyboard-shot")
     if page.locator(".storyboard-shot").count() < 2:
         raise AssertionError("Storyboard did not consume M6 graph shots")
-    page.get_by_role("tab", name="画布").click()
-    page.wait_for_selector('.node[data-node-id^="production_graph_"]')
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
+    graph_version = workspace["graph_version"]
+    canonical_names = [
+        *[
+            item.get("metadata", {}).get("display_name", "")
+            for item in workspace["sequence"]["characters"]
+        ],
+        *[
+            item.get("metadata", {}).get("name", "")
+            for item in workspace["sequence"]["scenes"]
+        ],
+        *[
+            item.get("metadata", {}).get("name", "")
+            for item in workspace["sequence"]["props"]
+        ],
+    ]
+    page.get_by_role("tab", name="资产 Bible").click()
+    bible = page.locator(".studio-asset-bible")
+    expect(bible).to_be_visible()
+    expect(bible.locator(".asset-bible-status-bar")).to_contain_text("已选择")
+    expect(bible.locator(".asset-bible-status-bar")).to_contain_text(
+        f"{len(workspace['sequence']['scenes'])} 场 · {len(workspace['sequence']['shots'])} 镜头"
+    )
+    expect(bible.locator(".asset-bible-status-bar")).to_contain_text(
+        f"{len(canonical_names)} 项来源已确认"
+    )
+    for name in canonical_names:
+        if name:
+            expect(bible).to_contain_text(name)
+    agent = page.locator(".agent-production-copilot")
+    expect(agent.get_by_role("button", name="识别资产候选")).to_be_visible()
+    identify = bible.get_by_role("button", name="识别资产候选")
+    expect(identify).to_be_enabled()
+    identify.click()
+    review = bible.locator(".asset-bible-command-review")
+    expect(review).to_be_visible()
+    expect(review).to_contain_text(
+        f"影响 {len(canonical_names)} 个资产 · {len(workspace['sequence']['scenes'])} 场 · {len(workspace['sequence']['shots'])} 镜头"
+    )
+    review.get_by_role("button", name="取消").click()
+    expect(bible.locator(".asset-bible-command-review")).to_have_count(0)
+    after_preview = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
+    if after_preview["graph_version"] != graph_version:
+        raise AssertionError("Asset Bible preview mutated the confirmed graph")
+    if any(token in bible.inner_text() for token in ("graph_digest", "ProductionGraph", "source_graph_asset_ids")):
+        raise AssertionError("Asset Bible leaked graph internals into the creator surface")
     return {
         "canvas_graph_nodes": True,
         "canvas_graph_nodes_do_not_overlap": True,
         "canvas_graph_titles_contained": True,
         "canvas_graph_placeholders_absent": True,
         "storyboard_graph_shots": True,
+        "asset_bible_graph_source_ready": True,
+        "asset_bible_canonical_assets_visible": True,
+        "asset_bible_identify_action_enabled": True,
+        "asset_bible_preview_cancel_preserved_graph": True,
         "agent_chat_fixed": True,
         "agent_next_action_matches_graph": True,
         "graph_digest_parity": workspace["graph_digest"] == workspace["storyboard"]["graph_digest"],

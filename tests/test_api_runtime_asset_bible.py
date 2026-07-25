@@ -379,7 +379,7 @@ def test_api_preview_confirm_retry_and_studio_reload_are_zero_provider_and_idemp
     assert restored["idempotency_keys"] == [preview.json()["command_id"]]
 
 
-def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_path) -> None:
+def test_canonical_graph_owns_asset_bible_without_copying_or_invalidating_source_assets(tmp_path) -> None:
     from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
     from apps.api.runtime_store import RuntimeStore
 
@@ -392,13 +392,32 @@ def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_pat
         idempotency_key="seed-story-truth",
         semantic_digest=canonical_digest({"seed": "story"}),
         events=[
-            {"type": "node_upserted", "node": {"node_id": "revision-current", "category": "revision", "metadata": {}}},
-            {"type": "node_upserted", "node": {"node_id": "scene-1", "category": "location", "metadata": {}}},
-            {"type": "node_upserted", "node": {"node_id": "shot-1-1", "category": "unit", "metadata": {}}},
+            {"type": "node_upserted", "node": {"node_id": "revision-current", "category": "revision", "metadata": {"source_digest": "a" * 64}}},
+            {"type": "node_upserted", "node": {"node_id": "character-orchid", "category": "entity", "metadata": {"display_name": "Orchid Vale", "appearance": "silver braid"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-observatory", "category": "location", "metadata": {"name": "Glass Observatory", "space": "high glass dome"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-archive", "category": "location", "metadata": {"name": "Tidal Archive", "space": "submerged shelves"}}},
+            {"type": "node_upserted", "node": {"node_id": "prop-astrolabe", "category": "resource", "metadata": {"name": "Ivory Astrolabe", "kind": "prop", "classification": "canonical_prop", "style": "engraved ivory"}}},
+            {"type": "node_upserted", "node": {"node_id": "aid-moonlight", "category": "resource", "metadata": {"name": "Moonlight Reference", "kind": "reference_set", "classification": "production_aid"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-observatory", "category": "unit", "metadata": {"intent": "align the astrolabe", "duration_seconds": 4, "blocking": "Orchid aligns the instrument"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-archive", "category": "unit", "metadata": {"intent": "trace the tide chart", "duration_seconds": 5, "blocking": "Orchid enters the archive"}}},
+            *[
+                {"type": "relation_upserted", "from_id": "revision-current", "to_id": node_id, "relation_type": "derived_from"}
+                for node_id in ("character-orchid", "scene-observatory", "scene-archive", "prop-astrolabe", "aid-moonlight")
+            ],
+            {"type": "relation_upserted", "from_id": "scene-observatory", "to_id": "shot-observatory", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-archive", "to_id": "shot-archive", "relation_type": "contains"},
+            *[
+                {"type": "relation_upserted", "from_id": asset_id, "to_id": shot_id, "relation_type": "required_by"}
+                for asset_id in ("character-orchid", "prop-astrolabe")
+                for shot_id in ("shot-observatory", "shot-archive")
+            ],
         ],
     )
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
-    generate_request = {**generation_body(), "requested_at": "2026-07-24T00:00:00Z"}
+    generate_request = {
+        "command": {"type": "generate_candidates"},
+        "requested_at": "2026-07-24T00:00:00Z",
+    }
     generated_preview = client.post(
         f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
         json=generate_request,
@@ -414,7 +433,34 @@ def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_pat
     )
     assert generated.status_code == 200, generated.text
     assert generated.json()["authority_mode"] == "canonical_production_graph"
+    generated_ids = {
+        item["stable_id"] for item in generated.json()["asset_bible"]["assets"]
+    }
+    assert generated_ids == {
+        "character-orchid",
+        "scene-observatory",
+        "scene-archive",
+        "prop-astrolabe",
+    }
+    assert generated.json()["asset_bible"]["candidate_set"]["source_graph_asset_ids"] == sorted(generated_ids)
+    assert generated.json()["provider_dispatch_count"] == 0
+    assert generated.json()["external_cost_usd"] == 0
     graph_version = generated.json()["graph_version"]
+    regenerated_preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json={
+            "asset_bible": generated.json()["asset_bible"],
+            "command": {"type": "regenerate_candidates"},
+            "requested_at": "2026-07-24T00:00:30Z",
+        },
+    )
+    assert regenerated_preview.status_code == 200, regenerated_preview.text
+    assert {
+        item["stable_id"]
+        for item in regenerated_preview.json()["result"]["asset_bible"]["assets"]
+        if item["review_state"] not in {"rejected", "superseded"}
+    } == generated_ids
+    assert regenerated_preview.json()["provider_dispatch_count"] == 0
     replayed = client.post(
         f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
         json={
@@ -455,14 +501,46 @@ def test_canonical_graph_owns_asset_bible_and_invalidates_merged_sources(tmp_pat
     assert merged.status_code == 200, merged.text
     graph = graph_store.load(PROJECT_ID)
     for source in scene_assets:
-        assert graph["nodes"][source["stable_id"]]["state"] == "invalidated"
-        assert all(
-            source["stable_id"] not in {relation["from_id"], relation["to_id"]}
+        assert graph["nodes"][source["stable_id"]]["state"] == "active"
+        assert graph["nodes"][source["stable_id"]]["metadata"]["space"] in {
+            "high glass dome",
+            "submerged shelves",
+        }
+        assert any(
+            relation["from_id"] == source["stable_id"]
+            and relation["relation_type"] == "contains"
             for relation in graph["relations"]
         )
     restored = client.get(f"/projects/{PROJECT_ID}/m6/asset-bible").json()
     assert restored["authority_mode"] == "canonical_production_graph"
     assert restored["asset_bible"]["current_revision_id"] == merged.json()["asset_bible"]["current_revision_id"]
+
+    graph_store.append(
+        PROJECT_ID,
+        expected_version=merged.json()["graph_version"],
+        idempotency_key="seed-ambiguous-active-revision",
+        semantic_digest=canonical_digest({"seed": "ambiguous-revision"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "revision-history-still-active",
+                    "category": "revision",
+                    "metadata": {"source_digest": "b" * 64},
+                },
+            },
+        ],
+    )
+    ambiguous = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json={
+            "asset_bible": merged.json()["asset_bible"],
+            "command": {"type": "regenerate_candidates"},
+            "requested_at": "2026-07-24T00:02:00Z",
+        },
+    )
+    assert ambiguous.status_code == 422
+    assert "exactly one active canonical script revision" in ambiguous.text
 
 
 def test_split_rejects_duplicate_occurrence_assignment() -> None:

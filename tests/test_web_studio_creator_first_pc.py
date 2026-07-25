@@ -287,6 +287,11 @@ def test_confirmed_production_graph_offers_storyboard_review_and_has_no_overlapp
           version_history: [],
         }},
       }};
+      workspace.sequence.script_revisions.push({{
+        node_id: "script-history",
+        state: "invalidated",
+        metadata: {{ title: "historical script" }},
+      }});
       const state = {{
         nodes: {{ source: {{ id: "source", x: 80, y: 80, w: 280, h: 190, params: {{}} }} }},
         edges: {{}},
@@ -311,11 +316,18 @@ def test_confirmed_production_graph_offers_storyboard_review_and_has_no_overlapp
         section: "canvas",
         productionGraph: graph,
       }});
+      const bibleCopilot = deriveProductionCopilotState({{
+        studioState: {{}},
+        capabilityGates: {{ llm: true, image: false, video: false }},
+        section: "asset_bible",
+        productionGraph: graph,
+      }});
       console.log(JSON.stringify({{
         projectedCount: projected.length,
         minimumY: Math.min(...projected.map((node) => node.y)),
         sourceBottom: state.nodes.source.y + state.nodes.source.h,
         copilot,
+        bibleCopilot,
       }}));
     """
     completed = subprocess.run(
@@ -327,12 +339,23 @@ def test_confirmed_production_graph_offers_storyboard_review_and_has_no_overlapp
     )
     result = json.loads(completed.stdout)
 
-    assert result["projectedCount"] == 18
+    assert result["projectedCount"] == 19
     assert result["minimumY"] > result["sourceBottom"]
     assert result["copilot"]["stage"] == "production_plan_ready"
+    assert result["copilot"]["dependencies"][0] == {
+        "key": "script",
+        "label": "当前剧本",
+        "state": "ready",
+    }
     assert result["copilot"]["ready_summary"] == "制作方案已保存：3 个角色、2 个场景、5 个镜头。"
     assert result["copilot"]["next_valid_action"]["action"] == "open_storyboard"
     assert result["copilot"]["next_valid_action"]["label"] == "查看故事板"
+    assert result["bibleCopilot"]["next_valid_action"] == {
+        "action": "generate_asset_candidates",
+        "label": "识别资产候选",
+        "reason": "基于已保存的角色、场景、道具和镜头建立可审核资产候选。",
+        "enabled": True,
+    }
 
 
 def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection() -> None:
@@ -347,3 +370,210 @@ def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection()
     assert "canonical_production_graph" in projection
     for forbidden in ("secondProductionGraph", "secondaryGraphStore", "creatorShellGraph"):
         assert forbidden not in shell
+
+
+def test_confirmed_graph_projects_asset_bible_source_across_refresh_without_preview_leakage() -> None:
+    bible_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
+    script = f"""
+      import {{ assetBibleSourceContext, deriveProductionCopilotState }} from {json.dumps(bible_uri)};
+      const workspace = {{
+        status: "ready",
+        graph_version: 8,
+        graph_digest: "confirmed-graph-digest",
+        storyboard: {{ graph_version: 8, graph_digest: "confirmed-graph-digest" }},
+        sequence: {{
+          script_revisions: [
+            {{ node_id: "revision-8", state: "active", metadata: {{ source_digest: "source" }} }},
+          ],
+          characters: [
+            {{ node_id: "character-nova", state: "active", metadata: {{ display_name: "Nova Reed" }} }},
+          ],
+          scenes: [
+            {{ node_id: "scene-copper-quay", state: "active", metadata: {{ name: "Copper Quay", space: "rain-washed quay" }} }},
+          ],
+          props: [
+            {{ node_id: "prop-glass-compass", state: "active", metadata: {{ name: "Glass Compass", kind: "prop", classification: "canonical_prop" }} }},
+          ],
+          production_aids: [
+            {{ node_id: "aid-weather", state: "active", metadata: {{ name: "Weather Reference", classification: "production_aid" }} }},
+          ],
+          shots: [
+            {{ node_id: "shot-a", state: "active", metadata: {{ intent: "find north", duration_seconds: 4 }} }},
+            {{ node_id: "shot-b", state: "active", metadata: {{ intent: "cross the quay", duration_seconds: 7 }} }},
+          ],
+          dependencies: [
+            {{ from_id: "revision-8", to_id: "character-nova", relation_type: "derived_from" }},
+            {{ from_id: "revision-8", to_id: "scene-copper-quay", relation_type: "derived_from" }},
+            {{ from_id: "revision-8", to_id: "prop-glass-compass", relation_type: "derived_from" }},
+            {{ from_id: "revision-8", to_id: "aid-weather", relation_type: "derived_from" }},
+            {{ from_id: "scene-copper-quay", to_id: "shot-a", relation_type: "contains" }},
+            {{ from_id: "scene-copper-quay", to_id: "shot-b", relation_type: "contains" }},
+          ],
+        }},
+      }};
+      const failedPreviewOnlyState = {{
+        nodes: {{}},
+        planningRun: {{
+          phase: "failed",
+          source_text: "This failed preview must not become Asset Bible truth.",
+        }},
+      }};
+      const first = assetBibleSourceContext(failedPreviewOnlyState, workspace);
+      const refreshed = assetBibleSourceContext({{}}, JSON.parse(JSON.stringify(workspace)));
+      const failedOnly = assetBibleSourceContext(failedPreviewOnlyState, {{
+        status: "planning_required",
+        graph_version: 0,
+      }});
+      const ambiguous = JSON.parse(JSON.stringify(workspace));
+      ambiguous.sequence.script_revisions.push({{
+        node_id: "revision-history",
+        state: "active",
+        metadata: {{ source_digest: "historical" }},
+      }});
+      const legacyShotPlan = {{
+        candidate_id: "legacy-candidate",
+        scenes: [{{
+          scene_id: "legacy-scene",
+          name: "Legacy Stage",
+          shots: [{{ shot_id: "legacy-shot", title: "Legacy Shot", duration_sec: 5 }}],
+        }}],
+      }};
+      const legacyState = {{
+        nodes: {{
+          story: {{
+            id: "story",
+            type: "text",
+            content: "Legacy source that must not override canonical fail-closed state.",
+            params: {{
+              currentRevisionId: "legacy-revision",
+              revisions: [{{
+                revision_id: "legacy-revision",
+                screenplay_candidate: {{
+                  screenplay_text: "Legacy source that must not override canonical fail-closed state.",
+                }},
+              }}],
+              shotPlanDraft: {{ ...legacyShotPlan, source_revision_id: "legacy-revision" }},
+              embeddedCreativeAction: {{
+                action_type: "shot_breakdown",
+                status: "applied",
+                applied_at: "2026-07-24T00:00:00Z",
+                applied_revision_id: "legacy-revision",
+                applied_subgraph: {{
+                  candidate_id: "legacy-candidate",
+                  shot_plan: legacyShotPlan,
+                }},
+              }},
+            }},
+          }},
+          sequence: {{
+            id: "sequence",
+            type: "sequence",
+            params: {{
+              nodeRole: "m6_6_shot_sequence_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+            }},
+          }},
+          scene: {{
+            id: "scene",
+            type: "scene",
+            title: "Legacy Stage",
+            params: {{
+              nodeRole: "m6_6_scene_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+              source_sequence_node_id: "sequence",
+            }},
+          }},
+          shot: {{
+            id: "shot",
+            type: "shot",
+            title: "Legacy Shot",
+            params: {{
+              nodeRole: "m6_6_shot_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+              source_scene_node_id: "scene",
+              duration_sec: 5,
+            }},
+          }},
+        }},
+        edges: {{
+          source: {{ from: "story", to: "sequence", relation_type: "proposed" }},
+          scene: {{ from: "sequence", to: "scene", relation_type: "sequence" }},
+          shot: {{ from: "scene", to: "shot", relation_type: "sequence" }},
+        }},
+      }};
+      const legacySource = assetBibleSourceContext(legacyState, null);
+      const ambiguousSource = assetBibleSourceContext(legacyState, ambiguous);
+      const ambiguousCopilot = deriveProductionCopilotState({{
+        studioState: legacyState,
+        capabilityGates: {{ llm: true, image: false, video: false }},
+        section: "asset_bible",
+        productionGraph: {{
+          status: "ready",
+          shots: [{{ graphNodeId: "shot-a" }}, {{ graphNodeId: "shot-b" }}],
+          summary: {{
+            scriptRevisions: 2,
+            characters: 1,
+            locations: 1,
+            props: 1,
+          }},
+        }},
+      }});
+      console.log(JSON.stringify({{
+        first,
+        refreshed,
+        failedOnly,
+        legacySource,
+        ambiguousSource,
+        ambiguousCopilot,
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+    first = result["first"]
+
+    assert first == result["refreshed"]
+    assert result["failedOnly"] is None
+    assert result["ambiguousSource"] is None
+    assert "authority_mode" not in result["legacySource"]
+    assert result["legacySource"]["script_revision_id"] == "legacy-revision"
+    assert result["ambiguousCopilot"]["stage"] == "production_plan_revision_conflict"
+    assert result["ambiguousCopilot"]["next_valid_action"] == {
+        "action": "resolve_script_revision",
+        "label": "等待版本确认",
+        "reason": "当前存在多个已应用剧本版本，确认唯一版本后才能整理资产。",
+        "enabled": False,
+    }
+    assert first["authority_mode"] == "canonical_production_graph"
+    assert first["script_revision_id"] == "revision-8"
+    assert first["scene_count"] == 1
+    assert first["shot_count"] == 2
+    assert first["duration_sec"] == 11
+    assert [
+        (item["asset_type"], item["display_name"])
+        for item in first["canonical_assets"]
+    ] == [
+        ("character", "Nova Reed"),
+        ("scene", "Copper Quay"),
+        ("prop", "Glass Compass"),
+    ]
+    assert [item["display_name"] for item in first["production_aids"]] == [
+        "Weather Reference"
+    ]
+    assert first["provider_dispatch_count"] == 0
+    assert first["external_cost_usd"] == 0
+
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    assert shell.count(
+        "assetBibleSourceContext(snapshot.studioState || {}, snapshot.sequenceWorkspace)"
+    ) == 3
+    assert "source?.canonical_assets?.length" in shell
+    assert "项来源已确认" in shell

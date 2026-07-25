@@ -48,7 +48,9 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     scenes,
     shots,
     summary: {
-      scriptRevisions: array(sequence.script_revisions).length,
+      scriptRevisions: array(sequence.script_revisions).filter(
+        (item) => item?.state !== "invalidated",
+      ).length,
       sequences: array(sequence.sequences).length,
       characters: array(sequence.characters).length,
       locations: array(sequence.scenes).length,
