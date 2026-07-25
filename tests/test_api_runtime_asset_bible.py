@@ -422,6 +422,7 @@ def test_canonical_graph_owns_asset_bible_without_copying_or_invalidating_source
         f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
         json=generate_request,
     ).json()
+    assert generated_preview["expected_graph_version"] == 1
     generated = client.post(
         f"/projects/{PROJECT_ID}/m6/asset-bible/commands/confirm",
         json={
@@ -455,6 +456,7 @@ def test_canonical_graph_owns_asset_bible_without_copying_or_invalidating_source
         },
     )
     assert regenerated_preview.status_code == 200, regenerated_preview.text
+    assert regenerated_preview.json()["expected_graph_version"] == graph_version
     assert {
         item["stable_id"]
         for item in regenerated_preview.json()["result"]["asset_bible"]["assets"]

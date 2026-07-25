@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from types import SimpleNamespace
 
@@ -235,6 +236,61 @@ def source_contract(*, graph_version: int = 0, graph_digest: str = "") -> dict:
     }
 
 
+def compact_source_contract(*, shot_count: int = 3) -> dict:
+    source = source_contract()
+    shot_ids = [f"scene-1-shot-{index}" for index in range(1, shot_count + 1)]
+    shots = [
+        item
+        for item in source["shot_grounding"]["shots"]
+        if item["shot_id"] in shot_ids
+    ]
+    scenes = [source["shot_grounding"]["scenes"][0]]
+    assets = [
+        item
+        for item in source["asset_bible"]["assets"]
+        if item["stable_id"] in {"asset-character-a", "asset-scene-a", "asset-prop-a"}
+    ]
+    renamed = {
+        "asset-character-a": "巡夜人·甲",
+        "asset-scene-a": "北侧检修站",
+        "asset-prop-a": "六角校准器",
+    }
+    for asset in assets:
+        asset["display_name"] = renamed[asset["stable_id"]]
+        asset["aliases"] = [asset["display_name"]]
+        asset["occurrences"] = {"scene_ids": ["scene-1"], "shot_ids": shot_ids}
+        asset["source_evidence"] = [
+            {
+                "source_type": "occurrence_ledger",
+                "source_id": asset["stable_id"],
+                "scene_ids": ["scene-1"],
+                "shot_ids": shot_ids,
+                "excerpt": "已应用分镜中的资产出现范围",
+            }
+        ]
+        asset["continuity_states"][0]["scene_ids"] = ["scene-1"]
+        asset["continuity_states"][0]["shot_ids"] = shot_ids
+    bible = source["asset_bible"]
+    bible["assets"] = assets
+    bible["candidate_set"]["scene_index"] = scenes
+    bible["candidate_set"]["shot_index"] = shots
+    bible["candidate_set"]["scene_count"] = 1
+    bible["candidate_set"]["shot_count"] = shot_count
+    bible["coverage"].update(
+        {
+            "scene_total": 1,
+            "scene_covered": 1,
+            "shot_total": shot_count,
+            "shot_covered": shot_count,
+            "asset_shot_covered": shot_count,
+            "required_occurrence_total": len(assets) * shot_count,
+            "resolved_required": len(assets) * shot_count,
+        }
+    )
+    source["shot_grounding"] = {"scenes": scenes, "shots": shots}
+    return source
+
+
 def _command(client: TestClient, command: dict, source: dict, *, confirm: bool = True) -> dict:
     body = {"command": command, "source": source, "requested_at": REQUESTED_AT}
     preview = client.post(f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview", json=body)
@@ -256,19 +312,21 @@ def _compiled_locked_client(tmp_path, monkeypatch) -> tuple[TestClient, dict]:
     return client, source
 
 
-def test_manifest_compiler_produces_exact_nine_unique_lineage_items_without_name_rules() -> None:
+def test_manifest_compiler_produces_dynamic_unique_lineage_items_without_name_rules() -> None:
     manifest = compile_image_admission_manifest(PROJECT_ID, source_contract(), created_at=REQUESTED_AT)
 
     assert manifest["status"] == "draft"
-    assert len(manifest["items"]) == len({item["item_id"] for item in manifest["items"]}) == 9
+    assert len(manifest["items"]) == len({item["item_id"] for item in manifest["items"]}) == 12
     assert [item["item_type"] for item in manifest["items"]].count("character_design") == 3
-    assert [item["item_type"] for item in manifest["items"]].count("scene_plate") == 1
-    assert [item["item_type"] for item in manifest["items"]].count("prop_design") == 2
+    assert [item["item_type"] for item in manifest["items"]].count("scene_plate") == 3
+    assert [item["item_type"] for item in manifest["items"]].count("prop_design") == 3
     assert [item["item_type"] for item in manifest["items"]].count("shot_keyframe") == 3
     assert all(item["candidate_count"] == 1 for item in manifest["items"])
     assert all(item["source_fingerprint"] == manifest["source_fingerprint"] for item in manifest["items"])
     assert manifest["budget_contract"]["unit_estimate_usd"] == "0.0377"
-    assert manifest["budget_contract"]["max_estimated_usd"] == "0.3500"
+    assert manifest["budget_contract"]["max_estimated_usd"] == "0.0377"
+    assert manifest["budget_contract"]["max_dispatches"] == 1
+    assert manifest["budget_contract"]["program_max_usd"] == "50.0000"
     assert manifest["art_direction"]["visual_style"] == "写实古装动作片"
     assert manifest["creative_grounding"]["status"] == "ready"
     assert manifest["creative_grounding"]["source_evidence_summary"]["status"] == "complete"
@@ -380,19 +438,26 @@ def test_prompt_and_source_fingerprint_change_with_reviewed_creative_facts() -> 
     assert revised_item["prompt_contract"]["provider_prompt_digest"] != original_item["prompt_contract"]["provider_prompt_digest"]
 
 
-def test_manifest_compiler_blocks_ambiguous_character_or_prop_selection() -> None:
-    source = source_contract()
-    source["asset_bible"]["assets"].append(
-        _asset("asset-character-d", "character", "角色丁", scene_ids=["scene-2"], shot_ids=["scene-2-shot-8"])
+@pytest.mark.parametrize("shot_count", [1, 2, 3])
+def test_manifest_compiler_accepts_general_canonical_asset_and_shot_counts(shot_count: int) -> None:
+    manifest = compile_image_admission_manifest(
+        PROJECT_ID,
+        compact_source_contract(shot_count=shot_count),
     )
-    with pytest.raises(ValueError, match="three approved character"):
-        compile_image_admission_manifest(PROJECT_ID, source)
 
-    source = source_contract()
-    props = [item for item in source["asset_bible"]["assets"] if item["asset_type"] == "prop"]
-    props[2]["occurrences"] = deepcopy(props[1]["occurrences"])
-    with pytest.raises(ValueError, match="core prop selection is ambiguous"):
-        compile_image_admission_manifest(PROJECT_ID, source)
+    assert manifest["selection_summary"] == {
+        "canonical_character_count": 1,
+        "canonical_scene_count": 1,
+        "canonical_prop_count": 1,
+        "applied_shot_count": shot_count,
+        "representative_shot_count": shot_count,
+        "item_count": 3 + shot_count,
+    }
+    assert {item["label"] for item in manifest["items"] if item["target_asset_ids"]} == {
+        "巡夜人·甲",
+        "北侧检修站",
+        "六角校准器",
+    }
 
 
 def test_preview_cancel_is_non_mutating_and_confirm_reload_is_stable(tmp_path, monkeypatch) -> None:
@@ -444,63 +509,120 @@ def test_gate_closed_and_reference_contract_block_before_budget_reservation(tmp_
     assert persisted["budget"]["dispatches_reserved"] == 0
 
 
-def test_decimal_cap_failed_dispatch_consumption_and_confirm_replay(tmp_path, monkeypatch) -> None:
+def test_legacy_multi_dispatch_budget_contract_fails_closed_before_reservation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    path = (
+        tmp_path
+        / "runtime"
+        / "projects"
+        / PROJECT_ID
+        / "image_admission"
+        / "manifest.json"
+    )
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["budget_contract"]["max_dispatches"] = 9
+    manifest["budget_contract"]["max_estimated_usd"] = "0.3500"
+    path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    item_id = next(
+        item["item_id"]
+        for item in manifest["items"]
+        if item["item_type"] == "character_design"
+    )
+
+    blocked = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "reserve_dispatch",
+                "item_id": item_id,
+                "idempotency_key": "legacy-budget-reserve",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert blocked.status_code == 422
+    assert "费用合同已更新" in blocked.json()["detail"]["details"]["raw_detail"]
+    persisted = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()[
+        "manifest"
+    ]
+    assert persisted["budget"]["dispatches_reserved"] == 0
+
+
+def test_single_smoke_cap_failed_dispatch_consumption_and_confirm_replay(tmp_path, monkeypatch) -> None:
     client, source = _compiled_locked_client(tmp_path, monkeypatch)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
     item_id = next(item["item_id"] for item in manifest["items"] if item["item_type"] == "character_design")
 
-    for ordinal in range(1, 10):
-        reserve = {
-            "type": "reserve_dispatch",
+    reserve = {
+        "type": "reserve_dispatch",
+        "item_id": item_id,
+        "idempotency_key": "reserve-1",
+    }
+    request = {"command": reserve, "source": source, "requested_at": REQUESTED_AT}
+    preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json=request,
+    ).json()
+    request["preview_digest"] = preview["preview_digest"]
+    confirmed = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=request,
+    )
+    assert confirmed.status_code == 200
+    replay = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=request,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    _command(
+        client,
+        {
+            "type": "record_failure",
             "item_id": item_id,
-            "idempotency_key": f"reserve-{ordinal}",
-        }
-        request = {"command": reserve, "source": source, "requested_at": REQUESTED_AT}
-        preview = client.post(
-            f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
-            json=request,
-        ).json()
-        request["preview_digest"] = preview["preview_digest"]
-        confirmed = client.post(
-            f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
-            json=request,
-        )
-        assert confirmed.status_code == 200
-        replay = client.post(
-            f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
-            json=request,
-        )
-        assert replay.status_code == 200
-        assert replay.json()["idempotent_replay"] is True
-        _command(
-            client,
-            {
-                "type": "record_failure",
+            "idempotency_key": "failure-1",
+            "error_category": "controlled_test_failure",
+        },
+        source,
+    )
+    _command(
+        client,
+        {
+            "type": "replace",
+            "item_id": item_id,
+            "idempotency_key": "replace-1",
+            "reason": "bounded retry preview",
+        },
+        source,
+    )
+    blocked = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "reserve_dispatch",
                 "item_id": item_id,
-                "idempotency_key": f"failure-{ordinal}",
-                "error_category": "controlled_test_failure",
+                "idempotency_key": "reserve-2",
             },
-            source,
-        )
-        if ordinal < 9:
-            _command(
-                client,
-                {
-                    "type": "replace",
-                    "item_id": item_id,
-                    "idempotency_key": f"replace-{ordinal}",
-                    "reason": "bounded retry preview",
-                },
-                source,
-            )
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert blocked.status_code == 422
+    assert "仅允许发送一次" in blocked.json()["detail"]["details"]["raw_detail"]
 
     persisted = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
-    assert persisted["budget"]["dispatches_reserved"] == 9
-    assert persisted["budget"]["estimated_reserved_usd"] == "0.3393"
+    assert persisted["budget"]["dispatches_reserved"] == 1
+    assert persisted["budget"]["estimated_reserved_usd"] == "0.0377"
     assert persisted["budget"]["remaining_dispatches"] == 0
     assert persisted["actual_usd"] is None
-    assert len([receipt for receipt in persisted["receipts"] if receipt["state"] == "failed"]) == 9
+    assert len([receipt for receipt in persisted["receipts"] if receipt["state"] == "failed"]) == 1
 
 
 def test_generation_job_binding_survives_reload_without_another_reservation(tmp_path, monkeypatch) -> None:

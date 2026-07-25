@@ -19,8 +19,8 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
   const budget = manifest?.budget || {
     dispatches_reserved: 0,
     estimated_reserved_usd: "0.0000",
-    remaining_dispatches: Number(budgetContract.max_dispatches || 9),
-    remaining_estimated_usd: String(budgetContract.max_estimated_usd || "0.3500"),
+    remaining_dispatches: Number(budgetContract.max_dispatches || 1),
+    remaining_estimated_usd: String(budgetContract.max_estimated_usd || "0.0377"),
   };
   return {
     status: manifest?.status || "empty",

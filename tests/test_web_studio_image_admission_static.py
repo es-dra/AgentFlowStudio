@@ -53,8 +53,8 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
           status: "locked",
           actual_usd: null,
           billing_verification_state: "unverified",
-          budget_contract: {{ max_dispatches: 9, max_estimated_usd: "0.3500" }},
-          budget: {{ dispatches_reserved: 2, estimated_reserved_usd: "0.0754" }},
+          budget_contract: {{ max_dispatches: 1, max_estimated_usd: "0.0377" }},
+          budget: {{ dispatches_reserved: 1, estimated_reserved_usd: "0.0377", remaining_dispatches: 0 }},
           items: [
             {{ item_id: "a", state: "approved" }},
             {{ item_id: "b", state: "candidate" }},
@@ -74,6 +74,31 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
     assert result["counts"]["failed"] == 1
     assert result["actual_usd"] is None
     assert result["billing_verification_state"] == "unverified"
+
+
+def test_first_image_surface_is_dynamic_creator_copy_with_a_single_dispatch_stop() -> None:
+    shell = PRODUCT_SHELL.read_text(encoding="utf-8")
+    copilot = (ROOT / "apps/studio/src/asset-bible-workspace.js").read_text(encoding="utf-8")
+    workspace = WORKSPACE.read_text(encoding="utf-8")
+
+    for marker in (
+        "首张图片 · 单次费用硬门",
+        "准备首张图片",
+        "创建首张图片清单",
+        "本轮硬上限",
+        "参考图保持一致已准备",
+        "图片能力尚未开启",
+        "Number(view.budget?.remaining_dispatches || 0) > 0",
+    ):
+        assert marker in shell
+    assert "准备首张图片" in copilot
+    assert "首张图片清单已编译" in copilot
+    assert "3 个角色、1 个主场景、2 个核心道具、3 个镜头关键帧" not in shell
+    assert "九项代表集" not in shell
+    assert "关键帧连续性被阻断" not in shell
+    assert "参考图编辑合同已声明" not in shell
+    assert "max_dispatches || 1" in workspace
+    assert "max_estimated_usd || \"0.0377\"" in workspace
 
 
 def test_generation_request_uses_the_locked_prompt_contract_without_frontend_recompile() -> None:
