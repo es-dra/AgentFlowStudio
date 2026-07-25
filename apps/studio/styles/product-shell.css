@@ -955,6 +955,13 @@
 .agent-command-details dd { margin: 0; font-size: 11px; }
 .agent-command-details dt { color: var(--product-muted); }
 .agent-command-details dd { overflow: hidden; color: var(--product-text); text-overflow: ellipsis; white-space: nowrap; }
+.agent-m6-scope-impact { display: grid; gap: 8px; max-height: min(36vh, 360px); overflow: auto; border-radius: 6px; padding: 8px; background: #07131b; }
+.agent-m6-scope-impact p { margin: 0; color: var(--product-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.agent-m6-scope-grid { display: grid; gap: 7px; }
+.agent-m6-scope-group { display: grid; gap: 4px; min-width: 0; }
+.agent-m6-scope-group strong { color: #dff7fb; font-size: 11px; }
+.agent-m6-scope-group ul { display: grid; gap: 3px; margin: 0; padding-left: 14px; }
+.agent-m6-scope-group li { color: #c9d8de; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .agent-command-actions { display: flex; gap: 8px; }
 .agent-current-task-review {
   display: grid;

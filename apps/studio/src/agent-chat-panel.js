@@ -311,6 +311,7 @@ function commandPreview({ session, store, runtime, onRender }) {
   if (command.cost_label) details.append(el("dt", "", "费用"), el("dd", "", command.cost_label));
   details.append(el("dt", "", "故事板"), el("dd", "", command.impact?.storyboard_write ? "确认后同步" : "不写入"));
   preview.appendChild(details);
+  if (command.scope_impact) preview.appendChild(m6ScopeImpactReview(command.scope_impact));
   if (command.preview_diff) preview.appendChild(diffPreview(command.preview_diff));
   preview.appendChild(evidenceDetails("查看证据/开发详情", [
     ["command_id", command.command_id],
@@ -834,6 +835,102 @@ function diffPreview(diff) {
   const after = el("p", "", `修订 ${Number(diff.after_chars || 0)} 字：${diff.after_excerpt || "空"}`);
   wrap.append(before, after);
   return wrap;
+}
+
+function m6ScopeImpactReview(impact = {}) {
+  const wrap = el("section", "agent-m6-scope-impact");
+  const summary = impact.summary || {};
+  wrap.append(
+    el("span", "eyebrow", "范围影响清单"),
+    el(
+      "p",
+      "",
+      `新增 ${Number(summary.additions || 0)} · 改名 ${Number(summary.renames || 0)} · 扩写 ${Number(summary.expansions || 0)} · 分类 ${Number(summary.classifications || 0)} · 关联 ${Number(summary.affected_associations || 0)}`,
+    ),
+  );
+  const grid = el("div", "agent-m6-scope-grid");
+  grid.append(
+    m6ScopeGroup("新增", impact.proposed_additions, m6ScopeItemText),
+    m6ScopeGroup("改名", impact.proposed_renames, m6ScopeItemText),
+    m6ScopeGroup("扩写", impact.proposed_expansions, m6ScopeItemText),
+    m6ScopeGroup("分类", impact.proposed_classifications, m6ScopeItemText),
+    m6ScopeGroup("关联", impact.affected_associations, m6ScopeAssociationText),
+  );
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function m6ScopeGroup(label, items, renderItem) {
+  const section = el("section", "agent-m6-scope-group");
+  section.appendChild(el("strong", "", label));
+  const list = el("ul", "");
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    list.appendChild(el("li", "", "无"));
+  } else {
+    for (const item of rows) list.appendChild(el("li", "", renderItem(item)));
+  }
+  section.appendChild(list);
+  return section;
+}
+
+function m6ScopeItemText(item = {}) {
+  const type = m6ScopeTypeLabel(item.item_type || item.association_type || "item");
+  if (item.before || item.after) {
+    return `${type}：${item.before || "未列出"} → ${item.after || "未列出"}${item.classification ? `（${m6ClassificationLabel(item.classification)}）` : ""}`;
+  }
+  if (Array.isArray(item.fields) && item.fields.length) {
+    return `${type}：${item.name || "未命名"} · ${item.fields.join("、")}`;
+  }
+  const parts = [type, item.name].filter(Boolean);
+  const tags = [
+    m6ClassificationLabel(item.classification),
+    item.kind,
+    item.production_aid_type || item.canonical_asset_type,
+  ].filter(Boolean);
+  return `${parts.join("：")}${tags.length ? `（${tags.join(" / ")}）` : ""}`;
+}
+
+function m6ScopeAssociationText(item = {}) {
+  if (item.association_type === "shot.references") {
+    const parts = [
+      item.scene ? `场景 ${item.scene}` : "",
+      item.characters?.length ? `角色 ${item.characters.join("、")}` : "",
+      item.canonical_props?.length ? `规范道具 ${item.canonical_props.join("、")}` : "",
+      item.production_aids?.length ? `生产辅助 ${item.production_aids.join("、")}` : "",
+      Number(item.duration_seconds || 0) ? `${Number(item.duration_seconds).toFixed(1)}秒` : "",
+    ].filter(Boolean);
+    return `${item.name || "镜头"}：${parts.join("；") || "无引用"}`;
+  }
+  const names = Array.isArray(item.names) && item.names.length ? item.names.join("、") : "无";
+  const association = m6ScopeTypeLabel(item.association_type || "association");
+  return `${association}：${names}${item.classification ? `（${m6ClassificationLabel(item.classification)}）` : ""}`;
+}
+
+function m6ClassificationLabel(value) {
+  return {
+    canonical_character: "规范角色 canonical_character",
+    canonical_scene: "规范场景 canonical_scene",
+    canonical_prop: "规范道具 canonical_prop",
+    production_aid: "生产辅助 production_aid",
+    production_shot: "制作镜头 production_shot",
+    canonical_prop_refs_only: "仅规范道具 canonical_prop_refs_only",
+    production_aid_refs_not_canonical_props: "生产辅助不计入规范道具 production_aid_refs_not_canonical_props",
+  }[value] || value;
+}
+
+function m6ScopeTypeLabel(type) {
+  return {
+    character: "角色",
+    scene: "场景",
+    asset: "资产",
+    shot: "镜头",
+    "asset_bible.character_refs": "Asset Bible 角色引用",
+    "asset_bible.scene_refs": "Asset Bible 场景引用",
+    "asset_bible.prop_refs": "Asset Bible 道具引用",
+    "asset_bible.production_aid_refs": "Asset Bible 辅助引用",
+    "shot.references": "镜头引用",
+  }[type] || type;
 }
 
 function evidenceDetails(title, entries) {

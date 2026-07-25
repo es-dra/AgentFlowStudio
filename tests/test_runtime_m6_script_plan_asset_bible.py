@@ -60,6 +60,20 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
         assert candidate["cost_usd"] == 0
         assert all(item["promotion_state"] != "promoted" for item in candidate["knowledge_context"]["items"])
         assert all(shot["shot_size"] and shot["camera_movement"] and shot["narrative_purpose"] for shot in candidate["shots"])
+        prop_assets = [row for row in candidate["assets"] if row["kind"] == "prop"]
+        production_aids = [row for row in candidate["assets"] if row["kind"] in {"closeup", "reference_set", "style"}]
+        assert {row["asset_id"] for row in prop_assets} == set(candidate["asset_bible"]["prop_refs"])
+        assert {row["asset_id"] for row in production_aids} == set(candidate["asset_bible"]["production_aid_refs"])
+        assert not set(candidate["asset_bible"]["prop_refs"]) & {row["asset_id"] for row in production_aids}
+        assert all(row["classification"] == "canonical_prop" for row in prop_assets)
+        assert all(row["classification"] == "production_aid" for row in production_aids)
+        scope = candidate["m6_scope_review"]
+        assert scope["fail_closed"]["status"] == "pass"
+        assert scope["proposed_additions"]
+        assert scope["proposed_expansions"]
+        assert scope["proposed_classifications"]
+        assert any(item["association_type"] == "asset_bible.prop_refs" for item in scope["affected_associations"])
+        assert any(item["association_type"] == "asset_bible.production_aid_refs" for item in scope["affected_associations"])
 
 
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
@@ -85,6 +99,10 @@ def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tm
     assert workspace["graph_digest"] == graph["graph_digest"] == workspace["storyboard"]["graph_digest"]
     assert workspace["sequence"]["characters"]
     assert workspace["sequence"]["reference_sets"]
+    assert len(workspace["sequence"]["props"]) == 2
+    assert all(item["metadata"]["kind"] == "prop" for item in workspace["sequence"]["props"])
+    assert all(item["metadata"]["classification"] == "canonical_prop" for item in workspace["sequence"]["props"])
+    assert len(workspace["sequence"]["production_aids"]) >= 3
     assert workspace["provider_dispatch_count"] == 0
     assert workspace["cost_usd"] == 0
     assert not (tmp_path / "runtime" / "projects" / "m6-graph" / "studio_state.json").exists()
@@ -127,8 +145,19 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     assert first_candidate["provider_lineage"]["provider_calls_started"] is True
     assert first_candidate["provider_lineage"]["provider_raw_response_stored"] is False
     assert first_payload["validation"]["provider_dispatch_count"] == 1
+    assert first_candidate["m6_scope_review"]["canonical"]["characters"] == ["米拉", "陶", "阿衡"]
+    assert first_candidate["m6_scope_review"]["canonical"]["scenes"] == ["傍晚观测台", "雨后的信号室", "地下水泵间"]
+    assert first_candidate["m6_scope_review"]["canonical"]["props"] == ["铜色罗盘", "裂开的玻璃杯", "备用电池"]
+    assert [row["display_name"] for row in first_candidate["characters"]] == ["米拉", "陶", "阿衡"]
+    assert [row["name"] for row in first_candidate["scenes"]] == ["傍晚观测台", "雨后的信号室", "地下水泵间"]
+    assert [row["name"] for row in first_candidate["assets"] if row["kind"] == "prop"] == ["铜色罗盘", "裂开的玻璃杯", "备用电池"]
+    assert {row["asset_id"] for row in first_candidate["assets"] if row["kind"] == "prop"} == set(first_candidate["asset_bible"]["prop_refs"])
+    assert all(row["classification"] == "production_aid" for row in first_candidate["assets"] if row["kind"] in {"closeup", "reference_set", "style"})
     assert len(calls) == 1
     assert "固定 4x15" in str(calls[0]["prompt"])
+    assert "canonical characters" in str(calls[0]["prompt"])
+    assert "米拉、陶、阿衡" in str(calls[0]["prompt"])
+    assert "铜色罗盘、裂开的玻璃杯、备用电池" in str(calls[0]["prompt"])
 
     second_run = _start_and_wait(
         client,
@@ -157,7 +186,88 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     workspace = client.get("/projects/m6-codex/m5/sequence-workspace").json()
     assert workspace["graph_digest"] == graph["graph_digest"]
     assert workspace["sequence"]["reference_sets"]
+    assert len(workspace["sequence"]["props"]) == 3
+    assert all(item["metadata"]["classification"] == "canonical_prop" for item in workspace["sequence"]["props"])
+    assert len(workspace["sequence"]["production_aids"]) >= 3
     assert not (tmp_path / "runtime" / "projects" / "m6-codex" / "studio_state.json").exists()
+
+
+def test_m6_server_codex_scope_drift_fails_closed_before_candidate_or_graph_write(tmp_path, monkeypatch) -> None:
+    provider_config = tmp_path / "provider_config.json"
+    provider_config.write_text('{"schema_version":"company_provider_secrets.v0.1","accounts":{},"account_pools":{},"services":{}}', encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    for gate in (
+        "AFS_ALLOW_REMOTE_IMAGE",
+        "AFS_ALLOW_REMOTE_VIDEO",
+        "AFS_ALLOW_REMOTE_AUDIO",
+        "AFS_ALLOW_REMOTE_ASR",
+        "AFS_ALLOW_REMOTE_VISION",
+        "AFS_ALLOW_EXTERNAL_DOWNLOAD",
+    ):
+        monkeypatch.setenv(gate, "false")
+
+    drift_payload = _server_codex_payload()
+    drift_payload["characters"] = drift_payload["characters"] + [
+        {
+            "display_name": "额外角色",
+            "goal": "试图把模型自创人物加入制作图。",
+            "conflict": "该人物没有来自用户文本的 canonical 授权。",
+            "relationship_arc": "不应进入确认卡。",
+            "change_vector": "不应被写入。",
+            "appearance": "不应被写入。",
+            "wardrobe": "不应被写入。",
+            "age_range": "成人",
+            "proportion": "真人写实比例",
+            "signature_features": ["未授权轮廓", "未授权动作"],
+            "do_not_change": ["未授权身份", "未授权造型"],
+        }
+    ]
+    drift_payload["scenes"][0] = {**drift_payload["scenes"][0], "name": "改名观测台"}
+    drift_payload["assets"] = drift_payload["assets"] + [
+        {
+            "name": "未授权新道具",
+            "kind": "prop",
+            "source": "模型自创道具",
+            "version": "candidate.v1",
+            "applicable_scope": "project",
+            "confidence": 0.4,
+            "rights_boundary": "未授权道具不得进入候选",
+            "style": "不应使用",
+            "do_not_change": ["不应写入", "不应确认"],
+        }
+    ]
+
+    def fake_dispatch(*, prompt, output_dir, schema, schema_digest):
+        return {
+            "provider_calls_started": True,
+            "structured_output": drift_payload,
+        }
+
+    monkeypatch.setattr(runtime_m6_server_codex_planner, "_dispatch_server_codex_structured_plan", fake_dispatch)
+    runtime_root = tmp_path / "runtime"
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    response = client.post(
+        "/projects/m6-drift/m6/script-plan-asset-bible/preview",
+        headers={"X-Client-Request-ID": "m6-drift-preview"},
+        json={"source_kind": "script", "source_text": SCRIPT_TEXT},
+    )
+    assert response.status_code == 200, response.text
+    run = response.json()
+    for _ in range(200):
+        if run["phase"] == "failed":
+            break
+        time.sleep(0.01)
+        loaded = client.get(f"/projects/m6-drift/m6/script-plan-asset-bible/preview-runs/{run['run_id']}")
+        assert loaded.status_code == 200, loaded.text
+        run = loaded.json()
+    assert run["phase"] == "failed", run
+    assert run["error"]["category"] == "planning_rejected"
+    assert run["error"]["message"] == "制作方案未通过结构校验；制作事实未改变。"
+    assert run["candidate_digest"] == ""
+    run_dir = runtime_root / "projects" / "m6-drift" / "m6_preview_runs" / run["run_id"]
+    assert not (run_dir / "candidate.json").exists()
+    assert not (runtime_root / "projects" / "m6-drift" / "production_graph.json").exists()
 
 
 def test_m6_confirm_rejects_template_gaming_and_unresolved_lineage(tmp_path) -> None:
@@ -179,6 +289,17 @@ def test_m6_confirm_rejects_template_gaming_and_unresolved_lineage(tmp_path) -> 
     promoted["knowledge_context"]["items"][0]["promotion_state"] = "promoted"
     with pytest.raises(M6PlanningError, match="cannot be promoted"):
         validate_m6_candidate(promoted)
+
+    contaminated = build_m6_script_plan_asset_bible("m6-bad-closeup", {"source_kind": "idea", "source_text": IDEA_TEXT})["candidate"]
+    closeup_id = next(row["asset_id"] for row in contaminated["assets"] if row["kind"] == "closeup")
+    contaminated["asset_bible"]["prop_refs"].append(closeup_id)
+    with pytest.raises(M6PlanningError, match="prop_refs"):
+        validate_m6_candidate(contaminated)
+
+    renamed_scene = deepcopy(candidate)
+    renamed_scene["scenes"][0]["name"] = "模型改名场景"
+    with pytest.raises(M6PlanningError, match="scenes must exactly match"):
+        validate_m6_candidate(renamed_scene)
 
 
 def test_m6_preview_requires_named_entities_and_story_beats() -> None:
@@ -256,6 +377,19 @@ def _server_codex_payload() -> dict[str, object]:
                 "do_not_change": ["银灰外套", "短发轮廓", "镜头掌控位置"],
             },
             {
+                "display_name": "陶",
+                "goal": "记录偏移频率并确认备用电池是否能支撑重做方案。",
+                "conflict": "她担心返工压力会压垮预算，却被玻璃杯裂纹逼近真相。",
+                "relationship_arc": "从执行记录转为主动把技术证据交给米拉和阿衡共同面对。",
+                "change_vector": "从控制风险转为接受必须补拍的事实。",
+                "appearance": "黑色雨衣，手边总有记录本和备用电池。",
+                "wardrobe": "黑色雨衣、深色防水鞋，雨季湿痕保持连续。",
+                "age_range": "二十八到三十四岁",
+                "proportion": "真人写实比例，动作利落克制。",
+                "signature_features": ["黑色雨衣", "快速记录频率的手势"],
+                "do_not_change": ["黑色雨衣", "记录本位置", "技术判断角色"],
+            },
+            {
                 "display_name": "阿衡",
                 "goal": "确认耳机里的旧广播来源，同时避免暴露自己十年前没有上报。",
                 "conflict": "广播把他的旧选择拖回现场，米拉的镜头让逃避失效。",
@@ -326,6 +460,28 @@ def _server_codex_payload() -> dict[str, object]:
                 "do_not_change": ["铜色材质", "指针方向连续", "相对尺寸"],
             },
             {
+                "name": "裂开的玻璃杯",
+                "kind": "prop",
+                "source": "用户剧本输入的项目道具",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.84,
+                "rights_boundary": "用户提供或项目原创，待创作者确认后进入媒体生成",
+                "style": "透明玻璃、杯壁裂纹方向固定",
+                "do_not_change": ["裂纹方向", "杯口形状", "桌面位置"],
+            },
+            {
+                "name": "备用电池",
+                "kind": "prop",
+                "source": "用户剧本输入的项目道具",
+                "version": "candidate.v1",
+                "applicable_scope": "project",
+                "confidence": 0.83,
+                "rights_boundary": "用户提供或项目原创，待创作者确认后进入媒体生成",
+                "style": "黑色工业电池、磨损标签",
+                "do_not_change": ["黑色外壳", "标签方向", "相对尺寸"],
+            },
+            {
                 "name": "玻璃杯裂纹特写",
                 "kind": "closeup",
                 "source": "用户剧本输入的特写需求",
@@ -364,8 +520,8 @@ def _server_codex_payload() -> dict[str, object]:
                 "scene_index": 1,
                 "duration_seconds": 8.5,
                 "intent": "建立观测台空间和罗盘倒转的第一处异常。",
-                "character_indexes": [1, 2],
-                "asset_indexes": [1, 3],
+                "character_indexes": [1, 2, 3],
+                "asset_indexes": [1, 5],
                 "shot_size": "全景",
                 "camera_angle": "平视略低",
                 "camera_movement": "沿环形轨道缓慢横移",
@@ -379,8 +535,8 @@ def _server_codex_payload() -> dict[str, object]:
                 "scene_index": 2,
                 "duration_seconds": 5.0,
                 "intent": "用玻璃裂纹和波形建立证据连接。",
-                "character_indexes": [1],
-                "asset_indexes": [2, 3],
+                "character_indexes": [1, 2],
+                "asset_indexes": [2, 3, 4, 5],
                 "shot_size": "特写",
                 "camera_angle": "俯拍",
                 "camera_movement": "静止后微推",
@@ -394,8 +550,8 @@ def _server_codex_payload() -> dict[str, object]:
                 "scene_index": 3,
                 "duration_seconds": 11.0,
                 "intent": "让阿衡摘下耳机承认旧广播，完成关系变化。",
-                "character_indexes": [1, 2],
-                "asset_indexes": [1, 3],
+                "character_indexes": [1, 3],
+                "asset_indexes": [1, 5],
                 "shot_size": "中景",
                 "camera_angle": "平视",
                 "camera_movement": "手持轻微后退",

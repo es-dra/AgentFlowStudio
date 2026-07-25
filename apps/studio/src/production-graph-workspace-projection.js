@@ -54,6 +54,7 @@ export function productionGraphWorkspaceProjection(workspace = null) {
       locations: array(sequence.scenes).length,
       props: array(sequence.props).length,
       referenceSets: array(sequence.reference_sets).length,
+      productionAids: array(sequence.production_aids).length,
       tasks: array(sequence.tasks).length,
       candidates: array(sequence.candidates).length,
       selections: array(sequence.selections).length,
@@ -154,7 +155,7 @@ function sceneForShot(relations, shotId) {
 
 function emptySummary() {
   return { scriptRevisions: 0, sequences: 0, characters: 0, locations: 0, props: 0, referenceSets: 0, tasks: 0, candidates: 0,
-    selections: 0, reviews: 0, pendingReviews: 0, rejectedReviews: 0, deliveries: 0, versionHistory: [] };
+    productionAids: 0, selections: 0, reviews: 0, pendingReviews: 0, rejectedReviews: 0, deliveries: 0, versionHistory: [] };
 }
 
 function canvasNode(record, id, graphNodeId, type, fallbackTitle, column, index, projection) {

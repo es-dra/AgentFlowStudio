@@ -319,6 +319,7 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
   const scenes = Array.isArray(candidate.scenes) ? candidate.scenes.length : 0;
   const shots = Array.isArray(candidate.shots) ? candidate.shots.length : 0;
   const roles = Array.isArray(validation.review_roles) ? validation.review_roles.length : 0;
+  const scopeImpact = m6ScopeImpact(candidate);
   if (!session || candidate.m6_schema_version !== "afs.m6.script_plan_asset_bible.v0.1" || !characters || !scenes || !shots || roles < 6) {
     throw new Error("M6候选需要专业剧本、动态分镜、资产Bible和六视角审核合同");
   }
@@ -328,7 +329,7 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
     command_type: "m6_script_plan_asset_bible",
     graph_action: "confirm_m6_script_plan_asset_bible",
     title: "确认M6剧本制作方案",
-    summary: `确认后写入同一ProductionGraph：${characters} 个角色、${scenes} 个场景、${shots} 个动态镜头、${roles} 个审核视角。`,
+    summary: `确认后写入同一ProductionGraph：${characters} 个角色、${scenes} 个场景、${shots} 个动态镜头、${roles} 个审核视角；范围影响逐项列出。`,
     status: "preview",
     execution_mode: "runtime",
     context_key: context?.context_key || agentChatContextKey(context),
@@ -339,6 +340,7 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
     candidate_digest: candidateDigest,
     candidate,
     m6_validation: validation,
+    scope_impact: scopeImpact,
     storyboard_write: false,
     provider_dispatch_count: Number(preview?.dispatch_count || previewPayload?.provider_dispatch_count || 0),
   };
@@ -354,6 +356,71 @@ export function stageM6ScriptPlanCandidateCommand(session, context, preview) {
     appendMessage(session, { role: "assistant", text: "已生成 M6 方案预览；确认前不会写入制作图、调用外部能力或改变画布事实。" });
   }
   return command;
+}
+
+function m6ScopeImpact(candidate = {}) {
+  const review = candidate?.m6_scope_review && typeof candidate.m6_scope_review === "object" ? candidate.m6_scope_review : {};
+  const impact = {
+    schema_version: cleanToken(review.schema_version, 80) || "afs.m6.canonical_scope_review.v0.1",
+    source_authority: cleanToken(review.source_authority, 80) || "user_supplied_canonical_scope",
+    canonical: safeRecordOfLists(review.canonical),
+    production_aids: arrayOfRecords(review.production_aids).map((item) => ({
+      name: cleanText(item.name, 120),
+      kind: cleanToken(item.kind, 40),
+      classification: cleanToken(item.classification, 60),
+      production_aid_type: cleanToken(item.production_aid_type, 60),
+    })),
+    proposed_additions: arrayOfRecords(review.proposed_additions).map(m6ScopeImpactItem),
+    proposed_renames: arrayOfRecords(review.proposed_renames).map(m6ScopeImpactItem),
+    proposed_expansions: arrayOfRecords(review.proposed_expansions).map(m6ScopeImpactItem),
+    proposed_classifications: arrayOfRecords(review.proposed_classifications).map(m6ScopeImpactItem),
+    affected_associations: arrayOfRecords(review.affected_associations).map(m6ScopeImpactItem),
+  };
+  impact.summary = {
+    additions: impact.proposed_additions.length,
+    renames: impact.proposed_renames.length,
+    expansions: impact.proposed_expansions.length,
+    classifications: impact.proposed_classifications.length,
+    affected_associations: impact.affected_associations.length,
+  };
+  return impact;
+}
+
+function m6ScopeImpactItem(item = {}) {
+  return {
+    item_type: cleanToken(item.item_type, 40),
+    association_type: cleanToken(item.association_type, 80),
+    id: cleanToken(item.id, 180),
+    name: cleanText(item.name, 160),
+    before: cleanText(item.before, 160),
+    after: cleanText(item.after, 160),
+    kind: cleanToken(item.kind, 40),
+    classification: cleanToken(item.classification, 80),
+    canonical_asset_type: cleanToken(item.canonical_asset_type, 60),
+    production_aid_type: cleanToken(item.production_aid_type, 60),
+    authority: cleanToken(item.authority, 80),
+    fields: Array.isArray(item.fields) ? item.fields.map((field) => cleanToken(field, 80)).filter(Boolean).slice(0, 16) : [],
+    names: Array.isArray(item.names) ? item.names.map((name) => cleanText(name, 120)).filter(Boolean).slice(0, 24) : [],
+    scene: cleanText(item.scene, 120),
+    characters: Array.isArray(item.characters) ? item.characters.map((name) => cleanText(name, 120)).filter(Boolean).slice(0, 12) : [],
+    canonical_props: Array.isArray(item.canonical_props) ? item.canonical_props.map((name) => cleanText(name, 120)).filter(Boolean).slice(0, 12) : [],
+    production_aids: Array.isArray(item.production_aids) ? item.production_aids.map((name) => cleanText(name, 120)).filter(Boolean).slice(0, 12) : [],
+    duration_seconds: Number(item.duration_seconds || 0),
+  };
+}
+
+function safeRecordOfLists(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(
+    Object.entries(source).map(([key, list]) => [
+      cleanToken(key, 40),
+      Array.isArray(list) ? list.map((item) => cleanText(item, 120)).filter(Boolean).slice(0, 24) : [],
+    ]),
+  );
+}
+
+function arrayOfRecords(value) {
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
 }
 
 export function syncM6PreviewRunSession(session, context, run) {

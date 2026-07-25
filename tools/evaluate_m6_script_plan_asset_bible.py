@@ -9,25 +9,29 @@ from pathlib import Path
 def evaluate(root: Path) -> dict:
     findings: list[dict[str, str]] = []
     runtime = root / "apps/api/runtime_m6_script_plan_asset_bible.py"
+    server_codex = root / "apps/api/runtime_m6_server_codex_planner.py"
     adapter = root / "apps/api/runtime_film_production_graph.py"
     service = root / "apps/api/runtime_service.py"
     client = root / "apps/studio/src/runtime-client.js"
     lifecycle = root / "apps/studio/src/agent-chat-lifecycle.js"
+    panel = root / "apps/studio/src/agent-chat-panel.js"
     shell = root / "apps/studio/src/product-shell.js"
     projection = root / "apps/studio/src/production-graph-workspace-projection.js"
     styles = root / "apps/studio/styles/product-shell.css"
     tests = root / "tests/test_runtime_m6_script_plan_asset_bible.py"
-    for path in (runtime, adapter, service, client, lifecycle, shell, projection, styles, tests):
+    for path in (runtime, server_codex, adapter, service, client, lifecycle, panel, shell, projection, styles, tests):
         if not path.exists():
             findings.append({"severity": "P0", "issue": f"missing required M6 file: {path.relative_to(root)}"})
     if findings:
         return _report(findings)
 
     runtime_text = runtime.read_text(encoding="utf-8")
+    server_codex_text = server_codex.read_text(encoding="utf-8")
     adapter_text = adapter.read_text(encoding="utf-8")
     service_text = service.read_text(encoding="utf-8")
     client_text = client.read_text(encoding="utf-8")
     lifecycle_text = lifecycle.read_text(encoding="utf-8")
+    panel_text = panel.read_text(encoding="utf-8")
     shell_text = shell.read_text(encoding="utf-8")
     projection_text = projection.read_text(encoding="utf-8")
     styles_text = styles.read_text(encoding="utf-8")
@@ -44,13 +48,19 @@ def evaluate(root: Path) -> dict:
             "production_feasibility", "engineering_lineage_knowledge_safety",
         ))),
         ("P0", "asset Bible confirmation gate missing", "asset_bible" in runtime_text and "pending_confirmation" in runtime_text),
+        ("P0", "canonical scope review missing", "M6_SCOPE_REVIEW_SCHEMA_VERSION" in runtime_text and "build_m6_scope_review" in runtime_text and "fail_closed" in runtime_text),
+        ("P0", "production aids can still contaminate prop refs", "prop_refs must contain only canonical prop assets" in runtime_text and "production aids cannot appear in prop_refs" in runtime_text),
+        ("P0", "server Codex adapter does not fail closed on canonical drift", "canonical scope drift failed closed" in server_codex_text and "m6_source_canonical_scope" in server_codex_text),
         ("P0", "film adapter drops M6 professional metadata", "_film_metadata" in adapter_text and "shot_size" not in adapter_text),
+        ("P0", "film workspace still merges aids into props", "production_aids" in adapter_text and 'get("kind") == "prop"' in adapter_text),
         ("P0", "frontend M6 route client missing", "previewM6ScriptPlanAssetBible" in client_text and "confirmM6ScriptPlanAssetBible" in client_text),
         ("P0", "Agent Chat M6 command missing", "stageM6ScriptPlanCandidateCommand" in lifecycle_text and "m6_script_plan_asset_bible" in lifecycle_text),
+        ("P0", "Agent Chat confirmation card lacks itemized scope impact", "scope_impact" in lifecycle_text and "agent-m6-scope-impact" in panel_text and "范围影响清单" in panel_text),
         ("P0", "M6 path bypasses fixed right Agent Chat", "buildAgentChat" in shell_text and "stageM6ScriptPlanCandidateCommand" in shell_text),
         ("P0", "M6 creates a second shell/card stack", not any(token in shell_text for token in ("m6-card-stack", "m6-sequence-layout", "return buildGraphSequenceWorkspace"))),
         ("P1", "M6 planning input lacks responsive CSS", "m6-script-plan-entry" in styles_text and "grid-template-columns: 1fr" in styles_text),
         ("P1", "M6 tests do not attack fixed profiles", "fixed equal durations" in tests_text and "4x15" in tests_text and "10x6" in tests_text),
+        ("P1", "M6 tests do not attack canonical drift", "scope_drift_fails_closed" in tests_text and "prop_refs" in tests_text),
     ]
     for severity, issue, passed in checks:
         if not passed:
@@ -60,15 +70,30 @@ def evaluate(root: Path) -> dict:
         import sys
 
         sys.path.insert(0, str(root))
-        from apps.api.runtime_m6_script_plan_asset_bible import build_m6_script_plan_asset_bible
+        from apps.api.runtime_m6_script_plan_asset_bible import build_m6_script_plan_asset_bible, m6_source_canonical_scope
 
         cases = [_case_one(), _case_two(), _case_three()]
         previews = [build_m6_script_plan_asset_bible(f"eval-{index}", {"source_kind": "script", "source_text": text}) for index, text in enumerate(cases, start=1)]
         shot_counts = [len(item["candidate"]["shots"]) for item in previews]
         if len(set(shot_counts)) < 2:
             findings.append({"severity": "P0", "issue": "controlled corpora do not produce content-varying shot counts"})
-        for preview in previews:
+        for index, preview in enumerate(previews):
             candidate = preview["candidate"]
+            source_scope = m6_source_canonical_scope(cases[index])
+            if [row["display_name"] for row in candidate["characters"]] != source_scope["characters"]:
+                findings.append({"severity": "P0", "issue": "controlled corpus changed canonical character names"})
+            if [row["name"] for row in candidate["scenes"]] != source_scope["scenes"]:
+                findings.append({"severity": "P0", "issue": "controlled corpus changed canonical scene names"})
+            prop_assets = [row for row in candidate["assets"] if row.get("kind") == "prop"]
+            aid_assets = [row for row in candidate["assets"] if row.get("kind") in {"closeup", "reference_set", "style"}]
+            if [row["name"] for row in prop_assets] != source_scope["props"]:
+                findings.append({"severity": "P0", "issue": "controlled corpus changed canonical prop names"})
+            if set(candidate.get("asset_bible", {}).get("prop_refs", [])) != {row["asset_id"] for row in prop_assets}:
+                findings.append({"severity": "P0", "issue": "controlled corpus prop refs include non-props or miss canonical props"})
+            if set(candidate.get("asset_bible", {}).get("production_aid_refs", [])) != {row["asset_id"] for row in aid_assets}:
+                findings.append({"severity": "P0", "issue": "controlled corpus production aid refs incomplete"})
+            if candidate.get("m6_scope_review", {}).get("fail_closed", {}).get("status") != "pass":
+                findings.append({"severity": "P0", "issue": "controlled corpus scope review did not pass"})
             durations = [float(shot["duration_seconds"]) for shot in candidate["shots"]]
             if len(set(durations)) == 1:
                 findings.append({"severity": "P0", "issue": "controlled corpus produced fixed equal durations"})

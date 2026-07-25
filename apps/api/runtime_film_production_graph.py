@@ -268,13 +268,22 @@ def _sequence_workspace_projection(graph: Mapping[str, Any]) -> dict[str, Any]:
     units = [node for node in nodes.values() if node.get("category") == "unit"]
     resources = [node for node in nodes.values() if node.get("category") == "resource"]
     references = [node for node in resources if node.get("metadata", {}).get("kind") in {"reference", "reference_set"}]
-    props = [node for node in resources if node not in references]
+    production_aids = [
+        node for node in resources
+        if node.get("metadata", {}).get("classification") == "production_aid"
+        or node.get("metadata", {}).get("kind") in {"closeup", "reference", "reference_set", "style"}
+    ]
+    props = [
+        node for node in resources
+        if node.get("metadata", {}).get("kind") == "prop"
+        and node.get("metadata", {}).get("classification") != "production_aid"
+    ]
     versions = sorted(({"version": item["version"]} for item in graph["idempotency"].values()), key=lambda item: item["version"], reverse=True)
     return {"status": "ready", "graph_version": graph["version"], "graph_digest": graph["graph_digest"],
             "migration_state": "graph_backed_single_truth", "sequence": {
             "script_revisions": [node for node in nodes.values() if node.get("category") == "revision"],
             "characters": [node for node in nodes.values() if node.get("category") == "entity"],
-            "sequences": sequences, "scenes": scenes, "shots": units, "props": props, "reference_sets": references,
+            "sequences": sequences, "scenes": scenes, "shots": units, "props": props, "reference_sets": references, "production_aids": production_aids,
             "dependencies": graph["relations"], "tasks": list(graph["work"].values()), "candidates": list(graph["artifacts"].values()),
             "selections": [{"selection_key": key, **value} for key, value in graph["selections"].items()],
             "reviews": list(graph["reviews"].values()), "delivery_plan": list(graph["deliveries"].values()), "version_history": versions},

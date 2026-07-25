@@ -30,6 +30,7 @@ from apps.api.runtime_store import RuntimeStore
 
 M6_SCHEMA_VERSION = "afs.m6.script_plan_asset_bible.v0.1"
 FILM_SCHEMA_VERSION = "afs.film_domain_pack.v0.1"
+M6_SCOPE_REVIEW_SCHEMA_VERSION = "afs.m6.canonical_scope_review.v0.1"
 REVIEW_ROLES = (
     "screenwriter",
     "director_storyboard",
@@ -40,6 +41,8 @@ REVIEW_ROLES = (
 )
 KNOWLEDGE_LAYERS = {"fact", "user_preference", "project_decision", "draft", "long_term_experience"}
 KNOWLEDGE_SCOPES = {"project", "user", "team"}
+CANONICAL_ASSET_KINDS = {"prop"}
+PRODUCTION_AID_KINDS = {"closeup", "reference_set", "style"}
 
 
 class M6ScriptPlanPreviewRequest(BaseModel):
@@ -264,6 +267,13 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
     scene_rows = [_scene_row(project_key, candidate_key, index, name, source_text, revision_id) for index, name in enumerate(scenes, start=1)]
     asset_rows = _asset_rows(project_key, candidate_key, props, closeups, styles, character_rows, scene_rows, source_digest)
     shot_rows = _shot_rows(project_key, candidate_key, segments, character_rows, scene_rows, asset_rows, revision_id)
+    scope_review = build_m6_scope_review(
+        source_text=source_text,
+        characters=character_rows,
+        scenes=scene_rows,
+        assets=asset_rows,
+        shots=shot_rows,
+    )
     candidate = {
         "schema_version": FILM_SCHEMA_VERSION,
         "m6_schema_version": M6_SCHEMA_VERSION,
@@ -320,11 +330,14 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
             "status": "pending_confirmation",
             "character_refs": [row["character_id"] for row in character_rows],
             "scene_refs": [row["scene_id"] for row in scene_rows],
-            "prop_refs": [row["asset_id"] for row in asset_rows if row["kind"] in {"prop", "closeup"}],
+            "prop_refs": [row["asset_id"] for row in asset_rows if row["kind"] == "prop"],
+            "closeup_refs": [row["asset_id"] for row in asset_rows if row["kind"] == "closeup"],
             "reference_set_refs": [row["asset_id"] for row in asset_rows if row["kind"] == "reference_set"],
             "style_refs": [row["asset_id"] for row in asset_rows if row["kind"] == "style"],
+            "production_aid_refs": [row["asset_id"] for row in asset_rows if row["kind"] in PRODUCTION_AID_KINDS],
             "continuity_policy": "creator_confirmed_before_provider_dispatch",
         },
+        "m6_scope_review": scope_review,
         "knowledge_context": _knowledge_context(source_digest),
         "review_requirements": _review_requirements(),
         "issue_ledger": {
@@ -375,7 +388,7 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
         findings.append(_finding("P0", "structure", "candidate requires named characters, scenes, and at least two shots"))
     _check_required(characters, ("display_name", "goal", "conflict", "relationship_arc", "change_vector", "appearance", "wardrobe", "age_range", "proportion", "signature_features", "do_not_change"), findings, "character")
     _check_required(scenes, ("name", "space", "time_of_day", "lighting", "season", "continuity", "action", "rhythm", "emotion", "visual_expression", "do_not_change"), findings, "scene")
-    _check_required(assets, ("name", "kind", "rights_boundary", "source", "version", "applicable_scope", "confidence", "do_not_change"), findings, "asset")
+    _check_required(assets, ("name", "kind", "classification", "rights_boundary", "source", "version", "applicable_scope", "confidence", "do_not_change"), findings, "asset")
     _check_required(shots, ("duration_seconds", "intent", "shot_size", "camera_angle", "camera_movement", "blocking", "sound", "transition", "narrative_purpose", "content_driven_duration_reason"), findings, "shot")
     character_ids = {row.get("character_id") for row in characters}
     scene_ids = {row.get("scene_id") for row in scenes}
@@ -404,6 +417,8 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     for required_ref_key in ("character_refs", "scene_refs", "reference_set_refs"):
         if not bible.get(required_ref_key):
             findings.append(_finding("P1", "asset_bible_refs", f"asset Bible missing {required_ref_key}"))
+    _validate_m6_asset_scope(assets, bible, findings)
+    _validate_m6_scope_review(candidate, characters, scenes, assets, shots, findings)
     knowledge_items = _rows(candidate.get("knowledge_context") or {}, "items")
     for item in knowledge_items:
         missing = [key for key in ("source", "version", "applicable_scope", "confidence", "rights_boundary", "layer", "scope", "promotion_state", "rollback_ref") if not item.get(key)]
@@ -420,7 +435,22 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     p1 = sum(item["severity"] == "P1" for item in findings)
     if findings:
         raise M6PlanningError("; ".join(f"{item['severity']}:{item['surface']}:{item['issue']}" for item in findings[:6]))
-    return {"verdict": "PASS", "P0": p0, "P1": p1, "review_roles": sorted(roles), "provider_dispatch_count": provider_dispatch_count, "cost_usd": cost_usd}
+    scope_review = candidate.get("m6_scope_review") if isinstance(candidate.get("m6_scope_review"), Mapping) else {}
+    return {
+        "verdict": "PASS",
+        "P0": p0,
+        "P1": p1,
+        "review_roles": sorted(roles),
+        "provider_dispatch_count": provider_dispatch_count,
+        "cost_usd": cost_usd,
+        "canonical_scope": {
+            "status": "PASS",
+            "characters": len((scope_review.get("canonical") or {}).get("characters") or []),
+            "scenes": len((scope_review.get("canonical") or {}).get("scenes") or []),
+            "props": len((scope_review.get("canonical") or {}).get("props") or []),
+            "production_aids": len(scope_review.get("production_aids") or []),
+        },
+    }
 
 
 def _character_row(project_key: str, candidate_key: str, index: int, name: str, source_text: str) -> dict[str, Any]:
@@ -487,6 +517,7 @@ def _asset_row(project_key: str, candidate_key: str, kind: str, name: str, sourc
         "asset_id": f"{project_key}-m6-{kind}-{index}-{candidate_key}",
         "name": name,
         "kind": kind,
+        **m6_asset_scope_fields(kind),
         "source": "user_supplied_text_or_zero_cost_deterministic_preview",
         "version": "candidate.v1",
         "applicable_scope": "project",
@@ -495,6 +526,30 @@ def _asset_row(project_key: str, candidate_key: str, kind: str, name: str, sourc
         "style": name if kind == "style" else "",
         "do_not_change": ["名称", "用途", "相对尺寸", "镜头间连续状态"],
         "source_digest": source_digest,
+    }
+
+
+def m6_asset_scope_fields(kind: str) -> dict[str, str]:
+    normalized = str(kind or "").strip()
+    if normalized in CANONICAL_ASSET_KINDS:
+        return {
+            "classification": "canonical_prop",
+            "canonical_asset_type": "prop",
+            "production_aid_type": "",
+            "scope_authority": "user_supplied_canonical_scope",
+        }
+    if normalized in PRODUCTION_AID_KINDS:
+        return {
+            "classification": "production_aid",
+            "canonical_asset_type": "",
+            "production_aid_type": normalized,
+            "scope_authority": "production_aid_not_canonical_asset",
+        }
+    return {
+        "classification": "unknown",
+        "canonical_asset_type": "",
+        "production_aid_type": "",
+        "scope_authority": "unclassified",
     }
 
 
@@ -531,6 +586,353 @@ def _shot_rows(
             "source_evidence_refs": [{"source_kind": "script_revision", "source_id": revision_id, "quote": segment[:240]}],
         })
     return rows
+
+
+def m6_source_canonical_scope(source_text: str) -> dict[str, list[str]]:
+    text = _clean_text(source_text)
+    return {
+        "characters": _extract_named_characters(text),
+        "scenes": _extract_scenes(text),
+        "props": _extract_list_after_labels(text, ("道具", "props", "prop")),
+        "closeups": _extract_list_after_labels(text, ("特写", "closeups", "closeup")),
+        "styles": _extract_list_after_labels(text, ("风格", "视觉风格", "style")),
+    }
+
+
+def build_m6_scope_review(
+    *,
+    source_text: str,
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+    shots: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    source_scope = m6_source_canonical_scope(source_text)
+    canonical = {
+        "characters": list(source_scope["characters"]),
+        "scenes": list(source_scope["scenes"]),
+        "props": list(source_scope["props"]),
+    }
+    candidate_canonical = {
+        "characters": [_clean_label(str(row.get("display_name") or "")) for row in characters if _clean_label(str(row.get("display_name") or ""))],
+        "scenes": [_clean_label(str(row.get("name") or "")) for row in scenes if _clean_label(str(row.get("name") or ""))],
+        "props": [_clean_label(str(row.get("name") or "")) for row in assets if row.get("kind") == "prop" and _clean_label(str(row.get("name") or ""))],
+    }
+    drift = _canonical_scope_drift(canonical, candidate_canonical)
+    additions = _scope_additions(characters, scenes, assets, shots)
+    production_aids = [
+        {
+            "asset_id": str(row.get("asset_id") or ""),
+            "name": str(row.get("name") or ""),
+            "kind": str(row.get("kind") or ""),
+            "classification": "production_aid",
+            "production_aid_type": str(row.get("production_aid_type") or row.get("kind") or ""),
+        }
+        for row in assets
+        if str(row.get("kind") or "") in PRODUCTION_AID_KINDS
+    ]
+    return {
+        "schema_version": M6_SCOPE_REVIEW_SCHEMA_VERSION,
+        "source_authority": "user_supplied_canonical_scope",
+        "canonical": canonical,
+        "candidate_canonical": candidate_canonical,
+        "production_aids": production_aids,
+        "proposed_additions": additions,
+        "proposed_renames": drift["renamed_canonical_entities"],
+        "proposed_expansions": _scope_expansions(characters, scenes, assets, shots),
+        "proposed_classifications": _scope_classifications(characters, scenes, assets),
+        "affected_associations": _scope_associations(characters, scenes, assets, shots),
+        "fail_closed": {
+            "status": "pass" if not drift["reasons"] else "blocked",
+            "reasons": drift["reasons"],
+            "extra_canonical_entities": drift["extra_canonical_entities"],
+            "missing_canonical_entities": drift["missing_canonical_entities"],
+            "renamed_canonical_entities": drift["renamed_canonical_entities"],
+        },
+    }
+
+
+def _scope_additions(
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+    shots: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    additions: list[dict[str, Any]] = []
+    for row in characters:
+        additions.append({
+            "item_type": "character",
+            "id": str(row.get("character_id") or ""),
+            "name": str(row.get("display_name") or ""),
+            "classification": "canonical_character",
+            "authority": "user_supplied_canonical_scope",
+        })
+    for row in scenes:
+        additions.append({
+            "item_type": "scene",
+            "id": str(row.get("scene_id") or ""),
+            "name": str(row.get("name") or ""),
+            "classification": "canonical_scene",
+            "authority": "user_supplied_canonical_scope",
+        })
+    for row in assets:
+        kind = str(row.get("kind") or "")
+        additions.append({
+            "item_type": "asset",
+            "id": str(row.get("asset_id") or ""),
+            "name": str(row.get("name") or ""),
+            "kind": kind,
+            "classification": str(row.get("classification") or ""),
+            "authority": "user_supplied_canonical_scope" if kind == "prop" else "production_aid_pending_confirmation",
+        })
+    for index, row in enumerate(shots, start=1):
+        additions.append({
+            "item_type": "shot",
+            "id": str(row.get("shot_id") or ""),
+            "name": f"镜头{index}",
+            "classification": "production_shot",
+            "duration_seconds": float(row.get("duration_seconds") or 0),
+        })
+    return additions
+
+
+def _scope_expansions(
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+    shots: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    expansions: list[dict[str, Any]] = []
+    for row in characters:
+        expansions.append({
+            "item_type": "character",
+            "name": str(row.get("display_name") or ""),
+            "fields": ["goal", "conflict", "relationship_arc", "change_vector", "appearance", "continuity_locks"],
+        })
+    for row in scenes:
+        expansions.append({
+            "item_type": "scene",
+            "name": str(row.get("name") or ""),
+            "fields": ["space", "time_of_day", "lighting", "season", "continuity", "action", "rhythm", "emotion", "visual_expression"],
+        })
+    for row in assets:
+        expansions.append({
+            "item_type": "asset",
+            "name": str(row.get("name") or ""),
+            "fields": ["source", "rights_boundary", "version", "applicable_scope", "do_not_change"],
+        })
+    for index, row in enumerate(shots, start=1):
+        expansions.append({
+            "item_type": "shot",
+            "name": f"镜头{index}",
+            "fields": ["intent", "duration_seconds", "shot_size", "camera_angle", "camera_movement", "blocking", "sound", "transition"],
+        })
+    return expansions
+
+
+def _scope_classifications(
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    rows.extend(
+        {
+            "item_type": "character",
+            "id": str(row.get("character_id") or ""),
+            "name": str(row.get("display_name") or ""),
+            "classification": "canonical_character",
+        }
+        for row in characters
+    )
+    rows.extend(
+        {
+            "item_type": "scene",
+            "id": str(row.get("scene_id") or ""),
+            "name": str(row.get("name") or ""),
+            "classification": "canonical_scene",
+        }
+        for row in scenes
+    )
+    rows.extend(
+        {
+            "item_type": "asset",
+            "id": str(row.get("asset_id") or ""),
+            "name": str(row.get("name") or ""),
+            "kind": str(row.get("kind") or ""),
+            "classification": str(row.get("classification") or ""),
+            "canonical_asset_type": str(row.get("canonical_asset_type") or ""),
+            "production_aid_type": str(row.get("production_aid_type") or ""),
+        }
+        for row in assets
+    )
+    return rows
+
+
+def _scope_associations(
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+    shots: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    character_names = {str(row.get("character_id") or ""): str(row.get("display_name") or "") for row in characters}
+    scene_names = {str(row.get("scene_id") or ""): str(row.get("name") or "") for row in scenes}
+    asset_by_id = {str(row.get("asset_id") or ""): row for row in assets}
+    prop_assets = [row for row in assets if row.get("kind") == "prop"]
+    aid_assets = [row for row in assets if str(row.get("kind") or "") in PRODUCTION_AID_KINDS]
+    associations: list[dict[str, Any]] = [
+        {
+            "association_type": "asset_bible.character_refs",
+            "names": [str(row.get("display_name") or "") for row in characters],
+            "classification": "canonical_character_refs",
+        },
+        {
+            "association_type": "asset_bible.scene_refs",
+            "names": [str(row.get("name") or "") for row in scenes],
+            "classification": "canonical_scene_refs",
+        },
+        {
+            "association_type": "asset_bible.prop_refs",
+            "names": [str(row.get("name") or "") for row in prop_assets],
+            "classification": "canonical_prop_refs_only",
+        },
+        {
+            "association_type": "asset_bible.production_aid_refs",
+            "names": [str(row.get("name") or "") for row in aid_assets],
+            "classification": "production_aid_refs_not_canonical_props",
+        },
+    ]
+    for index, shot in enumerate(shots, start=1):
+        referenced_assets = [asset_by_id.get(str(asset_id or "")) for asset_id in shot.get("asset_refs") or []]
+        referenced_assets = [row for row in referenced_assets if row]
+        associations.append({
+            "association_type": "shot.references",
+            "name": f"镜头{index}",
+            "scene": scene_names.get(str(shot.get("scene_id") or ""), ""),
+            "characters": [character_names.get(str(character_id or ""), "") for character_id in shot.get("character_refs") or []],
+            "canonical_props": [str(row.get("name") or "") for row in referenced_assets if row.get("kind") == "prop"],
+            "production_aids": [str(row.get("name") or "") for row in referenced_assets if str(row.get("kind") or "") in PRODUCTION_AID_KINDS],
+            "duration_seconds": float(shot.get("duration_seconds") or 0),
+        })
+    return associations
+
+
+def _canonical_scope_drift(canonical: Mapping[str, list[str]], candidate_canonical: Mapping[str, list[str]]) -> dict[str, Any]:
+    extra: list[dict[str, str]] = []
+    missing: list[dict[str, str]] = []
+    renamed: list[dict[str, str]] = []
+    reasons: list[str] = []
+    for entity_type in ("characters", "scenes", "props"):
+        expected = list(canonical.get(entity_type) or [])
+        actual = list(candidate_canonical.get(entity_type) or [])
+        missing.extend({"entity_type": entity_type, "name": name} for name in expected if name not in actual)
+        extra.extend({"entity_type": entity_type, "name": name} for name in actual if name not in expected)
+        if len(expected) == len(actual):
+            renamed.extend(
+                {
+                    "entity_type": entity_type,
+                    "before": before,
+                    "after": after,
+                    "classification": f"canonical_{entity_type[:-1]}_rename",
+                }
+                for before, after in zip(expected, actual)
+                if before != after
+            )
+    if extra:
+        reasons.append("extra_canonical_entities")
+    if missing:
+        reasons.append("missing_canonical_entities")
+    if renamed:
+        reasons.append("renamed_canonical_entities")
+    return {
+        "reasons": reasons,
+        "extra_canonical_entities": extra,
+        "missing_canonical_entities": missing,
+        "renamed_canonical_entities": renamed,
+    }
+
+
+def _validate_m6_asset_scope(
+    assets: list[Mapping[str, Any]],
+    bible: Mapping[str, Any],
+    findings: list[dict[str, str]],
+) -> None:
+    prop_ids = {row.get("asset_id") for row in assets if row.get("kind") == "prop"}
+    closeup_ids = {row.get("asset_id") for row in assets if row.get("kind") == "closeup"}
+    reference_set_ids = {row.get("asset_id") for row in assets if row.get("kind") == "reference_set"}
+    style_ids = {row.get("asset_id") for row in assets if row.get("kind") == "style"}
+    production_aid_ids = closeup_ids | reference_set_ids | style_ids
+    for row in assets:
+        kind = str(row.get("kind") or "")
+        expected = m6_asset_scope_fields(kind)
+        if expected["classification"] == "unknown":
+            findings.append(_finding("P0", "asset_scope", f"asset {row.get('asset_id')} uses unsupported kind {kind}"))
+            continue
+        if row.get("classification") != expected["classification"]:
+            findings.append(_finding("P0", "asset_scope", f"asset {row.get('asset_id')} classification must be {expected['classification']}"))
+        if str(row.get("canonical_asset_type") or "") != expected["canonical_asset_type"]:
+            findings.append(_finding("P0", "asset_scope", f"asset {row.get('asset_id')} canonical type drifted"))
+        if str(row.get("production_aid_type") or "") != expected["production_aid_type"]:
+            findings.append(_finding("P0", "asset_scope", f"asset {row.get('asset_id')} production aid type drifted"))
+
+    prop_refs = set(bible.get("prop_refs") or [])
+    if prop_refs != prop_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "asset Bible prop_refs must contain only canonical prop assets"))
+    if prop_refs & production_aid_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "production aids cannot appear in prop_refs"))
+    if set(bible.get("closeup_refs") or []) != closeup_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "closeup_refs must contain only closeup production aids"))
+    if set(bible.get("reference_set_refs") or []) != reference_set_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "reference_set_refs must contain only reference set production aids"))
+    if set(bible.get("style_refs") or []) != style_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "style_refs must contain only style production aids"))
+    if set(bible.get("production_aid_refs") or []) != production_aid_ids:
+        findings.append(_finding("P0", "asset_bible_refs", "production_aid_refs must enumerate every closeup/reference/style aid"))
+
+
+def _validate_m6_scope_review(
+    candidate: Mapping[str, Any],
+    characters: list[Mapping[str, Any]],
+    scenes: list[Mapping[str, Any]],
+    assets: list[Mapping[str, Any]],
+    shots: list[Mapping[str, Any]],
+    findings: list[dict[str, str]],
+) -> None:
+    review = candidate.get("m6_scope_review") if isinstance(candidate.get("m6_scope_review"), Mapping) else None
+    if not review:
+        findings.append(_finding("P0", "m6_scope_review", "candidate must carry canonical scope review"))
+        return
+    if review.get("schema_version") != M6_SCOPE_REVIEW_SCHEMA_VERSION:
+        findings.append(_finding("P0", "m6_scope_review", "canonical scope review schema mismatch"))
+    fail_closed = review.get("fail_closed") if isinstance(review.get("fail_closed"), Mapping) else {}
+    if fail_closed.get("status") != "pass":
+        findings.append(_finding("P0", "m6_scope_review", f"canonical scope review failed closed: {', '.join(fail_closed.get('reasons') or [])}"))
+    for key in ("extra_canonical_entities", "missing_canonical_entities", "renamed_canonical_entities"):
+        if fail_closed.get(key):
+            findings.append(_finding("P0", "m6_scope_review", f"canonical scope review contains {key}"))
+
+    canonical = review.get("canonical") if isinstance(review.get("canonical"), Mapping) else {}
+    expected = {
+        "characters": list(canonical.get("characters") or []),
+        "scenes": list(canonical.get("scenes") or []),
+        "props": list(canonical.get("props") or []),
+    }
+    actual = {
+        "characters": [str(row.get("display_name") or "") for row in characters],
+        "scenes": [str(row.get("name") or "") for row in scenes],
+        "props": [str(row.get("name") or "") for row in assets if row.get("kind") == "prop"],
+    }
+    for entity_type, expected_names in expected.items():
+        if actual[entity_type] != expected_names:
+            findings.append(_finding("P0", "m6_scope_review", f"{entity_type} must exactly match user canonical scope"))
+    if not review.get("proposed_additions") or not review.get("proposed_expansions"):
+        findings.append(_finding("P0", "m6_scope_review", "confirmation scope review must enumerate additions and expansions"))
+    if len(review.get("proposed_classifications") or []) < len(characters) + len(scenes) + len(assets):
+        findings.append(_finding("P0", "m6_scope_review", "confirmation scope review must enumerate classifications"))
+    association_types = {item.get("association_type") for item in review.get("affected_associations") or [] if isinstance(item, Mapping)}
+    required_associations = {"asset_bible.character_refs", "asset_bible.scene_refs", "asset_bible.prop_refs", "asset_bible.production_aid_refs", "shot.references"}
+    if not required_associations <= association_types:
+        findings.append(_finding("P0", "m6_scope_review", "confirmation scope review must enumerate affected associations"))
 
 
 def _knowledge_context(source_digest: str) -> dict[str, Any]:
