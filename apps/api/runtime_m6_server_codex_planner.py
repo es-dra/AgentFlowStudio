@@ -15,9 +15,13 @@ from apps.api.runtime_m6_script_plan_asset_bible import (
     FILM_SCHEMA_VERSION,
     M6_SCHEMA_VERSION,
     M6PlanningError,
+    PRODUCTION_AID_KINDS,
+    build_m6_scope_review,
     _knowledge_context,
     _review_requirements,
     _safe_token,
+    m6_asset_scope_fields,
+    m6_source_canonical_scope,
     validate_m6_candidate,
 )
 from apps.api.runtime_production_graph import canonical_digest
@@ -134,6 +138,7 @@ def m6_server_codex_output_schema() -> dict[str, Any]:
     text = {"type": "string", "minLength": 2}
     sentence = {"type": "string", "minLength": 8}
     lock_list = {"type": "array", "minItems": 2, "maxItems": 8, "items": text}
+    index_list = {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "integer", "minimum": 1}}
     return {
         "type": "object",
         "additionalProperties": False,
@@ -205,8 +210,8 @@ def m6_server_codex_output_schema() -> dict[str, Any]:
             },
             "assets": {
                 "type": "array",
-                "minItems": 4,
-                "maxItems": 4,
+                "minItems": 1,
+                "maxItems": 32,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -237,7 +242,7 @@ def m6_server_codex_output_schema() -> dict[str, Any]:
                         "duration_seconds": {"type": "number"},
                         "intent": {"type": "string", "minLength": 10},
                         "character_indexes": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "integer", "minimum": 1}},
-                        "asset_indexes": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "integer", "minimum": 1, "enum": [1, 2, 3, 4]}},
+                        "asset_indexes": index_list,
                         "shot_size": {"type": "string", "enum": ["特写", "近景", "中景", "全景", "远景", "过肩", "主观"]},
                         "camera_angle": text,
                         "camera_movement": text,
@@ -264,6 +269,15 @@ def _server_codex_prompt(
     schema_digest: str,
     dispatch_id: str,
 ) -> str:
+    source_scope = m6_source_canonical_scope(source_text)
+    canonical_clause = "\n".join(
+        [
+            f"- canonical characters（必须逐字保留且不得增删）: {_join_names(source_scope['characters'])}",
+            f"- canonical scenes（必须逐字保留且不得改名）: {_join_names(source_scope['scenes'])}",
+            f"- canonical props（仅这些可作为 prop；不得把特写/参考/风格写进 prop）: {_join_names(source_scope['props'])}",
+            f"- production aids from user text（只能作为 closeup/style 等辅助项，不是 canonical prop）: closeups={_join_names(source_scope['closeups'])}; styles={_join_names(source_scope['styles'])}",
+        ]
+    )
     revision_clause = (
         f"这是第二轮或后续修订。上一轮候选谱系校验码: {parent_candidate_digest}。"
         f"该校验码只用于系统确认本次调用引用上一轮，不得写入标题、剧本文本、镜头目的、资产名称或任何创作字段；只针对反馈修复：{revision_instruction}"
@@ -279,17 +293,20 @@ dispatch_id: {dispatch_id}
 schema_digest: {schema_digest}
 修订要求: {revision_clause}
 
-硬性合同:
-- 写一个精炼但完整的专业影视剧本规划；draft_text 至少 260 个中文字符，但不要扩展成长文。
-- 角色必须有目标、冲突、关系、变化、外观、服装、年龄、比例、标志特征、禁止变化项；角色、场景、镜头和资产名称必须是中文专名，不得用英文单词加数字的占位名。
-- 禁止把字段写成“占位”“说明”“待定”“无”“未知”或只有标点；必须从用户文本中生成具体角色、场景、道具、特写和关系。
+	硬性合同:
+	- 写一个精炼但完整的专业影视剧本规划；draft_text 至少 260 个中文字符，但不要扩展成长文。
+	- 用户 canonical identity 是最高权威。下列名称必须按原文逐字保留，不能翻译、改名、替换、合并、补别名或提升模型自创名称：
+	{canonical_clause}
+	- 角色必须有目标、冲突、关系、变化、外观、服装、年龄、比例、标志特征、禁止变化项；角色、场景、镜头和资产名称必须是中文专名，不得用英文单词加数字的占位名。
+	- 禁止把字段写成“占位”“说明”“待定”“无”“未知”或只有标点；必须从用户文本中生成具体角色、场景、道具、特写和关系。
 - 场景必须有空间、时间、光线、季节、连续性、动作、节奏、情绪、视觉表达、对白或声音。
 - 镜头 3 到 7 个，数量和时长由内容决定；禁止固定 4x15、10x6、固定镜头数或关键词模板。
 - 单个镜头 duration_seconds 必须在 3 到 18 秒之间，总时长保持可执行；不要把一个复杂动作塞进超长单镜头。
 - 每镜头必须有景别、机位、运动、调度、声音、转场、叙事目的、内容驱动时长理由。
 - scene_index、character_indexes、asset_indexes 全部从一开始编号，最小值是 1，绝不能输出 0。
-- assets 必须恰好 4 项，顺序固定：1=prop，2=closeup，3=reference_set，4=style；资产名称必须使用中文。
-- asset_indexes 只能使用 1、2、3、4，必须引用上述四项之一，绝不能输出 5 或更大数字。
+	- assets 必须包含每一个用户 canonical prop，kind 只能为 prop，名称必须逐字等于 canonical props；如用户没有 canonical prop，不得自创 prop。
+	- closeup、reference_set、style 只能作为 production aid；它们可以补充制作判断，但不得伪装成 prop，不得增加 canonical 角色/场景/道具数量。
+	- asset_indexes 必须引用 assets 数组中真实存在的 1-based 序号，不得越界。
 - 必须覆盖权利边界、时间/摘要闭环、关系深度、制片可执行性；禁止媒体兜底或图片/视频承诺。
 - 禁止英文污染；除 schema 代码值外，所有创作文本用中文。
 - 输出完整闭合 JSON；不要 markdown、解释、路径、登录信息或原始元数据。
@@ -341,6 +358,7 @@ def _candidate_from_provider_payload(
             "asset_id": f"{project_key}-m6-{_safe_token(str(row.get('kind') or 'asset'))}-{index}-{candidate_key}",
             "source_digest": source_digest,
             **_copy_required(row, ("name", "kind", "source", "version", "applicable_scope", "confidence", "rights_boundary", "style", "do_not_change")),
+            **m6_asset_scope_fields(str(row.get("kind") or "")),
         }
         for index, row in enumerate(_rows(payload, "assets"), start=1)
     ]
@@ -364,6 +382,17 @@ def _candidate_from_provider_payload(
         raise M6PlanningError("server_codex output used fixed equal shot durations")
     structure = dict(payload.get("structure") or {})
     output_chars = len(str(payload))
+    scope_review = build_m6_scope_review(
+        source_text=_text(body.get("source_text")),
+        characters=characters,
+        scenes=scenes,
+        assets=assets,
+        shots=shots,
+    )
+    if scope_review.get("fail_closed", {}).get("status") != "pass":
+        fail_closed = scope_review.get("fail_closed") or {}
+        reasons = ", ".join(fail_closed.get("reasons") or ["canonical_scope_drift"])
+        raise M6PlanningError(f"server_codex canonical scope drift failed closed: {reasons}")
     candidate = {
         "schema_version": FILM_SCHEMA_VERSION,
         "m6_schema_version": M6_SCHEMA_VERSION,
@@ -452,11 +481,14 @@ def _candidate_from_provider_payload(
             "status": "pending_confirmation",
             "character_refs": [row["character_id"] for row in characters],
             "scene_refs": [row["scene_id"] for row in scenes],
-            "prop_refs": [row["asset_id"] for row in assets if row["kind"] in {"prop", "closeup"}],
+            "prop_refs": [row["asset_id"] for row in assets if row["kind"] == "prop"],
+            "closeup_refs": [row["asset_id"] for row in assets if row["kind"] == "closeup"],
             "reference_set_refs": [row["asset_id"] for row in assets if row["kind"] == "reference_set"],
             "style_refs": [row["asset_id"] for row in assets if row["kind"] == "style"],
+            "production_aid_refs": [row["asset_id"] for row in assets if row["kind"] in PRODUCTION_AID_KINDS],
             "continuity_policy": "creator_confirmed_before_any_media_provider_dispatch",
         },
+        "m6_scope_review": scope_review,
         "knowledge_context": _knowledge_context(source_digest),
         "review_requirements": _review_requirements(),
         "issue_ledger": {
@@ -496,6 +528,10 @@ def _by_one_based_index(rows: list[dict[str, Any]], index: int, field: str) -> d
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _join_names(values: list[str]) -> str:
+    return "、".join(value for value in values if value) or "（无）"
 
 
 __all__ = (

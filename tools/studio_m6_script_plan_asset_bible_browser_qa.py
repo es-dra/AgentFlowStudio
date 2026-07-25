@@ -20,7 +20,7 @@ from studio_asset_context_browser_qa_support import chrome_path, free_port, runt
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STAMP = int(time.time())
 PROJECT_ID = f"m6-browser-script-bible-{STAMP}"
-VIEWPORTS = ({"width": 1440, "height": 900}, {"width": 1024, "height": 768}, {"width": 800, "height": 900})
+VIEWPORTS = ({"width": 1920, "height": 1080}, {"width": 1440, "height": 900})
 SOURCE_TEXT = """
 角色：林澈、唐予。场景：夜晚旧剪辑室、清晨屋顶。道具：场记板、旧镜头。特写：林澈手背的伤痕、时间线上的红色标记。
 风格：克制写实冷暖对照。时间：夜晚到清晨。光线：剪辑室屏幕冷光与屋顶晨光。季节：初秋。连续性：旧镜头始终在唐予手边。
@@ -118,9 +118,9 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
             first = browser.new_page(viewport=VIEWPORTS[0])
             configure(first, repo, timeout_ms, console_errors, response_errors)
             first.goto(f"{base_url}/studio/?project={PROJECT_ID}&stage=canvas&qa=m6-preview", wait_until="domcontentloaded")
-            results["m6-preview-confirm-1440x900"] = assert_m6_preview_confirm(first, base_url)
-            screenshots["m6-preview-confirm-1440x900"] = str((screenshot_dir / "m6-preview-confirm-1440x900.png").resolve())
-            first.screenshot(path=screenshots["m6-preview-confirm-1440x900"], full_page=True)
+            results["m6-preview-confirm-1920x1080"] = assert_m6_preview_confirm(first, base_url, screenshot_dir)
+            screenshots["m6-after-confirm-1920x1080"] = str((screenshot_dir / "m6-after-confirm-1920x1080.png").resolve())
+            first.screenshot(path=screenshots["m6-after-confirm-1920x1080"], full_page=True)
             first.close()
 
             for viewport in VIEWPORTS:
@@ -157,7 +157,7 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
     }
 
 
-def assert_m6_preview_confirm(page: Page, base_url: str) -> dict[str, Any]:
+def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -> dict[str, Any]:
     page.wait_for_selector(".graph-canvas-status.planning-required")
     plan_status = page.locator(".graph-canvas-status.planning-required")
     if page.get_by_role("button", name="展开制作方案").count():
@@ -168,8 +168,35 @@ def assert_m6_preview_confirm(page: Page, base_url: str) -> dict[str, Any]:
         page.get_by_role("button", name="制作方案").click()
     page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
     page.get_by_role("button", name="生成剧本制作方案").click()
-    expect(page.locator(".agent-command-preview")).to_contain_text("确认M6剧本制作方案")
-    expect(page.locator(".agent-command-preview")).to_contain_text("动态镜头")
+    preview = page.locator(".agent-command-preview")
+    expect(preview).to_contain_text("确认M6剧本制作方案")
+    expect(preview).to_contain_text("动态镜头")
+    for token in (
+        "范围影响清单",
+        "新增",
+        "改名",
+        "扩写",
+        "分类",
+        "关联",
+        "林澈",
+        "唐予",
+        "夜晚旧剪辑室",
+        "清晨屋顶",
+        "场记板",
+        "旧镜头",
+        "规范道具 canonical_prop",
+        "生产辅助 production_aid",
+        "Asset Bible 道具引用",
+        "Asset Bible 辅助引用",
+    ):
+        expect(preview).to_contain_text(token)
+    expect(preview).to_contain_text("改名 0")
+    expect(preview.locator(".agent-m6-scope-group").filter(has_text="改名")).to_contain_text("无")
+    preview_text = preview.inner_text()
+    if "生产辅助 production_aid" not in preview_text or "规范道具 canonical_prop" not in preview_text:
+        raise AssertionError("confirmation card does not expose canonical/prod-aid classification")
+    preview_screenshot = str((screenshot_dir / "m6-confirmation-card-1920x1080.png").resolve())
+    page.screenshot(path=preview_screenshot, full_page=True)
     page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
     page.wait_for_selector(".graph-canvas-status.ready")
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
@@ -177,7 +204,14 @@ def assert_m6_preview_confirm(page: Page, base_url: str) -> dict[str, Any]:
         raise AssertionError("M6 confirmation did not produce one graph projection")
     if len(workspace["sequence"]["shots"]) < 2 or len(workspace["sequence"]["characters"]) < 2:
         raise AssertionError("M6 graph is missing shots or named characters")
-    return {"planning_required": True, "agent_preview": True, "explicit_confirmation": True, "same_graph_projection": True}
+    return {
+        "planning_required": True,
+        "agent_preview": True,
+        "pc_confirmation_card_transparent": True,
+        "confirmation_card_screenshot": preview_screenshot,
+        "explicit_confirmation": True,
+        "same_graph_projection": True,
+    }
 
 
 def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
@@ -208,7 +242,10 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
 def ensure_agent_visible(page: Page) -> None:
     if page.locator(".studio-agent-chat:visible").count():
         return
-    page.get_by_role("button", name="Agent").click()
+    if page.get_by_role("button", name="Agent").count():
+        page.get_by_role("button", name="Agent").click()
+    elif page.get_by_role("button", name="搭档").count():
+        page.get_by_role("button", name="搭档").click()
     expect(page.locator(".studio-agent-chat")).to_be_visible()
 
 
