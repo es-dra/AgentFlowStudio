@@ -74,7 +74,7 @@ export function requestProjectName(existingProjects = []) {
 }
 
 export function projectDisplayName(project) {
-  return project?.studio_state_meta?.projectName || project?.goal || project?.project_id || "";
+  return project?.studio_state_meta?.projectName || project?.goal || "未命名项目";
 }
 
 function isDuplicateProjectName(name, projects) {

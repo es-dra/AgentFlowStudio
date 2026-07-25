@@ -23,6 +23,7 @@ from agentflow_studio.production.adaptive_canvas_v2 import (
     seed_agent_authored_script_truth,
 )
 from agentflow_studio.production.media_operations_review import (
+    _classification,
     build_media_operations_command_preview,
     load_media_operations_review,
     media_file_path,
@@ -264,7 +265,6 @@ def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
     assert review["commands"][0]["paid_until_confirmed"] is False
     assert "not_human_creative_acceptance" in review["advanced_evidence"]["non_claims"]
     assert not any(token in serialized.lower() for token in ("/home/", "/tmp/", "/var/", "api_key", "authorization", "bearer", "secret", ".mp4", ".png"))
-
     preview = build_media_operations_command_preview(
         store,
         project_id="m6-3-ops-profile",
@@ -280,6 +280,14 @@ def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
     assert preview["idempotency_key"].startswith("m6-3-")
     assert "不会发起生成或产生费用" in preview["human_message"]
     assert "Provider" not in preview["human_message"]
+
+
+def test_media_recovery_classification_depends_on_ledger_not_project_name() -> None:
+    assert _classification({}) == "CLEAN_FULL_CASE"
+    assert _classification({"attempts": [], "project_id": "sci_fi_chamber-adversarial"}) == "CLEAN_FULL_CASE"
+    assert _classification({
+        "attempts": [{"attempt_id": "attempt-1", "stage": "video_chunk", "status": "failed"}],
+    }) == "RECOVERY_EVIDENCE_NOT_COUNTED"
 
 
 def test_media_operations_preview_route_serves_only_known_runtime_media(

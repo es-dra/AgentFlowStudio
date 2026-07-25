@@ -102,6 +102,9 @@ def test_empty_project_canvas_and_agent_offer_the_same_enabled_next_action() -> 
     assert '".canvas-empty-onboarding textarea"' in shell
     assert "agentCollapsed = isNarrowAgentLayout();" in shell
     assert "agentCollapsed = true;" not in shell
+    display_name = shell.split("function projectDisplayName()", 1)[1].split("function projectIdentityStatus()", 1)[0]
+    assert "snapshot.project?.project_id" not in display_name
+    assert '|| "未命名项目"' in display_name
 
 
 def test_media_result_context_offers_review_instead_of_starting_over() -> None:

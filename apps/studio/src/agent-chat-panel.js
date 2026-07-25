@@ -899,7 +899,7 @@ function m6ScopeItemText(item = {}) {
     return `${type}：${item.before || "未列出"} → ${item.after || "未列出"}${item.classification ? `（${m6ClassificationLabel(item.classification)}）` : ""}`;
   }
   if (Array.isArray(item.fields) && item.fields.length) {
-    return `${type}：${item.name || "未命名"} · ${item.fields.join("、")}`;
+    return `${type}：${item.name || "未命名"} · ${item.fields.map(m6FieldLabel).join("、")}`;
   }
   const parts = [type, item.name].filter(Boolean);
   const tags = [m6ClassificationLabel(item.classification)].filter(Boolean);
@@ -958,6 +958,39 @@ function m6ScopeTypeLabel(type) {
     "asset_bible.production_aid_refs": "制作参考清单",
     "shot.references": "镜头引用",
   }[type] || humanToken(type);
+}
+
+function m6FieldLabel(value) {
+  return {
+    goal: "创作目标",
+    conflict: "核心冲突",
+    relationship_arc: "关系变化",
+    change_vector: "角色转变",
+    appearance: "外观特征",
+    continuity_locks: "连续性要求",
+    space: "空间",
+    time_of_day: "时段",
+    lighting: "光线",
+    season: "季节",
+    continuity: "场景连续性",
+    action: "场景动作",
+    rhythm: "节奏",
+    emotion: "情绪",
+    visual_expression: "视觉表达",
+    source: "来源",
+    rights_boundary: "使用边界",
+    version: "版本",
+    applicable_scope: "适用范围",
+    do_not_change: "禁止变化",
+    intent: "镜头意图",
+    duration_seconds: "镜头时长",
+    shot_size: "景别",
+    camera_angle: "机位角度",
+    camera_movement: "镜头运动",
+    blocking: "人物调度",
+    sound: "声音",
+    transition: "转场",
+  }[String(value || "")] || "其他制作信息";
 }
 
 function humanToken(value) {

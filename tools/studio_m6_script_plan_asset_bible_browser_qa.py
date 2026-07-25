@@ -188,6 +188,10 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
         "制作参考",
         "道具清单",
         "制作参考清单",
+        "创作目标",
+        "关系变化",
+        "镜头时长",
+        "人物调度",
     ):
         expect(preview).to_contain_text(token)
     expect(preview).to_contain_text("名称变化 0")
@@ -195,10 +199,17 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
     preview_text = preview.inner_text()
     if "制作参考" not in preview_text or "主要道具" not in preview_text:
         raise AssertionError("confirmation card does not expose creator-readable asset classifications")
-    if any(token in preview_text for token in ("canonical_prop", "production_aid", "ProductionGraph", "M6")):
+    if any(token in preview_text for token in (
+        "canonical_prop", "production_aid", "ProductionGraph", "M6",
+        "relationship_arc", "duration_seconds", "camera_movement", "rights_boundary",
+    )):
         raise AssertionError("confirmation card leaks internal classification or graph vocabulary")
     preview_screenshot = str((screenshot_dir / "m6-confirmation-card-1920x1080.png").resolve())
     page.screenshot(path=preview_screenshot, full_page=True)
+    expansions = preview.locator(".agent-m6-scope-group").filter(has_text="内容补充")
+    expansions.scroll_into_view_if_needed()
+    expansion_screenshot = str((screenshot_dir / "m6-confirmation-expansions-1920x1080.png").resolve())
+    page.screenshot(path=expansion_screenshot, full_page=True)
     page.locator(".agent-command-preview").get_by_role("button", name="确认并保存").click()
     page.wait_for_selector(".graph-canvas-status.ready")
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
@@ -211,6 +222,7 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
         "agent_preview": True,
         "pc_confirmation_card_transparent": True,
         "confirmation_card_screenshot": preview_screenshot,
+        "confirmation_expansions_screenshot": expansion_screenshot,
         "explicit_confirmation": True,
         "same_graph_projection": True,
     }

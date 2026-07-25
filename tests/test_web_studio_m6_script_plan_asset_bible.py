@@ -44,6 +44,15 @@ def test_m6_frontend_contract_stays_in_single_shell_and_runtime_graph_path() -> 
     cancelled = panel.split('if (run?.phase !== "cancelled")', 1)[1].split("} catch", 1)[0]
     assert "session.pendingCommand = null;" in cancelled
     assert "cancelAgentCommand(session)" not in cancelled
+    for field, label in (
+        ("goal", "创作目标"),
+        ("relationship_arc", "关系变化"),
+        ("duration_seconds", "镜头时长"),
+        ("camera_movement", "镜头运动"),
+        ("rights_boundary", "使用边界"),
+    ):
+        assert f'{field}: "{label}"' in panel
+    assert "item.fields.map(m6FieldLabel)" in panel
     styles = (STUDIO_ROOT / "styles" / "product-shell.css").read_text(encoding="utf-8")
     assert ".studio-unified-workspace.agent-collapsed .canvas-workspace-stage .graph-canvas-status," in styles
     assert "buildCanvasWorkspace" in combined

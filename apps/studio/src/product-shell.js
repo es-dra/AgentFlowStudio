@@ -3812,10 +3812,9 @@ export function createProductShell(options = {}) {
   function projectDisplayName() {
     if (projectIdentityStatus() === "blocked") return "项目未载入";
     if (projectIdentityStatus() === "loading") return "正在验证项目";
-    const names = [snapshot.project?.name, snapshot.studioState?.meta?.projectName]
+    const names = [snapshot.project?.name, snapshot.project?.goal, snapshot.studioState?.meta?.projectName]
       .map((value) => String(value || "").trim());
-    return names.find((value) => value && !["未命名项目", "项目"].includes(value))
-      || String(snapshot.project?.project_id || snapshot.studioState?.meta?.projectId || "当前项目");
+    return names.find(Boolean) || "未命名项目";
   }
   function projectIdentityStatus() {
     return String(snapshot.studioState?.ui?.projectIdentity?.status || "ready");

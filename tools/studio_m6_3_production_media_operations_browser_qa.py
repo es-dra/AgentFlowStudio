@@ -118,6 +118,8 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
     page.screenshot(path=str(canvas_shot), full_page=True)
     canvas_text = page.locator("#product-shell-root").inner_text()
     assert_user_language(canvas_text, "canvas", case_id, viewport_key)
+    if project_id in canvas_text:
+        raise AssertionError(f"internal project id visible in creator surface for {case_id}:{viewport_key}")
     title_discoverable, title_screens = verify_project_title_discovery(page, case_id, viewport_key, screenshot_dir)
 
     page.get_by_role("tab", name="故事板").click()
