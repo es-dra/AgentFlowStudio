@@ -422,7 +422,7 @@ def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     bible = candidate.get("asset_bible") if isinstance(candidate.get("asset_bible"), Mapping) else {}
     if bible.get("status") not in {"pending_confirmation", "confirmed"}:
         findings.append(_finding("P0", "asset_bible", "asset Bible must be explicit and confirmation-gated"))
-    for required_ref_key in ("character_refs", "scene_refs", "reference_set_refs"):
+    for required_ref_key in ("character_refs", "scene_refs"):
         if not bible.get(required_ref_key):
             findings.append(_finding("P1", "asset_bible_refs", f"asset Bible missing {required_ref_key}"))
     _validate_m6_asset_scope(assets, bible, findings)

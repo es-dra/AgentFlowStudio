@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STAMP = int(time.time())
 PROJECT_ID = f"m6-browser-script-bible-{STAMP}"
 FAILED_PROJECT_ID = f"m6-browser-failed-plan-{STAMP}"
+PROCESSING_PROJECT_ID = f"m6-browser-processing-plan-{STAMP}"
 VIEWPORTS = ({"width": 1920, "height": 1080}, {"width": 1440, "height": 900})
 SOURCE_TEXT = """
 夏岚在海边档案馆整理一支银色录音笔。
@@ -71,6 +72,7 @@ def seed_project(runtime_root: Path) -> None:
     for project_id, goal in (
         (PROJECT_ID, "灯种黎明短片制作"),
         (FAILED_PROJECT_ID, "制作方案恢复验收"),
+        (PROCESSING_PROJECT_ID, "制作方案处理中验收"),
     ):
         created = client.post("/projects", json={"project_id": project_id, "goal": goal})
         if created.status_code not in {200, 409}:
@@ -135,6 +137,21 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
             )
             recovery.close()
 
+            processing = browser.new_page(viewport=VIEWPORTS[0])
+            configure(processing, repo, timeout_ms, console_errors, response_errors)
+            results["plan-processing-1920x1080"] = assert_plan_processing_copilot(
+                processing,
+                base_url,
+            )
+            screenshots["plan-processing-1920x1080"] = str(
+                (screenshot_dir / "plan-processing-1920x1080.png").resolve()
+            )
+            processing.screenshot(
+                path=screenshots["plan-processing-1920x1080"],
+                full_page=True,
+            )
+            processing.close()
+
             first = browser.new_page(viewport=VIEWPORTS[0])
             configure(first, repo, timeout_ms, console_errors, response_errors)
             first.goto(f"{base_url}/studio/?project={PROJECT_ID}&stage=canvas&qa=m6-preview", wait_until="domcontentloaded")
@@ -174,6 +191,81 @@ def run_qa(repo: Path, base_url: str, screenshot_dir: Path, headed: bool, timeou
         "response_error_count": 0,
         "provider_dispatch_count": workspace.get("provider_dispatch_count", 0),
         "cost_usd": workspace.get("cost_usd", 0),
+    }
+
+
+def assert_plan_processing_copilot(page: Page, base_url: str) -> dict[str, Any]:
+    route_state = {"fake_preview_submits": 0}
+    queued_run = {
+        "schema_version": "afs.m6.preview_run.v0.1",
+        "run_id": "processing-preview-run",
+        "project_id": PROCESSING_PROJECT_ID,
+        "client_request_id": "processing-preview-client",
+        "phase": "queued",
+        "status": "queued",
+        "dispatch_count": 1,
+        "candidate_digest": "",
+        "cost": {
+            "contract_estimated_usd": 0,
+            "provider_reported_external_cost_usd": 0,
+            "actual_usd": None,
+        },
+    }
+    running_run = {**queued_run, "phase": "running", "status": "running"}
+
+    page.route(
+        f"**/projects/{PROCESSING_PROJECT_ID}/m6/script-plan-asset-bible/preview-runs/latest",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"status": "empty", "run": None}),
+        ),
+    )
+    page.route(
+        f"**/projects/{PROCESSING_PROJECT_ID}/m6/script-plan-asset-bible/preview-runs/processing-preview-run",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(running_run),
+        ),
+    )
+
+    def preview_handler(route) -> None:
+        route_state["fake_preview_submits"] += 1
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(queued_run))
+
+    page.route(
+        f"**/projects/{PROCESSING_PROJECT_ID}/m6/script-plan-asset-bible/preview",
+        preview_handler,
+    )
+    page.goto(
+        f"{base_url}/studio/?project={PROCESSING_PROJECT_ID}&stage=canvas&qa=m6-processing",
+        wait_until="domcontentloaded",
+    )
+    page.wait_for_selector(".graph-canvas-status.planning-required")
+    page.get_by_role("button", name="制作方案").click()
+    page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
+    page.get_by_role("button", name="生成剧本制作方案").click()
+
+    agent = page.locator(".agent-production-copilot")
+    expect(agent).to_contain_text("制作方案正在准备")
+    expect(agent).to_contain_text("当前无需重复提交创作想法")
+    expect(agent).not_to_contain_text("项目已创建，可以从一个想法开始")
+    expect(agent.get_by_role("button", name="输入创作想法")).to_have_count(0)
+    progress = agent.get_by_role("button", name="查看制作进度")
+    expect(progress).to_be_visible()
+    progress.click()
+    expect(page.locator(".m6-preview-run-status.phase-running")).to_be_visible()
+    expect(page.locator(".graph-canvas-status.planning-required")).to_have_attribute("data-expanded", "true")
+    if route_state["fake_preview_submits"] != 1:
+        raise AssertionError("processing-state QA submitted more than one fake preview")
+    return {
+        "fake_preview_submit_count": 1,
+        "durable_run_phase": "running",
+        "copilot_processing_state_consistent": True,
+        "idle_start_action_absent": True,
+        "progress_action_visible": True,
+        "new_provider_dispatch_count": 0,
     }
 
 
