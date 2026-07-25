@@ -622,6 +622,7 @@ export function createProductShell(options = {}) {
     defer.type = "button";
     defer.addEventListener("click", () => {
       m6SourceText = "";
+      writeM6SourceDraft(currentM6SourceDraftKey(), "");
       setPlanningPanelOpen(false);
       notice = "已暂不处理制作方案；画布仍可从任意节点继续。";
       render();
@@ -639,6 +640,7 @@ export function createProductShell(options = {}) {
     textarea.setAttribute("aria-label", "输入想法或已有剧本");
     textarea.addEventListener("input", () => {
       m6SourceText = textarea.value;
+      writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     });
     const preview = node("button", "studio-primary-button", "生成剧本制作方案");
     preview.type = "button";
@@ -772,6 +774,9 @@ export function createProductShell(options = {}) {
     const expectedProjectId = currentM6ProjectId();
     if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
     const clientRequestId = runtime.newM6PreviewClientRequestId?.() || `m6_${Date.now()}`;
+    m6SourceText = String(sourceText || "");
+    writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
+    writeM6SourceDraft(currentM6SubmittedSourceKey(), m6SourceText);
     m6PreviewRun = {
       run_id: "",
       project_id: expectedProjectId,
@@ -2834,8 +2839,11 @@ export function createProductShell(options = {}) {
   function buildVersionBar() {
     const bar = node("footer", "storyboard-version-bar");
     const script = node("button", "studio-text-button");
+    const sceneAvailable = sceneModel().length > 0;
     script.type = "button";
     script.innerHTML = `${icon("script", 14)}脚本与对白`;
+    script.disabled = !sceneAvailable;
+    script.title = sceneAvailable ? "查看当前场景的脚本与对白" : "先完成制作方案并建立场景";
     script.addEventListener("click", () => {
       notice = "脚本上下文已绑定当前场景；详细内容保持折叠。";
       render();
@@ -2939,6 +2947,12 @@ export function createProductShell(options = {}) {
 
   function handleCopilotAction(action) {
     if (!action?.action) return;
+    if (action.action === "recover_plan_preview") {
+      showCanvas();
+      setPlanningPanelOpen(true);
+      void recoverM6PreviewRun();
+      return;
+    }
     if (action.action === "start_idea") {
       showCanvas();
       requestAnimationFrame(() => {
@@ -3228,6 +3242,9 @@ export function createProductShell(options = {}) {
     }
     planningPanelPreferenceKey = nextKey;
     planningPanelOpen = readPlanningPanelPreference(nextKey);
+    m6SourceText = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
+      ? readM6SourceDraft(currentM6SubmittedSourceKey()) || readM6SourceDraft(currentM6SourceDraftKey())
+      : readM6SourceDraft(currentM6SourceDraftKey());
   }
 
   function currentM6ProjectId() {
@@ -3256,6 +3273,9 @@ export function createProductShell(options = {}) {
       syncM6RunToAgent(run);
       if (run.phase === "succeeded") {
         stageRecoveredM6Candidate(run);
+      } else if (["failed", "unknown"].includes(String(run.phase || ""))) {
+        m6SourceText = readM6SourceDraft(currentM6SubmittedSourceKey())
+          || readM6SourceDraft(currentM6SourceDraftKey());
       } else if (["queued", "running", "running_cancel_requested"].includes(String(run.phase || ""))) {
         Promise.resolve().then(() => observeM6PreviewRun(run, runtime, expectedProjectId));
       }
@@ -3266,6 +3286,14 @@ export function createProductShell(options = {}) {
 
   function currentPlanningPanelPreferenceKey() {
     return `afs:m6:plan-panel:${snapshot.project?.project_id || "studio"}`;
+  }
+
+  function currentM6SourceDraftKey() {
+    return `afs:m6:plan-source:${snapshot.project?.project_id || "studio"}`;
+  }
+
+  function currentM6SubmittedSourceKey() {
+    return `afs:m6:submitted-source:${snapshot.project?.project_id || "studio"}`;
   }
 
   function closeResponsiveAgentOverlay() {
@@ -3806,6 +3834,7 @@ export function createProductShell(options = {}) {
       imageAdmission: imageAdmissionView(),
       mediaOperations: mediaOperationsReady() ? mediaOperationsView() : null,
       productionGraph: productionGraphWorkspaceProjection(snapshot.sequenceWorkspace),
+      planningRun: m6PreviewRun,
     });
   }
   function hasStoryFacts() { return shotModel().length > 0; }
@@ -4068,6 +4097,23 @@ function writePlanningPanelPreference(key, open) {
     window.sessionStorage?.setItem(key, open ? "open" : "closed");
   } catch {
     // Session storage can be unavailable; the current render still carries the state.
+  }
+}
+
+function readM6SourceDraft(key) {
+  try {
+    return String(window.sessionStorage?.getItem(key) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeM6SourceDraft(key, sourceText) {
+  try {
+    if (sourceText) window.sessionStorage?.setItem(key, String(sourceText));
+    else window.sessionStorage?.removeItem(key);
+  } catch {
+    // Session storage can be unavailable; the current render still carries the draft.
   }
 }
 
