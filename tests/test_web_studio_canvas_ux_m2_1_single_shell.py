@@ -55,7 +55,8 @@ def test_canvas_m2_1_single_shell_structure_and_empty_state_contract() -> None:
     assert "planStateLabel" in panel
     assert "\"待规划\"" in panel
     assert "planning_required" in panel
-    assert "evidenceDetails(\"查看证据/开发详情\"" in panel
+    assert 'evidenceDetails("诊断信息"' in panel
+    assert 'el("summary", "", "项目与制作详情")' in panel
     assert "diffPreview(command.preview_diff)" in panel
 
     assert "startEmbeddedCreativeAction" in prompt_bar

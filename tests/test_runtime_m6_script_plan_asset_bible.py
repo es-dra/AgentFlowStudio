@@ -58,6 +58,8 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
         assert {row["role"] for row in candidate["review_requirements"]} == set(REVIEW_ROLES)
         assert candidate["provider_dispatch_count"] == 0
         assert candidate["cost_usd"] == 0
+        assert candidate["brief"]["title"] in candidate["sequence"]["name"]
+        assert "M6" not in candidate["sequence"]["name"]
         assert all(item["promotion_state"] != "promoted" for item in candidate["knowledge_context"]["items"])
         assert all(shot["shot_size"] and shot["camera_movement"] and shot["narrative_purpose"] for shot in candidate["shots"])
         prop_assets = [row for row in candidate["assets"] if row["kind"] == "prop"]
@@ -74,6 +76,59 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
         assert scope["proposed_classifications"]
         assert any(item["association_type"] == "asset_bible.prop_refs" for item in scope["affected_associations"])
         assert any(item["association_type"] == "asset_bible.production_aid_refs" for item in scope["affected_associations"])
+
+
+def test_m6_canonical_names_preserve_conjunction_characters_and_line_boundaries() -> None:
+    source = """
+角色：和也、Anderson
+场景：和平广场、Andromeda Hall
+道具：红与蓝徽章、Anderson钥匙
+风格：清晰写实
+和也在和平广场举起红与蓝徽章，等待远处的回应。
+Anderson走进Andromeda Hall，把钥匙放在桌面上。
+"""
+
+    candidate = build_m6_script_plan_asset_bible(
+        "m6-adversarial-names",
+        {"source_kind": "script", "source_text": source},
+    )["candidate"]
+
+    scope = candidate["m6_scope_review"]["canonical"]
+    assert scope["characters"] == ["和也", "Anderson"]
+    assert scope["scenes"] == ["和平广场", "Andromeda Hall"]
+    assert scope["props"] == ["红与蓝徽章", "Anderson钥匙"]
+    assert [row["display_name"] for row in candidate["characters"]] == scope["characters"]
+    assert [row["name"] for row in candidate["scenes"]] == scope["scenes"]
+    assert [row["name"] for row in candidate["assets"] if row["kind"] == "prop"] == scope["props"]
+    assert candidate["m6_scope_review"]["fail_closed"]["status"] == "pass"
+
+
+def test_m6_server_codex_prompt_preserves_non_chinese_canonical_names() -> None:
+    source = """
+角色：和也、Anderson
+场景：和平广场、Andromeda Hall
+道具：红与蓝徽章
+和也在和平广场等待，Anderson随后进入。
+两人在Andromeda Hall交接红与蓝徽章。
+"""
+
+    prompt = runtime_m6_server_codex_planner._server_codex_prompt(
+        project_id="m6-multilingual-canonical",
+        source_kind="script",
+        source_text=source,
+        requested_language="zh-CN",
+        revision_instruction="",
+        parent_candidate_digest="",
+        schema_digest="a" * 64,
+        dispatch_id="m6_multilingual_test",
+    )
+
+    assert "canonical characters（必须逐字保留且不得增删）: 和也、Anderson" in prompt
+    assert "canonical scenes（必须逐字保留且不得改名）: 和平广场、Andromeda Hall" in prompt
+    assert "用户 canonical 名称保留原始字符和语言" in prompt
+    assert "不得翻译、音译或改写 canonical 名称" in prompt
+    assert "角色、场景、镜头和资产名称必须是中文专名" not in prompt
+    assert "禁止英文污染" not in prompt
 
 
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
@@ -144,6 +199,8 @@ def test_m6_server_codex_preview_uses_real_provider_contract_and_same_graph(tmp_
     assert first_candidate["provider_lineage"]["provider"] == "codex_local"
     assert first_candidate["provider_lineage"]["provider_calls_started"] is True
     assert first_candidate["provider_lineage"]["provider_raw_response_stored"] is False
+    assert first_candidate["brief"]["title"] in first_candidate["sequence"]["name"]
+    assert "M6" not in first_candidate["sequence"]["name"]
     assert first_payload["validation"]["provider_dispatch_count"] == 1
     assert first_candidate["m6_scope_review"]["canonical"]["characters"] == ["米拉", "陶", "阿衡"]
     assert first_candidate["m6_scope_review"]["canonical"]["scenes"] == ["傍晚观测台", "雨后的信号室", "地下水泵间"]

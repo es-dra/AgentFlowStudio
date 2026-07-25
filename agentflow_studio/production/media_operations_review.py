@@ -68,7 +68,7 @@ def load_media_operations_review(
         }
     )
     selected_redo = _redo_preview(shots[0] if shots else None, shots, cost)
-    classification = _classification(project_id, ledger)
+    classification = _classification(ledger)
     return _assert_safe_projection(
         {
             "schema_version": MEDIA_OPERATIONS_SCHEMA_VERSION,
@@ -329,22 +329,43 @@ def _assets(workspace: dict[str, Any], *, project_id: str, run_id: str) -> dict[
             "negative_locks": list(DEFAULT_MEDIA_NEGATIVE_LOCKS),
             "style": _text(assets.get("style_bible"), ""),
         },
-        "continuity_warning": "改动角色服装、空间光线、核心道具或 ReferenceSet 前需先预览影响；未确认不会写入制作图。",
+        "continuity_warning": "改动角色服装、空间光线、核心道具或制作参考前，先预览对当前镜头的影响；确认前不会保存更改。",
     }
 
 
 def _prop_locks(workspace: dict[str, Any]) -> list[dict[str, str]]:
-    text = " ".join(
-        [
-            *(str(item.get("continuity") or "") for item in workspace.get("assets", {}).get("characters") or [] if isinstance(item, dict)),
-            *(str(shot.get("action") or "") for shot in workspace.get("shots") or [] if isinstance(shot, dict)),
+    assets = workspace.get("assets") if isinstance(workspace.get("assets"), dict) else {}
+    props: list[dict[str, str]] = []
+    for raw in assets.get("props") or []:
+        if not isinstance(raw, dict):
+            continue
+        metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+        classification = _text(raw.get("classification") or metadata.get("classification"), "")
+        if classification != "canonical_prop":
+            continue
+        name = _text(raw.get("name") or raw.get("display_name") or metadata.get("display_name"), "")
+        if not name:
+            continue
+        continuity_parts = [
+            raw.get("continuity"),
+            metadata.get("continuity"),
+            raw.get("do_not_change"),
+            metadata.get("do_not_change"),
         ]
-    )
-    labels = []
-    for token in ("旧镜头", "场记板", "硬盘", "蓝色雨披", "担架", "裂纹平板", "红色束带", "编号七"):
-        if token in text:
-            labels.append({"name": token, "continuity": "保持归属、出现顺序和画面可读性", "status": "locked"})
-    return labels[:8]
+        continuity = "；".join(
+            part
+            for value in continuity_parts
+            for part in ([str(item).strip() for item in value] if isinstance(value, list) else [str(value or "").strip()])
+            if part
+        )
+        props.append(
+            {
+                "name": name,
+                "continuity": continuity or "保持名称、归属、出现顺序和画面可读性",
+                "status": "locked",
+            }
+        )
+    return props
 
 
 def _quality(qa: dict[str, Any]) -> dict[str, Any]:
@@ -458,12 +479,12 @@ def _commands(shots: list[dict[str, Any]], redo: dict[str, Any]) -> list[dict[st
 def _journey(workspace: dict[str, Any], cost: dict[str, Any], recovery: dict[str, Any]) -> list[dict[str, str]]:
     shot_count = len(workspace.get("shots") or [])
     return [
-        {"label": "剧本与修订", "state": "completed", "detail": "已读取 M6.1 revision2 的真实剧本与谱系"},
-        {"label": "结构与拆镜", "state": "completed", "detail": f"内容驱动 {shot_count} 个镜头；不是固定模板"},
-        {"label": "资产 Bible", "state": "completed", "detail": "角色、场景、ReferenceSet 与禁止变化项已确认"},
-        {"label": "生成与复用", "state": "completed", "detail": f"复用参考避免 {cost['avoided_dispatches_from_reference_reuse']} 次重复生成"},
-        {"label": "QA 与恢复", "state": "warning" if recovery["state"] == "recovered_with_attention" else "completed", "detail": _next_action(_classification("", {}), recovery)},
-        {"label": "交付候选", "state": "in_progress", "detail": "可审片；仍需 Owner 人工判断"},
+        {"label": "故事稿", "state": "completed", "detail": "已加载确认过的剧本和最新修改"},
+        {"label": "镜头设计", "state": "completed", "detail": f"{shot_count} 个镜头已按剧情顺序整理"},
+        {"label": "角色与场景", "state": "completed", "detail": "角色、场景、参考素材和连续性要求已确认"},
+        {"label": "画面制作", "state": "completed", "detail": "已复用确认过的参考素材，保持画面连续"},
+        {"label": "审片检查", "state": "warning" if recovery["state"] == "recovered_with_attention" else "completed", "detail": _next_action(_classification({}), recovery)},
+        {"label": "等待采用", "state": "in_progress", "detail": "镜头已可审看，采用前仍需人工确认"},
     ]
 
 
@@ -478,18 +499,18 @@ def _readiness(quality: dict[str, Any], recovery: dict[str, Any]) -> list[dict[s
     return items
 
 
-def _classification(project_id: str, ledger: dict[str, Any]) -> str:
+def _classification(ledger: dict[str, Any]) -> str:
     attempts = [item for item in ledger.get("attempts") or [] if isinstance(item, dict)]
     video_failures = [item for item in attempts if item.get("stage") == "video_chunk" and item.get("status") != "succeeded"]
-    if video_failures or "sci_fi_chamber" in project_id:
+    if video_failures:
         return "RECOVERY_EVIDENCE_NOT_COUNTED"
     return "CLEAN_FULL_CASE"
 
 
 def _next_action(classification: str, recovery: dict[str, Any]) -> str:
     if recovery.get("state") == "recovered_with_attention" or classification == "RECOVERY_EVIDENCE_NOT_COUNTED":
-        return "查看恢复记录，确认不会重复扣费后再决定是否局部重做。"
-    return "从故事板选择镜头，审看片段、资产锁和增量成本。"
+        return "查看上次生成情况，确认没有重复生成后，再决定是否重做当前镜头。"
+    return "从故事板选择镜头，审看片段并确认角色、场景和道具是否连续。"
 
 
 def _safe_action(value: str) -> str:

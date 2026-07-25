@@ -627,7 +627,7 @@ def test_provider_call_plan_is_read_only_and_marks_cost_as_owner_decision_needed
     assert plan["provider_dispatch_count"] == 0
     assert plan["secret_values_read"] is False
     assert plan["models"]["keyframe_image"]["model"] == "gpt-image-2"
-    assert plan["models"]["shot_video"]["model"] == "doubao-seedance-2-0-fast"
+    assert plan["models"]["shot_video"]["model"] == "doubao-seedance-2-0"
     assert plan["call_counts"]["shot_count"] == 15
     assert plan["call_counts"]["image_calls"] == 30
     assert plan["call_counts"]["video_calls"] == 15

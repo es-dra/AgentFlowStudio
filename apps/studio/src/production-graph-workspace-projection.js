@@ -107,17 +107,22 @@ export function applyProductionGraphCanvasProjection(state, workspace) {
     [array(sequence.shots), "shot", "镜头"],
   ];
   const nodeMap = new Map();
-  let column = 0;
+  const legacyBottom = Object.values(state.nodes || {}).reduce(
+    (bottom, node) => Math.max(bottom, Number(node?.y || 0) + Number(node?.h || 0)),
+    0,
+  );
+  const originY = legacyBottom > 0 ? legacyBottom + 80 : 80;
+  let slot = 0;
   for (const [records, type, fallbackTitle] of groups) {
     if (!records.length) continue;
-    records.forEach((record, index) => {
+    records.forEach((record) => {
       const graphNodeId = String(record.node_id || "");
       const id = canvasNodeId(graphNodeId);
       nodeMap.set(graphNodeId, id);
-      state.nodes[id] = canvasNode(record, id, graphNodeId, type, fallbackTitle, column, index, projection);
+      state.nodes[id] = canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY, projection);
       pushOrder(state, id);
+      slot += 1;
     });
-    column += 1;
   }
   for (const relation of array(sequence.dependencies)) {
     const from = nodeMap.get(String(relation.from_id || ""));
@@ -158,25 +163,24 @@ function emptySummary() {
     productionAids: 0, selections: 0, reviews: 0, pendingReviews: 0, rejectedReviews: 0, deliveries: 0, versionHistory: [] };
 }
 
-function canvasNode(record, id, graphNodeId, type, fallbackTitle, column, index, projection) {
+function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY, projection) {
   const metadata = record.metadata || {};
   const title = String(metadata.display_name || metadata.name || metadata.title || metadata.intent || fallbackTitle).trim() || fallbackTitle;
   const details = [];
   if (metadata.intent) details.push(String(metadata.intent));
   if (Number(metadata.duration_seconds || 0) > 0) details.push(`时长：${Number(metadata.duration_seconds).toFixed(1)} 秒`);
-  if (record.state === "invalidated") details.push("状态：需重新处理");
-  else details.push("状态：制作图投影");
+  if (record.state === "invalidated") details.push("需要更新");
   return {
     id,
     type,
     title: title.slice(0, 80),
-    x: 80 + (column % 3) * 330,
-    y: 80 + Math.floor(column / 3) * 300 + index * 230,
+    x: 80 + (slot % 4) * 330,
+    y: originY + Math.floor(slot / 4) * 240,
     w: 280,
     h: 190,
-    content: details.join("\n"),
+    content: details.join("\n") || "已加入当前制作方案。",
     prompt: "",
-    status: record.state === "invalidated" ? "blocked" : "draft",
+    status: record.state === "invalidated" ? "blocked" : "accepted",
     result: null,
     groupId: null,
     collapsed: false,

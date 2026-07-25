@@ -410,7 +410,7 @@ def _compile_report(
         "case_count": len(case_results),
         "provider_services": {
             "image": {"service_id": "image_relay", "model": "gpt-image-2"},
-            "video": {"service_id": "seedance_i2v", "model": "doubao-seedance-2-0-fast"},
+            "video": {"service_id": "seedance_i2v", "model": "doubao-seedance-2-0"},
         },
         "dispatch": {
             "paid_attempt_count": attempts,

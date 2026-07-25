@@ -69,14 +69,18 @@ def test_m6_3_media_operations_copy_keeps_cost_recovery_and_nonclaim_boundaries(
     for marker in (
         "确认前不会改动制作事实或产生费用",
         "确认前不会扣费",
-        "重复提交不会重复生成或扣费",
-        "重复提交保护已开启",
-        "不会发起生成或产生费用",
-        "不是人工验收、媒体商业质量验证或公开发布",
-        "生成调用",
-    ):
+            "重复提交不会重复生成或扣费",
+            "重复提交保护已开启",
+            "不会发起生成或产生费用",
+            "最终采用前仍需要人工确认画面质量",
+            "生成调用",
+            'node("details", "media-diagnostics-details")',
+            'node("summary", "", "诊断信息")',
+        ):
         assert marker in shell
-    assert "媒体制作" in agent_chat
+    assert "正在制作" in agent_chat
+    assert "制作详情" in agent_chat
+    assert "媒体制作" not in agent_chat
     assert "从已确认脚本、分镜和资产 Bible 只读投影" in agent_chat
     assert "idempotency_key" not in shell
     for forbidden in (

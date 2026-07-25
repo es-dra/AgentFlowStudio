@@ -88,7 +88,7 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert captured["poll_auth"] == "Bearer secret-video-key"
     assert captured["create_timeout"] == 900.0
     assert captured["download_timeout"] == 180.0
-    assert payload["model"] == "doubao-seedance-2-0-fast"
+    assert payload["model"] == "doubao-seedance-2-0"
     assert payload["ratio"] == "16:9"
     assert payload["duration"] == 5
     assert payload["resolution"] == "720p"
@@ -102,6 +102,79 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert (tmp_path / "run" / "video_candidates" / "candidate_001.mp4").read_bytes() == b"fake-seedance-video"
     assert "secret-video-key" not in json.dumps(result, ensure_ascii=False)
     assert "media.seedance.test" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_seedance_video_rejects_fast_or_alias_model_before_network(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+    network_calls = 0
+
+    def forbidden_urlopen(*args, **kwargs):
+        nonlocal network_calls
+        network_calls += 1
+        raise AssertionError("wrong Seedance model must fail before network")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", forbidden_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(
+            _seedance_provider_config(tmp_path, model="doubao-seedance-2-0-fast")
+        )
+    )
+
+    with pytest.raises(ModelGatewayError, match="exact non-fast model"):
+        registry.dispatch(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+    assert network_calls == 0
+
+
+def test_seedance_video_rejects_extra_body_model_override_before_network(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+    network_calls = 0
+
+    def forbidden_urlopen(*args, **kwargs):
+        nonlocal network_calls
+        network_calls += 1
+        raise AssertionError("extra_body model override must fail before network")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", forbidden_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(
+            _seedance_provider_config(
+                tmp_path,
+                extra_body={"model": "doubao-seedance-2-0-fast"},
+            )
+        )
+    )
+
+    with pytest.raises(ModelGatewayError, match="extra_body cannot override request field: model"):
+        registry.dispatch(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+    assert network_calls == 0
 
 
 def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
@@ -395,7 +468,12 @@ def _upload_image(client: TestClient, project_id: str, role: str) -> str:
     return response.json()["asset"]["asset_id"]
 
 
-def _seedance_provider_config(tmp_path) -> str:
+def _seedance_provider_config(
+    tmp_path,
+    *,
+    model: str = "doubao-seedance-2-0",
+    extra_body: dict[str, object] | None = None,
+) -> str:
     payload = {
         "schema_version": "company_provider_secrets.local.v2",
         "accounts": {
@@ -403,7 +481,7 @@ def _seedance_provider_config(tmp_path) -> str:
                 "auth_type": "api_key",
                 "base_url": "https://relay.test/v1",
                 "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
-                "default_models": {"video": "doubao-seedance-2-0-fast"},
+                "default_models": {"video": model},
             }
         },
         "account_pools": {
@@ -430,7 +508,7 @@ def _seedance_provider_config(tmp_path) -> str:
                 "capability": "video",
                 "base_url": "https://relay.test",
                 "endpoint": "/volc/v1/contents/generations/tasks",
-                "model": "doubao-seedance-2-0-fast",
+                "model": model,
                 "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
                 "reference_roles": ["first_frame", "last_frame"],
                 "watermark": False,
@@ -460,6 +538,8 @@ def _seedance_provider_config(tmp_path) -> str:
             }
         },
     }
+    if extra_body is not None:
+        payload["services"]["seedance_i2v"]["extra_body"] = extra_body
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return str(path)

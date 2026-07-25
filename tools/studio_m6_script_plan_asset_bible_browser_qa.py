@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
 
 def seed_project(runtime_root: Path) -> None:
     client = runtime_test_client(runtime_root)
-    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "M6专业剧本到资产Bible制作图"})
+    created = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "灯种黎明短片制作"})
     if created.status_code not in {200, 409}:
         raise AssertionError(created.text)
     saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": studio_state(PROJECT_ID)})
@@ -78,7 +78,7 @@ def seed_project(runtime_root: Path) -> None:
 
 def studio_state(project_id: str) -> dict[str, Any]:
     return {
-        "meta": {"projectId": project_id, "projectName": "M6专业剧本项目", "canvasName": "制作画布", "seq": 1, "updated_at": ""},
+        "meta": {"projectId": project_id, "projectName": "灯种黎明", "canvasName": "制作画布", "seq": 1, "updated_at": ""},
         "viewport": {"x": 0, "y": 0, "scale": 1},
         "nodes": {
             "seed_brief": {
@@ -89,8 +89,8 @@ def studio_state(project_id: str) -> dict[str, Any]:
                 "y": 110,
                 "w": 300,
                 "h": 220,
-                "prompt": "等待M6专业剧本制作方案确认。",
-                "content": "等待M6专业剧本制作方案确认。",
+                "prompt": "等待制作方案确认。",
+                "content": "等待制作方案确认。",
                 "status": "draft",
                 "params": {},
                 "collapsed": False,
@@ -169,35 +169,48 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
     page.get_by_label("输入想法或已有剧本").fill(SOURCE_TEXT)
     page.get_by_role("button", name="生成剧本制作方案").click()
     preview = page.locator(".agent-command-preview")
-    expect(preview).to_contain_text("确认M6剧本制作方案")
+    expect(preview).to_contain_text("确认制作方案")
     expect(preview).to_contain_text("动态镜头")
     for token in (
-        "范围影响清单",
-        "新增",
-        "改名",
-        "扩写",
-        "分类",
-        "关联",
+        "本次方案包含",
+        "新建内容",
+        "名称变化",
+        "内容补充",
+        "资产用途",
+        "影响的镜头与引用",
         "林澈",
         "唐予",
         "夜晚旧剪辑室",
         "清晨屋顶",
         "场记板",
         "旧镜头",
-        "规范道具 canonical_prop",
-        "生产辅助 production_aid",
-        "Asset Bible 道具引用",
-        "Asset Bible 辅助引用",
+        "主要道具",
+        "制作参考",
+        "道具清单",
+        "制作参考清单",
+        "创作目标",
+        "关系变化",
+        "镜头时长",
+        "人物调度",
     ):
         expect(preview).to_contain_text(token)
-    expect(preview).to_contain_text("改名 0")
-    expect(preview.locator(".agent-m6-scope-group").filter(has_text="改名")).to_contain_text("无")
+    expect(preview).to_contain_text("名称变化 0")
+    expect(preview.locator(".agent-m6-scope-group").filter(has_text="名称变化")).to_contain_text("无")
     preview_text = preview.inner_text()
-    if "生产辅助 production_aid" not in preview_text or "规范道具 canonical_prop" not in preview_text:
-        raise AssertionError("confirmation card does not expose canonical/prod-aid classification")
+    if "制作参考" not in preview_text or "主要道具" not in preview_text:
+        raise AssertionError("confirmation card does not expose creator-readable asset classifications")
+    if any(token in preview_text for token in (
+        "canonical_prop", "production_aid", "ProductionGraph", "M6",
+        "relationship_arc", "duration_seconds", "camera_movement", "rights_boundary",
+    )):
+        raise AssertionError("confirmation card leaks internal classification or graph vocabulary")
     preview_screenshot = str((screenshot_dir / "m6-confirmation-card-1920x1080.png").resolve())
     page.screenshot(path=preview_screenshot, full_page=True)
-    page.locator(".agent-command-preview").get_by_role("button", name="确认执行").click()
+    expansions = preview.locator(".agent-m6-scope-group").filter(has_text="内容补充")
+    expansions.scroll_into_view_if_needed()
+    expansion_screenshot = str((screenshot_dir / "m6-confirmation-expansions-1920x1080.png").resolve())
+    page.screenshot(path=expansion_screenshot, full_page=True)
+    page.locator(".agent-command-preview").get_by_role("button", name="确认并保存").click()
     page.wait_for_selector(".graph-canvas-status.ready")
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
     if workspace["status"] != "ready" or workspace["graph_digest"] != workspace["storyboard"]["graph_digest"]:
@@ -209,6 +222,7 @@ def assert_m6_preview_confirm(page: Page, base_url: str, screenshot_dir: Path) -
         "agent_preview": True,
         "pc_confirmation_card_transparent": True,
         "confirmation_card_screenshot": preview_screenshot,
+        "confirmation_expansions_screenshot": expansion_screenshot,
         "explicit_confirmation": True,
         "same_graph_projection": True,
     }
@@ -220,8 +234,39 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
     body = page.locator("body").inner_text()
     if any(token in body for token in ("schema_version", "graph_digest", "m6-character-", "m6-script-plan-layout")):
         raise AssertionError("raw graph internals leaked into Studio copy")
+    projected_layout = page.locator('.node[data-node-id^="production_graph_"]').evaluate_all(
+        """
+        nodes => nodes.map((node) => {
+          const rect = node.getBoundingClientRect();
+          const title = node.querySelector(".node-title");
+          const titleRect = title?.getBoundingClientRect();
+          return {
+            id: node.dataset.nodeId,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            titleWithinNode: !titleRect || titleRect.right <= rect.right + 1,
+            text: node.innerText,
+          };
+        })
+        """
+    )
+    for index, node in enumerate(projected_layout):
+        if not node["titleWithinNode"]:
+            raise AssertionError(f"projected node title overflows its card: {node['id']}")
+        if any(token in node["text"] for token in ("输入故事", "上传或连接")):
+            raise AssertionError(f"projected node leaks an editor placeholder: {node['id']}")
+        for other in projected_layout[index + 1 :]:
+            overlap_width = min(node["right"], other["right"]) - max(node["left"], other["left"])
+            overlap_height = min(node["bottom"], other["bottom"]) - max(node["top"], other["top"])
+            if overlap_width > 1 and overlap_height > 1:
+                raise AssertionError(f"projected nodes overlap: {node['id']} and {other['id']}")
     ensure_agent_visible(page)
-    expect(page.locator(".studio-agent-chat")).to_be_visible()
+    agent = page.locator(".studio-agent-chat")
+    expect(agent).to_be_visible()
+    expect(agent).to_contain_text("制作方案已保存")
+    expect(agent.get_by_role("button", name="查看故事板")).to_be_visible()
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_selector(".storyboard-shot")
     if page.locator(".storyboard-shot").count() < 2:
@@ -231,8 +276,12 @@ def assert_graph_consumers(page: Page, base_url: str) -> dict[str, Any]:
     workspace = http_json(f"{base_url}/projects/{PROJECT_ID}/m5/sequence-workspace")
     return {
         "canvas_graph_nodes": True,
+        "canvas_graph_nodes_do_not_overlap": True,
+        "canvas_graph_titles_contained": True,
+        "canvas_graph_placeholders_absent": True,
         "storyboard_graph_shots": True,
         "agent_chat_fixed": True,
+        "agent_next_action_matches_graph": True,
         "graph_digest_parity": workspace["graph_digest"] == workspace["storyboard"]["graph_digest"],
         "provider_dispatch_count": workspace.get("provider_dispatch_count", 0),
         "cost_usd": workspace.get("cost_usd", 0),

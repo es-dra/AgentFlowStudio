@@ -101,9 +101,86 @@ export function deriveProductionCopilotState({
   section = "canvas",
   selectedAsset = null,
   imageAdmission = null,
+  mediaOperations = null,
+  productionGraph = null,
 } = {}) {
   const shotTruth = legacyAppliedStoryboardProjection(studioState);
   const bible = assetBibleProjection(studioState, runtimeAssetBible);
+  const mediaReviewReady = mediaOperations?.schema_version === "afs.media_operations_review.v0.1"
+    && array(mediaOperations.shots).length > 0;
+  if (mediaReviewReady) {
+    const shotCount = Number(mediaOperations.summary?.shot_count || mediaOperations.shots.length);
+    const readyShotCount = Number(mediaOperations.summary?.ready_shot_count || 0);
+    const nextReason = String(
+      mediaOperations.stage?.next_action
+      || "从故事板选择镜头，审看画面、动作和连续性。",
+    );
+    return {
+      stage: "media_review",
+      dependencies: [
+        { key: "script", label: "当前剧本", state: "ready" },
+        { key: "shots", label: "已应用分镜", state: "ready" },
+        { key: "media", label: "可审看片段", state: readyShotCount === shotCount ? "ready" : "pending" },
+      ],
+      blockers: [],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: capabilityGates.image === true,
+        video: capabilityGates.video === true,
+        admission: "ready",
+        cost_state: "available_in_details",
+      },
+      next_valid_action: {
+        action: "review_current_shot",
+        label: section === "storyboard" ? "播放当前镜头" : "审看片段",
+        reason: nextReason,
+        enabled: readyShotCount > 0,
+      },
+      ready_summary: `${readyShotCount}/${shotCount} 个镜头可以审看。`,
+      needs_input: nextReason,
+      asset_bible: bible,
+      provider_dispatch_count: Number(mediaOperations.advanced_evidence?.provider_dispatch_count || 0),
+      external_cost_usd: mediaOperations.cost?.conservative_estimated_usd ?? null,
+    };
+  }
+  const graphReady = productionGraph?.status === "ready" && array(productionGraph.shots).length > 0;
+  if (graphReady && bible.counts.total === 0) {
+    const summary = productionGraph.summary || {};
+    const shotCount = array(productionGraph.shots).length;
+    const assetCount = Number(summary.characters || 0)
+      + Number(summary.locations || 0)
+      + Number(summary.props || 0)
+      + Number(summary.referenceSets || 0)
+      + Number(summary.productionAids || 0);
+    const nextReason = "先审看镜头顺序、时长和画面意图，再继续资产与图片制作。";
+    return {
+      stage: "production_plan_ready",
+      dependencies: [
+        { key: "script", label: "当前剧本", state: "ready" },
+        { key: "shots", label: "已应用分镜", state: "ready" },
+        { key: "assets", label: "角色、场景与道具", state: assetCount > 0 ? "ready" : "pending" },
+      ],
+      blockers: [],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: capabilityGates.image === true,
+        video: capabilityGates.video === true,
+        admission: "structure_ready_media_disabled",
+        cost_state: "not_admitted",
+      },
+      next_valid_action: {
+        action: "open_storyboard",
+        label: section === "storyboard" ? "审看当前镜头" : "查看故事板",
+        reason: nextReason,
+        enabled: true,
+      },
+      ready_summary: `制作方案已保存：${Number(summary.characters || 0)} 个角色、${Number(summary.locations || 0)} 个场景、${shotCount} 个镜头。`,
+      needs_input: nextReason,
+      asset_bible: bible,
+      provider_dispatch_count: 0,
+      external_cost_usd: null,
+    };
+  }
   const scriptReady = Boolean(
     assetBibleSourceContext(studioState)?.script_revision_id
     || bible.candidate_set?.script_revision_id,
@@ -122,10 +199,10 @@ export function deriveProductionCopilotState({
   const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
   const qualityIssues = bible.recognition_quality.issues;
   let next = {
-    action: "open_script",
-    label: "选择当前剧本",
-    reason: "需要先确认当前剧本版本。",
-    enabled: section !== "canvas",
+    action: "start_idea",
+    label: "输入创作想法",
+    reason: "先描述故事、角色或一个画面，AI 创作搭档会和画布一起继续。",
+    enabled: true,
   };
   if (scriptReady && !shotReady) {
     next = { action: "open_storyboard", label: "拆分分镜", reason: "剧本已就绪，下一步是建立镜头计划。", enabled: true };
@@ -280,10 +357,47 @@ export function deriveProductionCopilotState({
       cost_state: Number(imageAdmission?.budget?.dispatches_reserved || 0) > 0 ? "estimated_reserved" : "not_admitted",
     },
     next_valid_action: next,
+    ready_summary: creatorReadySummary({
+      scriptReady,
+      shotReady,
+      candidatesReady,
+      bible,
+      contentReady,
+      admissionStatus,
+      admissionCounts,
+    }),
+    needs_input: next.reason,
     asset_bible: bible,
     provider_dispatch_count: Number(imageAdmission?.provider_dispatch_count || 0),
     external_cost_usd: imageAdmission?.actual_usd ?? null,
   };
+}
+
+function creatorReadySummary({
+  scriptReady,
+  shotReady,
+  candidatesReady,
+  bible,
+  contentReady,
+  admissionStatus,
+  admissionCounts,
+}) {
+  if (!scriptReady) return "项目已创建，可以从一个想法开始。";
+  if (!shotReady) return "剧本已选定，可以继续安排镜头。";
+  if (!candidatesReady) return "剧本和镜头已准备，可以整理角色、场景和道具。";
+  if (!contentReady) {
+    const confirmed = Number(bible.counts.approved || 0);
+    const total = Number(bible.counts.total || 0);
+    return `已整理 ${total} 项创作资产${confirmed ? `，其中 ${confirmed} 项已确认` : ""}。`;
+  }
+  if (Number(admissionCounts.candidate || 0) > 0) {
+    return `${Number(admissionCounts.candidate)} 张候选图片可以审看。`;
+  }
+  if (Number(admissionCounts.approved || 0) > 0) {
+    return `${Number(admissionCounts.approved)} 张图片已确认并保存到当前项目。`;
+  }
+  if (admissionStatus !== "empty") return "角色、场景、道具和图片清单已准备。";
+  return "角色、场景、道具和美术方向已准备。";
 }
 
 export function assetTypeLabel(value) {

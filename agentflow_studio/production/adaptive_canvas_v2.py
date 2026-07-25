@@ -7,6 +7,7 @@ import re
 import shlex
 import subprocess
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import import_module
@@ -474,8 +475,8 @@ def build_script_truth_from_profile(profile: AdaptiveProductionProfile) -> dict[
         "style_bible": profile.style_bible,
         "target_duration_sec": profile.target_duration_sec,
         "shot_count": profile.shot_count,
-        "characters": list(profile.characters),
-        "scenes": list(profile.scenes),
+        "characters": deepcopy(list(profile.characters)),
+        "scenes": deepcopy(list(profile.scenes)),
         "shots": shots,
         "asset_extraction": {
             "text_assets": ["script", "shot_summaries", "strategy_reasons"],
@@ -1608,8 +1609,8 @@ def _script_prompt(profile: AdaptiveProductionProfile) -> str:
     }
     return (
         "Return only strict JSON for one versioned Script/Story truth. Preserve the exact shot ids, durations, "
-        "and generation_strategy values provided. Expand action/camera/continuity only; do not add shots. "
-        "No dock, lighthouse, robot, blue raincoat. Profile JSON: "
+        "generation_strategy values, canonical names, and story facts provided. Expand action/camera/continuity "
+        "only; do not add shots, rename entities, or replace story content. Profile JSON: "
         f"{json.dumps(profile_payload, ensure_ascii=False)}"
     )
 
@@ -1629,55 +1630,198 @@ def _parse_script_json(text: str, profile: AdaptiveProductionProfile) -> dict[st
 
 
 def _validate_script_v3_payload(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> None:
+    top_level_fields = {"title", "logline", "style_bible", "characters", "scenes", "shots"}
+    character_fields = {"name", "continuity", "role"}
+    scene_fields = {"name", "visual_mood", "story_function"}
+    shot_fields = {
+        "shot_id",
+        "summary",
+        "location",
+        "characters",
+        "action",
+        "camera",
+        "target_duration_sec",
+        "generation_strategy",
+        "strategy_reason",
+        "continuity_in",
+        "continuity_out",
+    }
+    if set(payload) != top_level_fields:
+        missing = sorted(top_level_fields - set(payload))
+        extra = sorted(set(payload) - top_level_fields)
+        raise AdaptiveCanvasError(f"structured script fields mismatch; missing={missing}, extra={extra}")
+    for field in ("title", "logline", "style_bible"):
+        if not isinstance(payload.get(field), str) or not payload[field].strip():
+            raise AdaptiveCanvasError(f"structured script field is required: {field}")
+    exact_top_level = {
+        "title": profile.title,
+        "logline": profile.logline,
+        "style_bible": profile.style_bible,
+    }
+    for field, expected_value in exact_top_level.items():
+        if payload[field] != expected_value:
+            raise AdaptiveCanvasError(f"structured script {field} must match profile")
+
+    characters = payload.get("characters")
+    if not isinstance(characters, list) or len(characters) != len(profile.characters):
+        raise AdaptiveCanvasError("structured script character count must match profile")
+    for index, character in enumerate(characters, start=1):
+        if not isinstance(character, dict) or set(character) != character_fields:
+            raise AdaptiveCanvasError(f"structured script character fields mismatch at index {index}")
+        for field in character_fields:
+            if not isinstance(character.get(field), str) or not character[field].strip():
+                raise AdaptiveCanvasError(f"structured script field is required: characters[{index}].{field}")
+    expected_character_names = [str(item.get("name") or "") for item in profile.characters]
+    if [character["name"] for character in characters] != expected_character_names:
+        raise AdaptiveCanvasError("structured script character names must match profile")
+
+    scenes = payload.get("scenes")
+    if not isinstance(scenes, list) or len(scenes) != len(profile.scenes):
+        raise AdaptiveCanvasError("structured script scene count must match profile")
+    for index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict) or set(scene) != scene_fields:
+            raise AdaptiveCanvasError(f"structured script scene fields mismatch at index {index}")
+        for field in scene_fields:
+            if not isinstance(scene.get(field), str) or not scene[field].strip():
+                raise AdaptiveCanvasError(f"structured script field is required: scenes[{index}].{field}")
+    expected_scene_names = [str(item.get("name") or "") for item in profile.scenes]
+    if [scene["name"] for scene in scenes] != expected_scene_names:
+        raise AdaptiveCanvasError("structured script scene names must match profile")
+
     shots = payload.get("shots")
     if not isinstance(shots, list) or len(shots) != profile.shot_count:
         raise AdaptiveCanvasError("structured script shot count must match profile")
-    for supplied, expected in zip(shots, profile.shots, strict=True):
-        if not isinstance(supplied, dict) or str(supplied.get("shot_id") or "") != expected.shot_id:
+    for index, (supplied, expected) in enumerate(zip(shots, profile.shots, strict=True), start=1):
+        if not isinstance(supplied, dict) or set(supplied) != shot_fields:
+            raise AdaptiveCanvasError(f"structured script shot fields mismatch at index {index}")
+        for field in shot_fields - {"characters", "target_duration_sec"}:
+            if not isinstance(supplied.get(field), str) or not supplied[field].strip():
+                raise AdaptiveCanvasError(f"structured script field is required: shots[{index}].{field}")
+        supplied_characters = supplied.get("characters")
+        if (
+            not isinstance(supplied_characters, list)
+            or not supplied_characters
+            or any(not isinstance(name, str) or not name.strip() for name in supplied_characters)
+        ):
+            raise AdaptiveCanvasError(f"structured script field is required: shots[{index}].characters")
+        if str(supplied.get("shot_id") or "") != expected.shot_id:
             raise AdaptiveCanvasError("structured script shot order must match profile")
         if float(supplied.get("target_duration_sec") or 0.0) != float(expected.duration_sec):
             raise AdaptiveCanvasError("structured script duration must match profile")
         if str(supplied.get("generation_strategy") or "") != expected.generation_strategy:
             raise AdaptiveCanvasError("structured script strategy must match profile")
+        if supplied["summary"] != expected.summary:
+            raise AdaptiveCanvasError("structured script shot summary must match profile")
+        if supplied["location"] != expected.location:
+            raise AdaptiveCanvasError("structured script shot location must match profile")
+        if supplied_characters != list(expected.characters):
+            raise AdaptiveCanvasError("structured script shot characters must match profile")
 
 
 def _parse_script_payload(payload: dict[str, Any], profile: AdaptiveProductionProfile) -> dict[str, Any]:
-    fallback = build_script_truth_from_profile(profile)
-    merged = {**fallback, **payload}
-    shot_by_id = {str(shot.get("shot_id")): shot for shot in payload.get("shots", []) if isinstance(shot, dict)}
-    shots = []
-    for fallback_shot in fallback["shots"]:
-        supplied = shot_by_id.get(str(fallback_shot["shot_id"]), {})
-        merged_shot = {**fallback_shot, **{key: value for key, value in supplied.items() if value not in (None, "", [])}}
-        merged_shot["target_duration_sec"] = fallback_shot["target_duration_sec"]
-        merged_shot["generation_strategy"] = fallback_shot["generation_strategy"]
-        merged_shot["strategy_reason"] = fallback_shot["strategy_reason"]
-        merged_shot["chunk_plan"] = fallback_shot["chunk_plan"]
-        shots.append(merged_shot)
-    merged["shots"] = shots
-    merged["artifact_type"] = "afs_adaptive_canvas_script_truth"
-    merged["schema_version"] = "0.1.0"
-    return merged
+    _validate_script_v3_payload(payload, profile)
+    character_ids = {
+        str(item.get("name") or ""): str(item.get("character_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.characters
+    }
+    scene_ids = {
+        str(item.get("name") or ""): str(item.get("scene_id") or safe_id(str(item.get("name") or "")))
+        for item in profile.scenes
+    }
+    shots: list[dict[str, Any]] = []
+    for order, (supplied, expected) in enumerate(zip(payload["shots"], profile.shots, strict=True), start=1):
+        expanded = AdaptiveShotSpec(
+            shot_id=supplied["shot_id"],
+            summary=supplied["summary"],
+            location=supplied["location"],
+            characters=tuple(supplied["characters"]),
+            action=supplied["action"],
+            camera=supplied["camera"],
+            duration_sec=float(supplied["target_duration_sec"]),
+            generation_strategy=supplied["generation_strategy"],
+            strategy_reason=supplied["strategy_reason"],
+            continuity_in=supplied["continuity_in"],
+            continuity_out=supplied["continuity_out"],
+        )
+        shot = deepcopy(supplied)
+        shot.update(
+            {
+                "order": order,
+                "character_ids": [character_ids.get(name, safe_id(name)) for name in expanded.characters],
+                "scene_id": scene_ids.get(expanded.location, safe_id(expanded.location)),
+                "keyframe_prompt": _keyframe_prompt_for(profile, expanded),
+                "video_prompt": _video_prompt_for(profile, expanded),
+                "chunk_plan": compile_duration_chunks(
+                    expected.duration_sec,
+                    supported_durations_sec=profile.provider_supported_video_durations_sec,
+                ),
+            }
+        )
+        shots.append(shot)
+    return {
+        "artifact_type": "afs_adaptive_canvas_script_truth",
+        "schema_version": "0.1.0",
+        "title": payload["title"],
+        "logline": payload["logline"],
+        "style_bible": payload["style_bible"],
+        "target_duration_sec": profile.target_duration_sec,
+        "shot_count": profile.shot_count,
+        "characters": deepcopy(payload["characters"]),
+        "scenes": deepcopy(payload["scenes"]),
+        "shots": shots,
+        "asset_extraction": {
+            "text_assets": ["script", "shot_summaries", "strategy_reasons"],
+            "character_count": len(payload["characters"]),
+            "scene_count": len(payload["scenes"]),
+            "style_reference": "profile_style_bible",
+        },
+    }
 
 
 def _validate_script(script: dict[str, Any], profile: AdaptiveProductionProfile) -> None:
+    for field, expected_value in (
+        ("title", profile.title),
+        ("logline", profile.logline),
+        ("style_bible", profile.style_bible),
+    ):
+        if script.get(field) != expected_value:
+            raise AdaptiveCanvasError(f"script {field} must match profile")
+    characters = script.get("characters")
+    expected_character_names = [str(item.get("name") or "") for item in profile.characters]
+    if (
+        not isinstance(characters, list)
+        or [str(item.get("name") or "") for item in characters if isinstance(item, dict)] != expected_character_names
+    ):
+        raise AdaptiveCanvasError("script character names must match profile")
+    scenes = script.get("scenes")
+    expected_scene_names = [str(item.get("name") or "") for item in profile.scenes]
+    if (
+        not isinstance(scenes, list)
+        or [str(item.get("name") or "") for item in scenes if isinstance(item, dict)] != expected_scene_names
+    ):
+        raise AdaptiveCanvasError("script scene names must match profile")
     shots = script.get("shots")
     if not isinstance(shots, list) or len(shots) != profile.shot_count:
         raise AdaptiveCanvasError("script shot count must match profile")
-    forbidden = ("dock", "lighthouse", "robot", "blue raincoat")
-    lowered = json.dumps(script, ensure_ascii=False).lower()
-    for value in forbidden:
-        if value in lowered:
-            raise AdaptiveCanvasError(f"forbidden fixed template leaked into script: {value}")
-    expected = {shot.shot_id: shot for shot in profile.shots}
-    for shot in shots:
+    for shot, expected in zip(shots, profile.shots, strict=True):
+        if not isinstance(shot, dict):
+            raise AdaptiveCanvasError("script shots must be objects")
         shot_id = str(shot.get("shot_id") or "")
-        if shot_id not in expected:
-            raise AdaptiveCanvasError(f"unexpected shot id: {shot_id}")
-        if float(shot.get("target_duration_sec") or 0.0) != float(expected[shot_id].duration_sec):
+        if shot_id != expected.shot_id:
+            raise AdaptiveCanvasError("script shot order must match profile")
+        if float(shot.get("target_duration_sec") or 0.0) != float(expected.duration_sec):
             raise AdaptiveCanvasError("shot duration must match profile")
-        if str(shot.get("generation_strategy") or "") != expected[shot_id].generation_strategy:
+        if str(shot.get("generation_strategy") or "") != expected.generation_strategy:
             raise AdaptiveCanvasError("shot strategy must match profile")
+        if shot.get("summary") != expected.summary:
+            raise AdaptiveCanvasError("script shot summary must match profile")
+        if shot.get("location") != expected.location:
+            raise AdaptiveCanvasError("script shot location must match profile")
+        if shot.get("characters") != list(expected.characters):
+            raise AdaptiveCanvasError("script shot characters must match profile")
+        for field in ("action", "camera", "strategy_reason", "continuity_in", "continuity_out"):
+            if not str(shot.get(field) or "").strip():
+                raise AdaptiveCanvasError(f"script shot field is required: {field}")
         if not shot.get("chunk_plan"):
             raise AdaptiveCanvasError("shot must include chunk plan")
 
@@ -1772,45 +1916,7 @@ def _shot_video_prompt(
 
 
 def _video_safety_text(value: Any) -> str:
-    text = " ".join(str(value or "").split())
-    replacements = {
-        "对峙": "professional conversation",
-        "冲突": "production discussion",
-        "危机": "production planning",
-        "压力": "schedule focus",
-        "旧镜头": "film reel prop",
-        "删错": "editing issue",
-        "失误": "editing issue",
-        "限时": "timed production task",
-        "倒计时": "timer display",
-        "三分钟": "short time window",
-        "失重": "low-gravity rehearsal",
-        "倒置": "careful angled reach",
-        "腰绳": "support line",
-        "钢索": "support rail",
-        "氧气": "life-support panel",
-        "阀门": "control wheel",
-        "阀盘": "control wheel",
-        "氧气阀": "life-support control wheel",
-        "束带": "colored marker band",
-        "机械臂": "service arm",
-        "维修槽": "service bay",
-        "气闸": "door module",
-        "裂纹": "surface mark",
-        "告警": "status light",
-        "红色": "warm color",
-        "伤": "mark",
-        "血": "red label",
-        "武器": "tool",
-        "烟": "soft haze lighting",
-        "gore": "mark",
-        "blood": "red label",
-        "weapon": "tool",
-        "smoke": "soft haze lighting",
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    return text[:360]
+    return " ".join(str(value or "").split())[:360]
 
 
 def _negative_lock_sentence(profile: AdaptiveProductionProfile) -> str:

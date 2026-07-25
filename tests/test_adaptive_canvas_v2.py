@@ -21,8 +21,11 @@ from agentflow_studio.production.adaptive_canvas_v2 import (
     load_adaptive_workspace,
     run_adaptive_canvas_production,
     seed_agent_authored_script_truth,
+    _video_safety_text,
 )
 from agentflow_studio.production.media_operations_review import (
+    _classification,
+    _prop_locks,
     build_media_operations_command_preview,
     load_media_operations_review,
     media_file_path,
@@ -249,10 +252,21 @@ def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
         "uses_existing_paid_evidence": True,
         "production_provider_gates_expected_closed": True,
     }
+    creator_copy = json.dumps(
+        {
+            "next_action": review["stage"]["next_action"],
+            "journey": review["journey"],
+            "continuity_warning": review["assets"]["continuity_warning"],
+        },
+        ensure_ascii=False,
+    )
+    assert not any(
+        token in creator_copy
+        for token in ("M6", "revision2", "Owner", "ReferenceSet", "ProductionGraph")
+    )
     assert review["commands"][0]["paid_until_confirmed"] is False
     assert "not_human_creative_acceptance" in review["advanced_evidence"]["non_claims"]
     assert not any(token in serialized.lower() for token in ("/home/", "/tmp/", "/var/", "api_key", "authorization", "bearer", "secret", ".mp4", ".png"))
-
     preview = build_media_operations_command_preview(
         store,
         project_id="m6-3-ops-profile",
@@ -268,6 +282,50 @@ def test_media_operations_review_is_safe_and_keeps_single_graph_lineage(
     assert preview["idempotency_key"].startswith("m6-3-")
     assert "不会发起生成或产生费用" in preview["human_message"]
     assert "Provider" not in preview["human_message"]
+
+
+def test_media_recovery_classification_depends_on_ledger_not_project_name() -> None:
+    assert _classification({}) == "CLEAN_FULL_CASE"
+    assert _classification({"attempts": [], "project_id": "sci_fi_chamber-adversarial"}) == "CLEAN_FULL_CASE"
+    assert _classification({
+        "attempts": [{"attempt_id": "attempt-1", "stage": "video_chunk", "status": "failed"}],
+    }) == "RECOVERY_EVIDENCE_NOT_COUNTED"
+
+
+def test_media_prop_locks_use_structured_canonical_props_without_name_rules() -> None:
+    props = _prop_locks({
+        "assets": {
+            "props": [
+                {
+                    "name": "黑曜石钥匙",
+                    "classification": "canonical_prop",
+                    "continuity": "始终由主角左手持有",
+                },
+                {
+                    "display_name": "折叠星图",
+                    "classification": "canonical_prop",
+                    "do_not_change": ["保持刻度方向", "保持折痕位置"],
+                },
+                {
+                    "name": "海风色板",
+                    "classification": "production_aid",
+                },
+                {
+                    "name": "未分类对象",
+                },
+            ],
+        },
+    })
+
+    assert [item["name"] for item in props] == ["黑曜石钥匙", "折叠星图"]
+    assert props[0]["continuity"] == "始终由主角左手持有"
+    assert props[1]["continuity"] == "保持刻度方向；保持折痕位置"
+    assert all(item["status"] == "locked" for item in props)
+
+
+def test_video_prompt_text_preserves_story_terms_without_keyword_rewrites() -> None:
+    source = "  红色风筝在旧桥上方掠过，角色面对冲突后放下工具。  "
+    assert _video_safety_text(source) == source.strip()
 
 
 def test_media_operations_preview_route_serves_only_known_runtime_media(
@@ -469,8 +527,10 @@ def _provider_script_v3_profile():
     )
 
 
-def _script_v3_payload() -> dict[str, object]:
-    truth = build_script_truth_from_profile(_provider_script_v3_profile())
+def _script_v3_payload(profile=None) -> dict[str, object]:
+    truth = build_script_truth_from_profile(profile or _provider_script_v3_profile())
+    character_fields = ("name", "continuity", "role")
+    scene_fields = ("name", "visual_mood", "story_function")
     shot_fields = (
         "shot_id",
         "summary",
@@ -488,8 +548,8 @@ def _script_v3_payload() -> dict[str, object]:
         "title": truth["title"],
         "logline": truth["logline"],
         "style_bible": truth["style_bible"],
-        "characters": truth["characters"],
-        "scenes": truth["scenes"],
+        "characters": [{key: character[key] for key in character_fields} for character in truth["characters"]],
+        "scenes": [{key: scene[key] for key in scene_fields} for scene in truth["scenes"]],
         "shots": [{key: shot[key] for key in shot_fields} for shot in truth["shots"]],
     }
 
@@ -565,7 +625,7 @@ def test_script_v3_schema_invalid_final_marks_attempt_failed(tmp_path: Path) -> 
     class InvalidRegistry:
         def dispatch(self, capability: str, service_id: str, request: object) -> dict[str, object]:
             payload = _script_v3_payload()
-            payload["title"] = "robot"
+            del payload["shots"][0]["camera"]
             return {
                 "text": json.dumps(payload),
                 "structured_output": payload,
@@ -578,11 +638,54 @@ def test_script_v3_schema_invalid_final_marks_attempt_failed(tmp_path: Path) -> 
     run_root.mkdir()
     ledger = ChargeLedger(run_root / "charge_ledger.json", project_id="project", run_id="run", max_paid_attempts=20)
 
-    with pytest.raises(AdaptiveCanvasError, match="forbidden fixed template leaked into script"):
+    with pytest.raises(AdaptiveCanvasError, match="structured script shot fields mismatch at index 1"):
         adaptive_canvas._ensure_script(run_root, options, ledger, InvalidRegistry(), None)
 
     assert ledger.attempts[0]["status"] == "failed"
     assert ledger.attempts[0]["safe_error"]["type"] == "AdaptiveCanvasError"
+
+
+def test_script_v3_preserves_legitimate_story_terms_without_sample_word_rules() -> None:
+    base = _provider_script_v3_profile()
+    first_shot = replace(
+        base.shots[0],
+        summary="The robot crosses the dock toward the lighthouse.",
+        action="The robot folds a blue raincoat beside the dock.",
+    )
+    profile = replace(
+        base,
+        title="Robot at the Dock",
+        logline="A robot carries a blue raincoat toward a lighthouse.",
+        shots=(first_shot, *base.shots[1:]),
+    )
+    payload = _script_v3_payload(profile)
+
+    script = adaptive_canvas._parse_script_payload(payload, profile)
+
+    assert script["title"] == "Robot at the Dock"
+    assert script["logline"] == "A robot carries a blue raincoat toward a lighthouse."
+    assert script["shots"][0]["summary"] == first_shot.summary
+    assert script["shots"][0]["action"] == first_shot.action
+    assert "robot" in script["shots"][0]["video_prompt"].lower()
+    assert "dock" in script["shots"][0]["keyframe_prompt"].lower()
+
+
+def test_script_v3_canonical_name_drift_fails_closed() -> None:
+    profile = _provider_script_v3_profile()
+    payload = _script_v3_payload(profile)
+    payload["characters"][0]["name"] = "Renamed Character"
+
+    with pytest.raises(AdaptiveCanvasError, match="character names must match profile"):
+        adaptive_canvas._parse_script_payload(payload, profile)
+
+
+def test_reused_script_canonical_name_drift_fails_closed() -> None:
+    profile = _provider_script_v3_profile()
+    script = build_script_truth_from_profile(profile)
+    script["scenes"][0]["name"] = "Renamed Scene"
+
+    with pytest.raises(AdaptiveCanvasError, match="script scene names must match profile"):
+        adaptive_canvas._validate_script(script, profile)
 
 
 def test_script_v3_profile_contract_mismatch_marks_attempt_failed(tmp_path: Path) -> None:

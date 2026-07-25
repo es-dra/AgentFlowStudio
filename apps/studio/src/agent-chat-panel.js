@@ -51,7 +51,7 @@ export function buildAgentChatPanel({
 
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
-  if (copilot) body.appendChild(productionCopilot(copilot, onNextAction));
+  if (copilot && !session?.pendingCommand) body.appendChild(productionCopilot(copilot, onNextAction));
   syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
   const taskReview = currentTaskReview({ store, runtime, onRender });
   if (taskReview) body.appendChild(taskReview);
@@ -96,25 +96,15 @@ function contextStrip(context) {
     : context?.section === "storyboard_read_only"
       ? "故事板"
       : "画布";
-  strip.appendChild(el("span", "agent-context-chip", `当前：${currentTitle || fallbackTitle}`));
+  const current = el("div", "agent-current-context");
+  current.append(
+    el("span", "eyebrow", "正在制作"),
+    el("strong", "", currentTitle || fallbackTitle),
+  );
+  strip.appendChild(current);
   const screenplay = context?.selected_screenplay_summary || {};
-  strip.appendChild(el("span", "agent-context-chip", context?.script_revision_id || screenplay.revision_id ? "剧本可追溯" : "可从任意节点开始"));
   if (context?.selected_edge_id) {
-    strip.appendChild(
-      el("span", "agent-context-chip", `连线：${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"}`),
-    );
-  }
-  const counts = context?.counts || {};
-  if (context?.media_operations) {
-    const media = context.media_operations;
-    strip.appendChild(el("span", "agent-context-chip", "媒体制作"));
-    strip.appendChild(el("span", "agent-context-chip", `${Number(media.ready_shot_count || 0)}/${Number(media.shot_count || 0)} 镜头可审`));
-    strip.appendChild(el("span", "agent-context-chip", `估算 $${Number(media.estimated_cost_usd || 0).toFixed(2)}`));
-  } else {
-    strip.appendChild(el("span", "agent-context-chip", `${Number(counts.nodes || 0)} 节点 · ${Number(counts.scenes || 0)} 场景 · ${Number(counts.shots || 0)} 镜头`));
-  }
-  if (screenplay.scene_count) {
-    strip.appendChild(el("span", "agent-context-chip", `节点剧本：${Number(screenplay.scene_count || 0)} 场 · ${Number(screenplay.character_count || 0)} 角色 · ${Number(screenplay.dialogue_blocks || 0)} 对白`));
+    current.appendChild(el("small", "", `${context.selected_edge_from_title || "上游"} → ${context.selected_edge_to_title || "下游"}`));
   }
   strip.appendChild(contextDetails(context));
   return strip;
@@ -122,39 +112,58 @@ function contextStrip(context) {
 
 function productionCopilot(copilot, onNextAction) {
   const wrap = el("section", "agent-production-copilot");
-  wrap.setAttribute("aria-label", "生产阶段与下一动作");
-  wrap.appendChild(el("span", "eyebrow", "生产 Copilot"));
-  const dependencyList = el("div", "agent-production-dependencies");
-  for (const item of copilot.dependencies || []) {
-    dependencyList.appendChild(el("span", item.state === "ready" ? "ready" : "blocked", `${item.state === "ready" ? "已就绪" : "未完成"} · ${item.label}`));
+  wrap.setAttribute("aria-label", "创作进度与下一步");
+  wrap.append(
+    el("span", "eyebrow", "接下来"),
+    el("strong", "agent-production-ready", copilot.ready_summary || "当前项目已准备。"),
+  );
+  if (copilot.needs_input) {
+    const input = el("p", "agent-production-input");
+    input.append(el("span", "", "需要你"), document.createTextNode(copilot.needs_input));
+    wrap.appendChild(input);
   }
-  wrap.appendChild(dependencyList);
-  if (copilot.blockers?.length) {
-    wrap.appendChild(el("p", "agent-production-blocker", `阻塞：${copilot.blockers.join("；")}`));
-  }
-  const gate = copilot.gate || {};
-  wrap.appendChild(el(
-    "p",
-    "agent-production-gate",
-    gate.admission === "structure_ready_media_disabled"
-      ? "结构已就绪，但图片/视频媒体能力未启用。"
-      : gate.admission === "ready"
-        ? "结构与媒体准入条件已就绪。"
-        : "媒体准入尚未满足；当前未调用、未计费。",
-  ));
   const action = copilot.next_valid_action || {};
-  const button = el("button", "studio-primary-button", action.label || "等待下一动作");
+  const button = el("button", "studio-primary-button agent-primary-action", action.label || "继续创作");
   button.type = "button";
   button.disabled = action.enabled === false;
   button.title = action.reason || action.label || "";
   button.addEventListener("click", () => onNextAction?.(action));
-  wrap.append(button, el("small", "", action.reason || ""));
+  wrap.appendChild(button);
+
+  const details = el("details", "agent-production-details");
+  details.appendChild(el("summary", "", "制作详情"));
+  const dependencyList = el("div", "agent-production-dependencies");
+  for (const item of copilot.dependencies || []) {
+    dependencyList.appendChild(el("span", item.state === "ready" ? "ready" : "pending", `${item.state === "ready" ? "已准备" : "待完成"} · ${item.label}`));
+  }
+  details.appendChild(dependencyList);
+  if (copilot.blockers?.length) {
+    details.appendChild(el("p", "agent-production-blocker", `待处理：${copilot.blockers.join("；")}`));
+  }
+  const gate = copilot.gate || {};
+  details.appendChild(el(
+    "p",
+    "agent-production-gate",
+    gate.admission === "structure_ready_media_disabled"
+      ? "创作内容已准备，图片与视频能力暂未开启。"
+      : gate.admission === "ready"
+        ? "创作内容与生成条件已准备。"
+        : "先完成当前创作步骤，再继续生成图片或视频。",
+  ));
+  details.appendChild(evidenceDetails("诊断信息", [
+    ["stage", copilot.stage],
+    ["image_gate", gate.image === true ? "open" : "closed"],
+    ["video_gate", gate.video === true ? "open" : "closed"],
+    ["dispatch_count", Number(copilot.provider_dispatch_count || 0)],
+    ["cost_state", gate.cost_state],
+  ]));
+  wrap.appendChild(details);
   return wrap;
 }
 
 function contextDetails(context) {
   const details = el("details", "agent-context-details");
-  details.appendChild(el("summary", "", "上下文范围"));
+  details.appendChild(el("summary", "", "项目与制作详情"));
   const list = el("dl", "");
   for (const [label, value] of [
     ["项目", context?.project_name || "未命名项目"],
@@ -184,7 +193,7 @@ function contextDetails(context) {
     list.append(el("dt", "", "计划"), el("dd", "", planStateLabel(context?.production_plan_state)));
   }
   details.appendChild(list);
-  details.appendChild(evidenceDetails("开发证据", [
+  details.appendChild(evidenceDetails("诊断信息", [
     ["project_id", context?.project_id],
     ["script_revision_id", context?.script_revision_id],
     ["source_digest", context?.script_source_digest],
@@ -260,12 +269,12 @@ function terminalOutcomeMessage(action) {
     return { tone: "success", text: appliedCreativeActionReceiptText(action) };
   }
   if (action.status === "cancelled") {
-    return { tone: "", text: `${currentTaskTitle(action)}已取消：当前节点和 ProductionGraph 未改变。` };
+    return { tone: "", text: `${currentTaskTitle(action)}已取消：当前项目内容没有改变。` };
   }
   const failure = creativeActionFailureInfo(action);
   return {
     tone: "warning",
-    text: `${currentTaskTitle(action)}未完成：${failure.label}。${failure.preserved_state} ${failure.next_action}`,
+    text: `${currentTaskTitle(action)}需要处理：${failure.label}。${failure.preserved_state} ${failure.next_action}`,
   };
 }
 
@@ -298,22 +307,28 @@ function commandPreview({ session, store, runtime, onRender }) {
   const command = session.pendingCommand;
   const preview = el("section", `agent-command-preview ${command.status}`);
   preview.dataset.commandType = command.command_type;
+  const isPlanConfirmation = command.command_type === "m6_script_plan_asset_bible";
   preview.append(
-    el("span", "eyebrow", command.status === "blocked" ? "无法执行" : "命令预览"),
-    el("strong", "", command.title || "待确认命令"),
+    el("span", "eyebrow", command.status === "blocked" ? "需要调整" : "保存前预览"),
+    el("strong", "", isPlanConfirmation ? "确认制作方案" : command.title || "确认本次更改"),
     el("p", "", command.error_message || command.summary || "确认前不会改变画布。"),
   );
   const details = el("dl", "agent-command-details");
   if (command.edge_id || command.node_id || command.target_asset_id || command.target_shot_id || command.target_chunk_id) details.append(el("dt", "", "目标"), el("dd", "", humanCommandTarget(command)));
   if (command.impact?.node_ids?.length) details.append(el("dt", "", "影响"), el("dd", "", `${command.impact.node_ids.length} 个画布节点`));
-  if (command.tool_label) details.append(el("dt", "", "工具"), el("dd", "", command.tool_label));
-  if (command.provider_label) details.append(el("dt", "", "能力"), el("dd", "", command.provider_label));
-  if (command.cost_label) details.append(el("dt", "", "费用"), el("dd", "", command.cost_label));
-  details.append(el("dt", "", "故事板"), el("dd", "", command.impact?.storyboard_write ? "确认后同步" : "不写入"));
+  details.append(
+    el("dt", "", "当前状态"),
+    el("dd", "", command.status === "blocked" ? "不会保存，请先调整" : "仅预览，尚未保存"),
+    el("dt", "", "确认后"),
+    el("dd", "", command.impact?.storyboard_write ? "保存并同步到故事板" : "保存到当前项目"),
+  );
   preview.appendChild(details);
   if (command.scope_impact) preview.appendChild(m6ScopeImpactReview(command.scope_impact));
   if (command.preview_diff) preview.appendChild(diffPreview(command.preview_diff));
-  preview.appendChild(evidenceDetails("查看证据/开发详情", [
+  preview.appendChild(evidenceDetails("诊断信息", [
+    ["tool", command.tool_label],
+    ["capability", command.provider_label],
+    ["cost", command.cost_label],
     ["command_id", command.command_id],
     ["command_type", command.command_type],
     ["raw_command_text", command.raw_command_text],
@@ -328,7 +343,11 @@ function commandPreview({ session, store, runtime, onRender }) {
   ]));
   const actions = el("div", "agent-command-actions");
   if (command.status !== "blocked") {
-    const confirm = el("button", "studio-primary-button", command.status === "executing" ? "执行中" : "确认执行");
+    const confirm = el(
+      "button",
+      "studio-primary-button",
+      command.status === "executing" ? "正在保存" : isPlanConfirmation ? "确认并保存" : "确认更改",
+    );
     confirm.type = "button";
     confirm.disabled = command.status === "executing";
     confirm.addEventListener("click", () => {
@@ -348,7 +367,7 @@ function commandPreview({ session, store, runtime, onRender }) {
     });
     actions.appendChild(confirm);
   }
-  const cancel = el("button", "studio-secondary-button", "取消");
+  const cancel = el("button", "studio-secondary-button", isPlanConfirmation ? "继续修改" : "取消");
   cancel.type = "button";
   cancel.addEventListener("click", async () => {
     cancel.disabled = true;
@@ -418,7 +437,7 @@ function currentTaskReview({ store, runtime, onRender }) {
   wrap.appendChild(header);
   wrap.appendChild(taskPhaseList(task, action));
   if (action.status === "running") {
-    wrap.appendChild(el("p", "agent-current-task-copy", action.message || "正在生成可审查预览；确认前不会写入画布。"));
+    wrap.appendChild(el("p", "agent-current-task-copy", action.message || "正在生成可审看预览；确认前画布不会改变。"));
   } else if (action.status === "preview") {
     wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action.preview?.shot_plan) : screenplayReview(action, store, node));
   } else if (action.status === "unavailable") {
@@ -470,7 +489,7 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
 function failureReview(action) {
   const failure = creativeActionFailureInfo(action);
   const wrap = el("section", "agent-current-task-failure");
-  wrap.appendChild(el("p", "agent-current-task-error", `${failure.label}：${failure.detail || action.message || "任务未完成。"}`));
+  wrap.appendChild(el("p", "agent-current-task-error", `${failure.label}：${failure.detail || action.message || "这一步需要处理。"}`));
   wrap.appendChild(simpleList("恢复状态", [
     failure.preserved_state,
     failure.next_action,
@@ -704,7 +723,7 @@ function conversationStatus({ session, context, runtime, onRender }) {
     cancel.addEventListener("click", () => {
       state.cancel();
       state.status = "cancelled";
-      state.message = "已取消这次回答；如果服务端已经开始处理，结果不会写入画布。";
+      state.message = "已取消这次回答；如果服务端已经开始处理，结果也不会保存到画布。";
       onRender?.();
     });
     actions.appendChild(cancel);
@@ -841,20 +860,20 @@ function m6ScopeImpactReview(impact = {}) {
   const wrap = el("section", "agent-m6-scope-impact");
   const summary = impact.summary || {};
   wrap.append(
-    el("span", "eyebrow", "范围影响清单"),
+    el("span", "eyebrow", "本次方案包含"),
     el(
       "p",
       "",
-      `新增 ${Number(summary.additions || 0)} · 改名 ${Number(summary.renames || 0)} · 扩写 ${Number(summary.expansions || 0)} · 分类 ${Number(summary.classifications || 0)} · 关联 ${Number(summary.affected_associations || 0)}`,
+      `新建 ${Number(summary.additions || 0)} 项 · 名称变化 ${Number(summary.renames || 0)} 项 · 内容补充 ${Number(summary.expansions || 0)} 项 · 用途说明 ${Number(summary.classifications || 0)} 项 · 镜头关联 ${Number(summary.affected_associations || 0)} 项`,
     ),
   );
   const grid = el("div", "agent-m6-scope-grid");
   grid.append(
-    m6ScopeGroup("新增", impact.proposed_additions, m6ScopeItemText),
-    m6ScopeGroup("改名", impact.proposed_renames, m6ScopeItemText),
-    m6ScopeGroup("扩写", impact.proposed_expansions, m6ScopeItemText),
-    m6ScopeGroup("分类", impact.proposed_classifications, m6ScopeItemText),
-    m6ScopeGroup("关联", impact.affected_associations, m6ScopeAssociationText),
+    m6ScopeGroup("新建内容", impact.proposed_additions, m6ScopeItemText),
+    m6ScopeGroup("名称变化", impact.proposed_renames, m6ScopeItemText),
+    m6ScopeGroup("内容补充", impact.proposed_expansions, m6ScopeItemText),
+    m6ScopeGroup("资产用途", impact.proposed_classifications, m6ScopeItemText),
+    m6ScopeGroup("影响的镜头与引用", impact.affected_associations, m6ScopeAssociationText),
   );
   wrap.appendChild(grid);
   return wrap;
@@ -880,14 +899,12 @@ function m6ScopeItemText(item = {}) {
     return `${type}：${item.before || "未列出"} → ${item.after || "未列出"}${item.classification ? `（${m6ClassificationLabel(item.classification)}）` : ""}`;
   }
   if (Array.isArray(item.fields) && item.fields.length) {
-    return `${type}：${item.name || "未命名"} · ${item.fields.join("、")}`;
+    return `${type}：${item.name || "未命名"} · ${item.fields.map(m6FieldLabel).join("、")}`;
   }
   const parts = [type, item.name].filter(Boolean);
-  const tags = [
-    m6ClassificationLabel(item.classification),
-    item.kind,
-    item.production_aid_type || item.canonical_asset_type,
-  ].filter(Boolean);
+  const tags = [m6ClassificationLabel(item.classification)].filter(Boolean);
+  const aidType = m6ProductionAidTypeLabel(item.production_aid_type || item.kind);
+  if (item.classification === "production_aid" && aidType) tags.push(aidType);
   return `${parts.join("：")}${tags.length ? `（${tags.join(" / ")}）` : ""}`;
 }
 
@@ -896,8 +913,8 @@ function m6ScopeAssociationText(item = {}) {
     const parts = [
       item.scene ? `场景 ${item.scene}` : "",
       item.characters?.length ? `角色 ${item.characters.join("、")}` : "",
-      item.canonical_props?.length ? `规范道具 ${item.canonical_props.join("、")}` : "",
-      item.production_aids?.length ? `生产辅助 ${item.production_aids.join("、")}` : "",
+      item.canonical_props?.length ? `主要道具 ${item.canonical_props.join("、")}` : "",
+      item.production_aids?.length ? `制作参考 ${item.production_aids.join("、")}` : "",
       Number(item.duration_seconds || 0) ? `${Number(item.duration_seconds).toFixed(1)}秒` : "",
     ].filter(Boolean);
     return `${item.name || "镜头"}：${parts.join("；") || "无引用"}`;
@@ -909,14 +926,24 @@ function m6ScopeAssociationText(item = {}) {
 
 function m6ClassificationLabel(value) {
   return {
-    canonical_character: "规范角色 canonical_character",
-    canonical_scene: "规范场景 canonical_scene",
-    canonical_prop: "规范道具 canonical_prop",
-    production_aid: "生产辅助 production_aid",
-    production_shot: "制作镜头 production_shot",
-    canonical_prop_refs_only: "仅规范道具 canonical_prop_refs_only",
-    production_aid_refs_not_canonical_props: "生产辅助不计入规范道具 production_aid_refs_not_canonical_props",
-  }[value] || value;
+    canonical_character: "主要角色",
+    canonical_scene: "主要场景",
+    canonical_prop: "主要道具",
+    production_aid: "制作参考",
+    production_shot: "制作镜头",
+    canonical_prop_refs_only: "仅引用主要道具",
+    production_aid_refs_not_canonical_props: "制作参考，不计入主要道具",
+    canonical_character_refs: "主要角色引用",
+    canonical_scene_refs: "主要场景引用",
+  }[value] || humanToken(value);
+}
+
+function m6ProductionAidTypeLabel(value) {
+  return {
+    closeup: "细节特写",
+    reference_set: "视觉参考组",
+    style: "风格参考",
+  }[String(value || "")] || "";
 }
 
 function m6ScopeTypeLabel(type) {
@@ -925,12 +952,49 @@ function m6ScopeTypeLabel(type) {
     scene: "场景",
     asset: "资产",
     shot: "镜头",
-    "asset_bible.character_refs": "Asset Bible 角色引用",
-    "asset_bible.scene_refs": "Asset Bible 场景引用",
-    "asset_bible.prop_refs": "Asset Bible 道具引用",
-    "asset_bible.production_aid_refs": "Asset Bible 辅助引用",
+    "asset_bible.character_refs": "角色清单",
+    "asset_bible.scene_refs": "场景清单",
+    "asset_bible.prop_refs": "道具清单",
+    "asset_bible.production_aid_refs": "制作参考清单",
     "shot.references": "镜头引用",
-  }[type] || type;
+  }[type] || humanToken(type);
+}
+
+function m6FieldLabel(value) {
+  return {
+    goal: "创作目标",
+    conflict: "核心冲突",
+    relationship_arc: "关系变化",
+    change_vector: "角色转变",
+    appearance: "外观特征",
+    continuity_locks: "连续性要求",
+    space: "空间",
+    time_of_day: "时段",
+    lighting: "光线",
+    season: "季节",
+    continuity: "场景连续性",
+    action: "场景动作",
+    rhythm: "节奏",
+    emotion: "情绪",
+    visual_expression: "视觉表达",
+    source: "来源",
+    rights_boundary: "使用边界",
+    version: "版本",
+    applicable_scope: "适用范围",
+    do_not_change: "禁止变化",
+    intent: "镜头意图",
+    duration_seconds: "镜头时长",
+    shot_size: "景别",
+    camera_angle: "机位角度",
+    camera_movement: "镜头运动",
+    blocking: "人物调度",
+    sound: "声音",
+    transition: "转场",
+  }[String(value || "")] || "其他制作信息";
+}
+
+function humanToken(value) {
+  return String(value || "").replace(/[._]+/g, " ").trim() || "内容";
 }
 
 function evidenceDetails(title, entries) {

@@ -238,7 +238,7 @@ def _preview_run_http_error(exc: M6PreviewRunError, *, project_id: str, stage: s
 
 
 def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
-    source_text = _clean_text(body.get("source_text"))
+    source_text = _clean_source_text(body.get("source_text"))
     source_digest = canonical_digest({
         "schema_version": M6_SCHEMA_VERSION,
         "source_kind": body.get("source_kind") or "idea",
@@ -314,7 +314,7 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
         },
         "sequence": {
             "sequence_id": sequence_id,
-            "name": "M6专业剧本制作序列",
+            "name": f"{_title_from_source(source_text)} · 制作序列",
             "target_duration_seconds": round(sum(float(shot["duration_seconds"]) for shot in shot_rows), 2),
             "dynamic_policy": {
                 "source_segment_count": len(segments),
@@ -589,7 +589,7 @@ def _shot_rows(
 
 
 def m6_source_canonical_scope(source_text: str) -> dict[str, list[str]]:
-    text = _clean_text(source_text)
+    text = _clean_source_text(source_text)
     return {
         "characters": _extract_named_characters(text),
         "scenes": _extract_scenes(text),
@@ -1019,7 +1019,11 @@ def _extract_list_after_labels(text: str, labels: tuple[str, ...]) -> list[str]:
     for match in re.finditer(rf"(?:{label_pattern})\s*[:：]\s*([^\n。；;]+)", text, re.I):
         raw = match.group(1)
         raw = re.sub(r"[（(][^）)]*[）)]", "", raw)
-        rows.extend(part.strip(" 、,，/") for part in re.split(r"[、,，/]|和|与", raw) if part.strip(" 、,，/"))
+        rows.extend(
+            part.strip(" 、,，/")
+            for part in re.split(r"[、,，/]|(?:\s+(?:and|和|与)\s+)", raw, flags=re.I)
+            if part.strip(" 、,，/")
+        )
     return _dedupe([_clean_label(item) for item in rows if _clean_label(item)])
 
 
@@ -1101,7 +1105,7 @@ def _narrative_purpose(index: int, total: int) -> str:
 
 def _title_from_source(text: str) -> str:
     first = _source_segments(text)[0] if _source_segments(text) else text
-    return re.sub(r"\s+", "", first)[:32] or "M6专业剧本候选"
+    return re.sub(r"\s+", "", first)[:32] or "未命名制作方案"
 
 
 def _logline(segments: list[str]) -> str:
@@ -1138,9 +1142,13 @@ def _clean_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
+def _clean_source_text(value: Any) -> str:
+    normalized = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    return "\n".join(line.strip() for line in normalized.split("\n")).strip()
+
+
 def _clean_label(value: str) -> str:
-    cleaned = re.sub(r"^(以及|还有|并且|and)\s*", "", _clean_text(value), flags=re.I)
-    return cleaned[:80]
+    return str(value or "").strip()
 
 
 def _dedupe(values: list[str]) -> list[str]:

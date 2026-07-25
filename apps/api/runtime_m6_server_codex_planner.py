@@ -297,7 +297,7 @@ schema_digest: {schema_digest}
 	- 写一个精炼但完整的专业影视剧本规划；draft_text 至少 260 个中文字符，但不要扩展成长文。
 	- 用户 canonical identity 是最高权威。下列名称必须按原文逐字保留，不能翻译、改名、替换、合并、补别名或提升模型自创名称：
 	{canonical_clause}
-	- 角色必须有目标、冲突、关系、变化、外观、服装、年龄、比例、标志特征、禁止变化项；角色、场景、镜头和资产名称必须是中文专名，不得用英文单词加数字的占位名。
+	- 角色必须有目标、冲突、关系、变化、外观、服装、年龄、比例、标志特征、禁止变化项；用户 canonical 名称保留原始字符和语言，新生成的非 canonical 名称与创作说明使用中文，不得用英文单词加数字的占位名。
 	- 禁止把字段写成“占位”“说明”“待定”“无”“未知”或只有标点；必须从用户文本中生成具体角色、场景、道具、特写和关系。
 - 场景必须有空间、时间、光线、季节、连续性、动作、节奏、情绪、视觉表达、对白或声音。
 - 镜头 3 到 7 个，数量和时长由内容决定；禁止固定 4x15、10x6、固定镜头数或关键词模板。
@@ -308,7 +308,7 @@ schema_digest: {schema_digest}
 	- closeup、reference_set、style 只能作为 production aid；它们可以补充制作判断，但不得伪装成 prop，不得增加 canonical 角色/场景/道具数量。
 	- asset_indexes 必须引用 assets 数组中真实存在的 1-based 序号，不得越界。
 - 必须覆盖权利边界、时间/摘要闭环、关系深度、制片可执行性；禁止媒体兜底或图片/视频承诺。
-- 禁止英文污染；除 schema 代码值外，所有创作文本用中文。
+- 除用户 canonical 名称、原文引述和 schema 代码值外，所有新生成的创作说明用中文；不得翻译、音译或改写 canonical 名称。
 - 输出完整闭合 JSON；不要 markdown、解释、路径、登录信息或原始元数据。
 
 用户想法或已有剧本:
@@ -465,7 +465,7 @@ def _candidate_from_provider_payload(
         },
         "sequence": {
             "sequence_id": f"{project_key}-m6-sequence-{candidate_key}",
-            "name": "M6 服务器本地真实文本规划序列",
+            "name": f"{_text(payload.get('title'))[:96] or '未命名制作方案'} · 制作序列",
             "target_duration_seconds": round(sum(durations), 2),
             "dynamic_policy": {
                 "shot_count_decided_by_content": True,

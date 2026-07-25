@@ -452,6 +452,7 @@ def image_admission_capability() -> dict[str, Any]:
         "service_id": SERVICE_ID,
         "configured_from": LEGACY_SERVICE_ID,
         "model": MODEL_ID,
+        "exact_model": False,
         "configured": False,
         "image_gate_open": _gate_open(),
         "fixture_mode": _fixture_mode(),
@@ -461,7 +462,11 @@ def image_admission_capability() -> dict[str, Any]:
         "blocker": "图片服务未配置",
     }
     try:
-        descriptor = load_provider_registry().descriptor(SERVICE_ID)
+        registry = load_provider_registry()
+        descriptor = registry.descriptor(SERVICE_ID)
+        service = registry.store.service(SERVICE_ID)
+        configured_model = str(service.get("model") or "")
+        exact_model = configured_model == MODEL_ID
         reference_slots = int(descriptor.reference_image_slots or 0)
         edit = descriptor.image_edit_capabilities
         trusted_edit = bool(
@@ -471,12 +476,19 @@ def image_admission_capability() -> dict[str, Any]:
         )
         capability.update(
             {
-                "configured": True,
+                "configured": exact_model,
+                "exact_model": exact_model,
                 "reference_image_slots": reference_slots,
                 "trusted_image_edit": trusted_edit,
                 "input_fidelity_modes": list(edit.input_fidelity_modes),
-                "keyframe_continuity_ready": reference_slots > 0 or trusted_edit,
-                "blocker": "" if reference_slots > 0 or trusted_edit else "当前图片适配器未声明受信任的参考图或编辑输入能力",
+                "keyframe_continuity_ready": exact_model and (reference_slots > 0 or trusted_edit),
+                "blocker": (
+                    ""
+                    if exact_model and (reference_slots > 0 or trusted_edit)
+                    else "图片服务没有绑定本次要求的精确模型"
+                    if not exact_model
+                    else "当前图片适配器未声明受信任的参考图或编辑输入能力"
+                ),
             }
         )
     except (ModelGatewayError, OSError, ValueError):
@@ -523,6 +535,9 @@ def enforce_image_admission_keyframe_request(
         reservation_token=str(binding.get("reservation_token") or ""),
     )
     _assert_manifest_creative_ready(validated["manifest"])
+    capability = image_admission_capability()
+    if not capability["configured"] or not capability["exact_model"]:
+        raise ValueError(capability["blocker"])
     item = validated["item"]
     if request.candidate_count != 1:
         raise ValueError("image admission requires one independent candidate per dispatch")

@@ -19,6 +19,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_CREATE_ENDPOINT = "/volc/v1/contents/generations/tasks"
+EXACT_MODEL_ID = "doubao-seedance-2-0"
 MAX_ERROR_BODY_BYTES = 8192
 
 
@@ -62,8 +63,12 @@ class VolcSeedanceVideoAdapter:
             request.model_name_override
             or service.get("model")
             or default_models.get("video")
-            or "doubao-seedance-2-0-fast"
+            or EXACT_MODEL_ID
         )
+        if str(model) != EXACT_MODEL_ID:
+            raise ModelConfigError(
+                f"Seedance video service must use exact non-fast model: {EXACT_MODEL_ID}"
+            )
         endpoint = str(service.get("endpoint") or DEFAULT_CREATE_ENDPOINT)
         return {
             "base_url": _base_url(account, service),
@@ -183,7 +188,15 @@ def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderD
             payload[key] = bool(service.get(key))
     extra_body = service.get("extra_body")
     if isinstance(extra_body, dict):
-        payload.update(extra_body)
+        for raw_key, value in extra_body.items():
+            if value in (None, "", []):
+                continue
+            key = str(raw_key)
+            if key in payload:
+                if value != payload[key]:
+                    raise ModelConfigError(f"Seedance extra_body cannot override request field: {key}")
+                continue
+            payload[key] = value
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
 
 

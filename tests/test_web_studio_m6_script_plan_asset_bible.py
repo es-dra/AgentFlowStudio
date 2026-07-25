@@ -44,6 +44,15 @@ def test_m6_frontend_contract_stays_in_single_shell_and_runtime_graph_path() -> 
     cancelled = panel.split('if (run?.phase !== "cancelled")', 1)[1].split("} catch", 1)[0]
     assert "session.pendingCommand = null;" in cancelled
     assert "cancelAgentCommand(session)" not in cancelled
+    for field, label in (
+        ("goal", "创作目标"),
+        ("relationship_arc", "关系变化"),
+        ("duration_seconds", "镜头时长"),
+        ("camera_movement", "镜头运动"),
+        ("rights_boundary", "使用边界"),
+    ):
+        assert f'{field}: "{label}"' in panel
+    assert "item.fields.map(m6FieldLabel)" in panel
     styles = (STUDIO_ROOT / "styles" / "product-shell.css").read_text(encoding="utf-8")
     assert ".studio-unified-workspace.agent-collapsed .canvas-workspace-stage .graph-canvas-status," in styles
     assert "buildCanvasWorkspace" in combined
@@ -163,7 +172,7 @@ if (command.command_type !== "m6_script_plan_asset_bible") process.exit(2);
 if (!confirmPayload || confirmPayload.run_id !== "m6-preview-run" || confirmPayload.candidate_digest !== "c".repeat(64) || confirmPayload.expected_graph_version !== 0 || confirmPayload.candidate) process.exit(3);
 if (receipt.runtime_domain !== "production_graph" || receipt.graph_version !== 1 || receipt.provider_dispatch_count !== 1) process.exit(4);
 if (!command.scope_impact || command.scope_impact.summary.additions !== 4 || command.scope_impact.summary.renames !== 0) process.exit(5);
-if (!command.summary.includes("范围影响逐项列出")) process.exit(6);
+if (!command.summary.includes("所有新建、改名、补充、用途和关联都会逐项列出")) process.exit(6);
 console.log(JSON.stringify({ commandType: command.command_type, receiptDomain: receipt.runtime_domain, graphVersion: receipt.graph_version }));
 '''
     completed = subprocess.run(

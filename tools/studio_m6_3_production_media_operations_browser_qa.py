@@ -112,23 +112,22 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
     page.goto(f"{base_url}/studio/?project={project_id}", wait_until="networkidle")
     expect(page.locator("#product-shell-root")).to_be_visible()
     expect(page.locator(".media-canvas-status")).to_be_visible()
-    expect(page.locator("#product-shell-root")).to_contain_text("媒体审片候选")
-    expect(page.locator("#product-shell-root")).to_contain_text("进入故事板审片")
+    expect(page.locator("#product-shell-root")).to_contain_text("镜头已可审看")
+    expect(page.locator("#product-shell-root")).to_contain_text("查看故事板")
     canvas_shot = screenshot_dir / f"m6-3-{case_id}-canvas-{viewport_key}.png"
     page.screenshot(path=str(canvas_shot), full_page=True)
     canvas_text = page.locator("#product-shell-root").inner_text()
     assert_user_language(canvas_text, "canvas", case_id, viewport_key)
+    if project_id in canvas_text:
+        raise AssertionError(f"internal project id visible in creator surface for {case_id}:{viewport_key}")
     title_discoverable, title_screens = verify_project_title_discovery(page, case_id, viewport_key, screenshot_dir)
 
     page.get_by_role("tab", name="故事板").click()
     page.wait_for_function("document.querySelector('#product-shell-root')?.dataset.view === 'storyboard'")
     expect(page.locator(".media-operations-workspace")).to_be_visible()
-    expect(page.locator(".media-operations-workspace")).to_contain_text("生产审片")
-    expect(page.locator(".media-operations-workspace")).to_contain_text("Bible 与复用锁")
-    expect(page.locator(".media-operations-workspace")).to_contain_text("费用、重复提交保护与恢复")
-    expect(page.locator(".media-operations-workspace")).to_contain_text("最终审片")
-    expect(page.locator(".media-operations-workspace")).to_contain_text("确认前不会扣费")
-    expect(page.locator(".media-operations-workspace")).to_contain_text("不是人工验收")
+    expect(page.locator(".media-operations-workspace")).to_contain_text("镜头审看")
+    expect(page.locator(".media-creator-details > summary")).to_have_text("制作详情")
+    expect(page.locator(".media-diagnostics-details > summary")).to_have_text("诊断信息")
     if case_id in CLEAN_CASES:
         expect(page.locator(".media-operations-workspace")).to_contain_text("可审片")
     if case_id in RECOVERY_CASES:
@@ -141,6 +140,19 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
 
     storyboard_initial = screenshot_dir / f"m6-3-{case_id}-storyboard-initial-{viewport_key}.png"
     page.screenshot(path=str(storyboard_initial), full_page=True)
+    initial_text = page.locator(".media-operations-workspace").inner_text()
+    assert_user_language(initial_text, "storyboard-default", case_id, viewport_key)
+    hidden_by_default = ("M6.1 revision2", "Owner review candidate", "ReferenceSet", "Graph digest", "费用、重复提交保护与恢复")
+    leaked = [token for token in hidden_by_default if token.lower() in initial_text.lower()]
+    if leaked:
+        raise AssertionError(f"diagnostic or governance copy visible by default for {case_id}:{viewport_key}: {leaked}")
+
+    page.locator(".media-creator-details > summary").click()
+    expect(page.locator(".media-creator-details")).to_contain_text("角色、场景与道具")
+    expect(page.locator(".media-creator-details")).to_contain_text("交付检查")
+    page.locator(".media-diagnostics-details > summary").click()
+    expect(page.locator(".media-diagnostics-details")).to_contain_text("费用、重复提交保护与恢复")
+    expect(page.locator(".media-diagnostics-details")).to_contain_text("确认前不会扣费")
     shot_selected = select_review_shot(page)
     responsive_result, responsive_screens = verify_responsive_agent_chat(page, case_id, viewport_key, screenshot_dir)
 
@@ -176,6 +188,9 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
         expect(page.locator(".agent-mobile-backdrop")).to_have_count(0)
         expect(page.locator(".media-operations-workspace")).to_be_visible()
 
+    diagnostics = page.locator(".media-diagnostics-details")
+    if not diagnostics.evaluate("element => element.open"):
+        page.locator(".media-diagnostics-details > summary").click()
     page.locator(".cost-recovery-panel").scroll_into_view_if_needed()
     recovery_shot = screenshot_dir / f"m6-3-{case_id}-recovery-cost-{viewport_key}.png"
     page.screenshot(path=str(recovery_shot), full_page=True)
@@ -230,7 +245,11 @@ def verify_case(page: Any, base_url: str, case_id: str, viewport_key: str, scree
 
 
 def assert_user_language(text: str, surface: str, case_id: str, viewport_key: str) -> None:
-    forbidden = ("runtime root", "idempotency", "dispatch", "provider", "graph digest", "/home/", "/var/", "/tmp/")
+    forbidden = (
+        "runtime root", "idempotency", "dispatch", "provider", "graph digest",
+        "productiongraph", "referenceset", "owner review candidate",
+        "/home/", "/var/", "/tmp/",
+    )
     low = text.lower()
     leaked = [token for token in forbidden if token in low]
     if leaked:

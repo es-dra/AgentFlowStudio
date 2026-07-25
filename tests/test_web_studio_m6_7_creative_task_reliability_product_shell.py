@@ -213,6 +213,7 @@ def test_m6_7_2_readable_shot_graph_and_nonempty_shell_contract() -> None:
     assert ".node.shot-candidate-card .text-content-view" in node_css
 
     assert "buildInlinePlanAction" in shell
-    assert "可自由开始" in shell
+    assert "从一个想法开始" in shell
+    assert "可自由开始" not in shell
     assert "contextual-inline" in css
     assert "plan-inline-action" in css
