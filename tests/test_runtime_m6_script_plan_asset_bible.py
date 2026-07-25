@@ -78,6 +78,31 @@ def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles
         assert any(item["association_type"] == "asset_bible.production_aid_refs" for item in scope["affected_associations"])
 
 
+def test_m6_canonical_names_preserve_conjunction_characters_and_line_boundaries() -> None:
+    source = """
+角色：和也、Anderson
+场景：和平广场、Andromeda Hall
+道具：红与蓝徽章、Anderson钥匙
+风格：清晰写实
+和也在和平广场举起红与蓝徽章，等待远处的回应。
+Anderson走进Andromeda Hall，把钥匙放在桌面上。
+"""
+
+    candidate = build_m6_script_plan_asset_bible(
+        "m6-adversarial-names",
+        {"source_kind": "script", "source_text": source},
+    )["candidate"]
+
+    scope = candidate["m6_scope_review"]["canonical"]
+    assert scope["characters"] == ["和也", "Anderson"]
+    assert scope["scenes"] == ["和平广场", "Andromeda Hall"]
+    assert scope["props"] == ["红与蓝徽章", "Anderson钥匙"]
+    assert [row["display_name"] for row in candidate["characters"]] == scope["characters"]
+    assert [row["name"] for row in candidate["scenes"]] == scope["scenes"]
+    assert [row["name"] for row in candidate["assets"] if row["kind"] == "prop"] == scope["props"]
+    assert candidate["m6_scope_review"]["fail_closed"]["status"] == "pass"
+
+
 def test_m6_confirm_writes_the_same_production_graph_consumed_by_m5_workspace(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     run = _start_and_wait(client, "m6-graph", IDEA_TEXT, "m6-graph-preview")

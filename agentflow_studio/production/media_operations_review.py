@@ -341,7 +341,7 @@ def _prop_locks(workspace: dict[str, Any]) -> list[dict[str, str]]:
             continue
         metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
         classification = _text(raw.get("classification") or metadata.get("classification"), "")
-        if classification and classification != "canonical_prop":
+        if classification != "canonical_prop":
             continue
         name = _text(raw.get("name") or raw.get("display_name") or metadata.get("display_name"), "")
         if not name:
