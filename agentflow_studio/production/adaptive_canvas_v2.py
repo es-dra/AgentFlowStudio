@@ -1772,45 +1772,7 @@ def _shot_video_prompt(
 
 
 def _video_safety_text(value: Any) -> str:
-    text = " ".join(str(value or "").split())
-    replacements = {
-        "对峙": "professional conversation",
-        "冲突": "production discussion",
-        "危机": "production planning",
-        "压力": "schedule focus",
-        "旧镜头": "film reel prop",
-        "删错": "editing issue",
-        "失误": "editing issue",
-        "限时": "timed production task",
-        "倒计时": "timer display",
-        "三分钟": "short time window",
-        "失重": "low-gravity rehearsal",
-        "倒置": "careful angled reach",
-        "腰绳": "support line",
-        "钢索": "support rail",
-        "氧气": "life-support panel",
-        "阀门": "control wheel",
-        "阀盘": "control wheel",
-        "氧气阀": "life-support control wheel",
-        "束带": "colored marker band",
-        "机械臂": "service arm",
-        "维修槽": "service bay",
-        "气闸": "door module",
-        "裂纹": "surface mark",
-        "告警": "status light",
-        "红色": "warm color",
-        "伤": "mark",
-        "血": "red label",
-        "武器": "tool",
-        "烟": "soft haze lighting",
-        "gore": "mark",
-        "blood": "red label",
-        "weapon": "tool",
-        "smoke": "soft haze lighting",
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    return text[:360]
+    return " ".join(str(value or "").split())[:360]
 
 
 def _negative_lock_sentence(profile: AdaptiveProductionProfile) -> str:

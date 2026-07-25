@@ -334,17 +334,38 @@ def _assets(workspace: dict[str, Any], *, project_id: str, run_id: str) -> dict[
 
 
 def _prop_locks(workspace: dict[str, Any]) -> list[dict[str, str]]:
-    text = " ".join(
-        [
-            *(str(item.get("continuity") or "") for item in workspace.get("assets", {}).get("characters") or [] if isinstance(item, dict)),
-            *(str(shot.get("action") or "") for shot in workspace.get("shots") or [] if isinstance(shot, dict)),
+    assets = workspace.get("assets") if isinstance(workspace.get("assets"), dict) else {}
+    props: list[dict[str, str]] = []
+    for raw in assets.get("props") or []:
+        if not isinstance(raw, dict):
+            continue
+        metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+        classification = _text(raw.get("classification") or metadata.get("classification"), "")
+        if classification and classification != "canonical_prop":
+            continue
+        name = _text(raw.get("name") or raw.get("display_name") or metadata.get("display_name"), "")
+        if not name:
+            continue
+        continuity_parts = [
+            raw.get("continuity"),
+            metadata.get("continuity"),
+            raw.get("do_not_change"),
+            metadata.get("do_not_change"),
         ]
-    )
-    labels = []
-    for token in ("旧镜头", "场记板", "硬盘", "蓝色雨披", "担架", "裂纹平板", "红色束带", "编号七"):
-        if token in text:
-            labels.append({"name": token, "continuity": "保持归属、出现顺序和画面可读性", "status": "locked"})
-    return labels[:8]
+        continuity = "；".join(
+            part
+            for value in continuity_parts
+            for part in ([str(item).strip() for item in value] if isinstance(value, list) else [str(value or "").strip()])
+            if part
+        )
+        props.append(
+            {
+                "name": name,
+                "continuity": continuity or "保持名称、归属、出现顺序和画面可读性",
+                "status": "locked",
+            }
+        )
+    return props
 
 
 def _quality(qa: dict[str, Any]) -> dict[str, Any]:

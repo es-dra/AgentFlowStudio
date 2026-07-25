@@ -21,9 +21,11 @@ from agentflow_studio.production.adaptive_canvas_v2 import (
     load_adaptive_workspace,
     run_adaptive_canvas_production,
     seed_agent_authored_script_truth,
+    _video_safety_text,
 )
 from agentflow_studio.production.media_operations_review import (
     _classification,
+    _prop_locks,
     build_media_operations_command_preview,
     load_media_operations_review,
     media_file_path,
@@ -288,6 +290,39 @@ def test_media_recovery_classification_depends_on_ledger_not_project_name() -> N
     assert _classification({
         "attempts": [{"attempt_id": "attempt-1", "stage": "video_chunk", "status": "failed"}],
     }) == "RECOVERY_EVIDENCE_NOT_COUNTED"
+
+
+def test_media_prop_locks_use_structured_canonical_props_without_name_rules() -> None:
+    props = _prop_locks({
+        "assets": {
+            "props": [
+                {
+                    "name": "黑曜石钥匙",
+                    "classification": "canonical_prop",
+                    "continuity": "始终由主角左手持有",
+                },
+                {
+                    "display_name": "折叠星图",
+                    "classification": "canonical_prop",
+                    "do_not_change": ["保持刻度方向", "保持折痕位置"],
+                },
+                {
+                    "name": "海风色板",
+                    "classification": "production_aid",
+                },
+            ],
+        },
+    })
+
+    assert [item["name"] for item in props] == ["黑曜石钥匙", "折叠星图"]
+    assert props[0]["continuity"] == "始终由主角左手持有"
+    assert props[1]["continuity"] == "保持刻度方向；保持折痕位置"
+    assert all(item["status"] == "locked" for item in props)
+
+
+def test_video_prompt_text_preserves_story_terms_without_keyword_rewrites() -> None:
+    source = "  红色风筝在旧桥上方掠过，角色面对冲突后放下工具。  "
+    assert _video_safety_text(source) == source.strip()
 
 
 def test_media_operations_preview_route_serves_only_known_runtime_media(
