@@ -48,6 +48,7 @@ export function createProductShell(options = {}) {
   let notice = "";
   let pendingGraphImpact = null;
   let m6SourceText = "";
+  let m6SourceDraftDirty = false;
   let m6PreviewRun = null;
   let m6PreviewRecovering = false;
   let m6PreviewPollGeneration = 0;
@@ -622,6 +623,7 @@ export function createProductShell(options = {}) {
     defer.type = "button";
     defer.addEventListener("click", () => {
       m6SourceText = "";
+      m6SourceDraftDirty = false;
       writeM6SourceDraft(currentM6SourceDraftKey(), "");
       setPlanningPanelOpen(false);
       notice = "已暂不处理制作方案；画布仍可从任意节点继续。";
@@ -640,6 +642,7 @@ export function createProductShell(options = {}) {
     textarea.setAttribute("aria-label", "输入想法或已有剧本");
     textarea.addEventListener("input", () => {
       m6SourceText = textarea.value;
+      m6SourceDraftDirty = true;
       writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     });
     const preview = node("button", "studio-primary-button", "生成剧本制作方案");
@@ -3235,16 +3238,27 @@ export function createProductShell(options = {}) {
   function syncPlanningPanelPreference({ force = false } = {}) {
     const nextKey = currentPlanningPanelPreferenceKey();
     if (!force && planningPanelPreferenceKey === nextKey) return;
-    if (planningPanelPreferenceKey && planningPanelPreferenceKey !== nextKey) {
+    const enteringLoadedProject = planningPanelPreferenceKey === "afs:m6:plan-panel:studio"
+      && nextKey !== planningPanelPreferenceKey;
+    const leavingLoadedProject = planningPanelPreferenceKey
+      && planningPanelPreferenceKey !== "afs:m6:plan-panel:studio"
+      && planningPanelPreferenceKey !== nextKey;
+    if (leavingLoadedProject) {
       m6PreviewPollGeneration += 1;
       m6PreviewRun = null;
       m6PreviewRecovering = false;
     }
     planningPanelPreferenceKey = nextKey;
     planningPanelOpen = readPlanningPanelPreference(nextKey);
-    m6SourceText = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
+    const restoredSource = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
       ? readM6SourceDraft(currentM6SubmittedSourceKey()) || readM6SourceDraft(currentM6SourceDraftKey())
       : readM6SourceDraft(currentM6SourceDraftKey());
+    if (enteringLoadedProject && m6SourceDraftDirty && m6SourceText) {
+      writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
+    } else {
+      m6SourceText = restoredSource;
+    }
+    m6SourceDraftDirty = false;
   }
 
   function currentM6ProjectId() {

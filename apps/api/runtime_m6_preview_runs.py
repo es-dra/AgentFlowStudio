@@ -244,6 +244,9 @@ class M6PreviewRunStore:
                 return run
             category, message = _safe_error(error)
             run["error"] = {"category": category, "message": message}
+            validator_code = _safe_validator_code(error)
+            if validator_code:
+                run["error"]["validator_code"] = validator_code
             return self._transition(run, phase="failed", status="failed", finished=True)
 
     def cancel(self, project_id: str, run_id: str, *, owner_id: str) -> dict[str, Any]:
@@ -798,6 +801,13 @@ def _safe_error(error: BaseException) -> tuple[str, str]:
     if "provider" in text or "model" in text:
         return "text_service_failed", "文本规划能力未完成本次任务；制作事实未改变。"
     return "runtime_failed", "制作方案任务未完成；制作事实未改变。"
+
+
+def _safe_validator_code(error: BaseException) -> str:
+    value = str(getattr(error, "validator_code", "") or "").strip().lower()
+    if not value or len(value) > 80 or not value.isascii():
+        return ""
+    return value if value.replace("_", "").isalnum() else ""
 
 
 def _now() -> str:

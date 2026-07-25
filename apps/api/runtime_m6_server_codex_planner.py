@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -329,7 +330,7 @@ def _candidate_from_provider_payload(
     revision_instruction: str,
 ) -> dict[str, Any]:
     if payload.get("language") != "zh-CN":
-        raise M6PlanningError("server_codex output must use zh-CN")
+        raise M6PlanningError("server_codex output must use zh-CN", validator_code="output_language_mismatch")
     project_key = _safe_token(project_id)
     candidate_key = source_digest[:12]
     revision_number = 2 if parent_candidate_digest else 1
@@ -363,7 +364,10 @@ def _candidate_from_provider_payload(
         for index, row in enumerate(_rows(payload, "assets"), start=1)
     ]
     if not any(row["kind"] == "reference_set" for row in assets):
-        raise M6PlanningError("server_codex output must include at least one ReferenceSet asset")
+        raise M6PlanningError(
+            "server_codex output must include at least one ReferenceSet asset",
+            validator_code="production_aid_reference_set_missing",
+        )
     shots = []
     for index, row in enumerate(_rows(payload, "shots"), start=1):
         scene = _by_one_based_index(scenes, int(row.get("scene_index") or 0), "scene_index")
@@ -378,8 +382,8 @@ def _candidate_from_provider_payload(
             **_copy_required(row, ("duration_seconds", "intent", "shot_size", "camera_angle", "camera_movement", "blocking", "sound", "transition", "narrative_purpose", "content_driven_duration_reason")),
         })
     durations = [round(float(row.get("duration_seconds") or 0), 2) for row in shots]
-    if len(set(durations)) <= 1:
-        raise M6PlanningError("server_codex output used fixed equal shot durations")
+    timing_contract = _source_timing_contract(_text(body.get("source_text")))
+    _validate_source_timing_contract(shots, timing_contract)
     structure = dict(payload.get("structure") or {})
     output_chars = len(str(payload))
     scope_review = build_m6_scope_review(
@@ -392,7 +396,10 @@ def _candidate_from_provider_payload(
     if scope_review.get("fail_closed", {}).get("status") != "pass":
         fail_closed = scope_review.get("fail_closed") or {}
         reasons = ", ".join(fail_closed.get("reasons") or ["canonical_scope_drift"])
-        raise M6PlanningError(f"server_codex canonical scope drift failed closed: {reasons}")
+        raise M6PlanningError(
+            f"server_codex canonical scope drift failed closed: {reasons}",
+            validator_code="canonical_scope_drift",
+        )
     candidate = {
         "schema_version": FILM_SCHEMA_VERSION,
         "m6_schema_version": M6_SCHEMA_VERSION,
@@ -471,6 +478,7 @@ def _candidate_from_provider_payload(
                 "shot_count_decided_by_content": True,
                 "source_segment_count": len(shots),
                 "fixed_profile_forbidden": ["4x15", "4×15", "10x6", "10×6", "fixed_shot_count"],
+                "source_timing_contract": timing_contract,
             },
         },
         "characters": characters,
@@ -507,7 +515,10 @@ def _candidate_from_provider_payload(
 def _rows(value: Mapping[str, Any], key: str) -> list[Mapping[str, Any]]:
     rows = value.get(key)
     if not isinstance(rows, list) or not rows:
-        raise M6PlanningError(f"server_codex output missing {key}")
+        raise M6PlanningError(
+            f"server_codex output missing {key}",
+            validator_code=f"provider_missing_{_safe_token(key)}",
+        )
     return [row for row in rows if isinstance(row, Mapping)]
 
 
@@ -515,15 +526,86 @@ def _copy_required(row: Mapping[str, Any], keys: tuple[str, ...]) -> dict[str, A
     copied = {}
     for key in keys:
         if key not in row:
-            raise M6PlanningError(f"server_codex output missing {key}")
+            raise M6PlanningError(
+                f"server_codex output missing {key}",
+                validator_code=f"provider_missing_{_safe_token(key)}",
+            )
         copied[key] = row[key]
     return copied
 
 
 def _by_one_based_index(rows: list[dict[str, Any]], index: int, field: str) -> dict[str, Any]:
     if index < 1 or index > len(rows):
-        raise M6PlanningError(f"server_codex output has unresolved {field}: {index}")
+        raise M6PlanningError(
+            f"server_codex output has unresolved {field}: {index}",
+            validator_code=f"provider_unresolved_{_safe_token(field)}",
+        )
     return rows[index - 1]
+
+
+def _source_timing_contract(source_text: str) -> dict[str, Any]:
+    shot_counts: set[int] = set()
+    for pattern in (
+        r"(?:规划|安排|拆分|生成|制作|共|总共)?\s*(?<!第)(\d{1,2})\s*(?:个|支|段)?\s*(?:连续)?\s*(?:镜头|分镜)",
+        r"(?:plan|create|use|with|total(?:ling)?)?\s*(\d{1,2})\s*(?:continuous\s+)?shots?\b",
+    ):
+        for match in re.finditer(pattern, source_text, flags=re.I):
+            if re.search(r"第\s*$", source_text[:match.start(1)]):
+                continue
+            count = int(match.group(1))
+            if count > 0:
+                shot_counts.add(count)
+    shot_counts = sorted(shot_counts)
+    if len(shot_counts) > 1:
+        raise M6PlanningError(
+            "source declares conflicting shot counts",
+            validator_code="source_shot_count_ambiguous",
+        )
+    duration_matches = []
+    for pattern in (
+        r"(?:总时长|总长度|成片时长)\s*(约|大约|大概|近|approximately|about|around)?\s*(\d+(?:\.\d+)?)\s*(?:秒|s\b|seconds?\b)",
+        r"(?:total\s+duration)\s*(?:is|of|:)?\s*(approximately|about|around)?\s*(\d+(?:\.\d+)?)\s*(?:s\b|seconds?\b)",
+    ):
+        duration_matches.extend(re.findall(pattern, source_text, flags=re.I))
+    duration_values = sorted({round(float(value), 2) for _, value in duration_matches if float(value) > 0})
+    if len(duration_values) > 1:
+        raise M6PlanningError(
+            "source declares conflicting total durations",
+            validator_code="source_total_duration_ambiguous",
+        )
+    target_duration = duration_values[0] if duration_values else None
+    approximate = any(bool(marker) for marker, _ in duration_matches)
+    tolerance = round(max(1.0, target_duration * 0.1), 2) if target_duration and approximate else 0.25 if target_duration else None
+    return {
+        "source_authority": "user_supplied_timing_scope",
+        "requested_shot_count": shot_counts[0] if shot_counts else None,
+        "requested_total_duration_seconds": target_duration,
+        "duration_tolerance_seconds": tolerance,
+        "approximate_total_duration": bool(target_duration and approximate),
+    }
+def _validate_source_timing_contract(shots: list[dict[str, Any]], contract: Mapping[str, Any]) -> None:
+    requested_count = contract.get("requested_shot_count")
+    if requested_count is not None and len(shots) != int(requested_count):
+        raise M6PlanningError(
+            f"server_codex output shot count does not match source: expected {requested_count}, received {len(shots)}",
+            validator_code="source_shot_count_mismatch",
+        )
+    durations = [round(float(shot.get("duration_seconds") or 0), 2) for shot in shots]
+    if any(duration < 3 or duration > 18 for duration in durations):
+        raise M6PlanningError(
+            "server_codex output contains a shot duration outside the 3-18 second planning range",
+            validator_code="shot_duration_out_of_range",
+        )
+    requested_total = contract.get("requested_total_duration_seconds")
+    if requested_total is None:
+        return
+    actual_total = round(sum(durations), 2)
+    tolerance = float(contract.get("duration_tolerance_seconds") or 0)
+    if abs(actual_total - float(requested_total)) > tolerance:
+        raise M6PlanningError(
+            f"server_codex output total duration does not match source: expected {requested_total}, received {actual_total}",
+            validator_code="source_total_duration_mismatch",
+        )
 
 
 def _text(value: Any) -> str:
