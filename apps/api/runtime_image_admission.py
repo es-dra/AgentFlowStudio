@@ -33,6 +33,7 @@ PROMPT_CONTRACT_VERSION = "afs.image_prompt_contract.v0.1"
 SERVICE_ID = "image_relay"
 LEGACY_SERVICE_ID = "codex_image"
 MODEL_ID = "gpt-image-2"
+RECOVERY_SMOKE_ESTIMATE_USD = "0.0377"
 TRUE_VALUES = {"1", "true", "yes", "on"}
 ITEM_TYPES = {"character_design", "scene_plate", "prop_design", "shot_keyframe"}
 ITEM_STATES = {"planned", "reserved", "processing", "candidate", "approved", "rejected", "failed", "cancelled"}
@@ -46,6 +47,7 @@ COMMANDS = {
     "approve",
     "reject",
     "replace",
+    "create_recovery_manifest",
     "cancel_batch",
 }
 ASPECT_SIZES = {
@@ -138,6 +140,8 @@ def register_runtime_image_admission_routes(
                 path = _manifest_path(store, project_id)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 reject_unsafe_payload(result)
+                if command["type"] == "create_recovery_manifest":
+                    _archive_manifest_once(store, project_id, existing)
                 write_json(path, result)
             return {
                 **preview,
@@ -173,7 +177,14 @@ def preview_image_admission_command(
         if not before:
             raise ValueError("image admission manifest has not been compiled")
         _assert_source_current(before, body.get("source"))
-        manifest = _apply_command(store, project_id, before, command, recorded_at=requested_at)
+        manifest = _apply_command(
+            store,
+            project_id,
+            before,
+            command,
+            source_value=body.get("source"),
+            recorded_at=requested_at,
+        )
     impact = _impact(before, manifest, command)
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -575,6 +586,7 @@ def _apply_command(
     before: Mapping[str, Any],
     command: Mapping[str, Any],
     *,
+    source_value: Any = None,
     recorded_at: str | None = None,
 ) -> dict[str, Any]:
     timestamp = recorded_at or _now()
@@ -634,6 +646,11 @@ def _apply_command(
         item = _manifest_item(manifest, command.get("item_id"))
         if item.get("state") not in {"candidate", "rejected", "failed"}:
             raise ValueError("only a candidate, rejected, or failed item can be replaced")
+        if (
+            item.get("state") == "failed"
+            and int(manifest.get("budget", {}).get("remaining_dispatches") or 0) <= 0
+        ):
+            raise ValueError("failed image belongs to an exhausted manifest; create a new recovery manifest")
         if item.get("candidate"):
             manifest["history"].append(
                 {
@@ -647,6 +664,14 @@ def _apply_command(
         item.pop("reservation_token", None)
         item["state"] = "planned"
         _append_receipt(manifest, item, "replacement_planned", command, recorded_at=timestamp)
+    elif command_type == "create_recovery_manifest":
+        manifest = _create_recovery_manifest(
+            project_id,
+            before,
+            source_value,
+            command,
+            recorded_at=timestamp,
+        )
     elif command_type == "cancel_batch":
         cancelled = 0
         for item in manifest.get("items", []):
@@ -664,6 +689,117 @@ def _apply_command(
         raise ValueError("unsupported image admission command")
     manifest["updated_at"] = timestamp
     return manifest
+
+
+def _create_recovery_manifest(
+    project_id: str,
+    before: Mapping[str, Any],
+    source_value: Any,
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str,
+) -> dict[str, Any]:
+    if before.get("status") != "locked":
+        raise ValueError("only a locked image manifest can create a recovery manifest")
+    if isinstance(before.get("recovery_contract"), Mapping):
+        raise ValueError("the active manifest is already a single-item recovery manifest")
+    if str(command.get("source_manifest_id") or "") != str(before.get("manifest_id") or ""):
+        raise ValueError("recovery source manifest is stale")
+    item = _manifest_item(before, command.get("item_id"))
+    if item.get("state") != "failed":
+        raise ValueError("only a failed image item can create a recovery manifest")
+    if any(
+        entry.get("state") in {"reserved", "processing", "candidate"}
+        for entry in before.get("items", [])
+    ):
+        raise ValueError("active image work must finish before creating a recovery manifest")
+    contract = before.get("budget_contract") if isinstance(before.get("budget_contract"), Mapping) else {}
+    budget = before.get("budget") if isinstance(before.get("budget"), Mapping) else {}
+    if (
+        int(contract.get("max_dispatches") or 0) != 1
+        or int(contract.get("auto_retry", -1)) != 0
+        or not _recovery_budget_is_exact(contract)
+        or int(budget.get("dispatches_reserved") or 0) != 1
+        or int(budget.get("remaining_dispatches") or 0) != 0
+        or int(before.get("provider_dispatch_count") or 0) != 1
+    ):
+        raise ValueError("recovery requires one exhausted single-dispatch manifest")
+
+    fresh = compile_image_admission_manifest(project_id, source_value, created_at=recorded_at)
+    if (
+        fresh["budget_contract"]["unit_estimate_usd"] != contract.get("unit_estimate_usd")
+        or fresh["budget_contract"]["max_estimated_usd"] != contract.get("max_estimated_usd")
+    ):
+        raise ValueError("recovery pricing changed; review the image budget before creating a new manifest")
+    fresh_item = _manifest_item(fresh, item["item_id"])
+    fresh["version"] = int(before.get("version") or 1) + 1
+    fresh["items"] = [deepcopy(fresh_item)]
+    fresh["selection_summary"] = {
+        **fresh["selection_summary"],
+        "item_count": 1,
+        "recovery_item_count": 1,
+    }
+    fresh["recovery_contract"] = {
+        "kind": "single_item_failure_recovery",
+        "generation": 1,
+        "source_manifest_id": before["manifest_id"],
+        "source_manifest_hash": before["manifest_hash"],
+        "source_manifest_archived": True,
+        "selected_item_id": item["item_id"],
+        "previous_error_category": str(item.get("error_category") or "generation_failed")[:80],
+        "previous_dispatches_reserved": int(budget.get("dispatches_reserved") or 0),
+        "previous_estimated_reserved_usd": str(budget.get("estimated_reserved_usd") or "0.0000"),
+        "new_max_dispatches": 1,
+        "new_max_estimated_usd": fresh["budget_contract"]["max_estimated_usd"],
+        "auto_retry": 0,
+        "requires_separate_generation_confirmation": True,
+    }
+    manifest_hash = canonical_digest(_manifest_contract_payload(fresh))
+    fresh["manifest_hash"] = manifest_hash
+    fresh["manifest_id"] = f"image-admission-recovery-{manifest_hash[:16]}"
+    fresh["status"] = "locked"
+    fresh["locked_at"] = recorded_at
+    fresh["provider_dispatch_count"] = 0
+    fresh["actual_usd"] = None
+    fresh["billing_verification_state"] = "unverified"
+    _append_receipt(
+        fresh,
+        fresh["items"][0],
+        "recovery_manifest_created",
+        command,
+        recorded_at=recorded_at,
+    )
+    return fresh
+
+
+def _manifest_contract_payload(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    keys = (
+        "schema_version",
+        "project_id",
+        "version",
+        "source",
+        "source_fingerprint",
+        "art_direction",
+        "creative_grounding",
+        "selection_summary",
+        "items",
+        "budget_contract",
+        "provider_contract",
+        "recovery_contract",
+    )
+    return {key: deepcopy(manifest[key]) for key in keys if key in manifest}
+
+
+def _recovery_budget_is_exact(contract: Mapping[str, Any]) -> bool:
+    try:
+        return (
+            _money(Decimal(str(contract.get("unit_estimate_usd"))))
+            == RECOVERY_SMOKE_ESTIMATE_USD
+            and _money(Decimal(str(contract.get("max_estimated_usd"))))
+            == RECOVERY_SMOKE_ESTIMATE_USD
+        )
+    except (InvalidOperation, TypeError, ValueError):
+        return False
 
 
 def _reserve_dispatch(
@@ -1645,7 +1781,7 @@ def _impact(before: Mapping[str, Any], after: Mapping[str, Any], command: Mappin
         for item in after.get("items", [])
         if before_states.get(item["item_id"]) != item.get("state")
     ]
-    return {
+    impact = {
         "item_ids": changed or [item["item_id"] for item in after.get("items", [])],
         "item_count": len(after.get("items", [])),
         "manifest_status_before": before.get("status", "empty"),
@@ -1657,6 +1793,28 @@ def _impact(before: Mapping[str, Any], after: Mapping[str, Any], command: Mappin
         "preserved_on_cancel": True,
         "command_type": command["type"],
     }
+    if command["type"] == "create_recovery_manifest":
+        impact["recovery_manifest"] = {
+            "creates_new_manifest": True,
+            "previous_manifest_preserved_on_confirm": True,
+            "selected_item_count": 1,
+            "previous_dispatches_preserved": int(
+                before.get("budget", {}).get("dispatches_reserved") or 0
+            ),
+            "previous_estimated_reserved_usd": str(
+                before.get("budget", {}).get("estimated_reserved_usd") or "0.0000"
+            ),
+            "new_max_dispatches": int(
+                after.get("budget_contract", {}).get("max_dispatches") or 0
+            ),
+            "new_max_estimated_usd": str(
+                after.get("budget_contract", {}).get("max_estimated_usd") or "0.0000"
+            ),
+            "auto_retry": int(after.get("budget_contract", {}).get("auto_retry") or 0),
+            "provider_calls_before_confirm": 0,
+            "requires_separate_generation_confirmation": True,
+        }
+    return impact
 
 
 def _safe_command(value: Any) -> dict[str, Any]:
@@ -1673,6 +1831,7 @@ def _safe_command(value: Any) -> dict[str, Any]:
         "reason",
         "error_category",
         "provider_job_id",
+        "source_manifest_id",
     }
     return {key: deepcopy(value) for key, value in command.items() if key in allowed}
 
@@ -1697,6 +1856,29 @@ def _idempotent_receipt(manifest: Mapping[str, Any], command_value: Any) -> dict
 
 def _manifest_path(store: RuntimeStore, project_id: str):
     return store.projects_dir / safe_id(project_id) / "image_admission" / "manifest.json"
+
+
+def _archive_manifest_once(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    manifest_id = safe_id(str(manifest.get("manifest_id") or ""))
+    path = (
+        store.projects_dir
+        / safe_id(project_id)
+        / "image_admission"
+        / "history"
+        / f"{manifest_id}.json"
+    )
+    if path.is_file():
+        archived = read_json(path)
+        reject_unsafe_payload(archived)
+        if canonical_digest(archived) != canonical_digest(manifest):
+            raise ValueError("archived image manifest conflicts with the immutable source ledger")
+        return
+    reject_unsafe_payload(manifest)
+    write_json(path, deepcopy(manifest))
 
 
 def _money_env(name: str, default: str) -> Decimal:

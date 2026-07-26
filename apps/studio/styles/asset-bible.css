@@ -498,6 +498,7 @@
 .image-admission-capability,
 .image-admission-error,
 .image-admission-review,
+.image-admission-recovery-notice,
 .image-admission-empty {
   display: grid;
   gap: 5px;
@@ -509,7 +510,17 @@
 .image-admission-capability.ready { border-color: #2e936b; background: #10231d; }
 .image-admission-error { border-color: #c85c6b; background: #2b161a; }
 .image-admission-review { border-color: var(--product-accent); background: #102630; }
+.image-admission-recovery-notice { border-color: #2e936b; background: #10231d; }
 .image-admission-empty { border-color: #54778c; background: #0d202a; }
+
+.image-admission-recovery-notice p,
+.image-admission-failure-guidance p {
+  margin: 0;
+  color: var(--product-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.image-admission-recovery-action { justify-self: start; margin-top: 4px; }
 
 .image-admission-list {
   display: grid;
@@ -529,6 +540,16 @@
 .image-admission-item.state-failed .image-admission-item-state,
 .image-admission-item.state-rejected .image-admission-item-state { color: #efb1b8; }
 .image-admission-item-actions { justify-content: flex-end; }
+.image-admission-failure-guidance {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  border-left: 3px solid #c85c6b;
+  padding: 8px 10px;
+  background: #2b161a;
+}
+.image-admission-failure-guidance details { color: var(--product-muted); font-size: 10px; }
+.image-admission-failure-guidance summary { cursor: pointer; }
 .image-admission-grounding {
   display: grid;
   gap: 6px;

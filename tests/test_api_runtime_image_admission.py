@@ -554,7 +554,10 @@ def test_legacy_multi_dispatch_budget_contract_fails_closed_before_reservation(
     assert persisted["budget"]["dispatches_reserved"] == 0
 
 
-def test_single_smoke_cap_failed_dispatch_consumption_and_confirm_replay(tmp_path, monkeypatch) -> None:
+def test_failed_single_smoke_creates_one_new_manifest_without_reusing_old_ledger(
+    tmp_path,
+    monkeypatch,
+) -> None:
     client, source = _compiled_locked_client(tmp_path, monkeypatch)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
@@ -582,7 +585,7 @@ def test_single_smoke_cap_failed_dispatch_consumption_and_confirm_replay(tmp_pat
     )
     assert replay.status_code == 200
     assert replay.json()["idempotent_replay"] is True
-    _command(
+    failed = _command(
         client,
         {
             "type": "record_failure",
@@ -591,38 +594,247 @@ def test_single_smoke_cap_failed_dispatch_consumption_and_confirm_replay(tmp_pat
             "error_category": "controlled_test_failure",
         },
         source,
-    )
-    _command(
-        client,
-        {
-            "type": "replace",
-            "item_id": item_id,
-            "idempotency_key": "replace-1",
-            "reason": "bounded retry preview",
-        },
-        source,
-    )
-    blocked = client.post(
+    )["result"]["manifest"]
+    old_manifest = deepcopy(failed)
+    old_other_items = [
+        entry["item_id"] for entry in old_manifest["items"] if entry["item_id"] != item_id
+    ]
+
+    replace_blocked = client.post(
         f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
         json={
             "command": {
-                "type": "reserve_dispatch",
+                "type": "replace",
                 "item_id": item_id,
-                "idempotency_key": "reserve-2",
+                "idempotency_key": "replace-exhausted",
             },
             "source": source,
             "requested_at": REQUESTED_AT,
         },
     )
-    assert blocked.status_code == 422
-    assert "仅允许发送一次" in blocked.json()["detail"]["details"]["raw_detail"]
+    assert replace_blocked.status_code == 422
+    assert "create a new recovery manifest" in replace_blocked.json()["detail"]["details"]["raw_detail"]
 
+    recovery_command = {
+        "type": "create_recovery_manifest",
+        "item_id": item_id,
+        "source_manifest_id": old_manifest["manifest_id"],
+        "idempotency_key": "recovery-manifest-1",
+    }
+    request = {
+        "command": recovery_command,
+        "source": source,
+        "requested_at": REQUESTED_AT,
+    }
+    preview_response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json=request,
+    )
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
+    preview_manifest = preview["result"]["manifest"]
+    assert preview["provider_dispatch_count"] == 0
+    assert preview["external_cost_usd"] == "0.0000"
+    assert preview["impact"]["recovery_manifest"] == {
+        "creates_new_manifest": True,
+        "previous_manifest_preserved_on_confirm": True,
+        "selected_item_count": 1,
+        "previous_dispatches_preserved": 1,
+        "previous_estimated_reserved_usd": "0.0377",
+        "new_max_dispatches": 1,
+        "new_max_estimated_usd": "0.0377",
+        "auto_retry": 0,
+        "provider_calls_before_confirm": 0,
+        "requires_separate_generation_confirmation": True,
+    }
+    assert len(preview_manifest["items"]) == 1
+    assert preview_manifest["items"][0]["item_id"] == item_id
+    assert preview_manifest["items"][0]["state"] == "planned"
+    assert preview_manifest["status"] == "locked"
+    assert preview_manifest["budget"]["dispatches_reserved"] == 0
+    assert preview_manifest["budget"]["remaining_dispatches"] == 1
+    assert preview_manifest["provider_dispatch_count"] == 0
+    assert preview_manifest["recovery_contract"]["auto_retry"] == 0
+    assert preview_manifest["recovery_contract"]["requires_separate_generation_confirmation"] is True
+    assert client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"] == old_manifest
+
+    concurrent_request = {
+        "command": {
+            **recovery_command,
+            "idempotency_key": "recovery-manifest-concurrent",
+        },
+        "source": source,
+        "requested_at": REQUESTED_AT,
+    }
+    concurrent_preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json=concurrent_request,
+    )
+    assert concurrent_preview.status_code == 200
+    concurrent_request["preview_digest"] = concurrent_preview.json()["preview_digest"]
+
+    request["preview_digest"] = preview["preview_digest"]
+    confirmed_response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=request,
+    )
+    assert confirmed_response.status_code == 200, confirmed_response.text
+    confirmed = confirmed_response.json()["result"]["manifest"]
+    assert confirmed == client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    assert confirmed["manifest_id"] != old_manifest["manifest_id"]
+    assert confirmed["project_id"] == old_manifest["project_id"]
+    assert confirmed["source_fingerprint"] == old_manifest["source_fingerprint"]
+    assert confirmed["accepted_graph_snapshots"] == old_manifest["accepted_graph_snapshots"]
+    assert confirmed["source"]["asset_bible_revision_id"] == old_manifest["source"]["asset_bible_revision_id"]
+    assert confirmed["recovery_contract"]["source_manifest_id"] == old_manifest["manifest_id"]
+    assert confirmed["receipts"][-1]["state"] == "recovery_manifest_created"
+    assert confirmed_response.json()["result"]["graph_mutation"] == 0
+
+    archive_path = (
+        tmp_path
+        / "runtime"
+        / "projects"
+        / PROJECT_ID
+        / "image_admission"
+        / "history"
+        / f"{old_manifest['manifest_id']}.json"
+    )
+    assert json.loads(archive_path.read_text(encoding="utf-8")) == old_manifest
+    assert all(
+        entry["state"] == "planned"
+        for entry in old_manifest["items"]
+        if entry["item_id"] in old_other_items
+    )
+
+    replay = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=request,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    assert json.loads(archive_path.read_text(encoding="utf-8")) == old_manifest
+
+    concurrent_confirm = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=concurrent_request,
+    )
+    assert concurrent_confirm.status_code == 422
+    assert json.loads(archive_path.read_text(encoding="utf-8")) == old_manifest
+
+    duplicate = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **recovery_command,
+                "idempotency_key": "recovery-manifest-2",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert duplicate.status_code == 422
+    assert "already a single-item recovery manifest" in duplicate.json()["detail"]["details"]["raw_detail"]
+
+    reserve_preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "reserve_dispatch",
+                "item_id": item_id,
+                "idempotency_key": "recovery-reserve-preview",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert reserve_preview.status_code == 200, reserve_preview.text
     persisted = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
-    assert persisted["budget"]["dispatches_reserved"] == 1
-    assert persisted["budget"]["estimated_reserved_usd"] == "0.0377"
-    assert persisted["budget"]["remaining_dispatches"] == 0
-    assert persisted["actual_usd"] is None
-    assert len([receipt for receipt in persisted["receipts"] if receipt["state"] == "failed"]) == 1
+    assert persisted["budget"]["dispatches_reserved"] == 0
+    assert persisted["provider_dispatch_count"] == 0
+    assert len(persisted["items"]) == 1
+
+
+def test_recovery_manifest_fails_closed_on_stale_source_or_nonfailed_selection(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    path = (
+        tmp_path
+        / "runtime"
+        / "projects"
+        / PROJECT_ID
+        / "image_admission"
+        / "manifest.json"
+    )
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    failed_item = next(item for item in manifest["items"] if item["item_type"] == "character_design")
+    planned_item = next(item for item in manifest["items"] if item["item_id"] != failed_item["item_id"])
+    manifest["budget"].update(
+        {
+            "dispatches_reserved": 1,
+            "estimated_reserved_usd": "0.0377",
+            "remaining_dispatches": 0,
+            "remaining_estimated_usd": "0.0000",
+        }
+    )
+    manifest["provider_dispatch_count"] = 1
+    failed_item["state"] = "failed"
+    failed_item["dispatch_ordinal"] = 1
+    failed_item["error_category"] = "blocked"
+    path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+    base_command = {
+        "type": "create_recovery_manifest",
+        "source_manifest_id": manifest["manifest_id"],
+    }
+    wrong_item = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **base_command,
+                "item_id": planned_item["item_id"],
+                "idempotency_key": "wrong-item",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert wrong_item.status_code == 422
+    stale_source = deepcopy(source)
+    stale_source["asset_bible"]["locked_revision_id"] = "asset-bible-r9-stale"
+    stale = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **base_command,
+                "item_id": failed_item["item_id"],
+                "idempotency_key": "stale-source",
+            },
+            "source": stale_source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert stale.status_code == 422
+    assert json.loads(path.read_text(encoding="utf-8")) == manifest
+
+    monkeypatch.setenv("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0500")
+    monkeypatch.setenv("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.0500")
+    price_drift = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **base_command,
+                "item_id": failed_item["item_id"],
+                "idempotency_key": "price-drift",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert price_drift.status_code == 422
+    assert "pricing changed" in price_drift.json()["detail"]["details"]["raw_detail"]
+    assert json.loads(path.read_text(encoding="utf-8")) == manifest
 
 
 def test_generation_job_binding_survives_reload_without_another_reservation(tmp_path, monkeypatch) -> None:

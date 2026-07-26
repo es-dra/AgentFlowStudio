@@ -40,6 +40,11 @@ def test_image_admission_uses_preview_confirm_runtime_command_path() -> None:
     assert "disable_provider_retry: true" in workspace
     assert 'type: "record_job"' in workspace
     assert 'type: "record_failure"' in shell
+    assert 'type: "create_recovery_manifest"' in shell
+    assert "建立新的单次恢复清单" in shell
+    assert "确认只会建立新清单，不会生成图片" in shell
+    assert "预览生成恢复图片" in shell
+    assert 'node("button", "studio-secondary-button", "预览替换")' not in shell
     assert "Provider 调用" not in shell
     assert "codex_image" not in shell
     assert "gpt-image" not in shell
@@ -74,6 +79,41 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
     assert result["counts"]["failed"] == 1
     assert result["actual_usd"] is None
     assert result["billing_verification_state"] == "unverified"
+
+
+def test_failed_image_guidance_exposes_safe_recovery_without_raw_error_or_old_ledger_reuse() -> None:
+    script = f"""
+      import {{ imageAdmissionFailureGuidance }} from {json.dumps(WORKSPACE.as_uri())};
+      const manifest = {{
+        status: "locked",
+        budget_contract: {{ max_dispatches: 1, max_estimated_usd: "0.0377", auto_retry: 0 }},
+        budget: {{ dispatches_reserved: 1, remaining_dispatches: 0 }},
+      }};
+      console.log(JSON.stringify({{
+        blocked: imageAdmissionFailureGuidance({{ state: "failed", error_category: "blocked" }}, manifest),
+        unknown: imageAdmissionFailureGuidance({{ state: "failed", error_category: "private-provider-code" }}, manifest),
+        recovered: imageAdmissionFailureGuidance(
+          {{ state: "failed", error_category: "blocked" }},
+          {{ ...manifest, recovery_contract: {{ kind: "single_item_failure_recovery" }} }},
+        ),
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["blocked"] == {
+        "title": "图片结果未能安全接收",
+        "detail": "本次结果未通过安全接收检查，没有写入项目。旧尝试与费用记录会完整保留。",
+        "diagnostic": "安全接收受阻",
+        "can_create_recovery_manifest": True,
+    }
+    assert "private-provider-code" not in json.dumps(result["unknown"], ensure_ascii=False)
+    assert result["recovered"]["can_create_recovery_manifest"] is False
 
 
 def test_first_image_surface_is_dynamic_creator_copy_with_a_single_dispatch_stop() -> None:

@@ -21,6 +21,7 @@ import {
   imageAdmissionCommand,
   imageAdmissionGenerationRequest,
   imageAdmissionGenerationResult,
+  imageAdmissionFailureGuidance,
   imageAdmissionItemTypeLabel,
   imageAdmissionItemJobId,
   imageAdmissionJobCommand,
@@ -1910,6 +1911,38 @@ export function createProductShell(options = {}) {
     }
     panel.appendChild(metrics);
     const imageGateOpen = snapshot.mediaGates?.image === true;
+    const recovery = view.manifest?.recovery_contract;
+    if (recovery) {
+      const recoveryNotice = node("div", "image-admission-recovery-notice");
+      recoveryNotice.append(
+        node("strong", "", "新的单次恢复清单"),
+        node(
+          "p",
+          "",
+          `只包含原失败图片；旧清单的 ${recovery.previous_dispatches_reserved || 0} 次记录与 $${recovery.previous_estimated_reserved_usd || "0.0000"} 费用估算已保留。`,
+        ),
+        node("p", "", "建立清单不会生成图片；仍需另行预览并确认一次生成。"),
+      );
+      const recoveryItem = view.items.find((item) => item.state === "planned");
+      if (
+        imageGateOpen
+        && recoveryItem
+        && Number(view.budget?.remaining_dispatches || 0) > 0
+      ) {
+        const generate = node(
+          "button",
+          "studio-primary-button image-admission-recovery-action",
+          "预览生成恢复图片",
+        );
+        generate.type = "button";
+        generate.addEventListener("click", () => void stageImageAdmissionCommand({
+          type: "reserve_dispatch",
+          item_id: recoveryItem.item_id,
+        }));
+        recoveryNotice.appendChild(generate);
+      }
+      panel.appendChild(recoveryNotice);
+    }
     const continuityReady = view.capability.keyframe_continuity_ready === true;
     const blocker = node("div", continuityReady ? "image-admission-capability ready" : "image-admission-capability");
     blocker.append(
@@ -1964,6 +1997,21 @@ export function createProductShell(options = {}) {
         : `${occurrenceCount} 个镜头出现 · 来源已绑定`,
     ));
     main.appendChild(buildImageAdmissionGrounding(item));
+    const failure = imageAdmissionFailureGuidance(item, view.manifest);
+    if (failure) {
+      const failurePanel = node("div", "image-admission-failure-guidance");
+      failurePanel.append(
+        node("strong", "", failure.title),
+        node("p", "", failure.detail),
+      );
+      const diagnostics = node("details", "");
+      diagnostics.append(
+        node("summary", "", "查看失败分类"),
+        node("p", "", failure.diagnostic),
+      );
+      failurePanel.appendChild(diagnostics);
+      main.appendChild(failurePanel);
+    }
     const media = buildImageAdmissionCandidateMedia(item, view);
     if (media.element) main.appendChild(media.element);
     const state = node("span", "image-admission-item-state", imageAdmissionStateLabel(item.state));
@@ -2023,11 +2071,15 @@ export function createProductShell(options = {}) {
       reject.addEventListener("click", () => void stageImageAdmissionCommand({ type: "reject", item_id: item.item_id, reason: "人工审核未通过" }));
       actions.append(approve, reject);
     }
-    if (["failed", "rejected"].includes(item.state)) {
-      const replace = node("button", "studio-secondary-button", "预览替换");
-      replace.type = "button";
-      replace.addEventListener("click", () => void stageImageAdmissionCommand({ type: "replace", item_id: item.item_id, reason: "创建替换候选" }));
-      actions.appendChild(replace);
+    if (failure?.can_create_recovery_manifest) {
+      const recover = node("button", "studio-primary-button", "建立新的单次恢复清单");
+      recover.type = "button";
+      recover.addEventListener("click", () => void stageImageAdmissionCommand({
+        type: "create_recovery_manifest",
+        item_id: item.item_id,
+        source_manifest_id: view.manifest.manifest_id,
+      }));
+      actions.appendChild(recover);
     }
     if (actions.childElementCount) row.appendChild(actions);
     return row;
@@ -2188,17 +2240,43 @@ export function createProductShell(options = {}) {
   function buildImageAdmissionReview() {
     const preview = imageAdmissionPreview;
     const willDispatch = preview.command?.type === "reserve_dispatch";
+    const willCreateRecovery = preview.command?.type === "create_recovery_manifest";
     const review = node("section", "image-admission-review");
     review.setAttribute("aria-live", "polite");
     review.append(
-      node("strong", "", willDispatch ? "确认占用一次额度并生成" : "确认图片准入变更"),
-      node("p", "", willDispatch
-        ? `确认后将先占用第 ${preview.impact?.dispatches_reserved_after || 0} 次额度，再串行发送这一项；失败也占用次数，不会自动重试。`
-        : `将影响 ${preview.impact?.item_count || 0} 项；现在仅供预览，确认后才会保存。`),
+      node(
+        "strong",
+        "",
+        willDispatch
+          ? "确认占用一次额度并生成"
+          : willCreateRecovery
+            ? "建立新的单次恢复清单"
+            : "确认图片准入变更",
+      ),
+      node(
+        "p",
+        "",
+        willDispatch
+          ? `确认后将先占用第 ${preview.impact?.dispatches_reserved_after || 0} 次额度，再串行发送这一项；失败也占用次数，不会自动重试。`
+          : willCreateRecovery
+            ? `旧清单的 ${preview.impact?.recovery_manifest?.previous_dispatches_preserved || 0} 次记录与 $${preview.impact?.recovery_manifest?.previous_estimated_reserved_usd || "0.0000"} 费用估算将永久保留。新清单只包含原失败图片，硬上限 ${preview.impact?.recovery_manifest?.new_max_dispatches || 1} 次 / $${preview.impact?.recovery_manifest?.new_max_estimated_usd || "0.0377"}，不会自动重试。`
+            : `将影响 ${preview.impact?.item_count || 0} 项；现在仅供预览，确认后才会保存。`,
+      ),
     );
+    if (willCreateRecovery) {
+      const selected = preview.result?.manifest?.items?.[0];
+      review.append(
+        node("p", "image-admission-review-target", `恢复项目：${selected?.label || "原失败图片"}`),
+        node("p", "", "确认只会建立新清单，不会生成图片。之后仍需另行预览并确认生成。"),
+      );
+    }
     const actions = node("div", "image-admission-actions");
     const cancel = node("button", "studio-secondary-button", "取消");
-    const confirm = node("button", "studio-primary-button", "确认");
+    const confirm = node(
+      "button",
+      "studio-primary-button",
+      willCreateRecovery ? "建立新清单" : "确认",
+    );
     cancel.type = confirm.type = "button";
     cancel.addEventListener("click", cancelImageAdmissionCommand);
     confirm.addEventListener("click", () => void confirmImageAdmissionCommand());
@@ -2244,6 +2322,8 @@ export function createProductShell(options = {}) {
       imageAdmissionError = "";
       notice = confirmedCommand.type === "reserve_dispatch"
         ? "额度已原子占用，正在发送单项生成请求。"
+        : confirmedCommand.type === "create_recovery_manifest"
+          ? "新的单次恢复清单已建立；旧记录已保留。需要你另行预览并确认生成。"
         : confirmedCommand.type === "approve"
           ? "图片候选已确认并保存到当前项目；可以继续查看已确认图片。"
         : "图片准入清单已更新；未调用外部能力。";
@@ -2344,7 +2424,7 @@ export function createProductShell(options = {}) {
         item_id: item.item_id,
         error_category: status || "generation_failed",
       });
-      notice = "这一项失败且已隔离；可在预算范围内预览替换。";
+      notice = "这一项失败且已隔离；旧记录已保留，可建立新的单次恢复清单。";
       return;
     }
     if (!jobId) throw new Error("图片任务未返回可恢复的任务标识。");
