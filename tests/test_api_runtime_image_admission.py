@@ -1483,6 +1483,21 @@ def test_next_batches_preserve_history_scale_budget_and_bind_approved_references
     assert replay.status_code == 200
     assert replay.json()["idempotent_replay"] is True
     assert replay.json()["result"]["manifest"] == batch
+    semantic_conflict = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json={
+            "command": {
+                **command,
+                "item_ids": command["item_ids"][:1],
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+            "preview_digest": preview["preview_digest"],
+        },
+    )
+    assert semantic_conflict.status_code == 422
+    assert "idempotency key conflicts" in semantic_conflict.json()["detail"]["details"]["raw_detail"]
+    assert client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"] == batch
     concurrent = client.post(
         f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
         json={

@@ -76,6 +76,7 @@ export function createProductShell(options = {}) {
   let imageAdmissionError = "";
   let imageAdmissionNextBatchOptions = null;
   let imageAdmissionNextBatchSelection = new Set();
+  let imageAdmissionNextBatchProjectId = "";
   const imageAdmissionMediaStates = new Map();
   let imageAdmissionViewer = null;
   let imageAdmissionViewerReturnKey = "";
@@ -1902,9 +1903,14 @@ export function createProductShell(options = {}) {
       return panel;
     }
     const metrics = node("div", "image-admission-metrics");
+    const unitEstimate = imageAdmissionEstimateLabel(view.budget_contract.unit_estimate_usd, " / 张");
+    const batchEstimate = imageAdmissionEstimateLabel(
+      view.budget_contract.max_estimated_usd,
+      ` · ${view.budget_contract.max_dispatches || 0} 次`,
+    );
     for (const [label, value] of [
-      ["公开单价", `$${view.budget_contract.unit_estimate_usd || "0.0377"} / 张`],
-      ["本轮硬上限", `$${view.budget_contract.max_estimated_usd || "0.0377"} · ${view.budget_contract.max_dispatches || 1} 次`],
+      ["公开单价", unitEstimate],
+      ["本轮硬上限", batchEstimate],
       ["已占用", `${view.budget.dispatches_reserved || 0} 次 · $${view.budget.estimated_reserved_usd || "0.0000"}`],
       ["实际账单", view.actual_usd == null ? "未核验" : `$${view.actual_usd}`],
     ]) {
@@ -1965,7 +1971,10 @@ export function createProductShell(options = {}) {
     const list = node("div", "image-admission-list");
     for (const item of view.items) list.appendChild(buildImageAdmissionItem(item, view));
     panel.appendChild(list);
-    if (imageAdmissionNextBatchOptions) {
+    if (
+      imageAdmissionNextBatchOptions
+      && imageAdmissionNextBatchProjectId === currentProductProjectId()
+    ) {
       panel.appendChild(buildImageAdmissionNextBatchSelector(view));
     }
     const actions = node("div", "image-admission-actions");
@@ -2019,29 +2028,34 @@ export function createProductShell(options = {}) {
     }
     sectionEl.appendChild(options);
     const selectedCount = imageAdmissionNextBatchSelection.size;
-    const unit = view.budget_contract.unit_estimate_usd || "0.0377";
-    const estimate = (Number(unit) * selectedCount).toFixed(4);
     sectionEl.appendChild(node(
       "p",
       "image-admission-next-batch-cost",
-      `已选 ${selectedCount} 项 · 公开估算 $${estimate} · 不会自动重试`,
+      `已选 ${selectedCount} 项 · 下一步按当前服务合同核验费用 · 不会自动重试`,
     ));
     const actions = node("div", "image-admission-actions");
     const cancel = node("button", "studio-secondary-button", "取消选择");
     cancel.type = "button";
     cancel.addEventListener("click", () => {
-      imageAdmissionNextBatchOptions = null;
-      imageAdmissionNextBatchSelection = new Set();
+      resetImageAdmissionNextBatchState();
       render();
     });
-    const prepare = node("button", "studio-primary-button", "确认费用");
+    const prepare = node("button", "studio-primary-button", "预览费用");
     prepare.type = "button";
     prepare.disabled = selectedCount === 0;
-    prepare.addEventListener("click", () => void stageImageAdmissionCommand({
-      type: "create_next_batch_manifest",
-      source_manifest_id: view.manifest.manifest_id,
-      item_ids: [...imageAdmissionNextBatchSelection],
-    }));
+    prepare.addEventListener("click", () => {
+      if (imageAdmissionNextBatchProjectId !== currentProductProjectId()) {
+        resetImageAdmissionNextBatchState();
+        imageAdmissionError = "项目已切换；请在当前项目重新准备下一批图片。";
+        render();
+        return;
+      }
+      void stageImageAdmissionCommand({
+        type: "create_next_batch_manifest",
+        source_manifest_id: view.manifest.manifest_id,
+        item_ids: [...imageAdmissionNextBatchSelection],
+      });
+    });
     actions.append(cancel, prepare);
     sectionEl.appendChild(actions);
     return sectionEl;
@@ -2049,6 +2063,7 @@ export function createProductShell(options = {}) {
 
   async function loadImageAdmissionNextBatchOptions() {
     imageAdmissionError = "";
+    const requestedProjectId = currentProductProjectId();
     try {
       const request = {
         command: imageAdmissionCommand({ type: "inspect_next_batch" }),
@@ -2056,8 +2071,12 @@ export function createProductShell(options = {}) {
         requested_at: new Date().toISOString(),
       };
       const preview = await options.getRuntime?.().previewImageAdmissionCommand(request);
+      if (!requestedProjectId || requestedProjectId !== currentProductProjectId()) {
+        throw new Error("项目已切换；请在当前项目重新准备下一批图片。");
+      }
       imageAdmissionNextBatchOptions = preview?.result?.manifest?.next_batch_options || [];
       imageAdmissionNextBatchSelection = new Set();
+      imageAdmissionNextBatchProjectId = requestedProjectId;
       if (!imageAdmissionNextBatchOptions.length) {
         imageAdmissionError = "当前项目没有尚未发送的图片项目。";
       }
@@ -2065,6 +2084,20 @@ export function createProductShell(options = {}) {
       imageAdmissionError = options.formatError?.(error) || String(error?.message || error || "下一批图片准备失败");
     }
     render();
+  }
+
+  function currentProductProjectId() {
+    return String(
+      snapshot.project?.project_id
+      || snapshot.studioState?.meta?.projectId
+      || "",
+    );
+  }
+
+  function resetImageAdmissionNextBatchState() {
+    imageAdmissionNextBatchOptions = null;
+    imageAdmissionNextBatchSelection = new Set();
+    imageAdmissionNextBatchProjectId = "";
   }
 
   function buildImageAdmissionItem(item, view) {
@@ -2187,10 +2220,19 @@ export function createProductShell(options = {}) {
     const evidence = node("details", "");
     evidence.append(
       node("summary", "", "来源与费用"),
-      node("p", "", `${item.size} · 单项估算 $${imageAdmissionView().budget_contract.unit_estimate_usd || "0.0377"} · 公开估算，非最终账单`),
+      node(
+        "p",
+        "",
+        `${item.size} · 单项估算 ${imageAdmissionEstimateLabel(imageAdmissionView().budget_contract.unit_estimate_usd)} · 公开估算，非最终账单`,
+      ),
     );
     sectionEl.appendChild(evidence);
     return sectionEl;
+  }
+
+  function imageAdmissionEstimateLabel(value, suffix = "") {
+    const amount = String(value || "");
+    return amount ? `$${amount}${suffix}` : "待核验";
   }
 
   function buildImageAdmissionCandidateMedia(item, view) {
@@ -2350,7 +2392,7 @@ export function createProductShell(options = {}) {
         willDispatch
           ? `确认后将先占用第 ${preview.impact?.dispatches_reserved_after || 0} 次额度，再串行发送这一项；失败也占用次数，不会自动重试。`
           : willCreateRecovery
-            ? `旧清单的 ${preview.impact?.recovery_manifest?.previous_dispatches_preserved || 0} 次记录与 $${preview.impact?.recovery_manifest?.previous_estimated_reserved_usd || "0.0000"} 费用估算将永久保留。新清单只包含原失败图片，硬上限 ${preview.impact?.recovery_manifest?.new_max_dispatches || 1} 次 / $${preview.impact?.recovery_manifest?.new_max_estimated_usd || "0.0377"}，不会自动重试。`
+            ? `旧清单的 ${preview.impact?.recovery_manifest?.previous_dispatches_preserved || 0} 次记录与 ${imageAdmissionEstimateLabel(preview.impact?.recovery_manifest?.previous_estimated_reserved_usd)} 费用估算将永久保留。新清单只包含原失败图片，硬上限 ${preview.impact?.recovery_manifest?.new_max_dispatches || 1} 次 / ${imageAdmissionEstimateLabel(preview.impact?.recovery_manifest?.new_max_estimated_usd)}，不会自动重试。`
             : willCreateNextBatch
               ? `旧清单与所有尝试会保留。新清单包含 ${preview.impact?.next_batch_manifest?.selected_item_count || 0} 项，硬上限 ${preview.impact?.next_batch_manifest?.new_max_dispatches || 0} 次 / $${preview.impact?.next_batch_manifest?.new_max_estimated_usd || "0.0000"}，不会自动重试。`
             : `将影响 ${preview.impact?.item_count || 0} 项；现在仅供预览，确认后才会保存。`,
@@ -2423,8 +2465,7 @@ export function createProductShell(options = {}) {
       const confirmedCommand = preview.request?.command || {};
       imageAdmissionPreview = null;
       imageAdmissionError = "";
-      imageAdmissionNextBatchOptions = null;
-      imageAdmissionNextBatchSelection = new Set();
+      resetImageAdmissionNextBatchState();
       notice = confirmedCommand.type === "reserve_dispatch"
         ? "额度已原子占用，正在发送单项生成请求。"
         : confirmedCommand.type === "create_recovery_manifest"
@@ -3750,6 +3791,7 @@ export function createProductShell(options = {}) {
   }
 
   async function refresh(runtime, authUser = null) {
+    resetImageAdmissionNextBatchState();
     if (projectIdentityStatus() === "blocked") {
       let workspace = snapshot.workspace;
       try {

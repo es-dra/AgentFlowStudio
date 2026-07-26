@@ -2066,6 +2066,7 @@ def _append_receipt(
         "manifest_hash": manifest["manifest_hash"],
         "item_id": item.get("item_id"),
         "idempotency_key": str(command.get("idempotency_key") or ""),
+        "command_digest": _command_semantic_digest(command),
         "provider": "api_relay",
         "service_id": SERVICE_ID,
         "model": MODEL_ID,
@@ -2195,13 +2196,29 @@ def _idempotent_receipt(manifest: Mapping[str, Any], command_value: Any) -> dict
     if not key:
         return {}
     item_id = str(command.get("item_id") or ("manifest" if command["type"] in {"compile", "lock"} else "batch"))
-    return next(
+    receipt = next(
         (
-            deepcopy(receipt)
+            receipt
             for receipt in manifest.get("receipts", [])
             if receipt.get("idempotency_key") == key and receipt.get("item_id") == item_id
         ),
-        {},
+        None,
+    )
+    if not receipt:
+        return {}
+    if receipt.get("command_digest") != _command_semantic_digest(command):
+        raise ValueError("image admission idempotency key conflicts with another command")
+    return deepcopy(receipt)
+
+
+def _command_semantic_digest(command_value: Any) -> str:
+    command = _safe_command(command_value)
+    return canonical_digest(
+        {
+            key: value
+            for key, value in command.items()
+            if key != "idempotency_key"
+        }
     )
 
 
