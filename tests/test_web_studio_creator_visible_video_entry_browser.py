@@ -104,14 +104,29 @@ def test_desktop_storyboard_and_agent_use_the_same_zero_provider_video_entry() -
 
 
 def _assert_storyboard_entry(page: Page) -> None:
-    assert page.get_by_role("button", name="准备镜头视频").first.is_visible()
+    main_entry = page.locator("#product-main").get_by_role(
+        "button",
+        name="准备镜头视频",
+        exact=True,
+    )
+    assert main_entry.count() == 1
+    assert main_entry.is_visible()
     assert page.locator(".agent-primary-action").get_by_text("准备镜头视频").is_visible()
     assert page.get_by_text("镜头 01").first.is_visible()
     assert page.get_by_text("已生成媒体 1 / 3").is_visible()
     page.wait_for_function(
         "document.querySelector('.shot-media img')?.naturalWidth > 0"
     )
-    page.get_by_role("button", name="准备镜头视频").first.click()
+    page.evaluate("window.__deferCompilePreview = true")
+    main_entry.click()
+    assert page.locator(".storyboard-heading-actions").get_by_role(
+        "button",
+        name="正在准备…",
+        exact=True,
+    ).is_visible()
+    assert page.locator(".video-admission-panel").is_visible()
+    assert page.evaluate("window.__calls.compilePreview") == 1
+    page.evaluate("window.__releaseCompilePreview()")
     page.get_by_text("确认视频准备", exact=True).wait_for()
     assert page.get_by_text("已批准关键帧").last.is_visible()
     assert page.get_by_text("角色甲、月台甲、怀表甲").is_visible()
@@ -120,6 +135,11 @@ def _assert_storyboard_entry(page: Page) -> None:
 
 def _assert_two_step_confirmation(page: Page) -> None:
     page.get_by_role("button", name="确认", exact=True).click()
+    assert page.locator("#product-main").get_by_role(
+        "button",
+        name="确认镜头视频",
+        exact=True,
+    ).is_visible()
     page.locator(".agent-primary-action").get_by_text("确认镜头视频").wait_for()
     page.get_by_role("button", name="预览并确认生成").click()
     page.get_by_text("确认发送镜头 01 视频", exact=True).wait_for()
@@ -317,6 +337,14 @@ def _contract_html() -> str:
         previewVideoAdmissionCommand(request) {
           if (request.command.type === "compile") window.__calls.compilePreview += 1;
           if (request.command.type === "reserve_dispatch") window.__calls.reservePreview += 1;
+          if (request.command.type === "compile" && window.__deferCompilePreview) {
+            return new Promise((resolve) => {
+              window.__releaseCompilePreview = () => {
+                window.__deferCompilePreview = false;
+                resolve(preview(request.command));
+              };
+            });
+          }
           return Promise.resolve(preview(request.command));
         },
         confirmVideoAdmissionCommand(request) {
