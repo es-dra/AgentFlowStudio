@@ -81,6 +81,14 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
         raise AssertionError(f"unexpected URL: {url}")
 
     monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        lambda host, port, *, addresses, timeout: _FakePinnedConnection(
+            _PinnedResponse(b"fake-seedance-video", "video/mp4"),
+            on_request=lambda: captured.update(download_timeout=timeout),
+        ),
+    )
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
     registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
@@ -358,6 +366,13 @@ def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> Non
         raise AssertionError(f"unexpected URL: {url}")
 
     monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        lambda *_args, **_kwargs: _FakePinnedConnection(
+            _PinnedResponse(b"fake-seedance-video", "video/mp4")
+        ),
+    )
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
     registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
@@ -405,6 +420,13 @@ def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_p
         raise AssertionError(f"unexpected URL: {url}")
 
     monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        lambda *_args, **_kwargs: _FakePinnedConnection(
+            _PinnedResponse(b"fake-seedance-video", "video/mp4")
+        ),
+    )
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
     registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
@@ -592,7 +614,7 @@ def test_seedance_artifact_download_rejects_unsafe_urls_before_network(
         called += 1
         raise AssertionError("unsafe artifact URL must fail before network")
 
-    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    monkeypatch.setattr(volc_seedance_video, "_PinnedHTTPSConnection", forbidden)
     with pytest.raises(ModelProviderError):
         volc_seedance_video._download_video(
             url,
@@ -602,20 +624,26 @@ def test_seedance_artifact_download_rejects_unsafe_urls_before_network(
     assert called == 0
 
 
-def test_seedance_artifact_download_rejects_redirect_final_host(monkeypatch) -> None:
-    response = _BytesResponse(b"video", "video/mp4")
-    response.geturl = lambda: "https://evil.test/result.mp4"
+def test_seedance_artifact_download_rejects_redirect_before_following(monkeypatch) -> None:
+    followed = 0
+
+    def connection(*_args, **_kwargs):
+        nonlocal followed
+        followed += 1
+        return _FakePinnedConnection(_PinnedResponse(b"", "text/plain", status=302))
+
     monkeypatch.setattr(
-        volc_seedance_video.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: response,
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        connection,
     )
-    with pytest.raises(ModelProviderError, match="not allowed"):
+    with pytest.raises(ModelProviderError, match="HTTP error 302"):
         volc_seedance_video._download_video(
             "https://media.seedance.test/result.mp4",
             timeout_sec=5,
             allowed_url_hosts=("media.seedance.test",),
         )
+    assert followed == 1
 
 
 def test_seedance_artifact_download_rejects_private_dns_resolution(monkeypatch) -> None:
@@ -633,7 +661,7 @@ def test_seedance_artifact_download_rejects_private_dns_resolution(monkeypatch) 
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.10.20", 443))
         ],
     )
-    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    monkeypatch.setattr(volc_seedance_video, "_PinnedHTTPSConnection", forbidden)
     with pytest.raises(ModelProviderError, match="public network"):
         volc_seedance_video._download_video(
             "https://media.seedance.test/result.mp4",
@@ -641,6 +669,50 @@ def test_seedance_artifact_download_rejects_private_dns_resolution(monkeypatch) 
             allowed_url_hosts=("media.seedance.test",),
         )
     assert called == 0
+
+
+def test_seedance_pinned_connection_uses_validated_socket_without_dns_reresolution(
+    monkeypatch,
+) -> None:
+    connected: list[tuple[str, int]] = []
+
+    class RawSocket:
+        def settimeout(self, _timeout):
+            return None
+
+        def connect(self, sockaddr):
+            connected.append(sockaddr)
+
+        def close(self):
+            return None
+
+    class Context:
+        def wrap_socket(self, raw, *, server_hostname):
+            assert server_hostname == "media.seedance.test"
+            return raw
+
+    monkeypatch.setattr(
+        volc_seedance_video.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("pinned connect must not resolve DNS again")
+        ),
+    )
+    monkeypatch.setattr(
+        volc_seedance_video.socket,
+        "socket",
+        lambda family, kind: RawSocket(),
+    )
+    connection = volc_seedance_video._PinnedHTTPSConnection(
+        "media.seedance.test",
+        443,
+        addresses=((socket.AF_INET, ("8.8.8.8", 443)),),
+        timeout=5,
+    )
+    connection._context = Context()
+    connection.connect()
+
+    assert connected == [("8.8.8.8", 443)]
 
 
 def test_seedance_poll_rejects_unencoded_provider_task_path_before_network(
@@ -927,3 +999,32 @@ class _BytesResponse:
 
     def geturl(self) -> str:
         return "https://media.seedance.test/result.mp4"
+
+
+class _PinnedResponse:
+    def __init__(self, payload: bytes, content_type: str, *, status: int = 200):
+        self.payload = payload
+        self.content_type = content_type
+        self.status = status
+
+    def read(self) -> bytes:
+        return self.payload
+
+    def getheader(self, name: str) -> str:
+        return self.content_type if name.lower() == "content-type" else ""
+
+
+class _FakePinnedConnection:
+    def __init__(self, response: _PinnedResponse, *, on_request=None):
+        self.response = response
+        self.on_request = on_request
+
+    def request(self, *_args, **_kwargs) -> None:
+        if self.on_request:
+            self.on_request()
+
+    def getresponse(self) -> _PinnedResponse:
+        return self.response
+
+    def close(self) -> None:
+        return None

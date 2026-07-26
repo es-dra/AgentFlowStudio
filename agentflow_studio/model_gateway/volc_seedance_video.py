@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import ipaddress
 import json
 import os
 import re
 import socket
+import ssl
 import urllib.error
 import urllib.request
 from decimal import Decimal, InvalidOperation
@@ -280,17 +282,33 @@ def _request_json(
 
 
 def _download_video(url: str, *, timeout_sec: float, allowed_url_hosts: tuple[str, ...]) -> tuple[bytes, str]:
-    _validate_artifact_url(url, allowed_url_hosts)
+    parsed, addresses = _validate_artifact_url(url, allowed_url_hosts)
+    connection: http.client.HTTPSConnection | None = None
     try:
-        with urllib.request.urlopen(url, timeout=timeout_sec) as response:
-            final_url = str(response.geturl() if hasattr(response, "geturl") else url)
-            _validate_artifact_url(final_url, allowed_url_hosts)
-            body = response.read()
-            content_type = str(response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-    except urllib.error.HTTPError as exc:
-        raise ModelProviderError(f"Seedance video download HTTP error {exc.code}") from exc
-    except urllib.error.URLError as exc:
-        raise ModelProviderError(f"Seedance video download failed: {_safe_error(str(exc.reason))}") from exc
+        connection = _PinnedHTTPSConnection(
+            parsed.hostname or "",
+            parsed.port or 443,
+            addresses=addresses,
+            timeout=timeout_sec,
+        )
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        connection.request("GET", path, headers={"Accept": "video/*"})
+        response = connection.getresponse()
+        if int(response.status) != 200:
+            raise ModelProviderError(
+                f"Seedance video download HTTP error {int(response.status)}"
+            )
+        body = response.read()
+        content_type = str(response.getheader("Content-Type") or "").split(";")[0].strip().lower()
+    except ModelProviderError:
+        raise
+    except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+        raise ModelProviderError(f"Seedance video download failed: {_safe_error(str(exc))}") from exc
+    finally:
+        if connection is not None:
+            connection.close()
     if not body:
         raise ModelProviderError("Seedance video download returned empty content")
     return body, content_type
@@ -518,10 +536,17 @@ def _video_extension(content_type: str) -> str:
     return ".mp4"
 
 
-def _validate_artifact_url(url: str, allowed: tuple[str, ...]) -> None:
+def _validate_artifact_url(
+    url: str,
+    allowed: tuple[str, ...],
+) -> tuple[Any, tuple[tuple[int, tuple[Any, ...]], ...]]:
     if not allowed:
         raise ModelProviderError("Seedance video artifact host allowlist is empty")
     parsed = urlparse(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ModelProviderError("Seedance video download URL is not allowed") from exc
     host = (parsed.hostname or "").lower().rstrip(".")
     normalized = tuple(item.lower().strip().rstrip(".") for item in allowed if item.strip())
     if (
@@ -529,6 +554,7 @@ def _validate_artifact_url(url: str, allowed: tuple[str, ...]) -> None:
         or not host
         or parsed.username
         or parsed.password
+        or port not in {None, 443}
         or host not in normalized
     ):
         raise ModelProviderError("Seedance video download URL is not allowed")
@@ -539,14 +565,52 @@ def _validate_artifact_url(url: str, allowed: tuple[str, ...]) -> None:
     if literal is not None or host == "localhost":
         raise ModelProviderError("Seedance video download host must be a public DNS name")
     try:
-        addresses = {
-            ipaddress.ip_address(item[4][0])
-            for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+        resolved = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+        addresses = tuple(
+            (int(item[0]), tuple(item[4]))
+            for item in resolved
+        )
+        address_values = {
+            ipaddress.ip_address(sockaddr[0])
+            for _, sockaddr in addresses
         }
     except (OSError, ValueError) as exc:
         raise ModelProviderError("Seedance video download host could not be safely resolved") from exc
-    if not addresses or any(not _public_address(address) for address in addresses):
+    if not addresses or any(not _public_address(address) for address in address_values):
         raise ModelProviderError("Seedance video download host resolved outside the public network")
+    return parsed, addresses
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        *,
+        addresses: tuple[tuple[int, tuple[Any, ...]], ...],
+        timeout: float,
+    ) -> None:
+        super().__init__(
+            host,
+            port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
+        )
+        self._pinned_addresses = addresses
+
+    def connect(self) -> None:
+        last_error: OSError | None = None
+        for family, sockaddr in self._pinned_addresses:
+            raw = socket.socket(family, socket.SOCK_STREAM)
+            try:
+                raw.settimeout(self.timeout)
+                raw.connect(sockaddr)
+                self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+                return
+            except OSError as exc:
+                last_error = exc
+                raw.close()
+        raise OSError("Seedance video artifact host connection failed") from last_error
 
 
 def _public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:

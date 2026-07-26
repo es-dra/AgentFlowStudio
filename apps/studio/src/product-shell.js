@@ -1141,6 +1141,11 @@ export function createProductShell(options = {}) {
           video.addEventListener("click", () => {
             videoAdmissionOpen = true;
             render();
+            requestAnimationFrame(() => {
+              const panel = document.querySelector(".video-admission-panel");
+              panel?.scrollIntoView({ block: "start", behavior: "auto" });
+              panel?.querySelector("button")?.focus({ preventScroll: true });
+            });
           });
           headerActions.appendChild(video);
         }
@@ -2688,12 +2693,21 @@ export function createProductShell(options = {}) {
     panel.appendChild(metrics);
     const item = view.item || {};
     if (item.state === "planned") {
-      const generate = node("button", "studio-primary-button", "预览并确认生成");
-      generate.type = "button";
-      generate.disabled = !snapshot.mediaGates?.video;
-      generate.title = generate.disabled ? "视频能力尚未启用；不会发送任务。" : "";
-      generate.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "reserve_dispatch" }));
-      panel.appendChild(generate);
+      if (view.readiness?.status !== "ready") {
+        const blocked = node("div", "image-admission-empty");
+        blocked.append(
+          node("strong", "", "视频准备需要更新"),
+          node("p", "", view.readiness?.next_action || "请先恢复当前关键帧、参考组与视频能力检查。"),
+        );
+        panel.appendChild(blocked);
+      } else {
+        const generate = node("button", "studio-primary-button", "预览并确认生成");
+        generate.type = "button";
+        generate.disabled = !snapshot.mediaGates?.video;
+        generate.title = generate.disabled ? "视频能力尚未启用；不会发送任务。" : "";
+        generate.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "reserve_dispatch" }));
+        panel.appendChild(generate);
+      }
     } else if (item.state === "reserved") {
       panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
     } else if (["processing", "reconcile_required"].includes(item.state)) {

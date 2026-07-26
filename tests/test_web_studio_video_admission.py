@@ -161,6 +161,9 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
     assert 'if (!snapshot.mediaGates?.video)' in source
     assert 'videoAdmissionMediaState !== "loaded"' in source
     assert 'video.addEventListener("loadeddata"' in source
+    assert 'if (view.readiness?.status !== "ready")' in source
+    assert "视频准备需要更新" in source
+    assert 'panel?.scrollIntoView({ block: "start", behavior: "auto" })' in source
     assert "video_admission_manifest_id" not in source
     assert "video_admission_reservation_token" not in source
     assert "doubao-seedance-2-0-fast" not in source
