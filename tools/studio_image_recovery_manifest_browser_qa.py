@@ -13,6 +13,8 @@ from typing import Any
 
 from playwright.sync_api import expect, sync_playwright
 
+from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
+from apps.api.runtime_store import RuntimeStore
 from studio_asset_context_browser_qa_support import (
     chrome_path,
     free_port,
@@ -175,6 +177,7 @@ def run_qa(
             page.wait_for_selector(".graph-canvas-status.ready")
             prepare_locked_manifest(page, base_url)
             old_manifest = seed_exhausted_failure(runtime_root)
+            graph_compatibility = advance_graph_after_legacy_manifest(runtime_root)
             page.reload(wait_until="domcontentloaded")
             open_asset_bible(page)
             panel = open_image_admission(page)
@@ -275,6 +278,7 @@ def run_qa(
         "status": "passed",
         "old_manifest_preserved": True,
         "new_manifest_single_item": True,
+        "legacy_graph_snapshot_compatibility": graph_compatibility,
         "refresh_recovered_active_manifest": True,
         "separate_generate_action_visible": True,
         "provider_routes": 0,
@@ -394,6 +398,45 @@ def seed_exhausted_failure(runtime_root: Path) -> dict[str, Any]:
         encoding="utf-8",
     )
     return deepcopy(manifest)
+
+
+def advance_graph_after_legacy_manifest(runtime_root: Path) -> dict[str, Any]:
+    manifest = read_manifest(runtime_root)
+    accepted = {
+        (
+            int(item.get("version") or 0),
+            str(item.get("graph_digest") or ""),
+        )
+        for item in manifest.get("accepted_graph_snapshots", [])
+        if isinstance(item, dict)
+    }
+    store = RuntimeStore(runtime_root)
+    graph_store = ProductionGraphStore(store)
+    before = graph_store.load(PROJECT_ID)
+    target_id = sorted(before["nodes"])[0]
+    after = graph_store.append(
+        PROJECT_ID,
+        expected_version=before["version"],
+        idempotency_key="browser-recovery-graph-advance",
+        semantic_digest=canonical_digest({"review": "recovery-compatibility"}),
+        events=[
+            {
+                "type": "review_recorded",
+                "review_id": "review-recovery-compatibility",
+                "target_id": target_id,
+                "state": "pending",
+                "evidence_refs": [],
+            }
+        ],
+    )
+    current = (after["version"], after["graph_digest"])
+    if current in accepted or after["version"] <= before["version"]:
+        raise AssertionError("browser fixture did not create legacy/current graph drift")
+    return {
+        "old_version": before["version"],
+        "current_version": after["version"],
+        "server_current_snapshot_required": True,
+    }
 
 
 def assert_recovery_manifest(
