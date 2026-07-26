@@ -364,9 +364,112 @@ def test_runtime_media_source_caches_authorized_project_media_between_rerenders(
 
     assert "mediaBlobCache" in runtime_media_source
     assert "cachedAuthorizedMediaUrl" in runtime_media_source
+    assert "syncAuthorizedMediaSession(token)" in runtime_media_source
+    assert "mediaAuthGeneration" in runtime_media_source
+    assert "current?.authGeneration === mediaAuthGeneration" in runtime_media_source
+    assert "for (const objectUrl of mediaBlobCache.values()) URL.revokeObjectURL(objectUrl)" in runtime_media_source
     assert "element.dataset.afsMediaRaw" in runtime_media_source
     assert "assignCachedMediaUrl" in runtime_media_source
     assert "revokeRuntimeMediaSource(element, { keepCached: true })" in runtime_media_source
+
+
+def test_runtime_media_source_does_not_fallback_to_anonymous_project_media() -> None:
+    runtime_media_source = _read("src/runtime-media-source.js")
+
+    assert "failAuthorizedMediaLoad(element)" in runtime_media_source
+    assert 'element.removeAttribute("src")' in runtime_media_source
+    assert 'typeof element.dispatchEvent === "function"' in runtime_media_source
+    assert 'queueMicrotask(() => element.dispatchEvent(new Event("error")))' in runtime_media_source
+    assert "if (element.dataset.afsMediaRequest === requestId) assignMediaUrl(element, url)" not in runtime_media_source
+
+
+def test_runtime_media_source_fails_without_auth_and_reauthorizes_after_session_change() -> None:
+    runtime_media_source = (STUDIO_ROOT / "src" / "runtime-media-source.js").resolve()
+    script = f"""
+      let token = "";
+      const requests = [];
+      let objectOrdinal = 0;
+      const revoked = [];
+      let releaseRace = null;
+      globalThis.window = {{
+        location: {{ protocol: "http:", href: "http://127.0.0.1:8790/studio/" }},
+        localStorage: {{ getItem: () => token }},
+      }};
+      globalThis.fetch = async (url, options) => {{
+        requests.push({{ url, authorization: options?.headers?.Authorization || "" }});
+        if (url.includes("asset-race")) {{
+          await new Promise((resolve) => {{ releaseRace = resolve; }});
+        }}
+        return {{ ok: true, blob: async () => new Blob(["candidate"]) }};
+      }};
+      URL.createObjectURL = () => `blob:test-${{++objectOrdinal}}`;
+      URL.revokeObjectURL = (value) => revoked.push(value);
+      const {{ setRuntimeMediaSource }} = await import({json.dumps(runtime_media_source.as_uri())});
+      const element = () => ({{
+        tagName: "IMG",
+        dataset: {{}},
+        src: "",
+        errors: 0,
+        removeAttribute(name) {{ if (name === "src") this.src = ""; }},
+        dispatchEvent(event) {{ if (event.type === "error") this.errors += 1; }},
+      }});
+      const route = "/projects/project-a/image-assets/asset-a/preview";
+      const noAuth = element();
+      const noAuthResult = await setRuntimeMediaSource(noAuth, route);
+      token = "session-a";
+      const first = element();
+      await setRuntimeMediaSource(first, route);
+      const sameSession = element();
+      await setRuntimeMediaSource(sameSession, route);
+      token = "session-b";
+      await setRuntimeMediaSource(first, route);
+      token = "";
+      await setRuntimeMediaSource(first, route);
+      token = "session-a";
+      const race = element();
+      const raceResultPromise = setRuntimeMediaSource(
+        race,
+        "/projects/project-a/image-assets/asset-race/preview",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      token = "session-b";
+      releaseRace();
+      const raceResult = await raceResultPromise;
+      console.log(JSON.stringify({{
+        noAuthResult,
+        noAuthErrors: noAuth.errors,
+        requests,
+        changedElementErrors: first.errors,
+        changedElementSrc: first.src,
+        sameSessionSrc: sameSession.src,
+        raceResult,
+        raceErrors: race.errors,
+        raceSrc: race.src,
+        revoked,
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["noAuthResult"] == ""
+    assert result["noAuthErrors"] == 1
+    assert [item["authorization"] for item in result["requests"]] == [
+        "Bearer session-a",
+        "Bearer session-b",
+        "Bearer session-a",
+    ]
+    assert result["sameSessionSrc"] == "blob:test-1"
+    assert result["changedElementErrors"] == 1
+    assert result["changedElementSrc"] == ""
+    assert result["raceResult"] == ""
+    assert result["raceErrors"] == 1
+    assert result["raceSrc"] == ""
+    assert result["revoked"] == ["blob:test-1", "blob:test-2", "blob:test-3"]
 
 
 def test_completed_image_nodes_use_full_bleed_preview_body() -> None:
