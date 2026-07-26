@@ -1373,3 +1373,209 @@ def test_approve_writes_exactly_once_to_existing_production_graph(tmp_path, monk
     )
     assert stale_response.status_code == 422
     assert "ProductionGraph source is stale" in stale_response.json()["detail"]["details"]["raw_detail"]
+
+
+def test_next_batches_preserve_history_scale_budget_and_bind_approved_references(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    store.ensure_project_manifest(PROJECT_ID)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.ensure(PROJECT_ID)
+    initial = compile_image_admission_manifest(PROJECT_ID, compact_source_contract(shot_count=3))
+    target_ids = sorted(
+        {
+            target
+            for item in initial["items"]
+            for target in [*item["target_asset_ids"], item.get("target_shot_id")]
+            if target
+        }
+    )
+    graph_store.append(
+        PROJECT_ID,
+        expected_version=graph["version"],
+        idempotency_key="seed-next-batch-authority",
+        semantic_digest=canonical_digest(target_ids),
+        events=[
+            {"type": "node_upserted", "node": {"node_id": target_id, "category": "entity", "state": "active"}}
+            for target_id in target_ids
+        ],
+    )
+
+    def current_source() -> dict:
+        value = compact_source_contract(shot_count=3)
+        current = graph_store.load(PROJECT_ID)
+        value["production_graph_version"] = current["version"]
+        value["production_graph_digest"] = current["graph_digest"]
+        return value
+
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    source = current_source()
+    _command(client, {"type": "compile"}, source)
+    _command(client, {"type": "lock"}, source)
+    monkeypatch.setenv("AFS_ALLOW_DETERMINISTIC_MEDIA_FIXTURES", "true")
+    manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    character = next(item for item in manifest["items"] if item["item_type"] == "character_design")
+    _command(client, {"type": "record_candidate", "item_id": character["item_id"], "fixture": True}, source)
+    _command(
+        client,
+        {"type": "approve", "item_id": character["item_id"], "idempotency_key": "approve-next-character"},
+        source,
+    )
+    source = current_source()
+    _command(client, {"type": "cancel_batch"}, source)
+
+    option_preview = _command(client, {"type": "inspect_next_batch"}, source, confirm=False)
+    selectable = option_preview["result"]["manifest"]["next_batch_options"]
+    assert character["item_id"] not in {item["item_id"] for item in selectable}
+    assert {item["item_type"] for item in selectable} == {"scene_plate", "prop_design"}
+    premature_keyframe = next(
+        item
+        for item in compile_image_admission_manifest(PROJECT_ID, source)["items"]
+        if item["item_type"] == "shot_keyframe"
+    )
+    blocked_keyframe = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "create_next_batch_manifest",
+                "source_manifest_id": client.get(
+                    f"/projects/{PROJECT_ID}/m6/image-admission"
+                ).json()["manifest"]["manifest_id"],
+                "item_ids": [premature_keyframe["item_id"]],
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert blocked_keyframe.status_code == 422
+    assert "every canonical asset" in blocked_keyframe.json()["detail"]["details"]["raw_detail"]
+    selected = [
+        item for item in selectable if item["item_type"] in {"scene_plate", "prop_design"}
+    ]
+    assert len(selected) == 2
+    before = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    command = {
+        "type": "create_next_batch_manifest",
+        "source_manifest_id": before["manifest_id"],
+        "item_ids": [item["item_id"] for item in selected],
+        "idempotency_key": "next-scene-prop-batch",
+    }
+    preview = _command(client, command, source, confirm=False)
+    assert preview["provider_dispatch_count"] == 0
+    assert preview["impact"]["next_batch_manifest"]["new_max_dispatches"] == 2
+    assert preview["impact"]["next_batch_manifest"]["new_max_estimated_usd"] == "0.0754"
+    batch = _command(client, command, source)["result"]["manifest"]
+    assert batch["budget_contract"]["max_dispatches"] == 2
+    assert batch["budget_contract"]["auto_retry"] == 0
+    assert batch["provider_dispatch_count"] == 0
+    replay = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json={
+            "command": command,
+            "source": source,
+            "requested_at": REQUESTED_AT,
+            "preview_digest": preview["preview_digest"],
+        },
+    )
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    assert replay.json()["result"]["manifest"] == batch
+    semantic_conflict = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json={
+            "command": {
+                **command,
+                "item_ids": command["item_ids"][:1],
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+            "preview_digest": preview["preview_digest"],
+        },
+    )
+    assert semantic_conflict.status_code == 422
+    assert "idempotency key conflicts" in semantic_conflict.json()["detail"]["details"]["raw_detail"]
+    assert client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"] == batch
+    concurrent = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **command,
+                "idempotency_key": "competing-next-scene-prop-batch",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert concurrent.status_code == 422
+    assert "source manifest is stale" in concurrent.json()["detail"]["details"]["raw_detail"]
+    archived = (
+        runtime_root
+        / "projects"
+        / PROJECT_ID
+        / "image_admission"
+        / "history"
+        / f"{before['manifest_id']}.json"
+    )
+    assert json.loads(archived.read_text(encoding="utf-8")) == before
+
+    for item in batch["items"]:
+        source = current_source()
+        _command(client, {"type": "record_candidate", "item_id": item["item_id"], "fixture": True}, source)
+        _command(
+            client,
+            {
+                "type": "approve",
+                "item_id": item["item_id"],
+                "idempotency_key": f"approve-next-{item['item_id']}",
+            },
+            source,
+        )
+    source = current_source()
+    keyframe_preview = _command(client, {"type": "inspect_next_batch"}, source, confirm=False)
+    keyframes = [
+        item
+        for item in keyframe_preview["result"]["manifest"]["next_batch_options"]
+        if item["item_type"] == "shot_keyframe"
+    ]
+    assert len(keyframes) == 3
+    current = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    keyframe_batch = _command(
+        client,
+        {
+            "type": "create_next_batch_manifest",
+            "source_manifest_id": current["manifest_id"],
+            "item_ids": [keyframes[0]["item_id"]],
+            "idempotency_key": "next-keyframe-batch",
+        },
+        source,
+    )["result"]["manifest"]
+    assert keyframe_batch["budget_contract"]["max_dispatches"] == 1
+    assert 1 <= len(keyframe_batch["items"][0]["reference_media_ids"]) <= 4
+    assert keyframe_batch["provider_dispatch_count"] == 0
+
+
+def test_next_batch_price_drift_fails_before_options_or_manifest_creation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    _command(client, {"type": "cancel_batch"}, source)
+    monkeypatch.setenv("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0400")
+
+    response = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {"type": "inspect_next_batch"},
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert response.status_code == 422
+    assert "pricing changed" in response.json()["detail"]["details"]["raw_detail"]
+    persisted = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    assert persisted["status"] == "cancelled"
+    assert persisted["provider_dispatch_count"] == 0

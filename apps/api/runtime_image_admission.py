@@ -47,7 +47,9 @@ COMMANDS = {
     "approve",
     "reject",
     "replace",
+    "inspect_next_batch",
     "create_recovery_manifest",
+    "create_next_batch_manifest",
     "cancel_batch",
 }
 ASPECT_SIZES = {
@@ -103,6 +105,8 @@ def register_runtime_image_admission_routes(
     @app.post("/projects/{project_id}/m6/image-admission/commands/confirm")
     def confirm_image_admission(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
         require_access(request, project_id)
+        if str((body.get("command") or {}).get("type") or "") == "inspect_next_batch":
+            raise HTTPException(status_code=422, detail="next image batch inspection cannot be confirmed")
         lock_path = _manifest_path(store, project_id).with_suffix(".lock")
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -140,7 +144,7 @@ def register_runtime_image_admission_routes(
                 path = _manifest_path(store, project_id)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 reject_unsafe_payload(result)
-                if command["type"] == "create_recovery_manifest":
+                if command["type"] in {"create_recovery_manifest", "create_next_batch_manifest"}:
                     _archive_manifest_once(store, project_id, existing)
                 write_json(path, result)
             return {
@@ -437,23 +441,26 @@ def load_image_admission_manifest(store: RuntimeStore, project_id: str) -> dict[
     return value
 
 
-def budget_contract() -> dict[str, Any]:
+def budget_contract(max_dispatches: int = 1) -> dict[str, Any]:
+    if max_dispatches < 1:
+        raise ValueError("image admission dispatch limit must be positive")
     unit = _money_env("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0377")
     configured_maximum = _money_env("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.3500")
     configured_program_maximum = _money_env("AFS_MEDIA_PROGRAM_MAX_USD", "50.0000")
     program_maximum = min(configured_program_maximum, Decimal("50.0000"))
-    maximum = min(unit, configured_maximum, program_maximum)
+    requested_maximum = unit * max_dispatches
+    maximum = min(requested_maximum, configured_maximum, program_maximum)
     if (
         unit <= 0
-        or configured_maximum < unit
+        or configured_maximum < requested_maximum
         or configured_program_maximum <= 0
-        or program_maximum < unit
+        or program_maximum < requested_maximum
     ):
         raise ValueError("image admission pricing must be positive")
     return {
         "currency": "USD",
         "unit_estimate_usd": _money(unit),
-        "max_dispatches": 1,
+        "max_dispatches": max_dispatches,
         "max_estimated_usd": _money(maximum),
         "program_max_usd": _money(program_maximum),
         "concurrency": 1,
@@ -678,6 +685,42 @@ def _apply_command(
             command,
             recorded_at=timestamp,
         )
+    elif command_type == "create_next_batch_manifest":
+        manifest = _create_next_batch_manifest(
+            store,
+            project_id,
+            before,
+            source_value,
+            command,
+            recorded_at=timestamp,
+        )
+    elif command_type == "inspect_next_batch":
+        if before.get("status") not in {"locked", "cancelled"}:
+            raise ValueError("only a finished image manifest can prepare the next image batch")
+        if any(
+            entry.get("state") in {"planned", "reserved", "processing", "candidate"}
+            for entry in before.get("items", [])
+        ):
+            raise ValueError("finish or stop the current image batch before preparing the next batch")
+        fresh = compile_image_admission_manifest(project_id, source_value, created_at=timestamp)
+        _assert_continuation_price_current(before, fresh)
+        completed_ids = _historically_sent_item_ids(store, project_id, before)
+        options = [
+            deepcopy(item)
+            for item in fresh.get("items", [])
+            if item.get("item_id") not in completed_ids
+        ]
+        manifest["next_batch_options"] = [
+            item
+            for item in options
+            if item.get("item_type") != "shot_keyframe"
+            or _bind_approved_reference_media(
+                store,
+                project_id,
+                [item],
+                require_complete=False,
+            )
+        ]
     elif command_type == "cancel_batch":
         cancelled = 0
         for item in manifest.get("items", []):
@@ -785,6 +828,202 @@ def _create_recovery_manifest(
     return fresh
 
 
+def _create_next_batch_manifest(
+    store: RuntimeStore,
+    project_id: str,
+    before: Mapping[str, Any],
+    source_value: Any,
+    command: Mapping[str, Any],
+    *,
+    recorded_at: str,
+) -> dict[str, Any]:
+    if before.get("status") not in {"locked", "cancelled"}:
+        raise ValueError("only a finished image manifest can create the next image batch")
+    if str(command.get("source_manifest_id") or "") != str(before.get("manifest_id") or ""):
+        raise ValueError("next image batch source manifest is stale")
+    if any(
+        entry.get("state") in {"planned", "reserved", "processing", "candidate"}
+        for entry in before.get("items", [])
+    ):
+        raise ValueError("finish or stop the current image batch before preparing the next batch")
+
+    selected_ids = command.get("item_ids")
+    if not isinstance(selected_ids, list) or not selected_ids:
+        raise ValueError("select one or more unique items for the next image batch")
+    selected_ids = [_token(value, "item_id") for value in selected_ids]
+    if len(selected_ids) != len(set(selected_ids)):
+        raise ValueError("select one or more unique items for the next image batch")
+
+    fresh = compile_image_admission_manifest(project_id, source_value, created_at=recorded_at)
+    _assert_continuation_price_current(before, fresh)
+    completed_ids = _historically_sent_item_ids(store, project_id, before)
+    eligible = {
+        str(item["item_id"]): item
+        for item in fresh.get("items", [])
+        if item.get("item_id") not in completed_ids
+    }
+    if any(item_id not in eligible for item_id in selected_ids):
+        raise ValueError("next image batch selection contains completed or unavailable items")
+
+    selected = [deepcopy(eligible[item_id]) for item_id in selected_ids]
+    _bind_approved_reference_media(store, project_id, selected)
+    contract = budget_contract(len(selected))
+    fresh["version"] = int(before.get("version") or 1) + 1
+    fresh["items"] = selected
+    fresh["selection_summary"] = {
+        **fresh["selection_summary"],
+        "item_count": len(selected),
+        "next_batch_item_count": len(selected),
+        "eligible_item_count": len(eligible),
+        "completed_item_count": len(completed_ids),
+    }
+    fresh["budget_contract"] = contract
+    fresh["budget"] = {
+        "dispatches_reserved": 0,
+        "estimated_reserved_usd": "0.0000",
+        "remaining_dispatches": len(selected),
+        "remaining_estimated_usd": contract["max_estimated_usd"],
+    }
+    fresh["continuation_contract"] = {
+        "kind": "next_image_batch",
+        "source_manifest_id": before["manifest_id"],
+        "source_manifest_hash": before["manifest_hash"],
+        "source_manifest_archived": True,
+        "selected_item_ids": selected_ids,
+        "selected_item_count": len(selected),
+        "new_max_dispatches": len(selected),
+        "new_max_estimated_usd": contract["max_estimated_usd"],
+        "auto_retry": 0,
+        "requires_separate_generation_confirmation": True,
+    }
+    manifest_hash = canonical_digest(_manifest_contract_payload(fresh))
+    fresh["manifest_hash"] = manifest_hash
+    fresh["manifest_id"] = f"image-admission-batch-{manifest_hash[:16]}"
+    fresh["status"] = "locked"
+    fresh["locked_at"] = recorded_at
+    fresh["provider_dispatch_count"] = 0
+    fresh["actual_usd"] = None
+    fresh["billing_verification_state"] = "unverified"
+    _append_receipt(
+        fresh,
+        {"item_id": "batch"},
+        "next_batch_manifest_created",
+        command,
+        recorded_at=recorded_at,
+    )
+    return fresh
+
+
+def _assert_continuation_price_current(
+    before: Mapping[str, Any],
+    fresh: Mapping[str, Any],
+) -> None:
+    previous_contract = (
+        before.get("budget_contract")
+        if isinstance(before.get("budget_contract"), Mapping)
+        else {}
+    )
+    fresh_contract = (
+        fresh.get("budget_contract")
+        if isinstance(fresh.get("budget_contract"), Mapping)
+        else {}
+    )
+    if (
+        fresh_contract.get("unit_estimate_usd")
+        != previous_contract.get("unit_estimate_usd")
+        or fresh_contract.get("program_max_usd")
+        != previous_contract.get("program_max_usd")
+    ):
+        raise ValueError("image pricing changed; review the current price before preparing the next batch")
+
+
+def _historically_sent_item_ids(
+    store: RuntimeStore,
+    project_id: str,
+    active: Mapping[str, Any],
+) -> set[str]:
+    manifests: list[Mapping[str, Any]] = [active]
+    history_dir = _manifest_path(store, project_id).parent / "history"
+    if history_dir.is_dir():
+        for path in sorted(history_dir.glob("*.json")):
+            archived = read_json(path)
+            reject_unsafe_payload(archived)
+            if (
+                archived.get("schema_version") != SCHEMA_VERSION
+                or archived.get("project_id") != project_id
+                or safe_id(str(archived.get("manifest_id") or "")) != path.stem
+            ):
+                raise ValueError("archived image manifest storage scope is invalid")
+            manifests.append(archived)
+    return {
+        str(item["item_id"])
+        for manifest in manifests
+        for item in manifest.get("items", [])
+        if isinstance(item, Mapping)
+        and item.get("item_id")
+        and (
+            item.get("state") not in {"planned", "cancelled"}
+            or int(item.get("dispatch_ordinal") or 0) > 0
+        )
+    }
+
+
+def _bind_approved_reference_media(
+    store: RuntimeStore,
+    project_id: str,
+    items: list[dict[str, Any]],
+    *,
+    require_complete: bool = True,
+) -> bool:
+    if not any(item.get("item_type") == "shot_keyframe" for item in items):
+        return True
+    if not graph_has_authority(store, project_id):
+        if require_complete:
+            raise ValueError("keyframe selection requires approved same-project reference media")
+        return False
+    graph = ProductionGraphStore(store).load(project_id)
+    approved_nodes = {
+        str(node_id): node
+        for node_id, node in graph.get("nodes", {}).items()
+        if node.get("state") == "active"
+        and node.get("metadata", {}).get("kind") == "approved_image"
+    }
+    media_by_target: dict[str, set[str]] = {}
+    for relation in graph.get("relations", []):
+        if (
+            isinstance(relation, Mapping)
+            and relation.get("relation_type") == "approved_image"
+            and str(relation.get("to_id") or "") in approved_nodes
+        ):
+            image_asset_id = str(
+                approved_nodes[str(relation["to_id"])].get("metadata", {}).get("image_asset_id") or ""
+            )
+            if image_asset_id:
+                media_by_target.setdefault(str(relation.get("from_id") or ""), set()).add(image_asset_id)
+    for item in items:
+        if item.get("item_type") != "shot_keyframe":
+            continue
+        reference_asset_ids = [str(value) for value in item.get("reference_asset_ids", [])]
+        if any(not media_by_target.get(asset_id) for asset_id in reference_asset_ids):
+            if require_complete:
+                raise ValueError(
+                    "keyframe selection requires approved reference images for every canonical asset"
+                )
+            return False
+        references = sorted(
+            {
+                media_id
+                for asset_id in reference_asset_ids
+                for media_id in media_by_target.get(str(asset_id), set())
+            }
+        )[:4]
+        if not references:
+            raise ValueError("keyframe selection requires approved character, scene, or prop reference images")
+        _validate_reference_media(store, project_id, references)
+        item["reference_media_ids"] = references
+    return True
+
+
 def _manifest_contract_payload(manifest: Mapping[str, Any]) -> dict[str, Any]:
     keys = (
         "schema_version",
@@ -799,6 +1038,7 @@ def _manifest_contract_payload(manifest: Mapping[str, Any]) -> dict[str, Any]:
         "budget_contract",
         "provider_contract",
         "recovery_contract",
+        "continuation_contract",
     )
     return {key: deepcopy(manifest[key]) for key in keys if key in manifest}
 
@@ -884,9 +1124,9 @@ def _reserve_dispatch(
         str(contract["unit_estimate_usd"])
     )
     if dispatches + 1 > int(contract["max_dispatches"]):
-        raise ValueError("首张图片本轮仅允许发送一次")
+        raise ValueError("本批图片发送次数已达到硬上限")
     if next_cost > Decimal(str(contract["max_estimated_usd"])):
-        raise ValueError("首张图片本轮费用估算已达到硬上限")
+        raise ValueError("本批图片费用估算已达到硬上限")
     ordinal = dispatches + 1
     token = canonical_digest(
         {
@@ -1332,29 +1572,33 @@ def _assert_source_current(
         for item in manifest.get("accepted_graph_snapshots", [])
         if isinstance(item, Mapping)
     }
-    if command_type != "create_recovery_manifest":
+    if command_type not in {
+        "create_recovery_manifest",
+        "create_next_batch_manifest",
+        "inspect_next_batch",
+    }:
         if observed_graph in accepted_graphs:
             return
         raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
     if not graph_path(store, project_id).is_file():
         if observed_graph == (0, "") and observed_graph in accepted_graphs:
             return
-        raise ValueError("image admission recovery graph lineage is unavailable")
+        raise ValueError("image admission continuation graph lineage is unavailable")
     try:
         current_graph = ProductionGraphStore(store).load(project_id)
     except ProductionGraphError as exc:
-        raise ValueError("image admission recovery graph lineage is unavailable") from exc
+        raise ValueError("image admission continuation graph lineage is unavailable") from exc
     current_snapshot = (
         int(current_graph.get("version") or 0),
         str(current_graph.get("graph_digest") or ""),
     )
     if observed_graph != current_snapshot:
-        raise ValueError("image admission recovery graph source is not the current project graph")
+        raise ValueError("image admission continuation graph source is not the current project graph")
     if observed_graph in accepted_graphs:
         return
     accepted_versions = {version for version, _digest in accepted_graphs}
     if not accepted_versions or observed_graph[0] <= max(accepted_versions):
-        raise ValueError("image admission recovery graph lineage is stale")
+        raise ValueError("image admission continuation graph lineage is stale")
 
 
 def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -1766,7 +2010,7 @@ def _assert_manifest_creative_ready(manifest: Mapping[str, Any]) -> None:
         if isinstance(manifest.get("budget_contract"), Mapping)
         else {}
     )
-    current_budget = budget_contract()
+    current_budget = budget_contract(int(persisted_budget.get("max_dispatches") or 1))
     budget_fields = (
         "currency",
         "unit_estimate_usd",
@@ -1822,6 +2066,7 @@ def _append_receipt(
         "manifest_hash": manifest["manifest_hash"],
         "item_id": item.get("item_id"),
         "idempotency_key": str(command.get("idempotency_key") or ""),
+        "command_digest": _command_semantic_digest(command),
         "provider": "api_relay",
         "service_id": SERVICE_ID,
         "model": MODEL_ID,
@@ -1894,6 +2139,32 @@ def _impact(before: Mapping[str, Any], after: Mapping[str, Any], command: Mappin
             "provider_calls_before_confirm": 0,
             "requires_separate_generation_confirmation": True,
         }
+    if command["type"] == "create_next_batch_manifest":
+        impact["next_batch_manifest"] = {
+            "creates_new_manifest": True,
+            "previous_manifest_preserved_on_confirm": True,
+            "selected_items": [
+                {
+                    "label": str(item.get("label") or ""),
+                    "item_type": str(item.get("item_type") or ""),
+                    "reference_media_count": len(item.get("reference_media_ids") or []),
+                }
+                for item in after.get("items", [])
+            ],
+            "selected_item_count": len(after.get("items", [])),
+            "previous_dispatches_preserved": int(
+                before.get("budget", {}).get("dispatches_reserved") or 0
+            ),
+            "new_max_dispatches": int(
+                after.get("budget_contract", {}).get("max_dispatches") or 0
+            ),
+            "new_max_estimated_usd": str(
+                after.get("budget_contract", {}).get("max_estimated_usd") or "0.0000"
+            ),
+            "auto_retry": int(after.get("budget_contract", {}).get("auto_retry") or 0),
+            "provider_calls_before_confirm": 0,
+            "requires_separate_generation_confirmation": True,
+        }
     return impact
 
 
@@ -1912,6 +2183,7 @@ def _safe_command(value: Any) -> dict[str, Any]:
         "error_category",
         "provider_job_id",
         "source_manifest_id",
+        "item_ids",
     }
     return {key: deepcopy(value) for key, value in command.items() if key in allowed}
 
@@ -1924,13 +2196,29 @@ def _idempotent_receipt(manifest: Mapping[str, Any], command_value: Any) -> dict
     if not key:
         return {}
     item_id = str(command.get("item_id") or ("manifest" if command["type"] in {"compile", "lock"} else "batch"))
-    return next(
+    receipt = next(
         (
-            deepcopy(receipt)
+            receipt
             for receipt in manifest.get("receipts", [])
             if receipt.get("idempotency_key") == key and receipt.get("item_id") == item_id
         ),
-        {},
+        None,
+    )
+    if not receipt:
+        return {}
+    if receipt.get("command_digest") != _command_semantic_digest(command):
+        raise ValueError("image admission idempotency key conflicts with another command")
+    return deepcopy(receipt)
+
+
+def _command_semantic_digest(command_value: Any) -> str:
+    command = _safe_command(command_value)
+    return canonical_digest(
+        {
+            key: value
+            for key, value in command.items()
+            if key != "idempotency_key"
+        }
     )
 
 

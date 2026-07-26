@@ -41,6 +41,8 @@ def test_image_admission_uses_preview_confirm_runtime_command_path() -> None:
     assert 'type: "record_job"' in workspace
     assert 'type: "record_failure"' in shell
     assert 'type: "create_recovery_manifest"' in shell
+    assert 'type: "inspect_next_batch"' in shell
+    assert 'type: "create_next_batch_manifest"' in shell
     assert "建立新的单次恢复清单" in shell
     assert "确认只会建立新清单，不会生成图片" in shell
     assert "预览生成恢复图片" in shell
@@ -48,6 +50,30 @@ def test_image_admission_uses_preview_confirm_runtime_command_path() -> None:
     assert "Provider 调用" not in shell
     assert "codex_image" not in shell
     assert "gpt-image" not in shell
+
+
+def test_next_image_batch_is_creator_selected_and_separate_from_generation() -> None:
+    shell = PRODUCT_SHELL.read_text(encoding="utf-8")
+    copilot = (ROOT / "apps/studio/src/asset-bible-workspace.js").read_text(encoding="utf-8")
+
+    for marker in (
+        "准备下一批图片",
+        "选择本批内容",
+        "预览费用",
+        "已完成和已有尝试不会进入新清单",
+        "确认只会保存新清单",
+        "每张图片仍需另行预览并确认生成",
+    ):
+        assert marker in shell
+    assert "准备下一批图片" in copilot
+    assert "当前批次已完成" in copilot
+    assert '"0.0377"' not in shell
+    assert "imageAdmissionNextBatchProjectId === currentProductProjectId()" in shell
+    assert "requestedProjectId !== currentProductProjectId()" in shell
+    refresh_body = shell.split("async function refresh(runtime, authUser = null)", 1)[1]
+    assert refresh_body.index("resetImageAdmissionNextBatchState();") < refresh_body.index(
+        'projectIdentityStatus() === "blocked"'
+    )
 
 
 def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_states() -> None:
@@ -138,7 +164,7 @@ def test_first_image_surface_is_dynamic_creator_copy_with_a_single_dispatch_stop
     assert "关键帧连续性被阻断" not in shell
     assert "参考图编辑合同已声明" not in shell
     assert "max_dispatches || 1" in workspace
-    assert "max_estimated_usd || \"0.0377\"" in workspace
+    assert "max_estimated_usd || \"\"" in workspace
 
 
 def test_generation_request_uses_the_locked_prompt_contract_without_frontend_recompile() -> None:

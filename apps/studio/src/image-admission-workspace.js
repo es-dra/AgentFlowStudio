@@ -20,7 +20,7 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
     dispatches_reserved: 0,
     estimated_reserved_usd: "0.0000",
     remaining_dispatches: Number(budgetContract.max_dispatches || 1),
-    remaining_estimated_usd: String(budgetContract.max_estimated_usd || "0.0377"),
+    remaining_estimated_usd: String(budgetContract.max_estimated_usd || ""),
   };
   return {
     status: manifest?.status || "empty",
