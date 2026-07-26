@@ -1349,6 +1349,7 @@ def _approve_to_graph(
                     "format": candidate["format"],
                     "width": candidate["width"],
                     "height": candidate["height"],
+                    "approval_graph_version": int(graph["version"]) + 1,
                     "asset_bible_revision_id": manifest["source"]["asset_bible_revision_id"],
                     "shot_candidate_id": manifest["source"]["shot_candidate_id"],
                     "billing_verification_state": "unverified",

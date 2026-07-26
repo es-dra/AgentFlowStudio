@@ -24,6 +24,10 @@ export function productionGraphWorkspaceProjection(workspace = null) {
 
   const sequence = workspace.sequence || {};
   const relations = array(sequence.dependencies);
+  const approvedMediaByTarget = approvedMediaProjection(
+    sequence.approved_media,
+    workspace.project_id,
+  );
   const shots = array(sequence.shots).map((shot) => ({
     nodeId: canvasNodeId(shot.node_id),
     graphNodeId: String(shot.node_id || ""),
@@ -32,6 +36,7 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     description: String(shot.metadata?.intent || ""),
     durationSeconds: Number(shot.metadata?.duration_seconds || 0),
     state: shot.state === "invalidated" ? "blocked" : shot.metadata?.review_state === "approved" ? "ready" : "draft",
+    preview: approvedMediaByTarget.get(String(shot.node_id || ""))?.previewUrl || "",
   }));
   const scenes = array(sequence.scenes).map((scene) => ({
     nodeId: canvasNodeId(scene.node_id),
@@ -158,6 +163,36 @@ export function productionGraphAgentContext(studioState, workspace) {
 
 function sceneForShot(relations, shotId) {
   return String(relations.find((item) => item.to_id === shotId && item.relation_type === "contains")?.from_id || "");
+}
+
+function approvedMediaProjection(value, projectId) {
+  const expectedProject = String(projectId || "");
+  const routePattern = /^\/projects\/([A-Za-z0-9_.-]+)\/image-assets\/[A-Za-z0-9_.-]+\/preview$/;
+  const byTarget = new Map();
+  const ambiguousTargets = new Set();
+  for (const media of array(value)) {
+    const previewUrl = String(media?.preview_url || "");
+    const match = previewUrl.match(routePattern);
+    if (
+      media?.media_kind !== "image"
+      || !match
+      || !expectedProject
+      || match[1] !== expectedProject
+    ) {
+      continue;
+    }
+    for (const targetId of array(media.target_node_ids)) {
+      const key = String(targetId || "");
+      if (!key || ambiguousTargets.has(key)) continue;
+      if (byTarget.has(key)) {
+        byTarget.delete(key);
+        ambiguousTargets.add(key);
+      } else {
+        byTarget.set(key, { previewUrl });
+      }
+    }
+  }
+  return byTarget;
 }
 
 function emptySummary() {

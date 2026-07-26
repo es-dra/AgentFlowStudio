@@ -155,6 +155,138 @@ def test_m5_sequence_workspace_is_graph_backed_and_mutations_are_impact_confirme
     assert mutation.json()["receipt"]["graph_version"] == graph["version"] + 1
 
 
+def test_m5_workspace_selects_one_graph_versioned_approved_image_per_shot(
+    tmp_path,
+) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    candidate = _candidate(
+        "approved-media",
+        durations=[6],
+        character_names=["程墨"],
+        scene_count=1,
+    )
+    graph = client.post(
+        "/projects/m5-approved-media/m4/film-candidates/confirm",
+        json={
+            "expected_graph_version": 0,
+            "idempotency_key": "confirm-approved-media",
+            "candidate": candidate,
+        },
+    ).json()["graph"]
+    shot_id = "approved-media-unit-1"
+    graph_store = ProductionGraphStore(RuntimeStore(tmp_path / "runtime"))
+    legacy = graph_store.append(
+        "m5-approved-media",
+        expected_version=graph["version"],
+        idempotency_key="legacy-approved-media",
+        semantic_digest=canonical_digest({"legacy": ["a", "b"]}),
+        events=[
+            *[
+                {
+                    "type": "node_upserted",
+                    "node": {
+                        "node_id": f"approved-{suffix}",
+                        "category": "artifact",
+                        "state": "active",
+                        "metadata": {
+                            "kind": "approved_image",
+                            "image_asset_id": f"image-{suffix}",
+                            "width": 1280,
+                            "height": 720,
+                        },
+                    },
+                }
+                for suffix in ("a", "b")
+            ],
+            *[
+                {
+                    "type": "relation_upserted",
+                    "from_id": shot_id,
+                    "to_id": f"approved-{suffix}",
+                    "relation_type": "approved_image",
+                }
+                for suffix in ("a", "b")
+            ],
+        ],
+    )
+    ambiguous = client.get(
+        "/projects/m5-approved-media/m5/sequence-workspace"
+    ).json()
+    assert ambiguous["sequence"]["approved_media"] == []
+
+    current_version = legacy["version"] + 1
+    current = graph_store.append(
+        "m5-approved-media",
+        expected_version=legacy["version"],
+        idempotency_key="current-approved-media",
+        semantic_digest=canonical_digest({"current": "c"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "approved-c",
+                    "category": "artifact",
+                    "state": "active",
+                    "metadata": {
+                        "kind": "approved_image",
+                        "image_asset_id": "image-c",
+                        "width": 1280,
+                        "height": 720,
+                        "approval_graph_version": current_version,
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": shot_id,
+                "to_id": "approved-c",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+    selected = client.get(
+        "/projects/m5-approved-media/m5/sequence-workspace"
+    ).json()["sequence"]["approved_media"]
+    assert len(selected) == 1
+    assert selected[0]["media_node_id"] == "approved-c"
+    assert selected[0]["approval_graph_version"] == current_version
+    assert selected[0]["target_node_ids"] == [shot_id]
+
+    graph_store.append(
+        "m5-approved-media",
+        expected_version=current["version"],
+        idempotency_key="conflicting-approved-media",
+        semantic_digest=canonical_digest({"conflict": "d"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "approved-d",
+                    "category": "artifact",
+                    "state": "active",
+                    "metadata": {
+                        "kind": "approved_image",
+                        "image_asset_id": "image-d",
+                        "width": 1280,
+                        "height": 720,
+                        "approval_graph_version": current_version,
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": shot_id,
+                "to_id": "approved-d",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+    tied = client.get(
+        "/projects/m5-approved-media/m5/sequence-workspace"
+    ).json()
+    assert tied["sequence"]["approved_media"] == []
+
+
 def test_m5_impact_preview_rejects_under_and_over_invalidation(tmp_path):
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     candidate = _candidate("impact", durations=[4, 9, 3], character_names=["乔安", "闻笙"], scene_count=2)

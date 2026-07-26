@@ -3412,9 +3412,9 @@ export function createProductShell(options = {}) {
     const media = node("span", `shot-media ${shot.preview ? "has-preview" : "empty"}`);
     if (shot.preview) {
       const image = document.createElement("img");
-      image.src = shot.preview;
       image.alt = `${shot.title} 镜头预览`;
       image.loading = "lazy";
+      void setRuntimeMediaSource(image, shot.preview);
       media.appendChild(image);
     } else {
       media.innerHTML = `${icon("image", 20)}<span class="shot-empty-copy"><strong>等待镜头画面</strong><small>${escapeHtml(shot.description)}</small></span>`;
@@ -4415,7 +4415,7 @@ export function createProductShell(options = {}) {
   function graphShotModel() {
     return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
-      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: "", state: shot.state, sceneId: shot.sceneNodeId }));
+      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview), state: shot.state, sceneId: shot.sceneNodeId }));
   }
 
   function graphSceneModel() {
