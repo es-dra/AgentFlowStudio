@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -36,6 +35,7 @@ from apps.api.runtime_video_admission import (
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
+VIDEO_CANDIDATE_BYTES = b"afs-deterministic-video-candidate-v1"
 REQUESTED_AT = "2026-07-26T03:00:00Z"
 
 
@@ -381,24 +381,7 @@ def _record_candidate_for_test(
     )
     candidate_path = store.run_dir(project_id, job_id) / "video_candidates" / "candidate_001.mp4"
     candidate_path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=c=black:s=1280x720:d=6",
-            "-c:v",
-            "mpeg4",
-            "-pix_fmt",
-            "yuv420p",
-            candidate_path,
-        ],
-        check=True,
-    )
+    candidate_path.write_bytes(VIDEO_CANDIDATE_BYTES)
     data = candidate_path.read_bytes()
     candidate = {
         "job_id": job_id,
@@ -578,10 +561,27 @@ def test_video_admission_reservation_is_idempotent_and_dispatch_claim_is_exactly
             project_id,
             request,
             job_id="video-job-002",
-        )
+    )
 
 
-def test_video_candidate_requires_human_approval_before_graph_writeback(tmp_path) -> None:
+def _stub_video_probe(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "apps.api.runtime_video_admission.probe_video_metadata",
+        lambda _path: SimpleNamespace(
+            probe_status="succeeded",
+            width=1280,
+            height=720,
+            duration_sec=6.0,
+            codec="mpeg4",
+        ),
+    )
+
+
+def test_video_candidate_requires_human_approval_before_graph_writeback(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _stub_video_probe(monkeypatch)
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     graph_store = ProductionGraphStore(store)
     initial_graph = graph_store.load(project_id)
@@ -610,24 +610,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(tmp_path
         / "candidate_001.mp4"
     )
     candidate_path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=c=black:s=1280x720:d=6",
-            "-c:v",
-            "mpeg4",
-            "-pix_fmt",
-            "yuv420p",
-            candidate_path,
-        ],
-        check=True,
-    )
+    candidate_path.write_bytes(VIDEO_CANDIDATE_BYTES)
     candidate_bytes = candidate_path.read_bytes()
     candidate = {
         "job_id": "video-job-001",
@@ -693,6 +676,7 @@ def test_video_approval_reconciles_graph_append_after_ledger_write_crash(
     tmp_path,
     monkeypatch,
 ) -> None:
+    _stub_video_probe(monkeypatch)
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     graph_store = ProductionGraphStore(store)
     _command(client, project_id, {"type": "compile", "idempotency_key": "compile-crash"})
