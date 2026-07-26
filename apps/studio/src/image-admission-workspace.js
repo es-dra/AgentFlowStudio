@@ -70,6 +70,48 @@ export function imageAdmissionStateLabel(value) {
   }[String(value || "")] || "待确认";
 }
 
+export function imageAdmissionFailureGuidance(item, manifest = {}) {
+  if (item?.state !== "failed") return null;
+  const category = String(item.error_category || "generation_failed");
+  const copy = {
+    blocked: {
+      title: "图片结果未能安全接收",
+      detail: "本次结果未通过安全接收检查，没有写入项目。旧尝试与费用记录会完整保留。",
+      diagnostic: "安全接收受阻",
+    },
+    generation_failed: {
+      title: "图片生成未完成",
+      detail: "本次生成没有产生可审核图片，没有写入项目。旧尝试与费用记录会完整保留。",
+      diagnostic: "生成未完成",
+    },
+    cancelled: {
+      title: "图片任务未完成",
+      detail: "本次任务结束时没有可审核图片，没有写入项目。旧尝试与费用记录会完整保留。",
+      diagnostic: "任务未完成",
+    },
+    deterministic_fixture_failure: {
+      title: "零费用测试未完成",
+      detail: "测试结果已隔离，没有写入项目。测试记录会完整保留。",
+      diagnostic: "测试失败",
+    },
+  }[category] || {
+    title: "图片生成未完成",
+    detail: "本次没有产生可安全审核的图片，没有写入项目。旧尝试与费用记录会完整保留。",
+    diagnostic: "生成未完成",
+  };
+  const budget = manifest?.budget || {};
+  const contract = manifest?.budget_contract || {};
+  return {
+    ...copy,
+    can_create_recovery_manifest: (
+      manifest?.status === "locked"
+      && !manifest?.recovery_contract
+      && Number(budget.dispatches_reserved || 0) === Number(contract.max_dispatches || 1)
+      && Number(budget.remaining_dispatches || 0) === 0
+    ),
+  };
+}
+
 export function imageAdmissionCommand(command, now = Date.now()) {
   return {
     ...command,
