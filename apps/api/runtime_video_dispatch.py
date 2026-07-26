@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from agentflow.algorithms.request_projection import build_request_plan
 from agentflow_studio.model_gateway.errors import ModelGatewayError
@@ -33,6 +33,16 @@ from apps.api.runtime_video_admission import (
     SERVICE_ID as SEEDANCE_SERVICE_ID,
     claim_video_admission_dispatch,
     enforce_video_admission_request,
+    mark_video_admission_network_started,
+    mark_video_admission_task_recorded,
+)
+from apps.api.runtime_video_dispatch_outbox import (
+    load_dispatch_outbox,
+    mark_network_may_have_started,
+    mark_reconcile_required,
+    prepare_dispatch_outbox,
+    record_provider_task,
+    recover_provider_task,
 )
 from apps.api.runtime_video_gate import gate_closed_block, provider_not_ready_block, video_gate
 from apps.api.runtime_video_manifest import (
@@ -317,6 +327,14 @@ def submit_video_generation(
         reference_paths.append(last_frame_path)
     if request.provider_service_id == SEEDANCE_SERVICE_ID:
         try:
+            prepare_dispatch_outbox(
+                output_dir,
+                project_id=project_id,
+                job_id=job_id,
+                manifest_id=request.video_admission_manifest_id or "",
+                manifest_hash=request.video_admission_manifest_hash or "",
+                item_id=request.video_admission_item_id or "",
+            )
             claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
         except ValueError as exc:
             raise RuntimeApiError(
@@ -354,10 +372,26 @@ def submit_video_generation(
         **prompt_log_fields,
     )
     try:
+        if request.provider_service_id == SEEDANCE_SERVICE_ID:
+            mark_video_admission_network_started(store, project_id, job_id=job_id)
+            mark_network_may_have_started(output_dir)
         provider_started = time.perf_counter()
         provider_task = registry.submit("video", request.provider_service_id, dispatch_request)
         provider_elapsed_ms = _elapsed_ms(provider_started)
+        if request.provider_service_id == SEEDANCE_SERVICE_ID:
+            outbox = record_provider_task(output_dir, provider_task)
+            mark_video_admission_task_recorded(
+                store,
+                project_id,
+                job_id=job_id,
+                provider_task_fingerprint=str(outbox.get("provider_task_fingerprint") or ""),
+            )
     except (ModelGatewayError, Exception) as exc:
+        if request.provider_service_id == SEEDANCE_SERVICE_ID:
+            try:
+                mark_reconcile_required(output_dir, "provider_submit_outcome_unknown")
+            except (OSError, ValueError):
+                pass
         provider_elapsed_ms = _elapsed_ms(provider_started) if "provider_started" in locals() else ""
         provider_error_summary = _provider_error_summary(exc)
         runtime_file_event(
@@ -385,6 +419,11 @@ def submit_video_generation(
             model_request_plan,
             gate,
             str(exc),
+            status=(
+                "reconcile_required"
+                if request.provider_service_id == SEEDANCE_SERVICE_ID
+                else "poll_failed"
+            ),
             provider_error_summary=provider_error_summary,
         )
     increment_daily_submit_count(store, project_id)
@@ -399,7 +438,7 @@ def submit_video_generation(
         node_id=request.node_id,
         job_id=job_id,
         provider_service_id=request.provider_service_id,
-        provider_task_id=_provider_task_id(provider_task),
+        provider_task_fingerprint=_provider_task_fingerprint(provider_task),
         status=task_state["status"],
         provider_elapsed_ms=provider_elapsed_ms,
         elapsed_ms=_elapsed_ms(started),
@@ -432,7 +471,35 @@ def submit_video_generation(
 
 def poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path, *, load_registry: Callable[[], Any], request_id: str = "", client_request_id: str = "") -> dict[str, Any]:
     started = time.perf_counter()
-    state = load_task_state(output_dir)
+    try:
+        state = load_task_state(output_dir)
+    except ValueError:
+        outbox = load_dispatch_outbox(output_dir)
+        if not outbox:
+            raise
+        provider_task = recover_provider_task(output_dir)
+        state = {
+            "schema_version": "afs_video_generation_task_state.v0.1",
+            "status": "submitted",
+            "provider_service_id": SEEDANCE_SERVICE_ID,
+            "capability": "video",
+            "task": provider_task,
+            "created_at": str(outbox.get("created_at") or _utc_now()),
+            "submitted_at": str(outbox.get("updated_at") or _utc_now()),
+            "provider_raw_persisted": False,
+            "request_id": "",
+            "client_request_id": "",
+            "context_bundle": None,
+            "video_admission": {
+                "manifest_id": str(outbox.get("manifest_id") or ""),
+                "manifest_hash": str(outbox.get("manifest_hash") or ""),
+                "item_id": str(outbox.get("item_id") or ""),
+                "max_dispatches": 1,
+                "auto_retry": 0,
+                "hard_budget_usd": "2.00",
+            },
+        }
+        write_task_state(output_dir, state)
     job_id = output_dir.name
     request_id = request_id or str(state.get("request_id") or "")
     client_request_id = client_request_id or str(state.get("client_request_id") or "")
@@ -474,18 +541,21 @@ def poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path
         )
         manifest = safe_manifest(
             project_id,
-            status="poll_failed",
+            status="reconcile_required",
             provider_calls_started=True,
             blocks=[_provider_not_ready_block(str(exc), provider_error_summary)],
             context_bundle=_context_bundle(state),
             **_manifest_contract_kwargs_from_state(state),
         )
         write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        state["status"] = "poll_failed"
+        state["status"] = "reconcile_required"
         state["last_poll_at"] = poll_time
-        state["completed_at"] = poll_time
+        state["last_poll_error"] = {
+            "category": "transient_provider_poll_error",
+            "retryable": True,
+        }
         write_task_state(output_dir, state)
-        return result_from_manifest(status="poll_failed", safe_manifest=manifest, task_state=state)
+        return result_from_manifest(status="reconcile_required", safe_manifest=manifest, task_state=state)
     if str(raw.get("status") or "").lower() == "running":
         runtime_file_event(
             "video",
@@ -559,6 +629,15 @@ def complete_video_result(
         model_call_context_id=str(task_state.get("model_call_context_id") or ""),
         **_manifest_contract_kwargs_from_state(task_state),
     )
+    usage_evidence = _safe_usage_evidence(raw)
+    if usage_evidence:
+        manifest["usage_evidence"] = usage_evidence
+        manifest["budget_evidence"] = {
+            "hard_ceiling_usd": "2.00",
+            "actual_charge_usd": None,
+            "actual_charge_verification": "unverified",
+            "provider_reported_output_tokens": usage_evidence.get("output_tokens"),
+        }
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     runtime_file_event(
         "video",
@@ -610,7 +689,7 @@ def _model_call_context(project_id: str, request: VideoGenerationRequest, contex
                 "max_dispatches": 1,
                 "auto_retry": 0,
                 "hard_budget_usd": "2.00",
-                "hard_budget_classification": "hard_ceiling_not_estimate_or_actual_charge",
+                "hard_budget_classification": "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
             } if request.video_admission_manifest_id else {},
         },
     )
@@ -697,11 +776,12 @@ def _poll_failed_result(
     gate: dict[str, str],
     reason: str,
     *,
+    status: str = "poll_failed",
     provider_error_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = safe_manifest(
         project_id,
-        status="poll_failed",
+        status=status,
         provider_calls_started=True,
         provider_gate=gate,
         blocks=[_provider_not_ready_block(reason, provider_error_summary or {})],
@@ -710,7 +790,7 @@ def _poll_failed_result(
         **_manifest_contract_kwargs(model_call_context, model_request_plan),
     )
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-    return result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
+    return result_from_manifest(status=status, safe_manifest=manifest, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
 
 
 def _provider_not_ready_block(reason: str, provider_error_summary: dict[str, Any]) -> dict[str, Any]:
@@ -838,9 +918,33 @@ def _task_state(
             "max_dispatches": 1,
             "auto_retry": 0,
             "hard_budget_usd": "2.00",
-            "hard_budget_classification": "hard_ceiling_not_estimate_or_actual_charge",
+            "hard_budget_classification": "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
         } if request.video_admission_manifest_id else {},
     }
+
+
+def _safe_usage_evidence(raw: Mapping[str, Any]) -> dict[str, Any]:
+    usage = raw.get("usage") if isinstance(raw.get("usage"), Mapping) else {}
+    billing = raw.get("billing") if isinstance(raw.get("billing"), Mapping) else {}
+    result: dict[str, Any] = {
+        "provider_reported_usage": bool(usage.get("provider_reported_usage")),
+        "provider_reported_cost": False,
+        "actual_charge_verification": "unverified",
+    }
+    for key in ("input_tokens", "output_tokens", "prompt_tokens", "completion_tokens", "total_tokens"):
+        value = usage.get(key)
+        if isinstance(value, (int, float)) and value >= 0:
+            result[key] = value
+    if "output_tokens" not in result:
+        value = billing.get("output_tokens")
+        if isinstance(value, (int, float)) and value >= 0:
+            result["output_tokens"] = value
+    return result
+
+
+def _provider_task_fingerprint(provider_task: Mapping[str, Any]) -> str:
+    task_id = str((provider_task.get("task") or {}).get("task_id") or "")
+    return hashlib.sha256(task_id.encode("utf-8")).hexdigest()[:16] if task_id else ""
 
 
 def _manifest_contract_kwargs(model_call_context: dict[str, Any], model_request_plan: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -885,11 +989,6 @@ def _context_bundle(state: dict[str, Any]) -> dict[str, Any] | None:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _provider_task_id(provider_task: dict[str, Any]) -> str:
-    task = provider_task.get("task") if isinstance(provider_task.get("task"), dict) else {}
-    return str(task.get("task_id") or task.get("id") or "")
 
 
 def _provider_model(registry: Any, service_id: str) -> str:

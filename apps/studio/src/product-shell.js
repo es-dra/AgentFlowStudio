@@ -2678,7 +2678,7 @@ export function createProductShell(options = {}) {
       ["模型", `${view.generation_contract.model} · 非 fast`],
       ["输出", `${view.generation_contract.resolution} · ${view.generation_contract.duration_sec} 秒`],
       ["参考", `已批准关键帧 + ${view.source?.references?.length || 0} 张参考图`],
-      ["费用边界", `$${view.budget_contract.hard_ceiling_usd} 硬上限 · 非估算/实际账单`],
+      ["费用停止线", `$${view.budget_contract.hard_ceiling_usd} 项目停止线 · 非供应商限额/估算/实际账单`],
       ["发送规则", "最多 1 次 · 自动重试 0"],
     ]) {
       const metric = node("div", "");
@@ -2696,11 +2696,16 @@ export function createProductShell(options = {}) {
       panel.appendChild(generate);
     } else if (item.state === "reserved") {
       panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
-    } else if (item.state === "processing") {
+    } else if (["processing", "reconcile_required"].includes(item.state)) {
       const recover = node("button", "studio-secondary-button", "检查视频进度");
       recover.type = "button";
       recover.addEventListener("click", () => void pollVideoAdmissionItem());
-      panel.append(node("p", "", "视频正在生成；刷新后仍可继续检查，不会重复发送。"), recover);
+      panel.append(
+        node("p", "", item.state === "reconcile_required"
+          ? "发送结果需要核对；系统不会盲目重发。请检查原任务进度。"
+          : "视频正在生成；刷新后仍可继续检查，不会重复发送。"),
+        recover,
+      );
     } else if (item.state === "candidate") {
       const media = node("div", "image-admission-candidate-media");
       const video = document.createElement("video");
@@ -2754,11 +2759,21 @@ export function createProductShell(options = {}) {
             ? "拒绝视频候选"
             : "确认视频准备"),
       node("p", "", commandType === "reserve_dispatch"
-        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 1 次发送 · 自动重试 0 · $2.00 硬上限（非预计或实际费用）。`
+        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
         : commandType === "compile"
           ? `使用 ${manifest.source?.keyframe?.label || "已批准关键帧"} 与 ${manifest.source?.references?.length || 0} 张已批准参考图；确认只保存准备清单。`
           : "批准才会写入当前项目；拒绝不会替换现有制作事实。"),
     );
+    if (commandType === "compile" || commandType === "reserve_dispatch") {
+      const referenceLabels = (manifest.source?.references || [])
+        .map((item) => item?.label)
+        .filter(Boolean);
+      review.appendChild(node(
+        "p",
+        "",
+        `参考组：${referenceLabels.join("、") || "尚未完成"}；关键帧：${manifest.source?.keyframe?.label || "尚未完成"}。`,
+      ));
+    }
     const actions = node("div", "image-admission-actions");
     const cancel = node("button", "studio-secondary-button", "取消");
     const confirm = node("button", "studio-primary-button", commandType === "reserve_dispatch" ? "确认并发送" : "确认");
@@ -2872,7 +2887,11 @@ export function createProductShell(options = {}) {
       notice = "视频候选已生成，等待你审看；批准后才会写入项目。";
       return;
     }
-    if (["failed", "blocked", "cancelled", "needs_attention", "poll_failed"].includes(result.status)) {
+    if (["reconcile_required", "poll_failed"].includes(result.status)) {
+      notice = "暂时无法确认视频进度；原任务可继续恢复，系统不会自动重发。";
+      return;
+    }
+    if (["failed", "blocked", "cancelled", "needs_attention"].includes(result.status)) {
       await commitVideoAdmissionCommand({ type: "record_failure", error_category: result.status || "generation_failed" });
       notice = "视频任务未产生可审核候选，且不会自动重试。";
       return;

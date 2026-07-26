@@ -1147,8 +1147,9 @@ process.stdout.write(JSON.stringify({
     assert payload["nodeRole"] == "video_generation"
     assert "图生视频时间轴" in payload["prompt"]
     assert "0.0s" in payload["prompt"]
-    assert "0.0-1.0s" in payload["prompt"]
-    assert "4.0-5.0s" in payload["prompt"]
+    assert "0.0-1.0s" not in payload["prompt"]
+    assert "4.0-5.0s" not in payload["prompt"]
+    assert "Generate a battle keyframe" in payload["prompt"]
     assert "首帧锁定" in payload["prompt"]
 
 
@@ -1281,8 +1282,9 @@ process.stdout.write(JSON.stringify({
     }
     assert "图生视频时间轴" in payload["prompt"]
     assert "0.0s" in payload["prompt"]
-    assert "1.0-2.5s" in payload["prompt"]
-    assert "4.0-5.0s" in payload["prompt"]
+    assert "1.0-2.5s" not in payload["prompt"]
+    assert "4.0-5.0s" not in payload["prompt"]
+    assert "分镜意图：@孙悟空 @金刚狼 @金箍棒，在山巅石台战场对峙。" in payload["prompt"]
     assert "单张关键帧" not in payload["prompt"]
     assert "候选资产卡（资产）" not in payload["prompt"]
     assert "重新生成整段视频" in payload["result"]

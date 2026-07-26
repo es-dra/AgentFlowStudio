@@ -23,6 +23,7 @@ from apps.api.runtime_logging import (
     user_action_from_request,
 )
 from apps.api.runtime_models import VideoGenerationRequest
+from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_store import RuntimeStore
 from apps.api.runtime_submit_idempotency import (
     abort_submit_idempotency,
@@ -206,6 +207,8 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
         job_id = store.new_job_id("video_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
+        if request.provider_service_id == "seedance_i2v":
+            store.write_job(runtime_job(job_id, project_id, "video_generation", "dispatch_prepared"))
         try:
             result = submit_video_generation(
                 store,

@@ -12,7 +12,7 @@ from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
-from apps.api.runtime_store import RuntimeStore
+from apps.api.runtime_store import RuntimeStore, read_json
 from apps.api.runtime_video_admission import (
     AUTO_RETRY,
     CREATE_ENDPOINT,
@@ -22,9 +22,12 @@ from apps.api.runtime_video_admission import (
     MODEL_ID,
     RESOLUTION,
     SERVICE_ID,
+    QUERY_ENDPOINT,
     claim_video_admission_dispatch,
     enforce_video_admission_request,
     load_video_admission_manifest,
+    mark_video_admission_network_started,
+    mark_video_admission_task_recorded,
     video_admission_capability,
     video_admission_generation_request,
 )
@@ -49,6 +52,17 @@ def _exact_seedance_capability(monkeypatch) -> None:
             service=lambda service_id: {
                 "model": MODEL_ID,
                 "endpoint": CREATE_ENDPOINT,
+                "query_endpoint": QUERY_ENDPOINT,
+                "allowed_artifact_hosts": ["media.example.invalid"],
+                "pricing_exposure_contract": {
+                    "verification_state": "verified",
+                    "billing_mode": "provider_output_tokens",
+                    "output_token_usd": "0.01",
+                    "worst_case_output_tokens": 100,
+                    "worst_case_cost_usd": "1.00",
+                    "source_checked_at": "2026-07-26T00:00:00Z",
+                    "provider_enforced_cost_cap": False,
+                },
             }
         ),
         descriptor=lambda service_id: descriptor,
@@ -81,6 +95,11 @@ def test_video_admission_capability_rejects_incomplete_reference_contract(monkey
             service=lambda service_id: {
                 "model": MODEL_ID,
                 "endpoint": CREATE_ENDPOINT,
+                "query_endpoint": QUERY_ENDPOINT,
+                "allowed_artifact_hosts": [],
+                "pricing_exposure_contract": {
+                    "verification_state": "unverified",
+                },
             }
         ),
         descriptor=lambda service_id: SimpleNamespace(
@@ -102,6 +121,43 @@ def test_video_admission_capability_rejects_incomplete_reference_contract(monkey
     assert capability["configured"] is False
     assert capability["reference_image_slots"] == 2
     assert capability["reference_mode_supported"] is False
+
+
+def test_video_admission_capability_blocks_unverified_pricing_exposure(monkeypatch) -> None:
+    registry = SimpleNamespace(
+        store=SimpleNamespace(
+            service=lambda service_id: {
+                "model": MODEL_ID,
+                "endpoint": CREATE_ENDPOINT,
+                "query_endpoint": QUERY_ENDPOINT,
+                "allowed_artifact_hosts": ["media.example.invalid"],
+                "pricing_exposure_contract": {
+                    "verification_state": "unverified",
+                    "billing_mode": "provider_output_tokens",
+                    "provider_enforced_cost_cap": False,
+                },
+            }
+        ),
+        descriptor=lambda service_id: SimpleNamespace(
+            reference_image_slots=4,
+            supported_durations_sec=[6],
+            supported_resolutions=["720p"],
+            frame_modes=["reference_images"],
+        ),
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_video_admission.load_provider_registry",
+        lambda: registry,
+    )
+
+    capability = video_admission_capability()
+
+    assert capability["exact_model"] is True
+    assert capability["exact_endpoint"] is True
+    assert capability["exact_query_endpoint"] is True
+    assert capability["pricing_verified"] is False
+    assert capability["provider_enforced_cost_cap"] is False
+    assert capability["configured"] is False
 
 
 def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[str, str]]:
@@ -175,17 +231,32 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
         },
     ]
     for label, asset_id in media.items():
+        target_id = {
+            "keyframe": "shot-01",
+            "character": "character-a",
+            "scene": "scene-a",
+            "prop": "prop-a",
+        }[label]
+        approved_node_id = f"approved-{label}"
         events.append(
             {
                 "type": "node_upserted",
                 "node": {
-                    "node_id": f"approved-{label}",
+                    "node_id": approved_node_id,
                     "category": "artifact",
                     "metadata": {
                         "kind": "approved_image",
                         "image_asset_id": asset_id,
                     },
                 },
+            }
+        )
+        events.append(
+            {
+                "type": "relation_upserted",
+                "from_id": target_id,
+                "to_id": approved_node_id,
+                "relation_type": "approved_image",
             }
         )
     graph = graph_store.append(
@@ -232,6 +303,7 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
                 "aspect_ratio": "16:9",
                 "state": "approved",
                 "candidate": {"image_asset_id": media["keyframe"]},
+                "reference_asset_ids": ["character-a", "scene-a", "prop-a"],
                 "reference_media_ids": [
                     media["character"],
                     media["scene"],
@@ -274,6 +346,87 @@ def _command(
     return response.json()
 
 
+def _claim_for_test(
+    store: RuntimeStore,
+    project_id: str,
+    request: VideoGenerationRequest,
+    *,
+    job_id: str,
+) -> dict:
+    claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+    mark_video_admission_network_started(store, project_id, job_id=job_id)
+    return mark_video_admission_task_recorded(
+        store,
+        project_id,
+        job_id=job_id,
+        provider_task_fingerprint="fixture-task-fingerprint",
+    )
+
+
+def _record_candidate_for_test(
+    client: TestClient,
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    job_id: str,
+) -> dict:
+    _command(
+        client,
+        project_id,
+        {
+            "type": "record_job",
+            "idempotency_key": f"record-{job_id}",
+            "provider_job_id": job_id,
+        },
+    )
+    candidate_path = store.run_dir(project_id, job_id) / "video_candidates" / "candidate_001.mp4"
+    candidate_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=1280x720:d=6",
+            "-c:v",
+            "mpeg4",
+            "-pix_fmt",
+            "yuv420p",
+            candidate_path,
+        ],
+        check=True,
+    )
+    data = candidate_path.read_bytes()
+    candidate = {
+        "job_id": job_id,
+        "candidate_id": "candidate_001",
+        "preview_url": (
+            f"/projects/{project_id}/video-generations/"
+            f"{job_id}/candidates/candidate_001/preview"
+        ),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "byte_count": len(data),
+        "usage_evidence": {
+            "provider_reported_usage": True,
+            "output_tokens": 1234,
+            "provider_reported_cost": False,
+            "actual_charge_verification": "unverified",
+        },
+    }
+    return _command(
+        client,
+        project_id,
+        {
+            "type": "record_candidate",
+            "idempotency_key": f"candidate-{job_id}",
+            "candidate": candidate,
+        },
+    )["result"]["manifest"]
+
+
 def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path) -> None:
     client, store, project_id, media = _seed_ready_project(tmp_path)
 
@@ -295,6 +448,7 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
         "model": MODEL_ID,
         "model_variant": "non_fast",
         "create_endpoint": CREATE_ENDPOINT,
+        "query_endpoint": QUERY_ENDPOINT,
         "resolution": RESOLUTION,
         "duration_sec": DURATION_SEC,
         "candidate_count": 1,
@@ -304,17 +458,22 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
     assert manifest["budget_contract"] == {
         "currency": "USD",
         "hard_ceiling_usd": f"{HARD_BUDGET_USD:.2f}",
-        "classification": "hard_ceiling_not_estimate_or_actual_charge",
+        "classification": "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
         "billing_mode": "provider_output_tokens",
+        "provider_enforced_cost_cap": False,
+        "program_stop_ceiling_only": True,
+        "pricing_verification_state": "verified",
+        "worst_case_output_tokens": 100,
+        "worst_case_cost_usd": "1.00",
         "actual_charge_usd": None,
         "actual_charge_verification": "unverified",
     }
     assert manifest["source"]["keyframe"]["image_asset_id"] == media["keyframe"]
-    assert [item["image_asset_id"] for item in manifest["source"]["references"]] == [
+    assert {item["image_asset_id"] for item in manifest["source"]["references"]} == {
         media["character"],
         media["scene"],
         media["prop"],
-    ]
+    }
     prompt = manifest["source"]["prompt_contract"]["provider_prompt"]
     for value in (
         "巡夜人甲",
@@ -394,7 +553,25 @@ def test_video_admission_reservation_is_idempotent_and_dispatch_claim_is_exactly
         request,
         job_id="video-job-001",
     )
-    assert claimed["provider_dispatch_count"] == replayed_claim["provider_dispatch_count"] == 1
+    assert claimed["provider_dispatch_count"] == replayed_claim["provider_dispatch_count"] == 0
+    assert claimed["item"]["network_disposition"] == "never_started"
+    ambiguous = mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="video-job-001",
+    )
+    assert ambiguous["provider_dispatch_count"] == 1
+    assert ambiguous["item"]["state"] == "reconcile_required"
+    assert ambiguous["item"]["network_disposition"] == "may_have_dispatched"
+    submitted = mark_video_admission_task_recorded(
+        store,
+        project_id,
+        job_id="video-job-001",
+        provider_task_fingerprint="safe-fingerprint",
+    )
+    assert submitted["provider_dispatch_count"] == 1
+    assert submitted["item"]["state"] == "processing"
+    assert submitted["item"]["network_disposition"] == "dispatched_with_task_identity"
     with pytest.raises(ValueError, match="already claimed"):
         claim_video_admission_dispatch(
             store,
@@ -417,7 +594,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(tmp_path
     request = VideoGenerationRequest(
         **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
     )
-    claim_video_admission_dispatch(store, project_id, request, job_id="video-job-001")
+    _claim_for_test(store, project_id, request, job_id="video-job-001")
     _command(
         client,
         project_id,
@@ -512,6 +689,92 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(tmp_path
     assert approved_videos[0]["metadata"]["actual_usd"] is None
 
 
+def test_video_approval_reconciles_graph_append_after_ledger_write_crash(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-crash"})
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-crash"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    _claim_for_test(store, project_id, request, job_id="video-job-crash")
+    _record_candidate_for_test(
+        client,
+        store,
+        project_id,
+        job_id="video-job-crash",
+    )
+    preview = _command(
+        client,
+        project_id,
+        {"type": "approve", "idempotency_key": "approve-crash"},
+        confirm=False,
+    )
+    body = {
+        "command": {"type": "approve", "idempotency_key": "approve-crash"},
+        "requested_at": REQUESTED_AT,
+        "preview_digest": preview["preview_digest"],
+    }
+    real_write_json = write_json
+    failed = False
+
+    def fail_manifest_once(path, payload):
+        nonlocal failed
+        if str(path).endswith("/video_admission/manifest.json") and not failed:
+            failed = True
+            raise OSError("simulated manifest write failure")
+        return real_write_json(path, payload)
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_admission.write_json",
+        fail_manifest_once,
+    )
+    with pytest.raises(OSError, match="simulated manifest"):
+        client.post(
+            f"/projects/{project_id}/m6/video-admission/commands/confirm",
+            json=body,
+        )
+    graph_after_append = graph_store.load(project_id)
+    assert len([
+        node for node in graph_after_append["nodes"].values()
+        if node.get("metadata", {}).get("kind") == "approved_video"
+    ]) == 1
+    assert load_video_admission_manifest(store, project_id)["item"]["state"] == "candidate"
+
+    refreshed_preview = _command(
+        client,
+        project_id,
+        {"type": "approve", "idempotency_key": "approve-after-refresh"},
+        confirm=False,
+    )
+    assert refreshed_preview["result"]["manifest"]["item"]["state"] == "approved"
+    replay = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={
+            "command": {
+                "type": "approve",
+                "idempotency_key": "approve-after-refresh",
+            },
+            "requested_at": REQUESTED_AT,
+            "preview_digest": refreshed_preview["preview_digest"],
+        },
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["idempotent_replay"] is True
+    assert replay.json()["result"]["graph_mutation"] == 0
+    repaired = load_video_admission_manifest(store, project_id)
+    assert repaired["item"]["state"] == "approved"
+    assert repaired["item"]["candidate"]["usage_evidence"]["output_tokens"] == 1234
+    assert graph_store.load(project_id)["version"] == graph_after_append["version"]
+
+
 def test_video_admission_fails_closed_on_reference_and_graph_drift(tmp_path) -> None:
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     _command(client, project_id, {"type": "compile", "idempotency_key": "compile"})
@@ -557,6 +820,38 @@ def test_video_admission_fails_closed_on_reference_and_graph_drift(tmp_path) -> 
     assert "ProductionGraph source is stale" in response.text
 
 
+def test_video_readiness_requires_literal_shot_one_and_exact_reference_pack(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    path = store.projects_dir / project_id / "image_admission" / "manifest.json"
+    manifest = read_json(path)
+    manifest["source"]["shot_grounding"]["shots"][0]["number"] = 2
+    write_json(path, manifest)
+
+    response = client.get(f"/projects/{project_id}/m6/video-admission")
+    assert response.status_code == 200
+    assert response.json()["readiness"]["status"] == "blocked"
+    assert "numbered 1" in response.json()["readiness"]["reason"]
+
+    manifest["source"]["shot_grounding"]["shots"][0]["number"] = 1
+    manifest["items"][0]["reference_asset_ids"] = ["character-a", "scene-a"]
+    write_json(path, manifest)
+    response = client.get(f"/projects/{project_id}/m6/video-admission")
+    assert response.json()["readiness"]["status"] == "blocked"
+    assert "every canonical shot asset" in response.json()["readiness"]["reason"]
+
+
+def test_video_readiness_rejects_keyframe_bound_to_another_shot(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    path = store.projects_dir / project_id / "image_admission" / "manifest.json"
+    manifest = read_json(path)
+    manifest["items"][0]["target_shot_id"] = "shot-other"
+    write_json(path, manifest)
+
+    response = client.get(f"/projects/{project_id}/m6/video-admission")
+    assert response.json()["readiness"]["status"] == "blocked"
+    assert "bound exactly to shot 01" in response.json()["readiness"]["reason"]
+
+
 def test_video_candidate_preview_is_bound_to_current_project_and_job(tmp_path) -> None:
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     _command(client, project_id, {"type": "compile", "idempotency_key": "compile"})
@@ -568,7 +863,7 @@ def test_video_candidate_preview_is_bound_to_current_project_and_job(tmp_path) -
     request = VideoGenerationRequest(
         **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
     )
-    claim_video_admission_dispatch(store, project_id, request, job_id="video-job-001")
+    _claim_for_test(store, project_id, request, job_id="video-job-001")
     _command(
         client,
         project_id,
@@ -615,7 +910,7 @@ def test_video_candidate_fails_closed_before_review_when_media_is_corrupt(tmp_pa
     request = VideoGenerationRequest(
         **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
     )
-    claim_video_admission_dispatch(store, project_id, request, job_id="video-job-001")
+    _claim_for_test(store, project_id, request, job_id="video-job-001")
     _command(
         client,
         project_id,

@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import re
+import socket
 import urllib.error
 import urllib.request
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError, ModelProviderError
@@ -19,8 +22,20 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_CREATE_ENDPOINT = "/volc/v1/contents/generations/tasks"
+DEFAULT_QUERY_ENDPOINT = f"{DEFAULT_CREATE_ENDPOINT}/{{id}}"
 EXACT_MODEL_ID = "doubao-seedance-2-0"
 MAX_ERROR_BODY_BYTES = 8192
+SAFE_TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+PUBLIC_REQUEST_FIELDS = {
+    "model",
+    "content",
+    "generate_audio",
+    "ratio",
+    "resolution",
+    "duration",
+    "watermark",
+    "seed",
+}
 
 
 class VolcSeedanceVideoAdapter:
@@ -74,17 +89,27 @@ class VolcSeedanceVideoAdapter:
             raise ModelConfigError(
                 f"Seedance video service must use native task endpoint: {DEFAULT_CREATE_ENDPOINT}"
             )
+        query_endpoint = str(service.get("query_endpoint") or "")
+        if query_endpoint != DEFAULT_QUERY_ENDPOINT:
+            raise ModelConfigError(
+                f"Seedance video service must use native task poll endpoint: {DEFAULT_QUERY_ENDPOINT}"
+            )
+        allowed_url_hosts = _allowed_url_hosts(service)
+        if not allowed_url_hosts:
+            raise ModelConfigError("Seedance video artifact host allowlist must not be empty")
+        exposure = _verified_exposure_contract(service)
         return {
             "base_url": _base_url(account, service),
             "endpoint": endpoint,
-            "query_endpoint": str(service.get("query_endpoint") or f"{endpoint.rstrip('/')}/{{id}}"),
+            "query_endpoint": query_endpoint,
             "credential_value": account.get("api_key"),
             "credential_env": account_selection.credential_env or account.get("api_key_env") or service.get("api_key_env"),
             "auth_header": str(service.get("auth_header") or account.get("auth_header") or "Authorization"),
             "auth_scheme": str(service.get("auth_scheme") or account.get("auth_scheme") or "Bearer"),
             "timeout_sec": float(service.get("submit_timeout_sec") or self.descriptor.async_timeout_sec or request.timeout_sec or 120.0),
             "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
-            "allowed_url_hosts": _allowed_url_hosts(service),
+            "allowed_url_hosts": allowed_url_hosts,
+            "pricing_exposure": exposure,
             "output_dir": request.output_dir,
             "payload": _seedance_payload(service=service, model=str(model), request=request),
         }
@@ -111,15 +136,19 @@ class VolcSeedanceVideoAdapter:
             "timeout_sec": float(plan.get("timeout_sec") or 120.0),
             "download_timeout_sec": float(plan.get("download_timeout_sec") or 180.0),
             "allowed_url_hosts": tuple(plan.get("allowed_url_hosts") or ()),
+            "pricing_exposure": dict(plan["pricing_exposure"]),
             "output_dir": str(plan["output_dir"]),
         }
 
     def poll(self, task: dict[str, Any]) -> dict[str, Any]:
         task_id = str(task.get("task_id") or "")
-        if not task_id:
-            raise ModelGatewayError("Seedance video task id is missing")
+        if not SAFE_TASK_ID.fullmatch(task_id):
+            raise ModelGatewayError("Seedance video task id is invalid")
+        query_template = str(task.get("query_url_template") or "")
+        if not query_template.endswith(DEFAULT_QUERY_ENDPOINT):
+            raise ModelGatewayError("Seedance video task poll endpoint is invalid")
         response = _request_json(
-            str(task.get("query_url_template") or "").format(id=task_id),
+            query_template.format(id=quote(task_id, safe="")),
             method="GET",
             payload=None,
             credential_value=None,
@@ -144,12 +173,14 @@ class VolcSeedanceVideoAdapter:
         video_path = output_dir / video_ref
         video_path.parent.mkdir(parents=True, exist_ok=True)
         video_path.write_bytes(video_bytes)
+        usage = _safe_usage(response)
+        billing = _seedance_billing_hint(task, response)
         return {
             "status": "succeeded",
             "provider_calls_started": True,
             "provider_raw_response_stored": False,
-            "usage": _safe_usage(response),
-            "billing": _seedance_billing_hint(task, response),
+            "usage": usage,
+            "billing": billing,
             "outputs": [
                 {
                     "candidate_id": "candidate_001",
@@ -196,6 +227,10 @@ def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderD
             if value in (None, "", []):
                 continue
             key = str(raw_key)
+            if key not in PUBLIC_REQUEST_FIELDS:
+                raise ModelConfigError(
+                    f"Seedance extra_body field is not in the public request contract: {key}"
+                )
             if key in payload:
                 if value != payload[key]:
                     raise ModelConfigError(f"Seedance extra_body cannot override request field: {key}")
@@ -245,10 +280,11 @@ def _request_json(
 
 
 def _download_video(url: str, *, timeout_sec: float, allowed_url_hosts: tuple[str, ...]) -> tuple[bytes, str]:
-    if not _host_allowed(url, allowed_url_hosts):
-        raise ModelProviderError("Seedance video download host is not allowed")
+    _validate_artifact_url(url, allowed_url_hosts)
     try:
         with urllib.request.urlopen(url, timeout=timeout_sec) as response:
+            final_url = str(response.geturl() if hasattr(response, "geturl") else url)
+            _validate_artifact_url(final_url, allowed_url_hosts)
             body = response.read()
             content_type = str(response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
     except urllib.error.HTTPError as exc:
@@ -315,7 +351,10 @@ def _task_id(response: dict[str, Any]) -> str:
     for key in ("id", "task_id"):
         value = data.get(key) or response.get(key)
         if isinstance(value, str) and value.strip():
-            return value.strip()
+            task_id = value.strip()
+            if not SAFE_TASK_ID.fullmatch(task_id):
+                raise ModelProviderError("Seedance video response returned an invalid task id")
+            return task_id
     raise ModelProviderError("Seedance video response missing task id")
 
 
@@ -479,15 +518,46 @@ def _video_extension(content_type: str) -> str:
     return ".mp4"
 
 
-def _host_allowed(url: str, allowed: tuple[str, ...]) -> bool:
+def _validate_artifact_url(url: str, allowed: tuple[str, ...]) -> None:
     if not allowed:
-        return True
-    host = (urlparse(url).hostname or "").lower()
-    for item in allowed:
-        normalized = item.lower().lstrip(".")
-        if host == normalized or host.endswith(f".{normalized}"):
-            return True
-    return False
+        raise ModelProviderError("Seedance video artifact host allowlist is empty")
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    normalized = tuple(item.lower().strip().rstrip(".") for item in allowed if item.strip())
+    if (
+        parsed.scheme.lower() != "https"
+        or not host
+        or parsed.username
+        or parsed.password
+        or host not in normalized
+    ):
+        raise ModelProviderError("Seedance video download URL is not allowed")
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None or host == "localhost":
+        raise ModelProviderError("Seedance video download host must be a public DNS name")
+    try:
+        addresses = {
+            ipaddress.ip_address(item[4][0])
+            for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+        }
+    except (OSError, ValueError) as exc:
+        raise ModelProviderError("Seedance video download host could not be safely resolved") from exc
+    if not addresses or any(not _public_address(address) for address in addresses):
+        raise ModelProviderError("Seedance video download host resolved outside the public network")
+
+
+def _public_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
 
 
 def _base_url(account: dict[str, Any], service: dict[str, Any]) -> str:
@@ -506,6 +576,43 @@ def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item).lower().strip() for item in value if str(item).strip())
+
+
+def _verified_exposure_contract(service: dict[str, Any]) -> dict[str, Any]:
+    contract = (
+        service.get("pricing_exposure_contract")
+        if isinstance(service.get("pricing_exposure_contract"), dict)
+        else {}
+    )
+    try:
+        output_token_usd = Decimal(str(contract.get("output_token_usd") or "0"))
+        worst_case_output_tokens = int(contract.get("worst_case_output_tokens") or 0)
+        worst_case_cost = Decimal(str(contract.get("worst_case_cost_usd") or "0"))
+    except (TypeError, ValueError, InvalidOperation) as exc:
+        raise ModelConfigError("Seedance video pricing exposure contract is invalid") from exc
+    calculated = output_token_usd * worst_case_output_tokens
+    if (
+        contract.get("verification_state") != "verified"
+        or contract.get("billing_mode") != "provider_output_tokens"
+        or not str(contract.get("source_checked_at") or "").strip()
+        or output_token_usd <= 0
+        or worst_case_output_tokens <= 0
+        or worst_case_cost != calculated
+        or worst_case_cost > Decimal("2.00")
+        or contract.get("provider_enforced_cost_cap") is not False
+    ):
+        raise ModelConfigError(
+            "Seedance video requires verified pricing and worst-case exposure within the USD 2.00 program ceiling"
+        )
+    return {
+        "verification_state": "verified",
+        "billing_mode": "provider_output_tokens",
+        "output_token_usd": str(output_token_usd),
+        "worst_case_output_tokens": worst_case_output_tokens,
+        "worst_case_cost_usd": f"{worst_case_cost:.2f}",
+        "source_checked_at": str(contract["source_checked_at"]),
+        "provider_enforced_cost_cap": False,
+    }
 
 def _service_account(store: CompanyProviderSecrets, service_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
     service = store.service(service_id)

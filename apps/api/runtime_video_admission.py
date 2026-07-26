@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from copy import deepcopy
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,6 +34,7 @@ SCHEMA_VERSION = "afs.video_admission_manifest.v0.1"
 SERVICE_ID = "seedance_i2v"
 MODEL_ID = "doubao-seedance-2-0"
 CREATE_ENDPOINT = "/volc/v1/contents/generations/tasks"
+QUERY_ENDPOINT = f"{CREATE_ENDPOINT}/{{id}}"
 RESOLUTION = "720p"
 DURATION_SEC = 6
 MAX_DISPATCHES = 1
@@ -98,6 +99,31 @@ def register_runtime_video_admission_routes(
         try:
             with exclusive_file_lock(lock_path):
                 existing = load_video_admission_manifest(store, project_id)
+                reconciled = _reconcile_existing_approval(
+                    graph_store,
+                    project_id,
+                    existing,
+                    body.get("command"),
+                    timestamp=_requested_at(body),
+                )
+                if reconciled:
+                    preview = _preview_payload(
+                        existing,
+                        reconciled,
+                        _safe_command(body.get("command")),
+                    )
+                    if str(body.get("preview_digest") or "") != preview["preview_digest"]:
+                        raise ValueError("video admission preview is stale; review the impact again")
+                    write_json(path, reconciled)
+                    return {
+                        **preview,
+                        "status": "confirmed",
+                        "idempotent_replay": True,
+                        "result": {"manifest": reconciled, "graph_mutation": 0},
+                        "receipt": reconciled.get("receipts", [])[-1],
+                        "provider_dispatch_count": 0,
+                        "external_cost_usd": None,
+                    }
                 replay = _idempotent_receipt(existing, body.get("command"))
                 if replay:
                     return {
@@ -165,29 +191,43 @@ def video_admission_readiness(store: RuntimeStore, project_id: str) -> dict[str,
 def video_admission_capability() -> dict[str, Any]:
     configured_model = ""
     configured_endpoint = ""
+    configured_query_endpoint = ""
     reference_slots = 0
     duration_supported = False
     resolution_supported = False
     reference_mode_supported = False
+    artifact_hosts_configured = False
+    pricing_verified = False
+    worst_case_output_tokens = 0
+    worst_case_cost_usd = ""
     try:
         registry = load_provider_registry()
         service = registry.store.service(SERVICE_ID)
         descriptor = registry.descriptor(SERVICE_ID)
         configured_model = str(service.get("model") or "")
         configured_endpoint = str(service.get("endpoint") or "")
+        configured_query_endpoint = str(service.get("query_endpoint") or "")
+        artifact_hosts_configured = bool(service.get("allowed_artifact_hosts"))
+        pricing = _pricing_exposure_contract(service)
+        pricing_verified = pricing["verified"]
+        worst_case_output_tokens = pricing["worst_case_output_tokens"]
+        worst_case_cost_usd = pricing["worst_case_cost_usd"]
         reference_slots = int(descriptor.reference_image_slots or 0)
         duration_supported = DURATION_SEC in descriptor.supported_durations_sec
         resolution_supported = RESOLUTION in descriptor.supported_resolutions
         reference_mode_supported = "reference_images" in descriptor.frame_modes
-    except (ModelGatewayError, KeyError, OSError, ValueError):
+    except (ModelGatewayError, KeyError, OSError, ValueError, InvalidOperation):
         pass
     exact_model = configured_model == MODEL_ID
     exact_endpoint = configured_endpoint == CREATE_ENDPOINT
+    exact_query_endpoint = configured_query_endpoint == QUERY_ENDPOINT
     exact_request_shape = (
         reference_slots >= 4
         and duration_supported
         and resolution_supported
         and reference_mode_supported
+        and artifact_hosts_configured
+        and pricing_verified
     )
     return {
         "service_id": SERVICE_ID,
@@ -196,13 +236,24 @@ def video_admission_capability() -> dict[str, Any]:
         "create_endpoint": CREATE_ENDPOINT,
         "resolution": RESOLUTION,
         "duration_sec": DURATION_SEC,
-        "configured": exact_model and exact_endpoint and exact_request_shape,
+        "configured": (
+            exact_model
+            and exact_endpoint
+            and exact_query_endpoint
+            and exact_request_shape
+        ),
         "exact_model": exact_model,
         "exact_endpoint": exact_endpoint,
+        "exact_query_endpoint": exact_query_endpoint,
         "reference_image_slots": reference_slots,
         "duration_supported": duration_supported,
         "resolution_supported": resolution_supported,
         "reference_mode_supported": reference_mode_supported,
+        "artifact_hosts_configured": artifact_hosts_configured,
+        "pricing_verified": pricing_verified,
+        "worst_case_output_tokens": worst_case_output_tokens,
+        "worst_case_cost_usd": worst_case_cost_usd,
+        "provider_enforced_cost_cap": False,
         "provider_calls_started": False,
     }
 
@@ -222,20 +273,36 @@ def preview_video_admission_command(
         before = load_video_admission_manifest(store, project_id)
         if not before:
             raise ValueError("video admission manifest has not been prepared")
-        _assert_manifest_current(store, project_id, before)
-        manifest = _apply_command(
+        manifest = _reconcile_existing_approval(
+            ProductionGraphStore(store),
+            project_id,
             before,
             command,
-            requested_at,
-            store=store,
-            project_id=project_id,
+            timestamp=requested_at,
         )
+        if manifest is None:
+            _assert_manifest_current(store, project_id, before)
+            manifest = _apply_command(
+                before,
+                command,
+                requested_at,
+                store=store,
+                project_id=project_id,
+            )
+    return _preview_payload(before, manifest, command)
+
+
+def _preview_payload(
+    before: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    command: Mapping[str, Any],
+) -> dict[str, Any]:
     payload = {
         "schema_version": SCHEMA_VERSION,
         "status": "preview",
-        "command": command,
+        "command": dict(command),
         "impact": _impact(before, manifest, command),
-        "result": {"manifest": manifest, "graph_mutation": 0},
+        "result": {"manifest": deepcopy(dict(manifest)), "graph_mutation": 0},
         "provider_dispatch_count": 0,
         "external_cost_usd": None,
         "requires_confirmation": True,
@@ -266,6 +333,7 @@ def compile_video_admission_manifest(
             "model": MODEL_ID,
             "model_variant": "non_fast",
             "create_endpoint": CREATE_ENDPOINT,
+            "query_endpoint": QUERY_ENDPOINT,
             "resolution": RESOLUTION,
             "duration_sec": DURATION_SEC,
             "candidate_count": 1,
@@ -275,8 +343,17 @@ def compile_video_admission_manifest(
         "budget_contract": {
             "currency": "USD",
             "hard_ceiling_usd": _money(HARD_BUDGET_USD),
-            "classification": "hard_ceiling_not_estimate_or_actual_charge",
+            "classification": "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
             "billing_mode": "provider_output_tokens",
+            "provider_enforced_cost_cap": False,
+            "program_stop_ceiling_only": True,
+            "pricing_verification_state": "verified",
+            "worst_case_output_tokens": int(
+                video_admission_capability()["worst_case_output_tokens"]
+            ),
+            "worst_case_cost_usd": str(
+                video_admission_capability()["worst_case_cost_usd"]
+            ),
             "actual_charge_usd": None,
             "actual_charge_verification": "unverified",
         },
@@ -285,6 +362,7 @@ def compile_video_admission_manifest(
             "state": "planned",
             "label": source["shot"]["label"],
             "provider_job_id": "",
+            "network_disposition": "never_started",
             "candidate": None,
             "error_category": "",
         },
@@ -354,7 +432,7 @@ def enforce_video_admission_request(
     mismatches = [name for name, (actual, expected) in checks.items() if actual != expected]
     if mismatches:
         raise ValueError(f"video admission request differs from confirmed contract: {', '.join(mismatches)}")
-    if item.get("state") not in {"reserved", "processing"}:
+    if item.get("state") not in {"reserved", "dispatch_prepared", "reconcile_required", "processing"}:
         raise ValueError("video admission item is not reserved for its one allowed dispatch")
     return manifest
 
@@ -373,24 +451,86 @@ def claim_video_admission_dispatch(
     with exclusive_file_lock(lock_path):
         manifest = enforce_video_admission_request(store, project_id, request)
         item = manifest["item"]
-        if item.get("state") == "processing":
+        if item.get("state") in {"dispatch_prepared", "reconcile_required", "processing"}:
             if item.get("provider_job_id") == job_id:
                 return manifest
             raise ValueError("video admission dispatch was already claimed")
         if int(manifest["budget"]["dispatches_reserved"]) != 1:
             raise ValueError("video admission dispatch budget is not reserved")
-        item["state"] = "processing"
+        item["state"] = "dispatch_prepared"
         item["provider_job_id"] = job_id
         item["dispatch_claimed_at"] = _now()
-        manifest["provider_dispatch_count"] = 1
+        item["network_disposition"] = "never_started"
+        manifest["provider_dispatch_count"] = 0
         _append_receipt(
             manifest,
-            "provider_dispatch_claimed",
+            "dispatch_prepared",
             {"type": "dispatch_claim", "idempotency_key": f"dispatch-{job_id}"},
             manifest["item"]["dispatch_claimed_at"],
         )
         manifest["updated_at"] = _now()
         reject_unsafe_payload(manifest)
+        write_json(path, manifest)
+        return manifest
+
+
+def mark_video_admission_network_started(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    job_id: str,
+) -> dict[str, Any]:
+    path = _manifest_path(store, project_id)
+    with exclusive_file_lock(path.with_suffix(".lock")):
+        manifest = load_video_admission_manifest(store, project_id)
+        item = manifest.get("item") or {}
+        if item.get("provider_job_id") != job_id:
+            raise ValueError("video dispatch job identity does not match")
+        if item.get("state") == "reconcile_required":
+            return manifest
+        if item.get("state") != "dispatch_prepared":
+            raise ValueError("video dispatch was not durably prepared")
+        item["state"] = "reconcile_required"
+        item["network_disposition"] = "may_have_dispatched"
+        manifest["provider_dispatch_count"] = 1
+        _append_receipt(
+            manifest,
+            "provider_submit_started",
+            {"type": "dispatch_start", "idempotency_key": f"dispatch-start-{job_id}"},
+            _now(),
+        )
+        manifest["updated_at"] = _now()
+        write_json(path, manifest)
+        return manifest
+
+
+def mark_video_admission_task_recorded(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    job_id: str,
+    provider_task_fingerprint: str,
+) -> dict[str, Any]:
+    path = _manifest_path(store, project_id)
+    with exclusive_file_lock(path.with_suffix(".lock")):
+        manifest = load_video_admission_manifest(store, project_id)
+        item = manifest.get("item") or {}
+        if item.get("provider_job_id") != job_id:
+            raise ValueError("video dispatch job identity does not match")
+        if item.get("state") == "processing":
+            return manifest
+        if item.get("state") != "reconcile_required":
+            raise ValueError("video dispatch is not awaiting task reconciliation")
+        item["state"] = "processing"
+        item["network_disposition"] = "dispatched_with_task_identity"
+        item["provider_task_fingerprint"] = str(provider_task_fingerprint or "")[:32]
+        _append_receipt(
+            manifest,
+            "provider_task_recorded",
+            {"type": "task_record", "idempotency_key": f"task-record-{job_id}"},
+            _now(),
+        )
+        manifest["updated_at"] = _now()
         write_json(path, manifest)
         return manifest
 
@@ -438,20 +578,21 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         for item in (image_manifest.get("source", {}).get("shot_grounding", {}).get("shots") or [])
         if isinstance(item, Mapping)
     }
-    keyframes.sort(
-        key=lambda item: (
-            int(shot_rows.get(str(item.get("target_shot_id") or ""), {}).get("number") or 999999),
-            str(item.get("target_shot_id") or ""),
-        )
-    )
-    keyframe = keyframes[0]
-    shot_id = str(keyframe.get("target_shot_id") or "")
-    shot = shot_rows.get(shot_id)
-    if not shot:
-        raise ValueError("approved keyframe does not resolve to an applied shot")
-    first_number = min(int(row.get("number") or 999999) for row in shot_rows.values())
-    if int(shot.get("number") or 999999) != first_number:
-        raise ValueError("video readiness is limited to the first applied shot")
+    shot_one_rows = [
+        row for row in shot_rows.values()
+        if int(row.get("number") or 0) == 1
+    ]
+    if len(shot_one_rows) != 1:
+        raise ValueError("video readiness requires exactly one applied shot numbered 1")
+    shot = shot_one_rows[0]
+    shot_id = str(shot.get("shot_id") or "")
+    matching_keyframes = [
+        item for item in keyframes
+        if str(item.get("target_shot_id") or "") == shot_id
+    ]
+    if len(matching_keyframes) != 1:
+        raise ValueError("video readiness requires one approved keyframe bound exactly to shot 01")
+    keyframe = matching_keyframes[0]
     candidate = keyframe["candidate"]
     first_frame = _validated_approved_image(
         store,
@@ -459,14 +600,37 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         graph,
         str(candidate.get("image_asset_id") or ""),
     )
-    reference_ids = [
+    media_by_target = _approved_media_by_target(graph)
+    if first_frame["image_asset_id"] not in media_by_target.get(shot_id, set()):
+        raise ValueError("approved shot 01 keyframe is not bound to shot 01 in ProductionGraph")
+    canonical_target_ids = _canonical_target_ids_for_shot(graph, shot_id)
+    declared_target_ids = {
+        str(item) for item in keyframe.get("reference_asset_ids", []) if str(item)
+    }
+    if not canonical_target_ids or declared_target_ids != canonical_target_ids:
+        raise ValueError("approved shot 01 keyframe reference pack is not bound to every canonical shot asset")
+    selected_reference_ids = {
         str(item)
         for item in keyframe.get("reference_media_ids", [])
         if str(item) and str(item) != first_frame["image_asset_id"]
-    ][:3]
+    }
+    reference_ids: list[tuple[str, str]] = []
+    for target_id in sorted(canonical_target_ids):
+        selected_for_target = sorted(
+            selected_reference_ids & media_by_target.get(target_id, set())
+        )
+        if len(selected_for_target) != 1:
+            raise ValueError("approved reference pack must select exactly one image for each canonical shot asset")
+        reference_ids.append((target_id, selected_for_target[0]))
+    if not reference_ids or len(reference_ids) > 3:
+        raise ValueError("approved reference pack must contain one to three canonical reference images")
     references = [
-        _validated_approved_image(store, project_id, graph, asset_id)
-        for asset_id in reference_ids
+        {
+            **_validated_approved_image(store, project_id, graph, asset_id),
+            "target_asset_id": target_id,
+            "label": _canonical_target_label(graph, target_id),
+        }
+        for target_id, asset_id in reference_ids
     ]
     current_snapshot = {
         "version": int(graph["version"]),
@@ -487,8 +651,8 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         "shot_candidate_id": str(image_manifest.get("source", {}).get("shot_candidate_id") or ""),
         "shot": {
             "shot_id": shot_id,
-            "number": int(shot.get("number") or first_number),
-            "label": str(shot.get("title") or f"镜头 {first_number:02d}"),
+            "number": 1,
+            "label": str(shot.get("title") or "镜头 01"),
         },
         "keyframe": {
             **first_frame,
@@ -503,18 +667,8 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
 
 def _canonical_labels_for_shot(graph: Mapping[str, Any], shot_id: str) -> dict[str, list[str]]:
     nodes = graph.get("nodes", {})
-    required_ids = {
-        str(item.get("from_id") or "")
-        for item in graph.get("relations", [])
-        if item.get("to_id") == shot_id and item.get("relation_type") == "required_by"
-    }
-    scene_ids = {
-        str(item.get("from_id") or "")
-        for item in graph.get("relations", [])
-        if item.get("to_id") == shot_id and item.get("relation_type") == "contains"
-    }
     result = {"characters": [], "scenes": [], "props": []}
-    for node_id in sorted(required_ids | scene_ids):
+    for node_id in sorted(_canonical_target_ids_for_shot(graph, shot_id)):
         node = nodes.get(node_id) or {}
         metadata = node.get("metadata") or {}
         label = str(metadata.get("display_name") or metadata.get("name") or "").strip()
@@ -527,6 +681,54 @@ def _canonical_labels_for_shot(graph: Mapping[str, Any], shot_id: str) -> dict[s
         elif node.get("category") == "resource" and metadata.get("kind") == "prop":
             result["props"].append(label)
     return result
+
+
+def _canonical_target_ids_for_shot(graph: Mapping[str, Any], shot_id: str) -> set[str]:
+    nodes = graph.get("nodes", {})
+    candidate_ids = {
+        str(item.get("from_id") or "")
+        for item in graph.get("relations", [])
+        if item.get("to_id") == shot_id
+        and item.get("relation_type") in {"required_by", "contains"}
+    }
+    return {
+        node_id
+        for node_id in candidate_ids
+        if (
+            (nodes.get(node_id) or {}).get("category") in {"entity", "location"}
+            or (
+                (nodes.get(node_id) or {}).get("category") == "resource"
+                and (nodes.get(node_id) or {}).get("metadata", {}).get("kind") == "prop"
+            )
+        )
+    }
+
+
+def _approved_media_by_target(graph: Mapping[str, Any]) -> dict[str, set[str]]:
+    approved_nodes = {
+        str(node_id): str(node.get("metadata", {}).get("image_asset_id") or "")
+        for node_id, node in graph.get("nodes", {}).items()
+        if node.get("state") == "active"
+        and node.get("metadata", {}).get("kind") == "approved_image"
+    }
+    result: dict[str, set[str]] = {}
+    for relation in graph.get("relations", []):
+        approved_node_id = str(relation.get("to_id") or "")
+        if relation.get("relation_type") != "approved_image" or approved_node_id not in approved_nodes:
+            continue
+        image_asset_id = approved_nodes[approved_node_id]
+        if image_asset_id:
+            result.setdefault(str(relation.get("from_id") or ""), set()).add(image_asset_id)
+    return result
+
+
+def _canonical_target_label(graph: Mapping[str, Any], target_id: str) -> str:
+    node = (graph.get("nodes") or {}).get(target_id) or {}
+    metadata = node.get("metadata") or {}
+    label = str(metadata.get("display_name") or metadata.get("name") or "").strip()
+    if not label:
+        raise ValueError("canonical reference pack target is missing its creator-facing label")
+    return label
 
 
 def _prompt_contract(shot: Mapping[str, Any], labels: Mapping[str, list[str]]) -> dict[str, Any]:
@@ -712,6 +914,12 @@ def _approve_to_graph(
                     "duration_sec": DURATION_SEC,
                     "billing_verification_state": "unverified",
                     "actual_usd": None,
+                    "provider_reported_output_tokens": (
+                        (candidate.get("usage_evidence") or {}).get("output_tokens")
+                    ),
+                    "approval_idempotency_key": str(
+                        command.get("idempotency_key") or f"approve-{manifest['manifest_id']}"
+                    ),
                 },
             },
         },
@@ -742,6 +950,63 @@ def _approve_to_graph(
         "promoted_at": _now(),
     }
     return manifest
+
+
+def _reconcile_existing_approval(
+    graph_store: ProductionGraphStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+    command_value: Any,
+    *,
+    timestamp: str,
+) -> dict[str, Any] | None:
+    command = dict(command_value) if isinstance(command_value, Mapping) else {}
+    if (
+        command.get("type") != "approve"
+        or not manifest
+        or (manifest.get("item") or {}).get("state") != "candidate"
+    ):
+        return None
+    candidate = (manifest.get("item") or {}).get("candidate") or {}
+    node_id = f"video-media-{safe_id(str(manifest.get('manifest_id') or ''))}"
+    graph = graph_store.load(project_id)
+    node = (graph.get("nodes") or {}).get(node_id) or {}
+    metadata = node.get("metadata") or {}
+    if not node:
+        return None
+    if (
+        metadata.get("kind") != "approved_video"
+        or metadata.get("manifest_hash") != manifest.get("manifest_hash")
+        or metadata.get("sha256") != candidate.get("sha256")
+        or metadata.get("job_id") != candidate.get("job_id")
+        or metadata.get("candidate_id") != candidate.get("candidate_id")
+        or metadata.get("model") != MODEL_ID
+        or metadata.get("resolution") != RESOLUTION
+        or int(metadata.get("duration_sec") or 0) != DURATION_SEC
+    ):
+        raise ValueError("existing video graph promotion conflicts with the approval ledger")
+    relation_matches = [
+        relation
+        for relation in graph.get("relations", [])
+        if relation.get("from_id") == manifest.get("source", {}).get("shot", {}).get("shot_id")
+        and relation.get("to_id") == node_id
+        and relation.get("relation_type") == "approved_video"
+    ]
+    if len(relation_matches) != 1:
+        raise ValueError("existing video graph promotion has an invalid shot binding")
+    reconciled = deepcopy(dict(manifest))
+    reconciled["item"]["state"] = "approved"
+    reconciled["item"]["promotion"] = {
+        "production_graph_node_id": node_id,
+        "graph_version": int(graph["version"]),
+        "graph_digest": str(graph["graph_digest"]),
+        "idempotent_replay": True,
+        "promoted_at": timestamp,
+    }
+    _append_receipt(reconciled, "approved", command, timestamp)
+    reconciled["updated_at"] = timestamp
+    reject_unsafe_payload(reconciled)
+    return reconciled
 
 
 def _assert_manifest_current(store: RuntimeStore, project_id: str, manifest: Mapping[str, Any]) -> None:
@@ -805,10 +1070,56 @@ def _safe_candidate(value: Any, *, project_id: str = "") -> dict[str, Any]:
         "sha256": sha256,
         "byte_count": byte_count,
         **(
+            {"usage_evidence": _safe_usage_evidence(candidate["usage_evidence"])}
+            if isinstance(candidate.get("usage_evidence"), Mapping)
+            else {}
+        ),
+        **(
             {"technical_qa": deepcopy(dict(candidate["technical_qa"]))}
             if isinstance(candidate.get("technical_qa"), Mapping)
             else {}
         ),
+    }
+
+
+def _safe_usage_evidence(value: Mapping[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "provider_reported_usage": bool(value.get("provider_reported_usage")),
+        "provider_reported_cost": False,
+        "actual_charge_verification": "unverified",
+    }
+    output_tokens = value.get("output_tokens")
+    if isinstance(output_tokens, (int, float)) and 0 <= output_tokens <= 10**12:
+        result["output_tokens"] = output_tokens
+    elif output_tokens is not None:
+        raise ValueError("video candidate output token evidence is invalid")
+    return result
+
+
+def _pricing_exposure_contract(service: Mapping[str, Any]) -> dict[str, Any]:
+    contract = (
+        service.get("pricing_exposure_contract")
+        if isinstance(service.get("pricing_exposure_contract"), Mapping)
+        else {}
+    )
+    output_token_usd = Decimal(str(contract.get("output_token_usd") or "0"))
+    worst_case_output_tokens = int(contract.get("worst_case_output_tokens") or 0)
+    worst_case_cost = Decimal(str(contract.get("worst_case_cost_usd") or "0"))
+    calculated = output_token_usd * worst_case_output_tokens
+    verified = (
+        contract.get("verification_state") == "verified"
+        and contract.get("billing_mode") == "provider_output_tokens"
+        and bool(str(contract.get("source_checked_at") or "").strip())
+        and output_token_usd > 0
+        and worst_case_output_tokens > 0
+        and worst_case_cost == calculated
+        and worst_case_cost <= HARD_BUDGET_USD
+        and contract.get("provider_enforced_cost_cap") is False
+    )
+    return {
+        "verified": verified,
+        "worst_case_output_tokens": worst_case_output_tokens,
+        "worst_case_cost_usd": f"{worst_case_cost:.2f}" if worst_case_cost > 0 else "",
     }
 
 

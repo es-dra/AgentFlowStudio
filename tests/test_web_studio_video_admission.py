@@ -42,7 +42,7 @@ const manifest = {
   },
   budget_contract: {
     hard_ceiling_usd: "2.00",
-    classification: "hard_ceiling_not_estimate_or_actual_charge",
+    classification: "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
     actual_charge_usd: null,
   },
   source: {
@@ -149,7 +149,8 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
         "6 秒",
         "已批准关键帧",
         "参考图",
-        "$2.00 硬上限（非预计或实际费用）",
+        "参考组：",
+        "$2.00 项目停止线（非供应商强制限额、预计或实际费用）",
         "1 次发送",
         "自动重试 0",
         "批准并写入项目",
@@ -165,6 +166,7 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
     assert "doubao-seedance-2-0-fast" not in source
     assert "写入当前 ProductionGraph" not in source
     assert "videoAdmissionView().item?.job_id === result.job_id" in source
+    assert "manifest.source?.references" in source
 
 
 def test_video_admission_runtime_client_uses_project_scoped_authenticated_routes() -> None:

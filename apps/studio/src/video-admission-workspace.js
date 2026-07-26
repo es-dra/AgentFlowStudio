@@ -63,6 +63,7 @@ export function videoAdmissionGenerationRequest(manifest, generatedAt) {
 
 export function videoAdmissionGenerationResult(response) {
   const candidate = candidatePreviewItems(response).find((item) => item?.candidate_id && item?.url);
+  const usageEvidence = response?.safe_manifest?.usage_evidence || {};
   return {
     job_id: String(response?.job?.job_id || ""),
     status: String(response?.job?.status || ""),
@@ -73,6 +74,14 @@ export function videoAdmissionGenerationResult(response) {
         preview_url: String(candidate.url || candidate.preview_url || ""),
         sha256: String(candidate.sha256 || candidate.canonical_digest || ""),
         byte_count: Number(candidate.byte_count || 0),
+        usage_evidence: {
+          provider_reported_usage: Boolean(usageEvidence.provider_reported_usage),
+          provider_reported_cost: false,
+          actual_charge_verification: "unverified",
+          ...(Number.isFinite(Number(usageEvidence.output_tokens))
+            ? { output_tokens: Number(usageEvidence.output_tokens) }
+            : {}),
+        },
       }
       : null,
   };

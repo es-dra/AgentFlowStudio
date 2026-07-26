@@ -268,11 +268,22 @@
       "account_ref": "volc_seedance_relay",
       "capability": "video",
       "endpoint": "/volc/v1/contents/generations/tasks",
+      "query_endpoint": "/volc/v1/contents/generations/tasks/{id}",
       "model": "doubao-seedance-2-0",
       "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
       "reference_roles": ["first_frame", "reference_image", "reference_image", "reference_image"],
       "watermark": false,
       "generate_audio": false,
+      "allowed_artifact_hosts": ["media.example.invalid"],
+      "pricing_exposure_contract": {
+        "verification_state": "unverified",
+        "billing_mode": "provider_output_tokens",
+        "output_token_usd": null,
+        "worst_case_output_tokens": null,
+        "worst_case_cost_usd": null,
+        "source_checked_at": null,
+        "provider_enforced_cost_cap": false
+      },
       "descriptor": {
         "schema_version": "provider_descriptor.v0.2",
         "modality": "video",

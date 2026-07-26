@@ -5,6 +5,7 @@ import io
 import json
 from types import SimpleNamespace
 import urllib.error
+import socket
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.errors import ModelGatewayError, ModelProviderError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
+from agentflow_studio.model_gateway import volc_seedance_video
 from apps.api import runtime_video_routes
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import reject_unsafe_payload
@@ -21,6 +23,16 @@ from apps.api.runtime_video_task_state import provider_task_for_state
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
+
+
+@pytest.fixture(autouse=True)
+def _public_test_dns(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.volc_seedance_video.socket.getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443))
+        ],
+    )
 
 
 def test_provider_registry_builds_seedance_example_descriptor() -> None:
@@ -56,11 +68,12 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
         if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-123":
             captured["poll_auth"] = request.get_header("Authorization")
             return _JsonResponse(
-                {
-                    "id": "cgt-seedance-123",
-                    "status": "succeeded",
-                    "content": {"video_url": "https://media.seedance.test/result.mp4"},
-                    }
+                    {
+                        "id": "cgt-seedance-123",
+                        "status": "succeeded",
+                        "content": {"video_url": "https://media.seedance.test/result.mp4"},
+                        "usage": {"output_tokens": 4321, "total_tokens": 5000},
+                        }
                 )
         if url == "https://media.seedance.test/result.mp4":
             captured["download_timeout"] = timeout
@@ -96,11 +109,21 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert payload["duration"] == 5
     assert payload["resolution"] == "720p"
     assert payload["watermark"] is False
+    assert "max_output_tokens" not in payload
     assert payload["content"][0] == {"type": "text", "text": "A controlled cinematic move from first to last frame."}
     assert payload["content"][1]["role"] == "first_frame"
     assert payload["content"][2]["role"] == "last_frame"
     assert payload["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
     assert result["status"] == "succeeded"
+    assert result["usage"]["output_tokens"] == 4321
+    assert result["billing"] == {
+        "provider_reported_cost": False,
+        "billing_mode": "output_tokens",
+        "model": "doubao-seedance-2-0",
+        "duration_sec": 5,
+        "resolution": "720p",
+        "output_tokens": 4321,
+    }
     assert result["outputs"][0]["video_path"] == "video_candidates/candidate_001.mp4"
     assert (tmp_path / "run" / "video_candidates" / "candidate_001.mp4").read_bytes() == b"fake-seedance-video"
     assert "secret-video-key" not in json.dumps(result, ensure_ascii=False)
@@ -178,6 +201,46 @@ def test_seedance_video_rejects_extra_body_model_override_before_network(tmp_pat
             ),
         )
     assert network_calls == 0
+
+
+def test_seedance_video_rejects_unsupported_output_limit_field_before_network(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("unsupported request field must fail before network")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "test-only")
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(
+            _seedance_provider_config(
+                tmp_path,
+                extra_body={"max_output_tokens": 100},
+            )
+        )
+    )
+    with pytest.raises(ModelGatewayError, match="public request contract"):
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="public contract only",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+    assert called == 0
 
 
 def test_seedance_video_rejects_non_native_create_endpoint_before_network(tmp_path, monkeypatch) -> None:
@@ -507,6 +570,182 @@ def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> Non
     assert called["count"] == 0
 
 
+@pytest.mark.parametrize(
+    ("url", "allowlist"),
+    [
+        ("http://media.seedance.test/result.mp4", ("media.seedance.test",)),
+        ("file:///tmp/result.mp4", ("media.seedance.test",)),
+        ("https://127.0.0.1/result.mp4", ("127.0.0.1",)),
+        ("https://media.seedance.test.evil.test/result.mp4", ("media.seedance.test",)),
+        ("https://media.seedance.test/result.mp4", ()),
+    ],
+)
+def test_seedance_artifact_download_rejects_unsafe_urls_before_network(
+    url,
+    allowlist,
+    monkeypatch,
+) -> None:
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("unsafe artifact URL must fail before network")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    with pytest.raises(ModelProviderError):
+        volc_seedance_video._download_video(
+            url,
+            timeout_sec=5,
+            allowed_url_hosts=allowlist,
+        )
+    assert called == 0
+
+
+def test_seedance_artifact_download_rejects_redirect_final_host(monkeypatch) -> None:
+    response = _BytesResponse(b"video", "video/mp4")
+    response.geturl = lambda: "https://evil.test/result.mp4"
+    monkeypatch.setattr(
+        volc_seedance_video.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: response,
+    )
+    with pytest.raises(ModelProviderError, match="not allowed"):
+        volc_seedance_video._download_video(
+            "https://media.seedance.test/result.mp4",
+            timeout_sec=5,
+            allowed_url_hosts=("media.seedance.test",),
+        )
+
+
+def test_seedance_artifact_download_rejects_private_dns_resolution(monkeypatch) -> None:
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("private DNS result must fail before download")
+
+    monkeypatch.setattr(
+        volc_seedance_video.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.10.20", 443))
+        ],
+    )
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    with pytest.raises(ModelProviderError, match="public network"):
+        volc_seedance_video._download_video(
+            "https://media.seedance.test/result.mp4",
+            timeout_sec=5,
+            allowed_url_hosts=("media.seedance.test",),
+        )
+    assert called == 0
+
+
+def test_seedance_poll_rejects_unencoded_provider_task_path_before_network(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(_seedance_provider_config(tmp_path))
+    )
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("invalid provider task identity must fail before network")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    with pytest.raises(ModelGatewayError, match="task id is invalid"):
+        registry.poll(
+            "video",
+            "seedance_i2v",
+            {
+                "task": {
+                    "task_id": "../other-task?x=1",
+                    "query_url_template": (
+                        "https://relay.test/volc/v1/contents/generations/tasks/{id}"
+                    ),
+                }
+            },
+        )
+    assert called == 0
+
+
+def test_seedance_rejects_non_native_poll_endpoint_before_network(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    config_path = _seedance_provider_config(tmp_path)
+    config = json.loads((tmp_path / "providers.local.json").read_text(encoding="utf-8"))
+    config["services"]["seedance_i2v"]["query_endpoint"] = "/v1/tasks/{id}"
+    (tmp_path / "providers.local.json").write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "test-only")
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("non-native poll endpoint must fail before network")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(config_path))
+    with pytest.raises(ModelGatewayError, match="native task poll endpoint"):
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="native poll contract",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+            ),
+        )
+    assert called == 0
+
+
+def test_seedance_fails_closed_without_verified_pricing_exposure(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    config_path = _seedance_provider_config(tmp_path)
+    config = json.loads((tmp_path / "providers.local.json").read_text(encoding="utf-8"))
+    config["services"]["seedance_i2v"]["pricing_exposure_contract"] = {
+        "verification_state": "unverified",
+        "billing_mode": "provider_output_tokens",
+        "output_token_usd": None,
+        "worst_case_output_tokens": None,
+        "worst_case_cost_usd": None,
+        "source_checked_at": None,
+        "provider_enforced_cost_cap": False,
+    }
+    (tmp_path / "providers.local.json").write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "test-only")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(config_path))
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("unverified exposure must block before network")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    with pytest.raises(ModelGatewayError, match="verified pricing"):
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="budget contract",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+            ),
+        )
+    assert called == 0
+
+
 def test_runtime_seedance_generation_cannot_bypass_video_admission(tmp_path, monkeypatch) -> None:
     captured: dict[str, object] = {}
 
@@ -607,11 +846,21 @@ def _seedance_provider_config(
                 "capability": "video",
                 "base_url": "https://relay.test",
                 "endpoint": "/volc/v1/contents/generations/tasks",
+                "query_endpoint": "/volc/v1/contents/generations/tasks/{id}",
                 "model": model,
                 "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
                 "reference_roles": ["first_frame", "last_frame"],
                 "watermark": False,
                 "allowed_artifact_hosts": ["media.seedance.test"],
+                "pricing_exposure_contract": {
+                    "verification_state": "verified",
+                    "billing_mode": "provider_output_tokens",
+                    "output_token_usd": "0.01",
+                    "worst_case_output_tokens": 100,
+                    "worst_case_cost_usd": "1.00",
+                    "source_checked_at": "2026-07-26T00:00:00Z",
+                    "provider_enforced_cost_cap": False,
+                },
                 "descriptor": {
                     "schema_version": "provider_descriptor.v0.2",
                     "modality": "video",
@@ -658,6 +907,9 @@ class _JsonResponse:
     def read(self) -> bytes:
         return json.dumps(self.payload).encode("utf-8")
 
+    def geturl(self) -> str:
+        return ""
+
 
 class _BytesResponse:
     def __init__(self, payload: bytes, content_type: str):
@@ -672,3 +924,6 @@ class _BytesResponse:
 
     def read(self, *_args) -> bytes:
         return self.payload
+
+    def geturl(self) -> str:
+        return "https://media.seedance.test/result.mp4"
