@@ -2811,6 +2811,7 @@ export function createProductShell(options = {}) {
     videoAdmissionOpen = true;
     videoAdmissionPending = true;
     render();
+    focusVideoAdmissionPanel();
     try {
       const request = {
         command: videoAdmissionCommand(command),
@@ -2824,17 +2825,22 @@ export function createProductShell(options = {}) {
       videoAdmissionPending = false;
     }
     render();
+    focusVideoAdmissionPanel();
   }
 
   async function openCurrentShotVideoPreparation() {
     videoAdmissionOpen = true;
     section = "storyboard";
     closeResponsiveAgentOverlay();
+    render();
+    focusVideoAdmissionPanel();
     if (videoAdmissionView().status === "empty" && !videoAdmissionPreview) {
       await stageVideoAdmissionCommand({ type: "compile" });
-    } else {
-      render();
     }
+    focusVideoAdmissionPanel();
+  }
+
+  function focusVideoAdmissionPanel() {
     requestAnimationFrame(() => {
       const panel = document.querySelector(".video-admission-panel");
       panel?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -3116,8 +3122,17 @@ export function createProductShell(options = {}) {
     heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1><p class="storyboard-total-summary">${totals.scene_count} 场景 · ${totals.shot_count} 镜头 · 总时长约 ${Math.round(totals.duration_sec)} 秒</p>`;
     const headingActions = node("div", "storyboard-heading-actions");
     headingActions.appendChild(node("span", "storyboard-duration", `${scene.shots.length} 镜头 · ${scene.duration}`));
-    if (currentShotVideoAdmissionReady() && videoAdmissionView().status === "empty") {
-      const prepareVideo = node("button", "studio-primary-button", videoAdmissionPending ? "正在准备…" : "准备镜头视频");
+    const videoView = videoAdmissionView();
+    const videoActionState = videoView.status === "empty"
+      ? "empty"
+      : String(videoView.item?.state || "");
+    if (currentShotVideoAdmissionReady() && ["empty", "planned"].includes(videoActionState)) {
+      const videoActionLabel = videoAdmissionPending
+        ? "正在准备…"
+        : videoView.item?.state === "planned"
+          ? "确认镜头视频"
+          : "准备镜头视频";
+      const prepareVideo = node("button", "studio-primary-button", videoActionLabel);
       prepareVideo.type = "button";
       prepareVideo.disabled = videoAdmissionPending;
       prepareVideo.addEventListener("click", () => void openCurrentShotVideoPreparation());
