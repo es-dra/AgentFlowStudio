@@ -30,7 +30,19 @@ def test_agent_chat_conversation_gate_closed_is_honest_unavailable(tmp_path, mon
         json={
             "message": "你好",
             "node_id": "idea_1",
-            "canvas_summary": {"nodes": 1, "selected_node_type": "text", "selected_node_title": "雨夜想法"},
+            "canvas_summary": {
+                "nodes": 1,
+                "selected_node_type": "text",
+                "selected_node_title": "雨夜想法",
+                "video_readiness_status": "ready",
+                "video_selected_shot_ready": 1,
+                "video_shot_label": "镜头 01",
+                "video_keyframe_label": "已批准关键帧",
+                "video_reference_count": 3,
+                "video_model": "doubao-seedance-2-0",
+                "video_resolution": "720p",
+                "video_duration_sec": 6,
+            },
             "provider_service_id": "server_codex",
             "generated_at": "2026-07-22T08:00:00Z",
         },
@@ -75,7 +87,19 @@ def test_agent_chat_conversation_uses_server_codex_structured_llm_and_preserves_
         json={
             "message": "你好",
             "node_id": "idea_1",
-            "canvas_summary": {"nodes": 1, "selected_node_type": "text", "selected_node_title": "雨夜想法"},
+            "canvas_summary": {
+                "nodes": 1,
+                "selected_node_type": "text",
+                "selected_node_title": "雨夜想法",
+                "video_readiness_status": "ready",
+                "video_selected_shot_ready": 1,
+                "video_shot_label": "镜头 01",
+                "video_keyframe_label": "已批准关键帧",
+                "video_reference_count": 3,
+                "video_model": "doubao-seedance-2-0",
+                "video_resolution": "720p",
+                "video_duration_sec": 6,
+            },
             "provider_service_id": "server_codex",
             "generated_at": "2026-07-22T08:00:00Z",
         },
@@ -101,3 +125,9 @@ def test_agent_chat_conversation_uses_server_codex_structured_llm_and_preserves_
     assert "AI 创作搭档" in request.prompt
     assert "你好" in request.prompt
     assert "不要声称已经修改画布" in request.prompt
+    assert "'video_readiness_status': 'ready'" in request.prompt
+    assert "'video_selected_shot_ready': 1" in request.prompt
+    assert "'video_reference_count': 3" in request.prompt
+    assert "'video_model': 'doubao-seedance-2-0'" in request.prompt
+    assert "不要声称参考图缺失" in request.prompt
+    assert "准备镜头视频" in request.prompt

@@ -2550,6 +2550,14 @@ function agentChatRuntimeSummary(context = {}) {
     selected_edge_from_title: cleanText(context?.selected_edge_from_title, 120),
     selected_edge_to_title: cleanText(context?.selected_edge_to_title, 120),
     section: cleanToken(context?.section, 80),
+    video_readiness_status: cleanToken(context?.video_readiness_status, 40),
+    video_selected_shot_ready: context?.video_selected_shot_ready === true ? 1 : 0,
+    video_shot_label: cleanText(context?.video_shot_label, 80),
+    video_keyframe_label: cleanText(context?.video_keyframe_label, 120),
+    video_reference_count: Number(context?.video_reference_count || 0),
+    video_model: cleanToken(context?.video_model, 80),
+    video_resolution: cleanToken(context?.video_resolution, 20),
+    video_duration_sec: Number(context?.video_duration_sec || 0),
   };
 }
 

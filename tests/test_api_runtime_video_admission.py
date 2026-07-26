@@ -416,6 +416,7 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
     readiness = client.get(f"/projects/{project_id}/m6/video-admission")
     assert readiness.status_code == 200
     assert readiness.json()["readiness"]["status"] == "ready"
+    assert readiness.json()["readiness"]["shot_id"] == "shot-01"
     assert readiness.json()["provider_dispatch_count"] == 0
 
     preview = _command(

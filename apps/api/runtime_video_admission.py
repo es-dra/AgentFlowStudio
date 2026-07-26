@@ -180,6 +180,7 @@ def video_admission_readiness(store: RuntimeStore, project_id: str) -> dict[str,
         }
     return {
         "status": "ready",
+        "shot_id": source["shot"]["shot_id"],
         "shot_label": source["shot"]["label"],
         "first_frame_label": source["keyframe"]["label"],
         "reference_count": len(source["references"]),

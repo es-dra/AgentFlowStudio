@@ -89,6 +89,7 @@ export function createProductShell(options = {}) {
   let videoAdmissionOpen = false;
   let videoAdmissionPreview = null;
   let videoAdmissionError = "";
+  let videoAdmissionPending = false;
   let videoAdmissionMediaState = "idle";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
@@ -1025,6 +1026,9 @@ export function createProductShell(options = {}) {
     main.id = "product-main";
     main.tabIndex = -1;
     main.append(buildContextBar(), buildStoryboardContent(), buildVersionBar());
+    if (videoAdmissionOpen || videoAdmissionView().status !== "empty") {
+      main.appendChild(buildVideoAdmissionPanel());
+    }
     return main;
   }
 
@@ -2673,6 +2677,8 @@ export function createProductShell(options = {}) {
       );
       const prepare = node("button", "studio-primary-button", "预览视频准备");
       prepare.type = "button";
+      prepare.disabled = videoAdmissionPending;
+      if (videoAdmissionPending) prepare.textContent = "正在准备…";
       prepare.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "compile" }));
       empty.appendChild(prepare);
       panel.appendChild(empty);
@@ -2800,9 +2806,11 @@ export function createProductShell(options = {}) {
   }
 
   async function stageVideoAdmissionCommand(command) {
-    if (videoAdmissionPreview) return;
+    if (videoAdmissionPreview || videoAdmissionPending) return;
     videoAdmissionError = "";
     videoAdmissionOpen = true;
+    videoAdmissionPending = true;
+    render();
     try {
       const request = {
         command: videoAdmissionCommand(command),
@@ -2812,8 +2820,26 @@ export function createProductShell(options = {}) {
       videoAdmissionPreview = { ...preview, request };
     } catch (error) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备预览失败");
+    } finally {
+      videoAdmissionPending = false;
     }
     render();
+  }
+
+  async function openCurrentShotVideoPreparation() {
+    videoAdmissionOpen = true;
+    section = "storyboard";
+    closeResponsiveAgentOverlay();
+    if (videoAdmissionView().status === "empty" && !videoAdmissionPreview) {
+      await stageVideoAdmissionCommand({ type: "compile" });
+    } else {
+      render();
+    }
+    requestAnimationFrame(() => {
+      const panel = document.querySelector(".video-admission-panel");
+      panel?.scrollIntoView({ block: "start", behavior: "auto" });
+      panel?.querySelector("button")?.focus({ preventScroll: true });
+    });
   }
 
   async function confirmVideoAdmissionCommand() {
@@ -2828,7 +2854,7 @@ export function createProductShell(options = {}) {
         ...(snapshot.videoAdmission || {}),
         status: response?.result?.manifest?.status || "locked",
         manifest: response?.result?.manifest || null,
-        readiness: { status: "ready" },
+        readiness: snapshot.videoAdmission?.readiness || { status: "ready" },
       };
       const commandType = preview.command?.type;
       videoAdmissionPreview = null;
@@ -2858,7 +2884,7 @@ export function createProductShell(options = {}) {
       ...(snapshot.videoAdmission || {}),
       status: response?.result?.manifest?.status || "locked",
       manifest: response?.result?.manifest || null,
-      readiness: { status: "ready" },
+      readiness: snapshot.videoAdmission?.readiness || { status: "ready" },
     };
     return response?.result?.manifest || null;
   }
@@ -3086,9 +3112,18 @@ export function createProductShell(options = {}) {
     const totals = storyboardTotalSummary();
     heading.append(
       node("div", "", `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1><p class="storyboard-total-summary">${totals.scene_count} 场景 · ${totals.shot_count} 镜头 · 总时长约 ${Math.round(totals.duration_sec)} 秒</p>`),
-      node("span", "storyboard-duration", `${scene.shots.length} 镜头 · ${scene.duration}`),
     );
     heading.firstElementChild.innerHTML = `<span class="eyebrow">场景 ${String(selection.sceneIndex + 1).padStart(2, "0")}</span><h1>${escapeHtml(scene.name)}</h1><p class="storyboard-total-summary">${totals.scene_count} 场景 · ${totals.shot_count} 镜头 · 总时长约 ${Math.round(totals.duration_sec)} 秒</p>`;
+    const headingActions = node("div", "storyboard-heading-actions");
+    headingActions.appendChild(node("span", "storyboard-duration", `${scene.shots.length} 镜头 · ${scene.duration}`));
+    if (currentShotVideoAdmissionReady() && videoAdmissionView().status === "empty") {
+      const prepareVideo = node("button", "studio-primary-button", videoAdmissionPending ? "正在准备…" : "准备镜头视频");
+      prepareVideo.type = "button";
+      prepareVideo.disabled = videoAdmissionPending;
+      prepareVideo.addEventListener("click", () => void openCurrentShotVideoPreparation());
+      headingActions.appendChild(prepareVideo);
+    }
+    heading.appendChild(headingActions);
     sectionEl.appendChild(heading);
     const grid = node("div", "storyboard-shot-grid");
     grid.classList.toggle("is-sparse", sparse);
@@ -3577,6 +3612,19 @@ export function createProductShell(options = {}) {
       });
       return;
     }
+    if (action.action === "prepare_shot_video") {
+      void openCurrentShotVideoPreparation();
+      return;
+    }
+    if ([
+      "review_video_admission",
+      "resume_video_admission",
+      "review_video_candidate",
+    ].includes(action.action)) {
+      videoAdmissionOpen = true;
+      showStoryboard();
+      return;
+    }
     if (action.action === "generate_asset_candidates") {
       void stageAssetBibleCommand({ type: "generate_candidates" });
       return;
@@ -4032,6 +4080,15 @@ export function createProductShell(options = {}) {
       assetBible: bible,
       copilot,
     });
+    const video = videoAdmissionView();
+    context.video_readiness_status = String(video.readiness?.status || "blocked");
+    context.video_selected_shot_ready = currentShotVideoAdmissionReady();
+    context.video_shot_label = String(video.readiness?.shot_label || "");
+    context.video_keyframe_label = String(video.readiness?.first_frame_label || "");
+    context.video_reference_count = Number(video.readiness?.reference_count || 0);
+    context.video_model = String(video.capability?.model || video.generation_contract?.model || "");
+    context.video_resolution = String(video.capability?.resolution || video.generation_contract?.resolution || "");
+    context.video_duration_sec = Number(video.capability?.duration_sec || video.generation_contract?.duration_sec || 0);
     if (mediaOperationsReady()) {
       const ops = mediaOperationsView();
       const selected = currentShot();
@@ -4449,6 +4506,7 @@ export function createProductShell(options = {}) {
     return fallback;
   }
   function currentCopilotState() {
+    const videoAdmission = videoAdmissionView();
     return deriveProductionCopilotState({
       studioState: snapshot.studioState || {},
       runtimeAssetBible: snapshot.runtimeAssetBible,
@@ -4456,10 +4514,22 @@ export function createProductShell(options = {}) {
       section,
       selectedAsset: section === "asset_bible" ? selectedAsset() : null,
       imageAdmission: imageAdmissionView(),
+      videoAdmission: {
+        ...videoAdmission,
+        selected_shot_ready: currentShotVideoAdmissionReady(),
+      },
       mediaOperations: mediaOperationsReady() ? mediaOperationsView() : null,
       productionGraph: productionGraphWorkspaceProjection(snapshot.sequenceWorkspace),
       planningRun: m6PreviewRun,
     });
+  }
+  function currentShotVideoAdmissionReady() {
+    const readiness = videoAdmissionView().readiness || {};
+    const shot = currentShot();
+    return readiness.status === "ready"
+      && Boolean(readiness.shot_id)
+      && readiness.shot_id === shot.graphNodeId
+      && Boolean(shot.preview);
   }
   function hasStoryFacts() { return shotModel().length > 0; }
   function projectDisplayName() {
