@@ -261,6 +261,8 @@ def _agent_chat_prompt(
             "你现在只回答问题或给建议；不要声称已经修改画布、生成媒体、保存文件或扣费。",
             "如果用户问节点、连线、下一步或费用，请结合安全上下文回答。",
             "如果上下文不足，只提出最小必要澄清，不要编造不存在的剧本、资产或上游事实。",
+            "如果视频准备状态为 ready 且当前镜头已匹配，必须承认安全上下文中已有的关键帧和参考图数量；不要声称参考图缺失。",
+            "对视频准备请求，只引导用户使用页面上的“准备镜头视频”真实入口；不要声称已创建清单、已确认或已发送。",
             "不要输出内部路径、端口、provider raw、密钥、请求头、schema 名称或调度细节。",
             f"Closed schema digest: {schema_digest}",
             f"Project id: {project_id}",
@@ -353,6 +355,14 @@ def _safe_canvas_summary(value: Any) -> dict[str, Any]:
         "selected_edge_from_title",
         "selected_edge_to_title",
         "section",
+        "video_readiness_status",
+        "video_selected_shot_ready",
+        "video_shot_label",
+        "video_keyframe_label",
+        "video_reference_count",
+        "video_model",
+        "video_resolution",
+        "video_duration_sec",
     }
     return {key: _safe_summary_value(value.get(key)) for key in allowed if key in value}
 

@@ -219,6 +219,7 @@ export function deriveProductionCopilotState({
   section = "canvas",
   selectedAsset = null,
   imageAdmission = null,
+  videoAdmission = null,
   mediaOperations = null,
   productionGraph = null,
   planningRun = null,
@@ -412,6 +413,11 @@ export function deriveProductionCopilotState({
   const admissionStatus = String(imageAdmission?.status || "empty");
   const admissionCounts = imageAdmission?.counts || {};
   const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
+  const videoReady = capabilityGates.video === true
+    && videoAdmission?.readiness?.status === "ready"
+    && videoAdmission?.selected_shot_ready === true;
+  const videoStatus = String(videoAdmission?.status || "empty");
+  const videoItemState = String(videoAdmission?.item?.state || "");
   const qualityIssues = bible.recognition_quality.issues;
   let next = {
     action: "start_idea",
@@ -514,6 +520,34 @@ export function deriveProductionCopilotState({
       action: "review_image_admission",
       label: "审阅已停止批次",
       reason: "未发送项目已停止；已完成和已拒绝记录仍保留。",
+      enabled: true,
+    };
+  } else if (contentReady && videoReady && videoItemState === "planned") {
+    next = {
+      action: "review_video_admission",
+      label: "确认镜头视频",
+      reason: "视频准备清单已保存；下一步审核最终模型、参考组、时长和费用停止线，再决定是否发送。",
+      enabled: true,
+    };
+  } else if (contentReady && videoReady && ["processing", "reconcile_required"].includes(videoItemState)) {
+    next = {
+      action: "resume_video_admission",
+      label: "检查视频进度",
+      reason: "当前视频任务可继续检查；刷新不会重复发送。",
+      enabled: true,
+    };
+  } else if (contentReady && videoReady && videoItemState === "candidate") {
+    next = {
+      action: "review_video_candidate",
+      label: "审看视频候选",
+      reason: "当前视频候选等待人工播放和审看；批准前不会写入项目。",
+      enabled: true,
+    };
+  } else if (contentReady && videoReady && videoStatus === "empty") {
+    next = {
+      action: "prepare_shot_video",
+      label: "准备镜头视频",
+      reason: "当前镜头的已批准关键帧和参考组已就绪；先审核视频准备清单，不会发送外部任务。",
       enabled: true,
     };
   } else if (contentReady && !imageEnabled) {
