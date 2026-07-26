@@ -540,6 +540,28 @@
 .image-admission-item.state-failed .image-admission-item-state,
 .image-admission-item.state-rejected .image-admission-item-state { color: #efb1b8; }
 .image-admission-item-actions { justify-content: flex-end; }
+.image-admission-next-batch {
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--product-border);
+}
+.image-admission-next-batch > p { margin: 0; color: var(--product-muted); font-size: 12px; }
+.image-admission-next-batch-options { display: grid; gap: 6px; }
+.image-admission-next-batch-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid var(--product-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--product-surface) 84%, transparent);
+  font-size: 12px;
+  cursor: pointer;
+}
+.image-admission-next-batch-option input { flex: 0 0 auto; }
+.image-admission-next-batch-cost { font-variant-numeric: tabular-nums; }
 .image-admission-failure-guidance {
   display: grid;
   gap: 4px;

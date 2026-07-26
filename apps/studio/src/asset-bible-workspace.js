@@ -525,6 +525,21 @@ export function deriveProductionCopilotState({
         : "结构已就绪，但当前环境未开放图片媒体能力。",
       enabled: false,
     };
+  } else if (
+    contentReady
+    && admissionStatus === "locked"
+    && Number(admissionCounts.approved || 0) + Number(admissionCounts.rejected || 0) > 0
+    && Number(admissionCounts.planned || 0) === 0
+    && Number(admissionCounts.reserved || 0) === 0
+    && Number(admissionCounts.processing || 0) === 0
+    && Number(admissionCounts.candidate || 0) === 0
+  ) {
+    next = {
+      action: "image_admission_ready",
+      label: "准备下一批图片",
+      reason: "当前批次已完成；可以从同一项目事实中选择尚未发送的场景、道具或镜头图片。",
+      enabled: true,
+    };
   } else if (contentReady) {
     next = { action: "image_admission_ready", label: "进入图片准入", reason: "结构与锁定版本已满足图片生产前置条件。", enabled: true };
   }
