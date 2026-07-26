@@ -754,6 +754,186 @@ def test_failed_single_smoke_creates_one_new_manifest_without_reusing_old_ledger
     assert len(persisted["items"]) == 1
 
 
+def test_legacy_failed_manifest_recovers_against_current_server_graph_without_relaxing_other_commands(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    store.ensure_project_manifest(PROJECT_ID)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.ensure(PROJECT_ID)
+    graph = graph_store.append(
+        PROJECT_ID,
+        expected_version=graph["version"],
+        idempotency_key="seed-recovery-lineage",
+        semantic_digest=canonical_digest({"node_id": "recovery-lineage-root"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "recovery-lineage-root",
+                    "category": "revision",
+                    "state": "active",
+                },
+            }
+        ],
+    )
+    old_source = source_contract(
+        graph_version=graph["version"],
+        graph_digest=graph["graph_digest"],
+    )
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    _command(client, {"type": "compile"}, old_source)
+    _command(client, {"type": "lock"}, old_source)
+    manifest = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    item_id = next(
+        item["item_id"]
+        for item in manifest["items"]
+        if item["item_type"] == "character_design"
+    )
+    _command(
+        client,
+        {
+            "type": "reserve_dispatch",
+            "item_id": item_id,
+            "idempotency_key": "legacy-lineage-reserve",
+        },
+        old_source,
+    )
+    old_manifest = _command(
+        client,
+        {
+            "type": "record_failure",
+            "item_id": item_id,
+            "idempotency_key": "legacy-lineage-failure",
+            "error_category": "blocked",
+        },
+        old_source,
+    )["result"]["manifest"]
+
+    advanced = graph_store.append(
+        PROJECT_ID,
+        expected_version=graph["version"],
+        idempotency_key="advance-after-legacy-manifest",
+        semantic_digest=canonical_digest({"state": "post-admission-projection"}),
+        events=[
+            {
+                "type": "node_metadata_updated",
+                "node_id": "recovery-lineage-root",
+                "patch": {"projection_state": "post-admission"},
+            }
+        ],
+    )
+    current_source = source_contract(
+        graph_version=advanced["version"],
+        graph_digest=advanced["graph_digest"],
+    )
+    recovery_command = {
+        "type": "create_recovery_manifest",
+        "item_id": item_id,
+        "source_manifest_id": old_manifest["manifest_id"],
+        "idempotency_key": "legacy-lineage-recovery",
+    }
+
+    ordinary_command = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "cancel_batch",
+                "idempotency_key": "ordinary-command-stays-stale",
+            },
+            "source": current_source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert ordinary_command.status_code == 422
+    assert "ProductionGraph source is stale" in ordinary_command.json()["detail"]["details"]["raw_detail"]
+
+    stale_accepted = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **recovery_command,
+                "idempotency_key": "stale-accepted-recovery",
+            },
+            "source": old_source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert stale_accepted.status_code == 422
+    assert "not the current project graph" in stale_accepted.json()["detail"]["details"]["raw_detail"]
+
+    forged_graph = deepcopy(current_source)
+    forged_graph["production_graph_digest"] = "f" * 64
+    forged = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": recovery_command,
+            "source": forged_graph,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert forged.status_code == 422
+    assert "not the current project graph" in forged.json()["detail"]["details"]["raw_detail"]
+
+    changed_bible = deepcopy(current_source)
+    changed_bible["asset_bible"]["assets"][0]["visual_identity"] = "changed identity"
+    semantic_drift = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": recovery_command,
+            "source": changed_bible,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert semantic_drift.status_code == 422
+    assert "manifest source is stale" in semantic_drift.json()["detail"]["details"]["raw_detail"]
+
+    request = {
+        "command": recovery_command,
+        "source": current_source,
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    assert client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"] == old_manifest
+    request["preview_digest"] = preview.json()["preview_digest"]
+    confirmed = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/confirm",
+        json=request,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    recovery = confirmed.json()["result"]["manifest"]
+    assert recovery["accepted_graph_snapshots"] == [
+        {
+            "version": advanced["version"],
+            "graph_digest": advanced["graph_digest"],
+            "reason": "manifest_source",
+        }
+    ]
+    assert len(recovery["items"]) == 1
+    assert recovery["items"][0]["item_id"] == item_id
+    assert recovery["provider_dispatch_count"] == 0
+    assert recovery["budget"]["dispatches_reserved"] == 0
+    assert recovery["budget"]["remaining_dispatches"] == 1
+    assert recovery["budget_contract"]["auto_retry"] == 0
+    assert graph_store.load(PROJECT_ID)["graph_digest"] == advanced["graph_digest"]
+    archive = (
+        runtime_root
+        / "projects"
+        / PROJECT_ID
+        / "image_admission"
+        / "history"
+        / f"{old_manifest['manifest_id']}.json"
+    )
+    assert json.loads(archive.read_text(encoding="utf-8")) == old_manifest
+
+
 def test_recovery_manifest_fails_closed_on_stale_source_or_nonfailed_selection(
     tmp_path,
     monkeypatch,
@@ -835,6 +1015,32 @@ def test_recovery_manifest_fails_closed_on_stale_source_or_nonfailed_selection(
     assert price_drift.status_code == 422
     assert "pricing changed" in price_drift.json()["detail"]["details"]["raw_detail"]
     assert json.loads(path.read_text(encoding="utf-8")) == manifest
+
+    monkeypatch.setenv("AFS_IMAGE_ADMISSION_UNIT_ESTIMATE_USD", "0.0377")
+    monkeypatch.setenv("AFS_IMAGE_ADMISSION_MAX_ESTIMATED_USD", "0.0377")
+    incompatible_legacy = deepcopy(manifest)
+    incompatible_item = next(
+        item
+        for item in incompatible_legacy["items"]
+        if item["item_id"] == failed_item["item_id"]
+    )
+    incompatible_item["prompt_contract"]["provider_prompt"] = "incompatible legacy prompt"
+    path.write_text(json.dumps(incompatible_legacy, ensure_ascii=False), encoding="utf-8")
+    incompatible = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                **base_command,
+                "item_id": failed_item["item_id"],
+                "idempotency_key": "incompatible-legacy-item",
+            },
+            "source": source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert incompatible.status_code == 422
+    assert "no longer matches" in incompatible.json()["detail"]["details"]["raw_detail"]
+    assert json.loads(path.read_text(encoding="utf-8")) == incompatible_legacy
 
 
 def test_generation_job_binding_survives_reload_without_another_reservation(tmp_path, monkeypatch) -> None:

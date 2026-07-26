@@ -24,6 +24,7 @@ from apps.api.runtime_production_graph import (
     ProductionGraphStore,
     canonical_digest,
     graph_has_authority,
+    graph_path,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -33,7 +34,6 @@ PROMPT_CONTRACT_VERSION = "afs.image_prompt_contract.v0.1"
 SERVICE_ID = "image_relay"
 LEGACY_SERVICE_ID = "codex_image"
 MODEL_ID = "gpt-image-2"
-RECOVERY_SMOKE_ESTIMATE_USD = "0.0377"
 TRUE_VALUES = {"1", "true", "yes", "on"}
 ITEM_TYPES = {"character_design", "scene_plate", "prop_design", "shot_keyframe"}
 ITEM_STATES = {"planned", "reserved", "processing", "candidate", "approved", "rejected", "failed", "cancelled"}
@@ -176,7 +176,13 @@ def preview_image_admission_command(
         before = load_image_admission_manifest(store, project_id)
         if not before:
             raise ValueError("image admission manifest has not been compiled")
-        _assert_source_current(before, body.get("source"))
+        _assert_source_current(
+            store,
+            project_id,
+            before,
+            body.get("source"),
+            command_type=command["type"],
+        )
         manifest = _apply_command(
             store,
             project_id,
@@ -718,9 +724,10 @@ def _create_recovery_manifest(
     if (
         int(contract.get("max_dispatches") or 0) != 1
         or int(contract.get("auto_retry", -1)) != 0
+        or int(contract.get("concurrency") or 0) != 1
+        or int(contract.get("candidate_count") or 0) != 1
         or not _recovery_budget_is_exact(contract)
-        or int(budget.get("dispatches_reserved") or 0) != 1
-        or int(budget.get("remaining_dispatches") or 0) != 0
+        or not _recovery_budget_is_consumed(contract, budget)
         or int(before.get("provider_dispatch_count") or 0) != 1
     ):
         raise ValueError("recovery requires one exhausted single-dispatch manifest")
@@ -732,6 +739,12 @@ def _create_recovery_manifest(
     ):
         raise ValueError("recovery pricing changed; review the image budget before creating a new manifest")
     fresh_item = _manifest_item(fresh, item["item_id"])
+    if canonical_digest(_recovery_item_contract(item)) != canonical_digest(
+        _recovery_item_contract(fresh_item)
+    ):
+        raise ValueError(
+            "recovery item no longer matches the current Asset Bible and shot grounding"
+        )
     fresh["version"] = int(before.get("version") or 1) + 1
     fresh["items"] = [deepcopy(fresh_item)]
     fresh["selection_summary"] = {
@@ -792,14 +805,51 @@ def _manifest_contract_payload(manifest: Mapping[str, Any]) -> dict[str, Any]:
 
 def _recovery_budget_is_exact(contract: Mapping[str, Any]) -> bool:
     try:
+        unit = Decimal(str(contract.get("unit_estimate_usd")))
+        maximum = Decimal(str(contract.get("max_estimated_usd")))
+        program_maximum = Decimal(str(contract.get("program_max_usd")))
         return (
-            _money(Decimal(str(contract.get("unit_estimate_usd"))))
-            == RECOVERY_SMOKE_ESTIMATE_USD
-            and _money(Decimal(str(contract.get("max_estimated_usd"))))
-            == RECOVERY_SMOKE_ESTIMATE_USD
+            str(contract.get("currency") or "") == "USD"
+            and unit > 0
+            and _money(unit) == _money(maximum)
+            and maximum <= program_maximum
         )
     except (InvalidOperation, TypeError, ValueError):
         return False
+
+
+def _recovery_budget_is_consumed(
+    contract: Mapping[str, Any],
+    budget: Mapping[str, Any],
+) -> bool:
+    try:
+        return (
+            int(budget.get("dispatches_reserved") or 0) == 1
+            and int(budget.get("remaining_dispatches") or 0) == 0
+            and _money(Decimal(str(budget.get("estimated_reserved_usd"))))
+            == _money(Decimal(str(contract.get("max_estimated_usd"))))
+            and _money(Decimal(str(budget.get("remaining_estimated_usd"))))
+            == "0.0000"
+        )
+    except (InvalidOperation, TypeError, ValueError):
+        return False
+
+
+def _recovery_item_contract(item: Mapping[str, Any]) -> dict[str, Any]:
+    runtime_fields = {
+        "candidate",
+        "dispatch_ordinal",
+        "error_category",
+        "promotion",
+        "provider_job_id",
+        "reservation_token",
+        "state",
+    }
+    return {
+        key: deepcopy(value)
+        for key, value in item.items()
+        if key not in runtime_fields
+    }
 
 
 def _reserve_dispatch(
@@ -1259,8 +1309,17 @@ def _source_fingerprint_payload(source: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _assert_source_current(manifest: Mapping[str, Any], source_value: Any) -> None:
-    source = _source_contract(str(manifest["project_id"]), source_value)
+def _assert_source_current(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+    source_value: Any,
+    *,
+    command_type: str,
+) -> None:
+    if str(manifest.get("project_id") or "") != project_id:
+        raise ValueError("image admission manifest project identity mismatch")
+    source = _source_contract(project_id, source_value)
     fingerprint = canonical_digest(_source_fingerprint_payload(source))
     if fingerprint != manifest.get("source_fingerprint"):
         raise ValueError("image admission manifest source is stale; compile and review a new manifest")
@@ -1273,8 +1332,29 @@ def _assert_source_current(manifest: Mapping[str, Any], source_value: Any) -> No
         for item in manifest.get("accepted_graph_snapshots", [])
         if isinstance(item, Mapping)
     }
-    if observed_graph not in accepted_graphs:
+    if command_type != "create_recovery_manifest":
+        if observed_graph in accepted_graphs:
+            return
         raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
+    if not graph_path(store, project_id).is_file():
+        if observed_graph == (0, "") and observed_graph in accepted_graphs:
+            return
+        raise ValueError("image admission recovery graph lineage is unavailable")
+    try:
+        current_graph = ProductionGraphStore(store).load(project_id)
+    except ProductionGraphError as exc:
+        raise ValueError("image admission recovery graph lineage is unavailable") from exc
+    current_snapshot = (
+        int(current_graph.get("version") or 0),
+        str(current_graph.get("graph_digest") or ""),
+    )
+    if observed_graph != current_snapshot:
+        raise ValueError("image admission recovery graph source is not the current project graph")
+    if observed_graph in accepted_graphs:
+        return
+    accepted_versions = {version for version, _digest in accepted_graphs}
+    if not accepted_versions or observed_graph[0] <= max(accepted_versions):
+        raise ValueError("image admission recovery graph lineage is stale")
 
 
 def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
