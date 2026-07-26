@@ -46,7 +46,7 @@ def test_provider_registry_builds_seedance_example_descriptor() -> None:
     assert descriptor.frame_slots == {"first_frame": "required", "last_frame": "optional"}
     assert descriptor.reference_image_slots == 4
     assert descriptor.frame_modes == ["first_frame", "first_last_frame", "reference_images"]
-    assert descriptor.supported_durations_sec == [6]
+    assert descriptor.supported_durations_sec == list(range(4, 16))
     assert descriptor.supported_resolutions == ["480p", "720p"]
     assert store.services["seedance_i2v"]["provider"] == "volc_seedance"
 
