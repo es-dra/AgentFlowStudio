@@ -951,6 +951,8 @@ def _provider_failure_block(
         block_id = "image_reference_slots_exceeded"
     elif "does not accept reference images" in lowered:
         block_id = "image_relay_reference_unsupported"
+    elif "image url host is not allowed" in lowered:
+        block_id = "image_artifact_host_not_allowed"
     elif "provider service not found" in lowered:
         block_id = "image_provider_service_not_found"
     elif "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
@@ -1005,7 +1007,7 @@ def _provider_stage_for_error(value: str) -> str:
     lowered = value.lower()
     if "reference_image_slots exceeded" in lowered or "does not accept reference images" in lowered:
         return "request_validation"
-    if "image url download" in lowered or "artifact download" in lowered:
+    if "image url download" in lowered or "image url host is not allowed" in lowered or "artifact download" in lowered:
         return "provider_image_download"
     if "timed out" in lowered or "timeout" in lowered:
         return "provider_request_read"
@@ -1025,6 +1027,8 @@ def _failure_class_for_provider_error(value: str, block_id: str = "") -> str:
         return "provider_gate_closed"
     if "reference_image_slots exceeded" in lowered or "does not accept reference images" in lowered:
         return "validation_block"
+    if "image url host is not allowed" in lowered:
+        return "artifact_host_validation"
     if "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
         return "provider_not_ready"
     if "http error" in lowered:

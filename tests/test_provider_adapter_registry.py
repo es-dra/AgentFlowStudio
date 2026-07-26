@@ -1113,6 +1113,70 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_provider_registry_accepts_exact_crazyrouter_52image_artifact_host(tmp_path, monkeypatch) -> None:
+    artifact_url = "https://r2.52image.xyz/task-artifacts/result.png"
+
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/generations":
+            return _JsonResponse({"data": [{"url": artifact_url}]})
+        if request.full_url == artifact_url:
+            return _BytesResponse(_png_bytes())
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["account_ref"] = "crazyrouter"
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "test-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    result = registry.dispatch(
+        "image",
+        "relay_image",
+        ProviderDispatchRequest(prompt="Generate a clean asset sheet", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+    )
+
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert artifact_url not in json.dumps(result, ensure_ascii=False)
+
+
+def test_provider_registry_rejects_52image_subdomain_not_on_exact_allowlist(tmp_path, monkeypatch) -> None:
+    artifact_url = "https://untrusted.r2.52image.xyz/task-artifacts/result.png"
+
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/generations":
+            return _JsonResponse({"data": [{"url": artifact_url}]})
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["account_ref"] = "crazyrouter"
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "test-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    with pytest.raises(ModelGatewayError, match="URL host is not allowed"):
+        registry.dispatch(
+            "image",
+            "relay_image",
+            ProviderDispatchRequest(prompt="Generate a clean asset sheet", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+        )
+
+
 @pytest.mark.parametrize("image_operation", ["generate", "edit"])
 def test_openai_images_extra_body_cannot_override_exact_request_model(tmp_path, image_operation: str) -> None:
     source_image = tmp_path / "source.png"
