@@ -28,6 +28,12 @@ from apps.api.runtime_video_contract import (
 )
 from apps.api.runtime_video_candidates import safe_outputs
 from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV
+from apps.api.runtime_video_admission import (
+    MODEL_ID as SEEDANCE_MODEL_ID,
+    SERVICE_ID as SEEDANCE_SERVICE_ID,
+    claim_video_admission_dispatch,
+    enforce_video_admission_request,
+)
 from apps.api.runtime_video_gate import gate_closed_block, provider_not_ready_block, video_gate
 from apps.api.runtime_video_manifest import (
     result_from_manifest,
@@ -140,6 +146,19 @@ def submit_video_generation(
         first_frame_asset_id=request.first_frame_image_asset_id,
         elapsed_ms=_elapsed_ms(started),
     )
+    approved_reference_paths: list[Path] = []
+    for reference_asset_id in request.reference_image_asset_ids:
+        try:
+            approved_reference_paths.append(image_asset_file_path(store, project_id, reference_asset_id))
+            frame_metadata.append(image_asset_metadata(store, project_id, reference_asset_id))
+        except (KeyError, ValueError) as exc:
+            raise RuntimeApiError(
+                "reference_image_asset_not_found",
+                "视频参考图片不存在或已失效。",
+                stage="reference_image_resolve",
+                user_action="请重新确认视频参考组后再生成。",
+                details={"asset_id": reference_asset_id},
+            ) from exc
     last_frame_path = None
     if request.last_frame_image_asset_id:
         try:
@@ -154,6 +173,16 @@ def submit_video_generation(
                 details={"asset_id": request.last_frame_image_asset_id},
             ) from exc
     preflight = video_generation_preflight(store, project_id, request)
+    try:
+        video_admission = enforce_video_admission_request(store, project_id, request)
+    except ValueError as exc:
+        raise RuntimeApiError(
+            "video_admission_rejected",
+            "视频生成确认已失效或与当前项目不一致。",
+            stage="video_admission",
+            user_action="请重新预览并确认视频生成。",
+            details={"reason": str(exc), "provider_calls_started": False},
+        ) from exc
     context_bundle = preflight.get("context_bundle")
     registry = None
     descriptor = None
@@ -208,6 +237,16 @@ def submit_video_generation(
         )
         return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, provider_not_ready_block(reason))
     provider_model = _provider_model(registry, request.provider_service_id)
+    if request.provider_service_id == SEEDANCE_SERVICE_ID and provider_model != SEEDANCE_MODEL_ID:
+        return _blocked_result(
+            project_id,
+            output_dir,
+            context_bundle,
+            model_call_context,
+            artifacts,
+            model_request_plan,
+            provider_not_ready_block("exact non-fast Seedance model is not configured"),
+        )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_VIDEO_ENV) or REMOTE_VIDEO_ENV)
     gate = video_gate(required_gate)
     if gate["status"] == "blocked":
@@ -273,13 +312,26 @@ def submit_video_generation(
                 "requires": "quota_override_confirmed",
             },
         )
-    reference_paths = (first_frame_path, last_frame_path) if last_frame_path else (first_frame_path,)
+    reference_paths = [first_frame_path, *approved_reference_paths]
+    if last_frame_path:
+        reference_paths.append(last_frame_path)
+    if request.provider_service_id == SEEDANCE_SERVICE_ID:
+        try:
+            claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+        except ValueError as exc:
+            raise RuntimeApiError(
+                "video_admission_dispatch_conflict",
+                "本次视频额度已被占用或生成请求已发送。",
+                stage="video_admission_claim",
+                user_action="请刷新查看现有任务，不要重复发送。",
+                details={"reason": str(exc), "provider_calls_started": False},
+            ) from exc
     dispatch_request = ProviderDispatchRequest(
         prompt=provider_prompt,
         output_dir=output_dir,
         aspect_ratio=request.aspect_ratio,
         candidate_count=1,
-        reference_image_paths=reference_paths,
+        reference_image_paths=tuple(reference_paths),
         subject_reference_image_path=first_frame_path,
         duration_sec=request.duration_sec,
         resolution=request.resolution,
@@ -287,6 +339,7 @@ def submit_video_generation(
         input_mode=video_input_mode(request),
         input_source=video_input_source_contract(request),
         duration_contract=video_duration_contract(request.duration_sec),
+        model_name_override=SEEDANCE_MODEL_ID if request.provider_service_id == SEEDANCE_SERVICE_ID else None,
     )
     runtime_file_event(
         "video",
@@ -538,7 +591,27 @@ def _model_call_context(project_id: str, request: VideoGenerationRequest, contex
             "resolution": request.resolution,
             "aspect_ratio": request.aspect_ratio,
             "input_mode": video_input_mode(request),
-            "reference_image_slots": 1 + int(bool(request.last_frame_image_asset_id)),
+            "reference_image_slots": (
+                1
+                + len(request.reference_image_asset_ids)
+                + int(bool(request.last_frame_image_asset_id))
+            ),
+            "video_admission_manifest_id": request.video_admission_manifest_id,
+            "video_admission_manifest_hash": request.video_admission_manifest_hash,
+            "video_admission_item_id": request.video_admission_item_id,
+            "video_admission": {
+                "manifest_id": request.video_admission_manifest_id,
+                "manifest_hash": request.video_admission_manifest_hash,
+                "item_id": request.video_admission_item_id,
+                "model": SEEDANCE_MODEL_ID,
+                "model_variant": "non_fast",
+                "resolution": request.resolution,
+                "duration_sec": request.duration_sec,
+                "max_dispatches": 1,
+                "auto_retry": 0,
+                "hard_budget_usd": "2.00",
+                "hard_budget_classification": "hard_ceiling_not_estimate_or_actual_charge",
+            } if request.video_admission_manifest_id else {},
         },
     )
 
@@ -744,6 +817,7 @@ def _task_state(
         "task": provider_task_for_state(provider_task),
         "first_frame_image_asset_id": request.first_frame_image_asset_id,
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
+        "reference_image_asset_ids": list(request.reference_image_asset_ids),
         "input_source": video_input_source_contract(request),
         "input_mode": video_input_mode(request),
         "generation_path_contract": video_generation_path_contract(request),
@@ -757,6 +831,15 @@ def _task_state(
         "model_call_context_id": model_call_context["context_id"],
         "model_request_plan_ref": "model_request_plan.json",
         "video_generation_plan": generation_plan,
+        "video_admission": {
+            "manifest_id": request.video_admission_manifest_id,
+            "manifest_hash": request.video_admission_manifest_hash,
+            "item_id": request.video_admission_item_id,
+            "max_dispatches": 1,
+            "auto_retry": 0,
+            "hard_budget_usd": "2.00",
+            "hard_budget_classification": "hard_ceiling_not_estimate_or_actual_charge",
+        } if request.video_admission_manifest_id else {},
     }
 
 
@@ -778,6 +861,9 @@ def _manifest_contract_kwargs(model_call_context: dict[str, Any], model_request_
         if isinstance(provider_constraints.get("generation_path_contract"), dict)
         else {},
         "duration_contract": duration_contract if isinstance(duration_contract, dict) else {},
+        "video_admission": provider_constraints.get("video_admission")
+        if isinstance(provider_constraints.get("video_admission"), dict)
+        else {},
     }
 
 
@@ -789,6 +875,7 @@ def _manifest_contract_kwargs_from_state(state: dict[str, Any]) -> dict[str, Any
         if isinstance(state.get("generation_path_contract"), dict)
         else {},
         "duration_contract": state.get("duration_contract") if isinstance(state.get("duration_contract"), dict) else {},
+        "video_admission": state.get("video_admission") if isinstance(state.get("video_admission"), dict) else {},
     }
 
 

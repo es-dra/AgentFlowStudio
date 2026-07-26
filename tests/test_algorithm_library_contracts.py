@@ -181,7 +181,7 @@ def test_creative_intent_video_prompt_algorithm_handles_i2v_contract() -> None:
     assert "不要把上游节点标题或完整旧提示词当成角色名字" in instruction
 
 
-def test_provider_gate_video_prompt_algorithm_strips_image_edit_language() -> None:
+def test_provider_gate_video_prompt_algorithm_does_not_keyword_rewrite_user_text() -> None:
     from agentflow.algorithms.provider_gate_manifest import video_provider_prompt
 
     prompt = video_provider_prompt(
@@ -193,8 +193,8 @@ def test_provider_gate_video_prompt_algorithm_strips_image_edit_language() -> No
         context_bundle={"text_channel": {"asset_identity_segment": "保持周彤身份"}},
     )
 
-    assert "图生图编辑" not in prompt
-    assert "单帧图像编辑" not in prompt
+    assert "图生图编辑" in prompt
+    assert "单帧图像编辑" in prompt
     assert "first frame as a strict visual anchor" in prompt
     assert "保持周彤身份" in prompt
 
@@ -225,8 +225,10 @@ def test_video_generation_plan_algorithm_returns_second_level_motion_beats() -> 
     assert plan["motion_plan"]["time_beats"][0]["time"] == "0.0s-1.0s"
     assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
     assert plan["motion_plan"]["time_beats"][2]["time"] == "3.5s-5.0s"
-    assert "rooftop platform and sky relationship" in plan["editing_plan"]["continuity_locks"]
-    assert "unrequested chair" in plan["editing_plan"]["forbidden_changes"]
+    assert "scene layout" in plan["editing_plan"]["continuity_locks"]
+    assert "new props" in plan["editing_plan"]["forbidden_changes"]
+    assert "rooftop platform and sky relationship" not in plan["editing_plan"]["continuity_locks"]
+    assert "unrequested chair" not in plan["editing_plan"]["forbidden_changes"]
 
 
 def test_video_generation_plan_uses_asset_graph_context() -> None:

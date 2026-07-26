@@ -45,6 +45,8 @@ def video_input_mode(request: Any) -> str:
         return "director_setup"
     if path_id == "i2v_first_last":
         return "first_last_frame"
+    if getattr(request, "reference_image_asset_ids", None):
+        return "reference_images"
     return "first_frame"
 
 

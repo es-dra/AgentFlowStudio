@@ -18,20 +18,11 @@ from agentflow.knowledge.expert_knowledge import expert_knowledge_from_text
 from agentflow.knowledge.professional_reference import professional_reference_from_text
 
 
-IMAGE_EDIT_REPLACEMENTS = {
-    "\u672c\u6b21\u53ea\u505a\u8fd9\u4e00\u9879\u56fe\u751f\u56fe\u7f16\u8f91": "\u672c\u6b21\u751f\u6210\u8fde\u7eed\u89c6\u9891\u6bb5\u843d",
-    "\u5355\u5e27\u56fe\u50cf\u7f16\u8f91\uff0c\u4e0d\u5236\u9020\u591a\u9636\u6bb5\u52a8\u4f5c\u6216\u5267\u60c5": "\u8fde\u7eed\u89c6\u9891\u8fd0\u52a8\uff0c\u52a8\u4f5c\u81ea\u7136\u63a8\u8fdb",
-    "\u5355\u5e27\u5173\u952e\u753b\u9762\uff0c\u4e0d\u5236\u9020\u591a\u9636\u6bb5\u52a8\u4f5c": "\u8fde\u7eed\u89c6\u9891\u8fd0\u52a8\uff0c\u52a8\u4f5c\u81ea\u7136\u63a8\u8fdb",
-    "\u4eba\u7269\u4fdd\u6301\u53c2\u8003\u56fe\u539f\u6709\u9759\u6001\u59ff\u6001\u548c\u8eab\u4f53\u671d\u5411": "\u4eba\u7269\u4ece\u9996\u5e27\u59ff\u6001\u81ea\u7136\u5f00\u59cb\u8fd0\u52a8\uff0c\u4fdd\u6301\u8eab\u4f53\u6bd4\u4f8b\u548c\u8eab\u4efd\u4e00\u81f4",
-    "\u53ea\u5448\u73b0": "\u4ee5\u8fde\u7eed\u8fd0\u52a8\u5448\u73b0",
-}
+IMAGE_EDIT_REPLACEMENTS: dict[str, str] = {}
 
 
 def strip_image_edit_language(value: str) -> str:
-    text = str(value or "")
-    for before, after in IMAGE_EDIT_REPLACEMENTS.items():
-        text = text.replace(before, after)
-    return re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", str(value or "")).strip()
 
 
 def video_provider_prompt(
@@ -167,8 +158,6 @@ def video_motion_plan(
     ]
     if last_frame_image_asset_id:
         beats[-1]["intent"] = "arrive at the last-frame visual anchor with smooth interpolation"
-    if _has_stars(source_text):
-        beats[1]["intent"] = f"{beats[1]['intent']}; add tiny star shimmer and restrained breathing motion"
     return {
         "duration_sec": final,
         "motion_style": "image_to_video_continuity",
@@ -240,7 +229,7 @@ def video_editing_plan(
         "clip_role": "single_continuity_clip",
         "transition_in": "start_from_first_frame",
         "transition_out": "match_last_frame_anchor" if last_frame_image_asset_id else "hold_readable_end_state",
-        "pacing": _domain_decision(domains, "editing_pacing") or ("slow_observational" if _has_stars(source_text) else "medium_continuous"),
+        "pacing": _domain_decision(domains, "editing_pacing") or "medium_continuous",
         "continuity_locks": _continuity_locks(source_text, asset_graph_context),
         "forbidden_changes": _forbidden_video_changes(source_text, asset_graph_context),
     }
@@ -378,8 +367,6 @@ def _timeline_character_state(phase: str, source_text: str) -> str:
         return "exact first-frame identity, silhouette, pose, material, and scene relationship"
     if phase == "settle":
         return "same identity and materials, readable final pose with no new character facts"
-    if _has_robot(source_text):
-        return "robot keeps mechanical proportions and approved shell while making only joint-consistent micro movement"
     return "subject keeps identity, wardrobe/material, proportions, and emotional direction"
 
 
@@ -390,8 +377,6 @@ def _timeline_action(phase: str, action: str, source_text: str, last_frame_image
         return "arrive at the last-frame anchor with smooth interpolation" if last_frame_image_asset_id else "settle into a stable end pose without adding plot"
     if phase == "pre_settle":
         return "reduce motion amplitude and prepare the final readable hold"
-    if _has_stars(source_text):
-        return f"{action}; restrained gaze shift, tiny star shimmer, and subtle breathing camera only"
     return action
 
 
@@ -405,10 +390,6 @@ def _timeline_edit_intent(phase: str) -> str:
 
 
 def _composition_guard(source_text: str) -> str:
-    if _has_rooftop(source_text) and _has_stars(source_text):
-        return "keep subject, rooftop boundary, and star field in the same readable spatial relationship"
-    if _has_robot(source_text):
-        return "keep robot scale, body proportions, and main scene anchors stable"
     return "keep subject scale, screen direction, and scene anchors stable"
 
 
@@ -421,20 +402,11 @@ def _duration_float(value: int | float | str) -> float:
 
 
 def _camera_policy(source_text: str) -> str:
-    source = source_text.lower()
-    if "push" in source or "\u63a8\u8fdb" in source_text:
-        return "slow push-in, preserve subject scale and composition"
-    if "follow" in source or "\u8ddf" in source_text:
-        return "light follow motion, no abrupt reframing"
-    return "locked-off or subtle breathing camera"
+    return "follow the supplied camera direction without inventing a different move"
 
 
 def _continuity_locks(source_text: str, asset_graph_context: dict[str, Any] | None = None) -> list[str]:
     locks = ["identity", "wardrobe/material", "scene layout", "lighting direction", "camera composition"]
-    if _has_robot(source_text):
-        locks.append("robot shell and mechanical proportions")
-    if _has_rooftop(source_text):
-        locks.append("rooftop platform and sky relationship")
     for asset in _graph_locked_assets(asset_graph_context):
         locks.extend(_strings(asset.get("continuity_locks"), limit=8))
     return _dedupe(locks)
@@ -442,8 +414,6 @@ def _continuity_locks(source_text: str, asset_graph_context: dict[str, Any] | No
 
 def _forbidden_video_changes(source_text: str, asset_graph_context: dict[str, Any] | None = None) -> list[str]:
     changes = ["new characters", "new props", "text", "watermark", "UI", "borders", "identity drift", "abrupt scene transition"]
-    if _has_rooftop(source_text):
-        changes.extend(["unrequested eaves", "unrequested chair", "unrequested stool"])
     for asset in _graph_locked_assets(asset_graph_context):
         changes.extend(_strings(asset.get("negative_locks"), limit=8))
     changes.extend(_feedback_forbidden_changes(asset_graph_context))
@@ -492,18 +462,6 @@ def _dedupe(values: list[str]) -> list[str]:
         if text and text not in result:
             result.append(text)
     return result
-
-
-def _has_robot(source_text: str) -> bool:
-    return "robot" in source_text.lower() or "\u673a\u5668\u4eba" in source_text
-
-
-def _has_rooftop(source_text: str) -> bool:
-    return "rooftop" in source_text.lower() or "\u5c4b\u9876" in source_text or "\u5929\u53f0" in source_text
-
-
-def _has_stars(source_text: str) -> bool:
-    return "star" in source_text.lower() or "\u661f" in source_text
 
 
 __all__ = (

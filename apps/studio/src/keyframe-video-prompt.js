@@ -1,21 +1,27 @@
-export const DEFAULT_KEYFRAME_VIDEO_MOTION = "轻微推进，保留对峙张力和呼吸感镜头。";
+export const DEFAULT_KEYFRAME_VIDEO_MOTION = "延续已确认镜头动作与机位，不新增剧情事实。";
 
 export function buildKeyframeVideoPrompt(source, videoAssetPlan, options = {}) {
   const duration = String(options.duration || source?.params?.spec?.duration || "5s").trim();
   const motion = String(options.motion || DEFAULT_KEYFRAME_VIDEO_MOTION).trim();
   const assetLines = videoAssetLines(videoAssetPlan);
   const sourceSummary = videoSafeSourceSummary(source);
+  const shot = source?.params?.structuredShot || {};
+  const action = String(shot.action || shot.description || source?.prompt || "").trim();
+  const composition = String(shot.composition || "").trim();
+  const camera = String(shot.camera_angle || "").trim();
+  const emotion = String(shot.emotion || "").trim();
+  const continuity = safeArray(shot.continuity_cues).map((item) => String(item || "").trim()).filter(Boolean);
   return [
     `${duration} 图生视频时间轴：以上游关键帧作为 0.0s 首帧视觉锚点。`,
     "首帧锁定：0.0s 必须贴合上游关键帧的角色身份、服装、道具几何、场景布局、镜头构图、光影和色彩关系。",
     "资产连续性锁定：",
     ...assetLines,
-    "时间轴动作设计：",
-    "0.0s：完全承接首帧姿态和构图，不跳切，不改脸，不换装，不改场景。",
-    "0.0-1.0s：保留对峙关系，只加入呼吸、衣料、发丝、尘土或环境光的轻微运动。",
-    "1.0-2.5s：主体沿首帧动作方向做小幅蓄势或重心转移，道具保持形状、尺度和握持关系。",
-    "2.5-4.0s：动作继续推进但不改变镜头主体关系；冲突张力增强，构图仍稳定。",
-    "4.0-5.0s：动作自然收束到可作为下一镜头衔接的姿态，保留首帧身份和空间关系。",
+    action ? `镜头动作：${action}` : "",
+    composition ? `构图：${composition}` : "",
+    camera ? `机位：${camera}` : "",
+    emotion ? `情绪：${emotion}` : "",
+    continuity.length ? `连续性：${continuity.join("；")}` : "",
+    "时间轴：从已批准首帧开始，只推进已明确的镜头动作，结尾保持可读且不增加新事件。",
     `镜头运动：${motion} 保持中低幅度镜头变化，避免大幅推拉、旋转、换景或突然剪辑。`,
     "负向约束：不新增角色、不新增额外道具、不出现文字、水印、UI、边框；不改变人物身份、脸型、发型轮廓、服装、道具结构或场景位置关系。",
     sourceSummary ? `上游关键帧摘要（仅作为首帧和连续性依据）：${sourceSummary}` : "",

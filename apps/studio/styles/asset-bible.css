@@ -607,6 +607,13 @@
 }
 .image-admission-fixture-note { display: block; margin-top: 6px; color: var(--product-muted); }
 .image-admission-candidate-media { display: grid; justify-items: start; gap: 7px; margin-top: 8px; }
+.video-admission-panel .image-admission-candidate-media video {
+  display: block;
+  width: min(100%, 720px);
+  max-height: 480px;
+  background: #050708;
+  object-fit: contain;
+}
 .image-admission-thumbnail-button {
   width: min(220px, 100%);
   aspect-ratio: 16 / 10;

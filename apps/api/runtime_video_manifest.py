@@ -158,6 +158,7 @@ def safe_manifest(
     input_mode: str | None = None,
     generation_path_contract: dict[str, Any] | None = None,
     duration_contract: dict[str, Any] | None = None,
+    video_admission: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     safe_blocks = annotate_blocks(blocks)
     manifest = {
@@ -201,6 +202,8 @@ def safe_manifest(
         manifest["generation_path_contract"] = generation_path_contract
     if duration_contract:
         manifest["duration_contract"] = duration_contract
+    if video_admission:
+        manifest["video_admission"] = video_admission
     if context_bundle:
         manifest["context_bundle_mode"] = context_bundle.get("mode")
         manifest["context_included_asset_count"] = len(context_bundle.get("included_assets") or [])

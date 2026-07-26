@@ -32,6 +32,9 @@ def test_provider_registry_builds_seedance_example_descriptor() -> None:
     assert descriptor.modality == "video"
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_VIDEO"
     assert descriptor.frame_slots == {"first_frame": "required", "last_frame": "optional"}
+    assert descriptor.reference_image_slots == 4
+    assert descriptor.frame_modes == ["first_frame", "first_last_frame", "reference_images"]
+    assert descriptor.supported_durations_sec == [6]
     assert descriptor.supported_resolutions == ["480p", "720p"]
     assert store.services["seedance_i2v"]["provider"] == "volc_seedance"
 
@@ -175,6 +178,108 @@ def test_seedance_video_rejects_extra_body_model_override_before_network(tmp_pat
             ),
         )
     assert network_calls == 0
+
+
+def test_seedance_video_rejects_non_native_create_endpoint_before_network(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+    config_path = _seedance_provider_config(tmp_path)
+    config = json.loads((tmp_path / "providers.local.json").read_text(encoding="utf-8"))
+    config["services"]["seedance_i2v"]["endpoint"] = "/v1/videos"
+    (tmp_path / "providers.local.json").write_text(json.dumps(config), encoding="utf-8")
+    network_calls = 0
+
+    def forbidden_urlopen(*args, **kwargs):
+        nonlocal network_calls
+        network_calls += 1
+        raise AssertionError("non-native endpoint must fail before network")
+
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen",
+        forbidden_urlopen,
+    )
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(config_path))
+
+    with pytest.raises(ModelGatewayError, match="native task endpoint"):
+        registry.dispatch(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+    assert network_calls == 0
+
+
+def test_seedance_readiness_payload_uses_six_seconds_and_reference_group(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    images = []
+    for index in range(4):
+        path = tmp_path / f"reference-{index}.png"
+        path.write_bytes(PNG_BYTES)
+        images.append(path)
+    config_path = _seedance_provider_config(tmp_path)
+    config = json.loads((tmp_path / "providers.local.json").read_text(encoding="utf-8"))
+    service = config["services"]["seedance_i2v"]
+    service["reference_roles"] = [
+        "first_frame",
+        "reference_image",
+        "reference_image",
+        "reference_image",
+    ]
+    descriptor = service["descriptor"]
+    descriptor["reference_image_slots"] = 4
+    descriptor["frame_modes"] = ["first_frame", "first_last_frame", "reference_images"]
+    descriptor["supported_durations_sec"] = [6]
+    (tmp_path / "providers.local.json").write_text(json.dumps(config), encoding="utf-8")
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return _JsonResponse({"id": "seedance-readiness-task", "status": "queued"})
+
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(config_path))
+    result = registry.submit(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="Preserve the approved canonical shot and references.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=tuple(images),
+            subject_reference_image_path=images[0],
+            duration_sec=6,
+            resolution="720p",
+            input_mode="reference_images",
+            model_name_override="doubao-seedance-2-0",
+        ),
+    )
+
+    payload = captured["payload"]
+    assert captured["url"] == "https://relay.test/volc/v1/contents/generations/tasks"
+    assert payload["model"] == "doubao-seedance-2-0"
+    assert payload["duration"] == 6
+    assert payload["resolution"] == "720p"
+    assert [item["role"] for item in payload["content"][1:]] == [
+        "first_frame",
+        "reference_image",
+        "reference_image",
+        "reference_image",
+    ]
+    assert result["task"]["status"] == "submitted"
 
 
 def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
@@ -402,7 +507,7 @@ def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> Non
     assert called["count"] == 0
 
 
-def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_path, monkeypatch) -> None:
+def test_runtime_seedance_generation_cannot_bypass_video_admission(tmp_path, monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     class CaptureRegistry:
@@ -441,15 +546,9 @@ def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_p
         json={**request, "preflight_token": preflight.json()["preflight_token"]},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["job"]["status"] == "needs_attention"
-    assert payload["candidate_previews"] == []
-    assert payload["runtime_recovery"]["status"] == "needs_attention"
-    assert payload["runtime_recovery"]["retry"]["default_scope"] == "failed_items_only"
-    assert captured["capability"] == "video"
-    assert captured["service_id"] == "seedance_i2v"
-    assert len(captured["reference_image_paths"]) == 2
+    assert response.status_code == 422
+    assert response.json()["detail"]["error"] == "video_admission_rejected"
+    assert captured == {}
 
 
 def _upload_image(client: TestClient, project_id: str, role: str) -> str:

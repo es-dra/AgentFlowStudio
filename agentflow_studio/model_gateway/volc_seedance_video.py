@@ -70,6 +70,10 @@ class VolcSeedanceVideoAdapter:
                 f"Seedance video service must use exact non-fast model: {EXACT_MODEL_ID}"
             )
         endpoint = str(service.get("endpoint") or DEFAULT_CREATE_ENDPOINT)
+        if endpoint != DEFAULT_CREATE_ENDPOINT:
+            raise ModelConfigError(
+                f"Seedance video service must use native task endpoint: {DEFAULT_CREATE_ENDPOINT}"
+            )
         return {
             "base_url": _base_url(account, service),
             "endpoint": endpoint,

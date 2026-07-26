@@ -390,7 +390,7 @@ def test_video_generation_does_not_create_fake_placeholder_for_non_fixture_provi
     assert not (tmp_path / "runtime" / "runs" / project_id / job_id / "video_candidates" / "candidate_001.mp4").exists()
 
 
-def test_video_provider_prompt_removes_image_edit_language() -> None:
+def test_video_provider_prompt_does_not_silently_rewrite_user_language() -> None:
     request = runtime_video_routes.VideoGenerationRequest(
         prompt_text="基于当前关键帧生成视频",
         optimized_prompt=(
@@ -418,16 +418,16 @@ def test_video_provider_prompt_removes_image_edit_language() -> None:
         },
     )
 
-    assert "图生图编辑" not in prompt
-    assert "单帧图像编辑" not in prompt
-    assert "静态姿态" not in prompt
+    assert "图生图编辑" in prompt
+    assert "单帧图像编辑" in prompt
+    assert "静态姿态" in prompt
     assert "旧关键帧提示词不应被直接拼入" not in prompt
     assert "first frame as a strict visual anchor" in prompt
     assert "角色在沙漠中行走" in prompt
     assert "周彤" in prompt
 
 
-def test_video_provider_prompt_uses_positive_abstract_contract_for_safe_ui_motion() -> None:
+def test_video_provider_prompt_does_not_use_sample_specific_abstract_branches() -> None:
     request = runtime_video_routes.VideoGenerationRequest(
         prompt_text=(
             "A safe abstract geometric storyboard with canvas nodes and timeline blocks. "
@@ -446,14 +446,11 @@ def test_video_provider_prompt_uses_positive_abstract_contract_for_safe_ui_motio
     assert "geometric storyboard" in lowered
     assert "canvas nodes" in lowered
     assert "timeline blocks" in lowered
-    assert "preserve the first-frame layout" in lowered
-    assert "first frame as a strict visual anchor" not in prompt
-    assert "Professional video reference:" not in prompt
-    assert "Director scenario video guidance:" not in prompt
-    assert "Second-level director timeline:" not in prompt
-    assert "forbidden_changes" not in prompt
-    for unsafe_term in ("people", "face", "body", "clothing", "hairstyle", "text", "watermark", "logo", "ui"):
-        assert unsafe_term not in lowered
+    assert "slow camera drift" in lowered
+    assert "first frame as a strict visual anchor" in lowered
+    assert "unrequested eaves" not in lowered
+    assert "robot head shell" not in lowered
+    assert "rural rooftop" not in lowered
 
 
 def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tmp_path, monkeypatch) -> None:
@@ -771,7 +768,8 @@ def test_video_generation_response_exposes_structured_generation_plan_when_gate_
     assert payload["job"]["status"] == "blocked"
     plan = payload["video_generation_plan"]
     assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
-    assert "unrequested eaves" in plan["editing_plan"]["forbidden_changes"]
+    assert "unrequested eaves" not in plan["editing_plan"]["forbidden_changes"]
+    assert "new characters" in plan["editing_plan"]["forbidden_changes"]
 
     request_plan = client.get(f"/artifacts/{payload['artifacts']['model_request_plan']['artifact_id']}").json()["payload"]
     assert request_plan["generation_plan"] == plan

@@ -269,6 +269,7 @@ class VideoGenerationRequest(BaseModel):
     provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str | None = Field(default=None, min_length=1)
     last_frame_image_asset_id: str | None = None
+    reference_image_asset_ids: list[str] = Field(default_factory=list, max_length=3)
     reference_video_artifact_id: str | None = Field(default=None, min_length=1)
     input_source: VideoInputSource | None = None
     director_setup: DirectorSetup2D | None = None
@@ -281,6 +282,10 @@ class VideoGenerationRequest(BaseModel):
     temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
     temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)
     preflight_token: str | None = None
+    video_admission_manifest_id: str | None = Field(default=None, min_length=1)
+    video_admission_manifest_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    video_admission_item_id: str | None = Field(default=None, min_length=1)
+    video_admission_reservation_token: str | None = Field(default=None, min_length=1)
     quota_override_confirmed: bool = False
     generated_at: str = Field(min_length=1)
 
