@@ -711,7 +711,11 @@ def test_video_approval_reconciles_graph_append_after_ledger_write_crash(
 
     def fail_manifest_once(path, payload):
         nonlocal failed
-        if str(path).endswith("/video_admission/manifest.json") and not failed:
+        if (
+            path.name == "manifest.json"
+            and path.parent.name == "video_admission"
+            and not failed
+        ):
             failed = True
             raise OSError("simulated manifest write failure")
         return real_write_json(path, payload)
