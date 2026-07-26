@@ -18,7 +18,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com", ".r2.dev")
+CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com", ".r2.dev", "r2.52image.xyz")
 
 
 class ApiRelayAdapter:

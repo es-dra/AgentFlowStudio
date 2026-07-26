@@ -12,12 +12,38 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.openapi_export import export_openapi_schema
-from apps.api.runtime_keyframes import DEFAULT_IMAGE_PROMPT_LIMIT, provider_keyframe_prompt
+from apps.api.runtime_keyframes import (
+    DEFAULT_IMAGE_PROMPT_LIMIT,
+    _provider_failure_block,
+    _provider_failure_diagnostics,
+    provider_keyframe_prompt,
+)
 from apps.api.runtime_service import create_runtime_app
 
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
+
+
+def test_keyframe_artifact_host_rejection_has_stable_download_diagnostics() -> None:
+    error = ModelGatewayError("API relay image URL host is not allowed: artifacts.example.test")
+    diagnostics = _provider_failure_diagnostics(
+        error,
+        "AFS_ALLOW_REMOTE_IMAGE",
+        retry_count=0,
+        provider_elapsed_ms=12.5,
+    )
+    block = _provider_failure_block(
+        str(error),
+        "AFS_ALLOW_REMOTE_IMAGE",
+        diagnostics=diagnostics,
+    )
+
+    assert block["block_id"] == "image_artifact_host_not_allowed"
+    assert block["failure_class"] == "artifact_host_validation"
+    assert block["provider_stage"] == "provider_image_download"
+    assert block["retry_count"] == 0
+    assert block["attempt_count"] == 1
 
 
 def test_prompt_optimizer_records_creative_agent_candidates_and_node_constraints(tmp_path) -> None:
