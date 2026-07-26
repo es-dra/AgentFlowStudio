@@ -34,6 +34,7 @@ import {
   assetBibleConfirmRequest,
   syncAssetBibleCommandAssistantReceipt,
 } from "./asset-bible-command-recovery.js";
+import { setRuntimeMediaSource } from "./runtime-media-source.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -2143,9 +2144,9 @@ export function createProductShell(options = {}) {
     const image = document.createElement("img");
     image.className = "image-admission-candidate-preview";
     image.alt = `${item.label || "图片项目"}候选缩略图`;
-    image.src = options.getRuntime?.().toMediaUrl(previewUrl);
     image.addEventListener("load", () => updateImageAdmissionMediaState(key, "loaded"));
     image.addEventListener("error", () => updateImageAdmissionMediaState(key, "failed"));
+    void setRuntimeMediaSource(image, previewUrl);
     open.appendChild(image);
     open.addEventListener("click", () => openImageAdmissionViewer(item, key));
     const meta = node(
@@ -2220,11 +2221,11 @@ export function createProductShell(options = {}) {
     close.addEventListener("click", closeImageAdmissionViewer);
     const image = document.createElement("img");
     image.alt = `${imageAdmissionViewer.label}完整候选图片`;
-    image.src = options.getRuntime?.().toMediaUrl(imageAdmissionViewer.previewUrl);
     image.addEventListener("error", () => {
       imageAdmissionMediaStates.set(imageAdmissionViewer.key, "failed");
       closeImageAdmissionViewer();
     });
+    void setRuntimeMediaSource(image, imageAdmissionViewer.previewUrl);
     const caption = node("div", "image-admission-viewer-caption");
     caption.append(
       node("strong", "", imageAdmissionViewer.label),

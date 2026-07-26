@@ -281,6 +281,11 @@ def test_image_candidate_review_requires_loaded_thumbnail_and_accessible_viewer(
     assert '"预览拒绝"' not in shell
     assert "approve.disabled = !media.canApprove" in shell
     assert "imageAdmissionMediaStates.set(key, state)" in shell
+    assert 'import { setRuntimeMediaSource } from "./runtime-media-source.js";' in shell
+    assert "setRuntimeMediaSource(image, previewUrl)" in shell
+    assert "setRuntimeMediaSource(image, imageAdmissionViewer.previewUrl)" in shell
+    assert "image.src = options.getRuntime?.().toMediaUrl(previewUrl)" not in shell
+    assert "image.src = options.getRuntime?.().toMediaUrl(imageAdmissionViewer.previewUrl)" not in shell
 
 
 def test_copilot_prioritizes_admission_recovery_and_candidate_review_over_media_gate() -> None:

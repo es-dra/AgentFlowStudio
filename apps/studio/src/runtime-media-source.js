@@ -2,12 +2,23 @@ import { authToken, runtimeBaseUrl, runtimeMediaUrl } from "./runtime-client.js"
 
 const mediaObjectUrls = new WeakMap();
 const mediaBlobCache = new Map();
+let mediaAuthToken = null;
+let mediaAuthGeneration = 0;
 
 export async function setRuntimeMediaSource(element, value) {
   if (!element) return "";
   const raw = String(value || "").trim();
   const url = runtimeMediaUrl(value);
-  if (element.dataset.afsMediaRaw === raw && element.dataset.afsMediaResolved === url && currentMediaUrl(element)) {
+  const authorized = shouldFetchAuthorizedMedia(value, url);
+  const token = authorized ? authToken() : "";
+  if (authorized) syncAuthorizedMediaSession(token);
+  const current = mediaObjectUrls.get(element);
+  if (
+    element.dataset.afsMediaRaw === raw
+    && element.dataset.afsMediaResolved === url
+    && currentMediaUrl(element)
+    && (!authorized || current?.authGeneration === mediaAuthGeneration)
+  ) {
     return currentMediaUrl(element);
   }
   revokeRuntimeMediaSource(element, { keepCached: true });
@@ -15,18 +26,18 @@ export async function setRuntimeMediaSource(element, value) {
     assignMediaUrl(element, "");
     return "";
   }
-  if (!shouldFetchAuthorizedMedia(value, url)) {
+  if (!authorized) {
     assignMediaUrl(element, url);
     return url;
   }
-  const token = authToken();
   if (!token) {
-    assignMediaUrl(element, url);
-    return url;
+    failAuthorizedMediaLoad(element);
+    return "";
   }
+  const authGeneration = mediaAuthGeneration;
   const cached = cachedAuthorizedMediaUrl(url);
   if (cached) {
-    assignCachedMediaUrl(element, raw, url, cached);
+    assignCachedMediaUrl(element, raw, url, cached, authGeneration);
     return cached;
   }
   const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -37,17 +48,22 @@ export async function setRuntimeMediaSource(element, value) {
     const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok) throw new Error(`media ${response.status}`);
     const objectUrl = URL.createObjectURL(await response.blob());
-    if (element.dataset.afsMediaRequest !== requestId) {
+    if (
+      element.dataset.afsMediaRequest !== requestId
+      || authToken() !== token
+      || mediaAuthGeneration !== authGeneration
+    ) {
       URL.revokeObjectURL(objectUrl);
+      if (element.dataset.afsMediaRequest === requestId) failAuthorizedMediaLoad(element);
       return "";
     }
     mediaBlobCache.set(url, objectUrl);
-    mediaObjectUrls.set(element, { url: objectUrl, cached: true });
+    mediaObjectUrls.set(element, { url: objectUrl, cached: true, authGeneration });
     assignMediaUrl(element, objectUrl);
     return objectUrl;
   } catch {
-    if (element.dataset.afsMediaRequest === requestId) assignMediaUrl(element, url);
-    return url;
+    if (element.dataset.afsMediaRequest === requestId) failAuthorizedMediaLoad(element);
+    return "";
   }
 }
 
@@ -68,15 +84,37 @@ function assignMediaUrl(element, url) {
   else element.src = url;
 }
 
-function assignCachedMediaUrl(element, raw, resolvedUrl, objectUrl) {
+function failAuthorizedMediaLoad(element) {
+  if (element.tagName === "A") {
+    if (typeof element.removeAttribute === "function") element.removeAttribute("href");
+    else element.href = "";
+  }
+  else {
+    if (typeof element.removeAttribute === "function") element.removeAttribute("src");
+    else element.src = "";
+    if (typeof element.dispatchEvent === "function") {
+      queueMicrotask(() => element.dispatchEvent(new Event("error")));
+    }
+  }
+}
+
+function assignCachedMediaUrl(element, raw, resolvedUrl, objectUrl, authGeneration) {
   element.dataset.afsMediaRaw = raw;
   element.dataset.afsMediaResolved = resolvedUrl;
-  mediaObjectUrls.set(element, { url: objectUrl, cached: true });
+  mediaObjectUrls.set(element, { url: objectUrl, cached: true, authGeneration });
   assignMediaUrl(element, objectUrl);
 }
 
 function cachedAuthorizedMediaUrl(url) {
   return mediaBlobCache.get(url) || "";
+}
+
+function syncAuthorizedMediaSession(token) {
+  if (mediaAuthToken === token) return;
+  for (const objectUrl of mediaBlobCache.values()) URL.revokeObjectURL(objectUrl);
+  mediaBlobCache.clear();
+  mediaAuthToken = token;
+  mediaAuthGeneration += 1;
 }
 
 function currentMediaUrl(element) {
