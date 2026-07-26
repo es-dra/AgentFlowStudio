@@ -633,7 +633,7 @@ def test_provider_call_plan_is_read_only_and_marks_cost_as_owner_decision_needed
     assert plan["call_counts"]["video_calls"] == 15
     assert plan["call_counts"]["max_attempted_calls_with_retries"] == 135
     assert plan["cost"]["status"] == "ESTIMATE_OWNER_DECISION_NEEDED"
-    assert plan["models"]["shot_video"]["supported_durations_sec"] == [5, 10]
+    assert plan["models"]["shot_video"]["supported_durations_sec"] == list(range(4, 16))
 
 
 def test_studio_projection_rejects_missing_manifest_digest() -> None:

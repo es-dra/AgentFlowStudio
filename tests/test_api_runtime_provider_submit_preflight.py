@@ -159,7 +159,7 @@ def test_video_submit_gate_open_accepts_matching_preflight_token(tmp_path, monke
 
     class FakeVideoRegistry:
         def descriptor(self, service_id: str):
-            assert service_id == "seedance_i2v"
+            assert service_id == "fake_video"
             return SimpleNamespace(
                 required_gate="AFS_ALLOW_REMOTE_VIDEO",
                 prompt_char_limit=2000,
@@ -194,7 +194,7 @@ def test_video_submit_gate_open_accepts_matching_preflight_token(tmp_path, monke
     payload = submitted.json()
     assert payload["job"]["status"] == "submitted"
     assert payload["provider_calls_started"] is True
-    assert captured == {"capability": "video", "service_id": "seedance_i2v", "duration_sec": 5}
+    assert captured == {"capability": "video", "service_id": "fake_video", "duration_sec": 5}
 
 
 def test_generation_comparison_gate_open_requires_preflight_before_provider_submit(tmp_path, monkeypatch) -> None:
@@ -311,7 +311,7 @@ def _video_request(*, first_frame_image_asset_id: str) -> dict[str, object]:
     return {
         "node_id": "video_preflight_guard",
         "prompt_text": "A slow camera push in from the first frame.",
-        "provider_service_id": "seedance_i2v",
+        "provider_service_id": "fake_video",
         "first_frame_image_asset_id": first_frame_image_asset_id,
         "duration_sec": 5,
         "resolution": "720p",

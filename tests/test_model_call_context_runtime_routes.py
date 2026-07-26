@@ -106,6 +106,7 @@ def test_runtime_video_generation_registers_model_call_context_and_request_plan(
             "node_id": "video-node-001",
             "prompt_text": "Animate the keyframe into a short establishing shot.",
             "optimized_prompt": "Animate the keyframe into a short establishing shot.",
+            "provider_service_id": "fake_video",
             "first_frame_image_asset_id": image_asset_id,
             "duration_sec": 5,
             "motion": "slow dolly in",

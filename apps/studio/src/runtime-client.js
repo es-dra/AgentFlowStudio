@@ -600,6 +600,15 @@ export function createRuntimeClient(projectId = "") {
     confirmImageAdmissionCommand(payload) {
       return requestJson(`/projects/${encoded}/m6/image-admission/commands/confirm`, { method: "POST", payload });
     },
+    loadVideoAdmission() {
+      return requestJson(`/projects/${encoded}/m6/video-admission`);
+    },
+    previewVideoAdmissionCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/video-admission/commands/preview`, { method: "POST", payload });
+    },
+    confirmVideoAdmissionCommand(payload) {
+      return requestJson(`/projects/${encoded}/m6/video-admission/commands/confirm`, { method: "POST", payload });
+    },
     createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
       return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {
         method: "POST",

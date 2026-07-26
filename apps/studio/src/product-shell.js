@@ -30,6 +30,12 @@ import {
   imageAdmissionStateLabel,
 } from "./image-admission-workspace.js";
 import {
+  videoAdmissionCommand,
+  videoAdmissionGenerationRequest,
+  videoAdmissionGenerationResult,
+  videoAdmissionProjection,
+} from "./video-admission-workspace.js";
+import {
   assetBibleConfirmRecovery,
   assetBibleConfirmRequest,
   syncAssetBibleCommandAssistantReceipt,
@@ -80,6 +86,10 @@ export function createProductShell(options = {}) {
   const imageAdmissionMediaStates = new Map();
   let imageAdmissionViewer = null;
   let imageAdmissionViewerReturnKey = "";
+  let videoAdmissionOpen = false;
+  let videoAdmissionPreview = null;
+  let videoAdmissionError = "";
+  let videoAdmissionMediaState = "idle";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -89,6 +99,7 @@ export function createProductShell(options = {}) {
     mediaOperations: null,
     runtimeAssetBible: null,
     imageAdmission: null,
+    videoAdmission: null,
     mediaGates: {},
     mediaCommandPreview: null,
     error: "",
@@ -1124,6 +1135,20 @@ export function createProductShell(options = {}) {
           render();
         });
         headerActions.appendChild(admission);
+        if (videoAdmissionView().readiness?.status === "ready") {
+          const video = node("button", "studio-secondary-button", "准备视频");
+          video.type = "button";
+          video.addEventListener("click", () => {
+            videoAdmissionOpen = true;
+            render();
+            requestAnimationFrame(() => {
+              const panel = document.querySelector(".video-admission-panel");
+              panel?.scrollIntoView({ block: "start", behavior: "auto" });
+              panel?.querySelector("button")?.focus({ preventScroll: true });
+            });
+          });
+          headerActions.appendChild(video);
+        }
       }
     }
     header.append(title, headerActions);
@@ -1133,6 +1158,9 @@ export function createProductShell(options = {}) {
     if (view.counts.total) main.appendChild(assetBibleArtDirection(view));
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
       main.appendChild(buildImageAdmissionPanel());
+    }
+    if (videoAdmissionOpen || videoAdmissionView().status !== "empty") {
+      main.appendChild(buildVideoAdmissionPanel());
     }
     if (assetCommandError && !assetCommandPreview) main.appendChild(assetBibleFailure());
     if (assetCommandPreview) main.appendChild(assetBibleCommandReview());
@@ -1164,6 +1192,13 @@ export function createProductShell(options = {}) {
         : imageAdmissionView().counts.candidate
           ? `${imageAdmissionView().counts.candidate} 张待审看`
           : "尚未生成"],
+      ["视频", videoAdmissionView().item?.state === "approved"
+        ? "1 条已确认"
+        : videoAdmissionView().item?.state === "candidate"
+          ? "1 条待审看"
+          : videoAdmissionView().readiness?.status === "ready"
+            ? "可准备"
+            : "等待关键帧"],
     ];
     for (const [label, value] of items) {
       const item = node("div", "");
@@ -2587,6 +2622,310 @@ export function createProductShell(options = {}) {
     render();
   }
 
+  function buildVideoAdmissionPanel() {
+    const view = videoAdmissionView();
+    const panel = node("section", "image-admission-panel video-admission-panel");
+    panel.setAttribute("aria-label", "镜头 01 视频准备");
+    const head = node("div", "image-admission-head");
+    const copy = node("div", "");
+    copy.append(
+      node("span", "eyebrow", "镜头 01 · 已批准关键帧驱动"),
+      node("h2", "", "准备单镜头视频"),
+      node("p", "", view.status === "empty"
+        ? "先确认镜头 01 关键帧与参考图片；确认前不会发送视频任务。"
+        : `${view.generation_contract.model || "doubao-seedance-2-0"}（非 fast） · 720p · 6 秒`),
+    );
+    const close = node("button", "studio-icon-button");
+    close.type = "button";
+    close.title = "收起视频准备";
+    close.setAttribute("aria-label", "收起视频准备");
+    close.innerHTML = icon("x", 15);
+    close.addEventListener("click", () => {
+      videoAdmissionOpen = false;
+      render();
+    });
+    head.append(copy, close);
+    panel.appendChild(head);
+    if (videoAdmissionError) {
+      const error = node("div", "image-admission-error");
+      error.setAttribute("role", "alert");
+      error.append(node("strong", "", "视频准备未改变"), node("p", "", videoAdmissionError));
+      panel.appendChild(error);
+    }
+    if (videoAdmissionPreview) {
+      panel.appendChild(buildVideoAdmissionReview());
+      return panel;
+    }
+    if (view.readiness?.status !== "ready" && view.status === "empty") {
+      const blocked = node("div", "image-admission-empty");
+      blocked.append(
+        node("strong", "", "等待镜头 01 关键帧"),
+        node("p", "", view.readiness?.next_action || "批准镜头 01 关键帧后可准备视频。"),
+      );
+      panel.appendChild(blocked);
+      return panel;
+    }
+    if (view.status === "empty") {
+      const empty = node("div", "image-admission-empty");
+      empty.append(
+        node("strong", "", "预览视频生成确认卡"),
+        node("p", "", "确认卡会列出模型、时长、清晰度、关键帧、参考组与预算上限；这一步不调用外部能力。"),
+      );
+      const prepare = node("button", "studio-primary-button", "预览视频准备");
+      prepare.type = "button";
+      prepare.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "compile" }));
+      empty.appendChild(prepare);
+      panel.appendChild(empty);
+      return panel;
+    }
+    const metrics = node("div", "image-admission-metrics");
+    for (const [label, value] of [
+      ["模型", `${view.generation_contract.model} · 非 fast`],
+      ["输出", `${view.generation_contract.resolution} · ${view.generation_contract.duration_sec} 秒`],
+      ["参考", `已批准关键帧 + ${view.source?.references?.length || 0} 张参考图`],
+      ["费用停止线", `$${view.budget_contract.hard_ceiling_usd} 项目停止线 · 非供应商限额/估算/实际账单`],
+      ["发送规则", "最多 1 次 · 自动重试 0"],
+    ]) {
+      const metric = node("div", "");
+      metric.append(node("span", "", label), node("strong", "", value));
+      metrics.appendChild(metric);
+    }
+    panel.appendChild(metrics);
+    const item = view.item || {};
+    if (item.state === "planned") {
+      if (view.readiness?.status !== "ready") {
+        const blocked = node("div", "image-admission-empty");
+        blocked.append(
+          node("strong", "", "视频准备需要更新"),
+          node("p", "", view.readiness?.next_action || "请先恢复当前关键帧、参考组与视频能力检查。"),
+        );
+        panel.appendChild(blocked);
+      } else {
+        const generate = node("button", "studio-primary-button", "预览并确认生成");
+        generate.type = "button";
+        generate.disabled = !snapshot.mediaGates?.video;
+        generate.title = generate.disabled ? "视频能力尚未启用；不会发送任务。" : "";
+        generate.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "reserve_dispatch" }));
+        panel.appendChild(generate);
+      }
+    } else if (item.state === "reserved") {
+      panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
+    } else if (["processing", "reconcile_required"].includes(item.state)) {
+      const recover = node("button", "studio-secondary-button", "检查视频进度");
+      recover.type = "button";
+      recover.addEventListener("click", () => void pollVideoAdmissionItem());
+      panel.append(
+        node("p", "", item.state === "reconcile_required"
+          ? "发送结果需要核对；系统不会盲目重发。请检查原任务进度。"
+          : "视频正在生成；刷新后仍可继续检查，不会重复发送。"),
+        recover,
+      );
+    } else if (item.state === "candidate") {
+      const media = node("div", "image-admission-candidate-media");
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", "镜头 01 视频候选");
+      if (videoAdmissionMediaState !== "loaded") {
+        video.addEventListener("loadeddata", () => {
+          videoAdmissionMediaState = "loaded";
+          render();
+        }, { once: true });
+      }
+      video.addEventListener("error", () => {
+        videoAdmissionMediaState = "failed";
+        render();
+      }, { once: true });
+      void setRuntimeMediaSource(video, item.candidate?.preview_url || "");
+      media.appendChild(video);
+      panel.appendChild(media);
+      const actions = node("div", "image-admission-actions");
+      const reject = node("button", "studio-secondary-button", "拒绝候选");
+      const approve = node("button", "studio-primary-button", "批准并写入项目");
+      reject.type = approve.type = "button";
+      reject.disabled = approve.disabled = videoAdmissionMediaState !== "loaded";
+      reject.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "reject" }));
+      approve.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "approve" }));
+      actions.append(reject, approve);
+      panel.appendChild(actions);
+    } else if (item.state === "approved") {
+      panel.appendChild(node("p", "", "视频候选已批准并保存到当前项目。"));
+    } else if (item.state === "failed") {
+      panel.appendChild(node("p", "", "视频任务未产生可审核候选；不会自动重试。"));
+    }
+    return panel;
+  }
+
+  function buildVideoAdmissionReview() {
+    const preview = videoAdmissionPreview;
+    const commandType = preview.command?.type;
+    const manifest = preview.result?.manifest || {};
+    const reviewView = videoAdmissionProjection({ manifest });
+    const review = node("section", "image-admission-review");
+    review.setAttribute("aria-live", "polite");
+    review.append(
+      node("strong", "", commandType === "reserve_dispatch"
+        ? "确认发送镜头 01 视频"
+        : commandType === "approve"
+          ? "批准视频候选并写入项目"
+          : commandType === "reject"
+            ? "拒绝视频候选"
+            : "确认视频准备"),
+      node("p", "", commandType === "reserve_dispatch"
+        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
+        : commandType === "compile"
+          ? `使用 ${manifest.source?.keyframe?.label || "已批准关键帧"} 与 ${manifest.source?.references?.length || 0} 张已批准参考图；确认只保存准备清单。`
+          : "批准才会写入当前项目；拒绝不会替换现有制作事实。"),
+    );
+    if (commandType === "compile" || commandType === "reserve_dispatch") {
+      const referenceLabels = (manifest.source?.references || [])
+        .map((item) => item?.label)
+        .filter(Boolean);
+      review.appendChild(node(
+        "p",
+        "",
+        `参考组：${referenceLabels.join("、") || "尚未完成"}；关键帧：${manifest.source?.keyframe?.label || "尚未完成"}。`,
+      ));
+    }
+    const actions = node("div", "image-admission-actions");
+    const cancel = node("button", "studio-secondary-button", "取消");
+    const confirm = node("button", "studio-primary-button", commandType === "reserve_dispatch" ? "确认并发送" : "确认");
+    cancel.type = confirm.type = "button";
+    cancel.addEventListener("click", cancelVideoAdmissionCommand);
+    confirm.addEventListener("click", () => void confirmVideoAdmissionCommand());
+    actions.append(cancel, confirm);
+    review.appendChild(actions);
+    return review;
+  }
+
+  async function stageVideoAdmissionCommand(command) {
+    if (videoAdmissionPreview) return;
+    videoAdmissionError = "";
+    videoAdmissionOpen = true;
+    try {
+      const request = {
+        command: videoAdmissionCommand(command),
+        requested_at: new Date().toISOString(),
+      };
+      const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
+      videoAdmissionPreview = { ...preview, request };
+    } catch (error) {
+      videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备预览失败");
+    }
+    render();
+  }
+
+  async function confirmVideoAdmissionCommand() {
+    const preview = videoAdmissionPreview;
+    if (!preview) return;
+    try {
+      const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
+        ...preview.request,
+        preview_digest: preview.preview_digest,
+      });
+      snapshot.videoAdmission = {
+        ...(snapshot.videoAdmission || {}),
+        status: response?.result?.manifest?.status || "locked",
+        manifest: response?.result?.manifest || null,
+        readiness: { status: "ready" },
+      };
+      const commandType = preview.command?.type;
+      videoAdmissionPreview = null;
+      videoAdmissionError = "";
+      render();
+      if (commandType === "reserve_dispatch") {
+        await dispatchVideoAdmissionItem();
+      }
+    } catch (error) {
+      videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备确认失败");
+      videoAdmissionPreview = null;
+      render();
+    }
+  }
+
+  async function commitVideoAdmissionCommand(command) {
+    const request = {
+      command: videoAdmissionCommand(command),
+      requested_at: new Date().toISOString(),
+    };
+    const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
+    const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
+      ...request,
+      preview_digest: preview.preview_digest,
+    });
+    snapshot.videoAdmission = {
+      ...(snapshot.videoAdmission || {}),
+      status: response?.result?.manifest?.status || "locked",
+      manifest: response?.result?.manifest || null,
+      readiness: { status: "ready" },
+    };
+    return response?.result?.manifest || null;
+  }
+
+  async function dispatchVideoAdmissionItem() {
+    if (!snapshot.mediaGates?.video) {
+      videoAdmissionError = "视频能力未启用；未发送任何外部请求。";
+      render();
+      return;
+    }
+    const runtime = options.getRuntime?.();
+    const request = videoAdmissionGenerationRequest(videoAdmissionView().manifest, new Date().toISOString());
+    try {
+      const preflight = await runtime.preflightVideo(request);
+      if (preflight.preflight_blocked) throw new Error("视频生成前检查未通过");
+      const response = await runtime.generateVideo({ ...request, preflight_token: preflight.preflight_token });
+      await reconcileVideoAdmissionGeneration(response);
+    } catch (error) {
+      videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频任务发送失败");
+    }
+    render();
+  }
+
+  async function pollVideoAdmissionItem() {
+    const jobId = videoAdmissionView().item?.job_id;
+    if (!jobId) return;
+    try {
+      await reconcileVideoAdmissionGeneration(await options.getRuntime?.().pollVideo(jobId));
+    } catch (error) {
+      videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频任务恢复失败");
+    }
+    render();
+  }
+
+  async function reconcileVideoAdmissionGeneration(response) {
+    const result = videoAdmissionGenerationResult(response);
+    if (result.candidate) {
+      await commitVideoAdmissionCommand({ type: "record_candidate", candidate: result.candidate });
+      videoAdmissionMediaState = "loading";
+      notice = "视频候选已生成，等待你审看；批准后才会写入项目。";
+      return;
+    }
+    if (["reconcile_required", "poll_failed"].includes(result.status)) {
+      notice = "暂时无法确认视频进度；原任务可继续恢复，系统不会自动重发。";
+      return;
+    }
+    if (["failed", "blocked", "cancelled", "needs_attention"].includes(result.status)) {
+      await commitVideoAdmissionCommand({ type: "record_failure", error_category: result.status || "generation_failed" });
+      notice = "视频任务未产生可审核候选，且不会自动重试。";
+      return;
+    }
+    if (!result.job_id) throw new Error("视频任务未返回可恢复的任务标识。");
+    if (videoAdmissionView().item?.job_id === result.job_id) {
+      notice = "视频仍在生成；刷新后可继续检查，不会重复发送。";
+      return;
+    }
+    await commitVideoAdmissionCommand({ type: "record_job", job_id: result.job_id });
+    notice = "视频任务已保存；刷新后可继续检查，不会重复发送。";
+  }
+
+  function cancelVideoAdmissionCommand() {
+    videoAdmissionPreview = null;
+    videoAdmissionError = "";
+    notice = "视频准备预览已取消；未发送任务。";
+    render();
+  }
+
   async function confirmAssetBibleCommand() {
     const preview = assetCommandPreview;
     if (!preview || assetCommandConfirmPending) return;
@@ -3073,9 +3412,9 @@ export function createProductShell(options = {}) {
     const media = node("span", `shot-media ${shot.preview ? "has-preview" : "empty"}`);
     if (shot.preview) {
       const image = document.createElement("img");
-      image.src = shot.preview;
       image.alt = `${shot.title} 镜头预览`;
       image.loading = "lazy";
+      void setRuntimeMediaSource(image, shot.preview);
       media.appendChild(image);
     } else {
       media.innerHTML = `${icon("image", 20)}<span class="shot-empty-copy"><strong>等待镜头画面</strong><small>${escapeHtml(shot.description)}</small></span>`;
@@ -3850,11 +4189,13 @@ export function createProductShell(options = {}) {
       }
       let runtimeAssetBible = null;
       let imageAdmission = null;
+      let videoAdmission = null;
       let mediaGates = {};
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
         try { runtimeAssetBible = await projectRuntime?.loadAssetBible?.(); } catch { runtimeAssetBible = null; }
         try { imageAdmission = await projectRuntime?.loadImageAdmission?.(); } catch { imageAdmission = null; }
+        try { videoAdmission = await projectRuntime?.loadVideoAdmission?.(); } catch { videoAdmission = null; }
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
       }
       snapshot = {
@@ -3865,6 +4206,7 @@ export function createProductShell(options = {}) {
         mediaOperations,
         runtimeAssetBible,
         imageAdmission,
+        videoAdmission,
         mediaGates,
         mediaCommandPreview: null,
         error: "",
@@ -4073,7 +4415,7 @@ export function createProductShell(options = {}) {
   function graphShotModel() {
     return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
-      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: "", state: shot.state, sceneId: shot.sceneNodeId }));
+      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview), state: shot.state, sceneId: shot.sceneNodeId }));
   }
 
   function graphSceneModel() {
@@ -4094,6 +4436,9 @@ export function createProductShell(options = {}) {
       snapshot.imageAdmission,
       Object.fromEntries(imageAdmissionMediaStates),
     );
+  }
+  function videoAdmissionView() {
+    return videoAdmissionProjection(snapshot.videoAdmission, videoAdmissionMediaState);
   }
   function selectedAsset() {
     const view = assetBibleView();
@@ -4201,6 +4546,7 @@ function clearedProjectSnapshot(snapshot) {
     mediaOperations: null,
     runtimeAssetBible: null,
     imageAdmission: null,
+    videoAdmission: null,
     mediaGates: {},
     mediaCommandPreview: null,
     error: "",

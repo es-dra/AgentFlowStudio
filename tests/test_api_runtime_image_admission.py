@@ -1321,6 +1321,26 @@ def test_approve_writes_exactly_once_to_existing_production_graph(tmp_path, monk
             if node.get("metadata", {}).get("item_id") == item["item_id"]
         ]
     ) == 1
+    workspace = client.get(f"/projects/{PROJECT_ID}/m5/sequence-workspace").json()
+    approved_media = workspace["sequence"]["approved_media"]
+    approved_candidate = promoted["candidate"]
+    assert approved_media == [
+        {
+            "media_node_id": promoted["promotion"]["production_graph_node_id"],
+            "media_kind": "image",
+            "preview_url": (
+                f"/projects/{PROJECT_ID}/image-assets/"
+                f"{approved_candidate['image_asset_id']}/preview"
+            ),
+            "width": 960,
+            "height": 1280,
+            "approval_graph_version": loaded_graph["version"],
+            "target_node_ids": item["target_asset_ids"],
+        }
+    ]
+    assert workspace["project_id"] == PROJECT_ID
+    assert workspace["provider_dispatch_count"] == 0
+    assert workspace["cost_usd"] == 0
     reloaded_source = source_contract(
         graph_version=loaded_graph["version"],
         graph_digest=loaded_graph["graph_digest"],

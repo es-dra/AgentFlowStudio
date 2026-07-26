@@ -358,6 +358,98 @@ def test_confirmed_production_graph_offers_storyboard_review_and_has_no_overlapp
     }
 
 
+def test_approved_keyframe_projects_into_storyboard_from_the_same_graph_after_refresh() -> None:
+    projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    script = f"""
+      import {{ productionGraphWorkspaceProjection }} from {json.dumps(projection_uri)};
+      const workspace = {{
+        status: "ready",
+        project_id: "project-refresh",
+        graph_version: 14,
+        graph_digest: "graph-v14",
+        storyboard: {{ graph_version: 14, graph_digest: "graph-v14" }},
+        sequence: {{
+          shots: [
+            {{ node_id: "shot-01", state: "active", metadata: {{ title: "镜头 01", duration_seconds: 6 }} }},
+            {{ node_id: "shot-02", state: "active", metadata: {{ title: "镜头 02", duration_seconds: 7 }} }},
+            {{ node_id: "shot-03", state: "active", metadata: {{ title: "镜头 03", duration_seconds: 5 }} }},
+          ],
+          scenes: [{{ node_id: "scene-main", state: "active", metadata: {{ name: "主场景" }} }}],
+          approved_media: [
+            {{
+              media_node_id: "approved-character",
+              media_kind: "image",
+              preview_url: "/projects/project-refresh/image-assets/character-image/preview",
+              target_node_ids: ["character-main"],
+            }},
+            {{
+              media_node_id: "approved-shot-01",
+              media_kind: "image",
+              preview_url: "/projects/project-refresh/image-assets/keyframe-01/preview",
+              target_node_ids: ["shot-01"],
+            }},
+            {{
+              media_node_id: "cross-project",
+              media_kind: "image",
+              preview_url: "/projects/other-project/image-assets/keyframe-02/preview",
+              target_node_ids: ["shot-02"],
+            }},
+            {{
+              media_node_id: "ambiguous-shot-03-a",
+              media_kind: "image",
+              preview_url: "/projects/project-refresh/image-assets/keyframe-03-a/preview",
+              target_node_ids: ["shot-03"],
+            }},
+            {{
+              media_node_id: "ambiguous-shot-03-b",
+              media_kind: "image",
+              preview_url: "/projects/project-refresh/image-assets/keyframe-03-b/preview",
+              target_node_ids: ["shot-03"],
+            }},
+          ],
+          dependencies: [
+            {{ from_id: "scene-main", to_id: "shot-01", relation_type: "contains" }},
+            {{ from_id: "scene-main", to_id: "shot-02", relation_type: "contains" }},
+            {{ from_id: "scene-main", to_id: "shot-03", relation_type: "contains" }},
+          ],
+        }},
+      }};
+      const first = productionGraphWorkspaceProjection(workspace);
+      const refreshed = productionGraphWorkspaceProjection(JSON.parse(JSON.stringify(workspace)));
+      console.log(JSON.stringify({{ first, refreshed }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    for projection in (result["first"], result["refreshed"]):
+        assert [shot["preview"] for shot in projection["shots"]] == [
+            "/projects/project-refresh/image-assets/keyframe-01/preview",
+            "",
+            "",
+        ]
+        assert projection["graphVersion"] == 14
+        assert projection["graphDigest"] == "graph-v14"
+
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    graph_shot_model = shell.split("function graphShotModel()", 1)[1].split(
+        "function graphSceneModel()",
+        1,
+    )[0]
+    shot_card = shell.split("function buildShotCard", 1)[1].split(
+        "function buildVersionBar",
+        1,
+    )[0]
+    assert "safePreview(shot.preview)" in graph_shot_model
+    assert "setRuntimeMediaSource(image, shot.preview)" in shot_card
+    assert "image.src = shot.preview" not in shot_card
+
+
 def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection() -> None:
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     projection = (STUDIO / "src" / "production-graph-workspace-projection.js").read_text(encoding="utf-8")

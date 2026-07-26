@@ -22,7 +22,7 @@ from apps.api.runtime_production_graph import (
     graph_projection,
     impacted_descendants,
 )
-from apps.api.runtime_store import RuntimeStore
+from apps.api.runtime_store import RuntimeStore, safe_id
 
 
 FILM_DOMAIN_PACK_SCHEMA_VERSION = "afs.film_domain_pack.v0.1"
@@ -179,7 +179,7 @@ def register_runtime_film_production_graph_routes(app: FastAPI, store: RuntimeSt
         if not graph["nodes"]:
             return {"status": "planning_required", "message": "请导入剧本或确认可信的制作方案。", "graph_version": graph["version"],
                     "graph_digest": graph["graph_digest"], "provider_dispatch_count": 0}
-        return _sequence_workspace_projection(graph)
+        return _sequence_workspace_projection(graph, project_id=project_id)
 
     @app.post("/projects/{project_id}/m5/impact-preview")
     def impact_preview(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
@@ -261,7 +261,11 @@ def _unique_ids(items: list[Mapping[str, Any]], key: str) -> None:
         raise GraphPlanningRequired(f"planning_required: unique {key} values are required")
 
 
-def _sequence_workspace_projection(graph: Mapping[str, Any]) -> dict[str, Any]:
+def _sequence_workspace_projection(
+    graph: Mapping[str, Any],
+    *,
+    project_id: str,
+) -> dict[str, Any]:
     nodes = graph["nodes"]
     sequences = [node for node in nodes.values() if node.get("category") == "collection"]
     scenes = [node for node in nodes.values() if node.get("category") == "location"]
@@ -278,17 +282,111 @@ def _sequence_workspace_projection(graph: Mapping[str, Any]) -> dict[str, Any]:
         if node.get("metadata", {}).get("kind") == "prop"
         and node.get("metadata", {}).get("classification") != "production_aid"
     ]
+    approved_media = _approved_media_projection(
+        nodes,
+        graph["relations"],
+        project_id=project_id,
+    )
     versions = sorted(({"version": item["version"]} for item in graph["idempotency"].values()), key=lambda item: item["version"], reverse=True)
-    return {"status": "ready", "graph_version": graph["version"], "graph_digest": graph["graph_digest"],
+    return {"status": "ready", "project_id": safe_id(project_id),
+            "graph_version": graph["version"], "graph_digest": graph["graph_digest"],
             "migration_state": "graph_backed_single_truth", "sequence": {
             "script_revisions": [node for node in nodes.values() if node.get("category") == "revision"],
             "characters": [node for node in nodes.values() if node.get("category") == "entity"],
             "sequences": sequences, "scenes": scenes, "shots": units, "props": props, "reference_sets": references, "production_aids": production_aids,
+            "approved_media": approved_media,
             "dependencies": graph["relations"], "tasks": list(graph["work"].values()), "candidates": list(graph["artifacts"].values()),
             "selections": [{"selection_key": key, **value} for key, value in graph["selections"].items()],
             "reviews": list(graph["reviews"].values()), "delivery_plan": list(graph["deliveries"].values()), "version_history": versions},
             "storyboard": {"mode": "read_only", "graph_version": graph["version"], "graph_digest": graph["graph_digest"], "shots": units},
             "evidence_details_available": True, "provider_dispatch_count": 0, "cost_usd": 0}
+
+
+def _approved_media_projection(
+    nodes: Mapping[str, Mapping[str, Any]],
+    relations: list[Mapping[str, Any]],
+    *,
+    project_id: str,
+) -> list[dict[str, Any]]:
+    targets_by_media: dict[str, list[str]] = {}
+    for relation in relations:
+        if relation.get("relation_type") != "approved_image":
+            continue
+        media_id = str(relation.get("to_id") or "")
+        target_id = str(relation.get("from_id") or "")
+        if media_id and target_id in nodes:
+            targets_by_media.setdefault(media_id, []).append(target_id)
+
+    media_records: dict[str, dict[str, Any]] = {}
+    for node_id, record in nodes.items():
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        image_asset_id = str(metadata.get("image_asset_id") or "")
+        if (
+            record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or metadata.get("kind") != "approved_image"
+            or not image_asset_id
+            or safe_id(image_asset_id) != image_asset_id
+            or node_id not in targets_by_media
+        ):
+            continue
+        media_records[node_id] = {
+            "media_node_id": node_id,
+            "media_kind": "image",
+            "preview_url": (
+                f"/projects/{safe_id(project_id)}/image-assets/"
+                f"{image_asset_id}/preview"
+            ),
+            "width": int(metadata.get("width") or 0),
+            "height": int(metadata.get("height") or 0),
+            "approval_graph_version": _positive_int(
+                metadata.get("approval_graph_version")
+            ),
+        }
+
+    media_by_target: dict[str, list[dict[str, Any]]] = {}
+    for media_id, targets in targets_by_media.items():
+        if media_id not in media_records:
+            continue
+        for target_id in sorted(set(targets)):
+            media_by_target.setdefault(target_id, []).append(media_records[media_id])
+
+    approved_media: list[dict[str, Any]] = []
+    for target_id, candidates in sorted(media_by_target.items()):
+        selected = _current_approved_media(candidates)
+        if selected is None:
+            continue
+        approved_media.append({**selected, "target_node_ids": [target_id]})
+    return approved_media
+
+
+def _current_approved_media(
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if len(candidates) == 1:
+        return candidates[0]
+    versioned = [
+        candidate
+        for candidate in candidates
+        if int(candidate.get("approval_graph_version") or 0) > 0
+    ]
+    if not versioned:
+        return None
+    highest = max(int(candidate["approval_graph_version"]) for candidate in versioned)
+    current = [
+        candidate
+        for candidate in versioned
+        if int(candidate["approval_graph_version"]) == highest
+    ]
+    return current[0] if len(current) == 1 else None
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
 
 
 def _sequence_action_events(graph: Mapping[str, Any], action: str, body: Mapping[str, Any]) -> list[dict[str, Any]]:

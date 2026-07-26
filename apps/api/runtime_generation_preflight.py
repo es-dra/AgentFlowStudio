@@ -17,6 +17,10 @@ from apps.api.runtime_video_contract import (
     video_input_mode,
     video_input_source_contract,
 )
+from apps.api.runtime_video_admission import (
+    SERVICE_ID as SEEDANCE_SERVICE_ID,
+    video_admission_capability,
+)
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -163,13 +167,43 @@ def _provider_capability_fields(kind: str, request: KeyframeGenerationRequest | 
         return {}
     path_preflight = generation_path_preflight(request)
     limits = _video_provider_capability_limits(request)
-    blocks = [*path_preflight["blocks"], *_video_unsupported_combination_blocks(limits)]
+    admission = _video_admission_preflight(request)
+    blocks = [
+        *path_preflight["blocks"],
+        *_video_unsupported_combination_blocks(limits),
+        *admission["blocks"],
+    ]
     return {
         "provider_capability_limits": limits,
         "generation_path_preflight": path_preflight,
         "preflight_blocked": bool(blocks),
         "blocked_unsupported_combinations": blocks,
+        "video_admission": admission["contract"],
     }
+
+
+def _video_admission_preflight(request: VideoGenerationRequest) -> dict[str, Any]:
+    if request.provider_service_id != SEEDANCE_SERVICE_ID:
+        return {"blocks": [], "contract": {}}
+    contract = {
+        "capability": video_admission_capability(),
+        "requires_confirmed_manifest": True,
+        "provider_calls_started": False,
+    }
+    if not request.video_admission_manifest_id:
+        return {
+            "blocks": [
+                {
+                    "error": "video_admission_required",
+                    "field": "video_admission_manifest_id",
+                    "stage": "video_admission",
+                    "provider_calls_started": False,
+                    "details": {"provider_calls_started": False},
+                }
+            ],
+            "contract": contract,
+        }
+    return {"blocks": [], "contract": contract}
 
 
 def _video_provider_capability_limits(request: VideoGenerationRequest) -> dict[str, Any]:
