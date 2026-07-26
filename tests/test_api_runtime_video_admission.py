@@ -160,7 +160,13 @@ def test_video_admission_capability_blocks_unverified_pricing_exposure(monkeypat
     assert capability["configured"] is False
 
 
-def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[str, str]]:
+def _seed_ready_project(
+    tmp_path,
+    *,
+    manifest_semantics: bool = True,
+    graph_semantics: bool = True,
+    manifest_status: str = "locked",
+) -> tuple[TestClient, RuntimeStore, str, dict[str, str]]:
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
     store = RuntimeStore(runtime_root)
@@ -208,7 +214,22 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
             "node": {
                 "node_id": "shot-01",
                 "category": "unit",
-                "metadata": {"kind": "shot", "display_name": "镜头 01"},
+                "metadata": {
+                    "kind": "shot",
+                    "display_name": "镜头 01",
+                    **(
+                        {
+                            "intent": "建立检修任务",
+                            "blocking": "巡夜人甲在操作台前校准六角校准器",
+                            "shot_size": "中景",
+                            "camera_angle": "平视",
+                            "camera_movement": "沿操作台缓慢向前推进",
+                            "narrative_purpose": "保持克制专注的检修压力",
+                        }
+                        if graph_semantics
+                        else {}
+                    ),
+                },
             },
         },
         {
@@ -271,7 +292,7 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
         "project_id": project_id,
         "manifest_id": "image-manifest-for-video",
         "manifest_hash": "a" * 64,
-        "status": "locked",
+        "status": manifest_status,
         "source": {
             "asset_bible_revision_id": "asset-bible-r9",
             "shot_candidate_id": "shots-r1",
@@ -281,12 +302,24 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
                         "shot_id": "shot-01",
                         "title": "镜头 01",
                         "number": 1,
-                        "action": "巡夜人甲用六角校准器完成一次精确校准",
-                        "composition": "中景，人物与操作台保持清晰层次",
-                        "camera_angle": "平视",
-                        "movement": "缓慢向前推进",
-                        "emotion": "克制而专注",
-                        "continuity_cues": ["服装、工具位置与北侧检修站照明保持连续"],
+                        "action": (
+                            "巡夜人甲用六角校准器完成一次精确校准"
+                            if manifest_semantics
+                            else ""
+                        ),
+                        "composition": (
+                            "中景，人物与操作台保持清晰层次"
+                            if manifest_semantics
+                            else ""
+                        ),
+                        "camera_angle": "平视" if manifest_semantics else "",
+                        "movement": "缓慢向前推进" if manifest_semantics else "",
+                        "emotion": "克制而专注" if manifest_semantics else "",
+                        "continuity_cues": (
+                            ["服装、工具位置与北侧检修站照明保持连续"]
+                            if manifest_semantics
+                            else []
+                        ),
                     }
                 ]
             },
@@ -318,6 +351,89 @@ def _seed_ready_project(tmp_path) -> tuple[TestClient, RuntimeStore, str, dict[s
     image_manifest_path.parent.mkdir(parents=True, exist_ok=True)
     write_json(image_manifest_path, image_manifest)
     return client, store, project_id, media
+
+
+def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_path) -> None:
+    client, _, project_id, _ = _seed_ready_project(
+        tmp_path,
+        manifest_semantics=False,
+    )
+
+    response = client.get(f"/projects/{project_id}/m6/video-admission")
+
+    assert response.status_code == 200
+    assert response.json()["readiness"]["status"] == "ready"
+    preview = _command(
+        client,
+        project_id,
+        {"type": "compile", "idempotency_key": "compile-normalized-shot"},
+        confirm=False,
+    )
+    prompt_contract = preview["result"]["manifest"]["source"]["prompt_contract"]
+    assert prompt_contract["shot_action"] == "巡夜人甲在操作台前校准六角校准器"
+    assert prompt_contract["composition"] == "中景"
+    assert prompt_contract["camera_movement"] == "沿操作台缓慢向前推进"
+    assert prompt_contract["emotion"] == "保持克制专注的检修压力"
+    assert prompt_contract["keyword_rewrite"] is False
+    assert prompt_contract["sample_fallback"] is False
+    assert preview["provider_dispatch_count"] == 0
+
+
+def test_video_readiness_still_fails_closed_when_creative_semantics_are_absent(tmp_path) -> None:
+    client, _, project_id, _ = _seed_ready_project(
+        tmp_path,
+        manifest_semantics=False,
+        graph_semantics=False,
+    )
+
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission")
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": {
+                "type": "compile",
+                "idempotency_key": "compile-missing-semantics",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert readiness.status_code == 200
+    assert readiness.json()["readiness"]["status"] == "blocked"
+    assert preview.status_code == 422
+    assert load_video_admission_manifest(
+        RuntimeStore(tmp_path / "runtime"),
+        project_id,
+    ) == {}
+
+
+@pytest.mark.parametrize("manifest_status", ["draft", "cancelled"])
+def test_video_readiness_requires_locked_image_manifest(
+    tmp_path,
+    manifest_status: str,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        manifest_status=manifest_status,
+    )
+
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission")
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": {
+                "type": "compile",
+                "idempotency_key": f"compile-{manifest_status}-manifest",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert readiness.status_code == 200
+    assert readiness.json()["readiness"]["status"] == "blocked"
+    assert preview.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == {}
+    assert ProductionGraphStore(store).load(project_id)["version"] == 1
 
 
 def _command(

@@ -565,6 +565,8 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     image_manifest = load_image_admission_manifest(store, project_id)
     if not image_manifest:
         raise ValueError("video readiness requires an approved shot keyframe")
+    if image_manifest.get("status") != "locked":
+        raise ValueError("video readiness requires a locked image admission manifest")
     keyframes = [
         item
         for item in image_manifest.get("items", [])
@@ -645,7 +647,10 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     if (current_snapshot["version"], current_snapshot["graph_digest"]) not in accepted:
         raise ValueError("approved keyframe lineage is stale against the current ProductionGraph")
     labels = _canonical_labels_for_shot(graph, shot_id)
-    prompt_contract = _prompt_contract(shot, labels)
+    prompt_contract = _prompt_contract(
+        _normalized_video_shot_semantics(graph, shot_id, shot),
+        labels,
+    )
     return {
         "production_graph": current_snapshot,
         "asset_bible_revision_id": str(image_manifest.get("source", {}).get("asset_bible_revision_id") or ""),
@@ -730,6 +735,65 @@ def _canonical_target_label(graph: Mapping[str, Any], target_id: str) -> str:
     if not label:
         raise ValueError("canonical reference pack target is missing its creator-facing label")
     return label
+
+
+def _normalized_video_shot_semantics(
+    graph: Mapping[str, Any],
+    shot_id: str,
+    shot_grounding: Mapping[str, Any],
+) -> dict[str, Any]:
+    graph_shot = (graph.get("nodes") or {}).get(shot_id) or {}
+    if graph_shot.get("state") != "active" or graph_shot.get("category") != "unit":
+        raise ValueError("video readiness requires the applied shot in ProductionGraph")
+    metadata = graph_shot.get("metadata") or {}
+
+    def first_text(*values: Any) -> str:
+        return next(
+            (str(value).strip() for value in values if str(value or "").strip()),
+            "",
+        )
+
+    continuity = [
+        str(item).strip()
+        for item in shot_grounding.get("continuity_cues", [])
+        if str(item).strip()
+    ]
+    if not continuity:
+        continuity = [
+            str(item).strip()
+            for item in metadata.get("continuity_cues", [])
+            if str(item).strip()
+        ]
+    return {
+        "action": first_text(
+            shot_grounding.get("action"),
+            metadata.get("action"),
+            metadata.get("blocking"),
+            metadata.get("intent"),
+        ),
+        "composition": first_text(
+            shot_grounding.get("composition"),
+            metadata.get("composition"),
+            shot_grounding.get("shot_size"),
+            metadata.get("shot_size"),
+        ),
+        "camera_angle": first_text(
+            shot_grounding.get("camera_angle"),
+            metadata.get("camera_angle"),
+        ),
+        "movement": first_text(
+            shot_grounding.get("movement"),
+            metadata.get("movement"),
+            metadata.get("camera_movement"),
+        ),
+        "emotion": first_text(
+            shot_grounding.get("emotion"),
+            metadata.get("emotion"),
+            shot_grounding.get("purpose"),
+            metadata.get("narrative_purpose"),
+        ),
+        "continuity_cues": continuity,
+    }
 
 
 def _prompt_contract(shot: Mapping[str, Any], labels: Mapping[str, list[str]]) -> dict[str, Any]:
