@@ -594,21 +594,13 @@ function appliedSubgraphSummary(subgraph) {
 }
 
 function taskPhaseList(task, action) {
-  const phases = Array.isArray(task?.completed_phases) ? task.completed_phases : [];
   const current = task?.phase || action?.status || "";
   const line = el("ol", "agent-task-phases");
   if (current === "failed" || action?.status === "unavailable") {
     line.appendChild(el("li", "current", "文本处理未完成"));
     return line;
   }
-  const ordered = [];
-  for (const phase of [...phases, current].filter(Boolean)) {
-    if (!ordered.includes(phase)) ordered.push(phase);
-  }
-  for (const phase of ordered.slice(-5)) {
-    const item = el("li", phase === current ? "current" : "", taskPhaseLabel(phase));
-    line.appendChild(item);
-  }
+  line.appendChild(el("li", "current", taskPhaseLabel(current)));
   return line;
 }
 

@@ -226,9 +226,11 @@ function parseRuntimeErrorPayload(response, body, requestMeta = null) {
     const payload = body ? JSON.parse(body) : {};
     const detail = payload?.detail && typeof payload.detail === "object" ? payload.detail : payload;
     if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      const validation = Array.isArray(detail) ? validationErrorSummary(detail) : { message: "", field: "" };
       return {
         payload,
-        message: Array.isArray(detail) ? validationErrorMessage(detail) : String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        message: validation.message || String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        field: validation.field,
         error: "",
       };
     }
@@ -256,10 +258,17 @@ function parseRuntimeErrorPayload(response, body, requestMeta = null) {
 }
 
 function validationErrorMessage(items) {
-  if (!Array.isArray(items) || !items.length) return "";
+  return validationErrorSummary(items).message;
+}
+
+function validationErrorSummary(items) {
+  if (!Array.isArray(items) || !items.length) return { message: "", field: "" };
   const first = items[0] || {};
   const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : first.field);
-  return [first.msg || "请求参数校验失败", field ? `字段：${field}` : ""].filter(Boolean).join(" ");
+  return {
+    message: cleanRuntimeErrorText(first.msg || "请求参数校验失败", 160),
+    field,
+  };
 }
 
 function validationFieldMessage(value) {
@@ -1026,6 +1035,12 @@ export function createRuntimeClient(projectId = "") {
     },
     recoverEmbeddedCreativeActionByClient(clientRequestId) {
       return requestJson(`/projects/${encoded}/embedded-creative-actions/by-client/${encodeURIComponent(clientRequestId)}`);
+    },
+    applyEmbeddedCreativeShotPlan(clientRequestId, payload) {
+      return requestJson(
+        `/projects/${encoded}/embedded-creative-actions/by-client/${encodeURIComponent(clientRequestId)}/apply-shot-plan`,
+        { method: "POST", payload },
+      );
     },
   };
 }

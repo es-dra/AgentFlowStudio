@@ -116,7 +116,8 @@ def test_m6_7_1_visual_correction_contract() -> None:
     assert "notice = \"当前节点任务已开始" not in shell
 
     assert "taskStatePhaseSummary" in panel
-    assert "ordered.includes(phase)" in panel
+    assert 'line.appendChild(el("li", "current", taskPhaseLabel(current)))' in panel
+    assert "ordered.includes(phase)" not in panel
 
     assert "embeddedTaskPerimeterSweep" in node_css
     assert "embeddedTaskPerimeterRotate" not in node_css

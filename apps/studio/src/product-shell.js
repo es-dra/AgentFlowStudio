@@ -66,6 +66,7 @@ export function createProductShell(options = {}) {
   let planningPanelPreferenceKey = "";
   let planningPanelHeight = readPlanningPanelHeight();
   let graphRefreshPending = false;
+  let productRefreshEpoch = 0;
   let agentChatWidth = readAgentChatWidth();
   let selectedAssetId = "";
   let assetCommandPreview = null;
@@ -3945,6 +3946,49 @@ export function createProductShell(options = {}) {
       requestCanvasSafeAreaUpdate();
       return;
     }
+    if (["preview_storyboard_breakdown", "retry_storyboard_breakdown"].includes(action.action)) {
+      showCanvas();
+      const target = currentReadyScriptNode();
+      if (!target) {
+        notice = "当前完整剧本暂时无法读取，请刷新后再试。";
+        render();
+        return;
+      }
+      options.getStore?.().set((state) => {
+        state.selection = { nodeIds: [target.id], edgeId: null };
+      }, { history: false });
+      setAgentChatExpanded(true);
+      render();
+      void startEmbeddedCreativeAction(
+        options.getStore?.(),
+        options.getRuntime?.(),
+        target,
+        "shot_breakdown",
+        { mode: "dynamic_shot_breakdown" },
+      );
+      return;
+    }
+    if (action.action === "review_storyboard_breakdown") {
+      showCanvas();
+      const target = currentReadyScriptNode();
+      if (target) {
+        options.getStore?.().set((state) => {
+          state.selection = { nodeIds: [target.id], edgeId: null };
+        }, { history: false });
+      }
+      setAgentChatExpanded(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      return;
+    }
+    if (action.action === "prepare_production_plan") {
+      showCanvas();
+      setPlanningPanelOpen(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      requestAnimationFrame(() => document.querySelector(".m6-plan-panel textarea, .m6-plan-panel")?.focus());
+      return;
+    }
     if (action.action === "review_current_shot") {
       showStoryboard();
       requestAnimationFrame(() => {
@@ -4156,6 +4200,21 @@ export function createProductShell(options = {}) {
       render();
       requestCanvasSafeAreaUpdate();
     });
+    window.addEventListener("afs:production-graph-updated", (event) => {
+      const workspace = event.detail?.workspace;
+      if (workspace?.project_id === currentProductProjectId()) {
+        snapshot.sequenceWorkspace = workspace;
+        applyGraphWorkspace(workspace);
+        snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+        render();
+        requestCanvasSafeAreaUpdate();
+        return;
+      }
+      void refreshGraphBoundRuntimeState().finally(() => {
+        render();
+        requestCanvasSafeAreaUpdate();
+      });
+    });
     window.addEventListener("afs:m6-preview-run-updated", (event) => {
       const run = event.detail?.run;
       if (!isM6RunCurrent(run) || (m6PreviewRun?.run_id && run.run_id !== m6PreviewRun.run_id)) return;
@@ -4344,6 +4403,22 @@ export function createProductShell(options = {}) {
   function currentScriptTruthNode(state = options.getStudioState?.() || snapshot.studioState) {
     const revisionId = String(state?.production?.script_core_truth_projection?.current_revision_id || "");
     return revisionId ? state?.nodes?.[`script_truth_revision_${revisionId}`] || null : null;
+  }
+
+  function currentReadyScriptNode(state = options.getStudioState?.() || snapshot.studioState) {
+    const projected = currentScriptTruthNode(state);
+    if (projected && String(projected.params?.scriptRevision?.source_text || projected.content || "").trim()) {
+      return projected;
+    }
+    const selectedId = state?.selection?.nodeIds?.[0] || "";
+    const selected = selectedId ? state?.nodes?.[selectedId] : null;
+    const nodes = [selected, ...Object.values(state?.nodes || {})];
+    return nodes.find((item, index) => (
+      item
+      && nodes.indexOf(item) === index
+      && item.type === "script"
+      && String(item.params?.scriptRevision?.source_text || item.content || item.prompt || "").trim()
+    )) || null;
   }
 
   async function previewCurrentIdeaExpansion(sourceText) {
@@ -4613,6 +4688,23 @@ export function createProductShell(options = {}) {
   }
 
   async function refresh(runtime, authUser = null) {
+    const refreshEpoch = ++productRefreshEpoch;
+    const requestRuntime = runtime;
+    snapshot = {
+      ...snapshot,
+      studioState: options.getStudioState?.() || snapshot.studioState,
+    };
+    const refreshIsCurrent = (projectId = requestRuntime?.projectId || "") => {
+      if (refreshEpoch !== productRefreshEpoch) return false;
+      if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return false;
+      const expected = String(projectId || "");
+      const runtimeProject = String(requestRuntime?.projectId || "");
+      if (expected && runtimeProject !== expected) return false;
+      const urlProject = explicitUrlProjectId();
+      if (urlProject.present && urlProject.value !== expected) return false;
+      const storeProject = String(options.getStudioState?.()?.meta?.projectId || "");
+      return !expected || !storeProject || storeProject === expected;
+    };
     resetImageAdmissionNextBatchState();
     if (projectIdentityStatus() === "blocked") {
       let workspace = snapshot.workspace;
@@ -4621,6 +4713,7 @@ export function createProductShell(options = {}) {
       } catch {
         workspace = null;
       }
+      if (!refreshIsCurrent()) return;
       snapshot = clearedProjectSnapshot({ ...snapshot, loading: false, authUser, workspace });
       render();
       return;
@@ -4635,21 +4728,21 @@ export function createProductShell(options = {}) {
       render();
       return;
     }
-    const requestRuntime = runtime;
     snapshot = { ...snapshot, loading: true, error: "", authUser, studioState: options.getStudioState?.() || snapshot.studioState };
     render();
     try {
       const workspace = await requestRuntime.workspaceOverview();
-      if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
+      if (!refreshIsCurrent()) return;
       const activeProjectId = requestRuntime.projectId && requestRuntime.projectId !== "studio-empty"
         ? requestRuntime.projectId
         : workspace?.projects?.[0]?.project_id || "";
+      if (!refreshIsCurrent(activeProjectId)) return;
       const activeProjectSummary = (workspace?.projects || []).find((item) => item?.project_id === activeProjectId) || null;
       let project = null;
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
         const payload = await projectRuntime?.projectOverview?.();
-        if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
+        if (!refreshIsCurrent(activeProjectId)) return;
         project = payload?.project || null;
         if (project && String(project.project_id || "") !== activeProjectId) {
           const mismatch = new Error("Runtime returned a different project identity");
@@ -4662,12 +4755,18 @@ export function createProductShell(options = {}) {
       let sequenceWorkspace = null;
       if (activeProjectId) {
         try { sequenceWorkspace = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.sequenceWorkspace?.(); } catch { sequenceWorkspace = null; }
+        if (!refreshIsCurrent(activeProjectId)) return;
+        if (sequenceWorkspace && String(sequenceWorkspace.project_id || "") !== activeProjectId) {
+          throw projectIdentityMismatch();
+        }
       }
       let mediaOperations = null;
       if (activeProjectId && shouldLoadMediaOperations(project, activeProjectSummary)) {
         try { mediaOperations = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.adaptiveCanvasOperations?.("paid-media-v2"); } catch { mediaOperations = null; }
+        if (!refreshIsCurrent(activeProjectId)) return;
       }
       if (sequenceWorkspace) {
+        if (!refreshIsCurrent(activeProjectId)) return;
         applyGraphWorkspace(sequenceWorkspace);
       }
       let runtimeAssetBible = null;
@@ -4677,10 +4776,15 @@ export function createProductShell(options = {}) {
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
         try { runtimeAssetBible = await projectRuntime?.loadAssetBible?.(); } catch { runtimeAssetBible = null; }
+        if (!refreshIsCurrent(activeProjectId)) return;
         try { imageAdmission = await projectRuntime?.loadImageAdmission?.(); } catch { imageAdmission = null; }
+        if (!refreshIsCurrent(activeProjectId)) return;
         try { videoAdmission = await projectRuntime?.loadVideoAdmission?.(); } catch { videoAdmission = null; }
+        if (!refreshIsCurrent(activeProjectId)) return;
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
+        if (!refreshIsCurrent(activeProjectId)) return;
       }
+      if (!refreshIsCurrent(activeProjectId)) return;
       snapshot = {
         loading: false,
         workspace,
@@ -4699,10 +4803,10 @@ export function createProductShell(options = {}) {
       if (activeProjectId) {
         const projectRuntime = activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId);
         await restoreLatestM6PreviewRun(projectRuntime, activeProjectId);
-        if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
+        if (!refreshIsCurrent(activeProjectId)) return;
       }
     } catch (error) {
-      if (options.isRuntimeCurrent && !options.isRuntimeCurrent(requestRuntime)) return;
+      if (!refreshIsCurrent()) return;
       snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
     }
     render();
@@ -5025,7 +5129,16 @@ export function createProductShell(options = {}) {
     return names.find(Boolean) || "未命名项目";
   }
   function projectIdentityStatus() {
-    return String(snapshot.studioState?.ui?.projectIdentity?.status || "ready");
+    const declared = String(snapshot.studioState?.ui?.projectIdentity?.status || "ready");
+    if (["blocked", "loading", "cache_read_only"].includes(declared)) return declared;
+    const expected = currentProductProjectId();
+    const identities = [
+      snapshot.project?.project_id,
+      snapshot.studioState?.meta?.projectId,
+      snapshot.sequenceWorkspace?.project_id,
+      explicitUrlProjectId().present ? explicitUrlProjectId().value : expected,
+    ].map((value) => String(value || "")).filter(Boolean);
+    return expected && identities.every((value) => value === expected) ? "ready" : "blocked";
   }
   function totalShots() { return sceneModel().reduce((sum, scene) => sum + scene.shots.length, 0); }
   function storyboardTotalSummary() {
@@ -5229,6 +5342,25 @@ function node(tag, className = "", text = "") {
   if (className) element.className = className;
   if (text !== "") element.textContent = String(text);
   return element;
+}
+
+function explicitUrlProjectId() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    return {
+      present: params.has("project"),
+      value: params.has("project") ? String(params.get("project") || "") : "",
+    };
+  } catch {
+    return { present: false, value: "" };
+  }
+}
+
+function projectIdentityMismatch() {
+  const error = new Error("Runtime returned a different project identity");
+  error.status = 409;
+  error.errorCode = "project_identity_mismatch";
+  return error;
 }
 
 function readAgentChatWidth() {

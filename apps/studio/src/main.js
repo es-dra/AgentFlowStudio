@@ -248,8 +248,7 @@ function bindProjectAccessRecovery() {
 }
 function bindProjectHistoryNavigation() {
   window.addEventListener("popstate", () => {
-    const projectId = new URLSearchParams(window.location.search || "").get("project") || "studio-empty";
-    void projectController.loadRequestedProject(projectId);
+    void projectController.loadRequestedProject(initialProjectId());
   });
 }
 function bindSessionExpiryBoundary() {

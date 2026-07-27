@@ -337,10 +337,12 @@ export function deriveProductionCopilotState({
       external_cost_usd: null,
     };
   }
+  const readyScriptNode = readyScriptNodeFromState(studioState);
   const scriptReady = Boolean(
     studioState?.production?.script_core_truth_projection?.current_revision_id
     || assetBibleSourceContext(studioState)?.script_revision_id
-    || bible.candidate_set?.script_revision_id,
+    || bible.candidate_set?.script_revision_id
+    || readyScriptNode
   );
   const scriptProjection = studioState?.production?.script_core_truth_projection || {};
   const ideaNeedsExpansion = scriptReady
@@ -414,6 +416,83 @@ export function deriveProductionCopilotState({
       provider_dispatch_count: 0,
       external_cost_usd: null,
     };
+  }
+  if (
+    scriptReady
+    && readyScriptNode
+    && !graphReady
+    && (
+      !studioState?.production?.script_core_truth_projection?.current_revision_id
+      || readyScriptNode.params?.embeddedCreativeAction?.action_type === "shot_breakdown"
+    )
+  ) {
+    const action = readyScriptNode.params?.embeddedCreativeAction || {};
+    const isBreakdown = action.action_type === "shot_breakdown";
+    const running = isBreakdown && ["running", "recovering", "applying"].includes(action.status);
+    const previewReady = isBreakdown && action.status === "preview";
+    const failed = isBreakdown && action.status === "unavailable";
+    if (running || previewReady || failed || !shotTruth.status || shotTruth.status !== "ready") {
+      return {
+        stage: previewReady
+          ? "storyboard_breakdown_review"
+          : running
+            ? "storyboard_breakdown_in_progress"
+            : failed
+              ? "storyboard_breakdown_recovery"
+              : "storyboard_breakdown_required",
+        dependencies: [
+          { key: "script", label: "当前剧本", state: "ready" },
+          { key: "storyboard", label: "场景与镜头", state: previewReady ? "review" : "pending" },
+        ],
+        blockers: [],
+        gate: {
+          llm: capabilityGates.llm === true,
+          image: false,
+          video: false,
+          admission: "text_storyboard_preview",
+          cost_state: "not_admitted",
+        },
+        next_valid_action: previewReady
+          ? {
+            action: "review_storyboard_breakdown",
+            label: "审看分镜候选",
+            reason: "场景、镜头顺序和时长已准备好；应用前制作内容不会改变。",
+            enabled: true,
+          }
+          : failed
+            ? {
+              action: "retry_storyboard_breakdown",
+              label: "重新预览分镜",
+              reason: "原剧本已保留；重新运行只使用文本能力。",
+              enabled: capabilityGates.llm === true,
+            }
+            : {
+              action: "preview_storyboard_breakdown",
+              label: running ? "查看分镜处理进度" : "拆分并审阅分镜",
+              reason: running
+                ? "正在恢复同一文本分镜预览，不会重复提交。"
+                : "使用当前完整剧本生成场景和镜头预览；确认前不修改制作内容。",
+              enabled: capabilityGates.llm === true,
+            },
+        ready_summary: previewReady
+          ? "分镜候选已准备好。"
+          : running
+            ? "完整剧本已保存，正在处理分镜文本。"
+            : failed
+              ? "分镜预览未完成，完整剧本已保留。"
+              : "完整剧本已保存。",
+        needs_input: previewReady
+          ? "审看场景、镜头顺序和时长，再决定应用或取消。"
+          : running
+            ? "等待同一文本预览完成。"
+            : failed
+              ? "恢复或重新运行同一文本分镜预览。"
+              : "拆分并审阅分镜。",
+        asset_bible: bible,
+        provider_dispatch_count: Number(action.provider_lineage?.provider_dispatch_count || 0),
+        external_cost_usd: null,
+      };
+    }
   }
   const planningPhase = String(planningRun?.phase || "");
   if (["queued", "running", "running_cancel_requested"].includes(planningPhase)) {
@@ -507,7 +586,12 @@ export function deriveProductionCopilotState({
     enabled: true,
   };
   if (scriptReady && !shotReady) {
-    next = { action: "open_storyboard", label: "拆分分镜", reason: "剧本已就绪，下一步是建立镜头计划。", enabled: true };
+    next = {
+      action: "prepare_production_plan",
+      label: "准备制作方案",
+      reason: "扩写故事已保存；下一步先预览角色、场景、道具和镜头结构，再决定是否应用。",
+      enabled: capabilityGates.llm === true,
+    };
   } else if (shotReady && !candidatesReady) {
     next = { action: "generate_asset_candidates", label: "识别资产候选", reason: "分镜已应用，可执行本地确定性资产识别，不调用外部能力。", enabled: true };
   } else if (candidatesReady && qualityIssues.length > 0) {
@@ -763,6 +847,21 @@ function creatorReadySummary({
   }
   if (admissionStatus !== "empty") return "角色、场景、道具和图片清单已准备。";
   return "角色、场景、道具和美术方向已准备。";
+}
+
+function readyScriptNodeFromState(studioState = {}) {
+  const selectedId = studioState?.selection?.nodeIds?.[0] || "";
+  const selected = selectedId ? studioState?.nodes?.[selectedId] : null;
+  const candidates = [
+    selected,
+    ...Object.values(studioState?.nodes || {}),
+  ];
+  return candidates.find((node, index) => (
+    node
+    && candidates.indexOf(node) === index
+    && node.type === "script"
+    && String(node.params?.scriptRevision?.source_text || node.content || node.prompt || "").trim()
+  )) || null;
 }
 
 export function assetTypeLabel(value) {

@@ -33,15 +33,29 @@ def embedded_creative_action(value: Any, *, text: TextSanitizer, number: NumberS
         "cancelled_at": text(value.get("cancelled_at"), "", 80),
         "applied_at": text(value.get("applied_at"), "", 80),
         "applied_revision_id": text(value.get("applied_revision_id"), "", 160),
+        "applied_graph_version": int(max(0, min(1_000_000, number(value.get("applied_graph_version"), 0)))),
+        "applied_graph_digest": text(value.get("applied_graph_digest"), "", 64),
         "latency_ms": int(max(0, min(86_400_000, number(value.get("latency_ms"), 0)))),
         "cost_usd": max(0, min(9999, number(value.get("cost_usd"), 0))),
         "creative_task": creative_task(value.get("creative_task") or value.get("creativeTask"), text=text, number=number),
         "provider_lineage": provider_lineage(value.get("provider_lineage"), text=text, number=number),
+        "safe_manifest": embedded_safe_manifest(value.get("safe_manifest"), text=text, number=number),
         "graph_mutation": graph_mutation(value.get("graph_mutation"), text=text, number=number),
         "preview": embedded_creative_preview(value.get("preview"), action_type=action_type, text=text, number=number),
         "applied_subgraph": shot_candidate_subgraph(value.get("applied_subgraph"), text=text, number=number),
     }
     return _compact(result)
+
+
+def embedded_safe_manifest(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return _compact({
+        "request_digest": text(value.get("request_digest"), "", 64),
+        "source_digest": text(value.get("source_digest"), "", 64),
+        "provider_dispatch_count": int(max(0, min(99, number(value.get("provider_dispatch_count"), 0)))),
+        "image_video_generation_enabled": bool(value.get("image_video_generation_enabled")),
+    })
 
 
 def embedded_creative_revisions(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> list[dict[str, Any]]:

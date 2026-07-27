@@ -7,6 +7,14 @@ export function applyScriptCoreTruthProjection(state, projection) {
     throw new Error("script truth project does not match the active canvas");
   }
   const revision = safeProjection.current_revision || null;
+  if (revision?.project_id && cleanToken(revision.project_id, 128) !== projectId) {
+    throw new Error("script revision project does not match the active canvas");
+  }
+  for (const asset of Array.isArray(safeProjection.assets) ? safeProjection.assets : []) {
+    if (asset?.project_id && cleanToken(asset.project_id, 128) !== projectId) {
+      throw new Error("script asset project does not match the active canvas");
+    }
+  }
   const revisionId = cleanToken(safeProjection.current_revision_id || revision?.revision_id, 140);
   const previousRevisionNode = state.nodes?.[`script_truth_revision_${revisionId}`] || null;
   removePreviousProjection(state);

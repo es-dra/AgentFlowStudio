@@ -149,6 +149,7 @@ import {
   applyEmbeddedCreativeAction,
   startEmbeddedCreativeAction,
 } from "./apps/studio/src/embedded-creative-actions.js";
+import { deriveProductionCopilotState } from "./apps/studio/src/asset-bible-workspace.js";
 
 const original = "钟楼下，修表师听见停摆怀表重新走动。";
 const revised = "暴雨将至，修表师在钟楼下听见停摆多年的怀表重新走动。";
@@ -245,6 +246,144 @@ const appliedNode = state.nodes["script_truth_revision_revision-2"];
 assert.equal(appliedNode.params.scriptRevision.source_text, revised);
 assert.equal(appliedNode.params.embeddedCreativeAction.status, "applied");
 assert.equal(state.nodes[firstNode.id], undefined);
+const next = deriveProductionCopilotState({
+  studioState: state,
+  runtimeAssetBible: null,
+  capabilityGates: { llm: true, image: false, video: false },
+});
+assert.equal(next.next_valid_action.action, "prepare_production_plan");
+assert.equal(next.next_valid_action.label, "准备制作方案");
+'''
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=STUDIO_ROOT.parents[1],
+        check=True,
+    )
+
+
+def test_complete_script_routes_to_text_only_storyboard_review_and_recovery() -> None:
+    script = r'''
+import assert from "node:assert/strict";
+import { deriveProductionCopilotState } from "./apps/studio/src/asset-bible-workspace.js";
+
+const source = "第一场\n外景，河岸，清晨。邮差把一封无人认领的信放进纸船，纸船逆流而上。\n第二场\n内景，旧邮局，夜。";
+const base = {
+  nodes: {
+    script_any: {
+      id: "script_any",
+      type: "script",
+      title: "完整剧本",
+      content: source,
+      params: {},
+    },
+  },
+  edges: {},
+  production: {},
+  selection: { nodeIds: ["script_any"], edgeId: null },
+};
+const required = deriveProductionCopilotState({
+  studioState: structuredClone(base),
+  capabilityGates: { llm: true, image: true, video: true },
+});
+assert.equal(required.stage, "storyboard_breakdown_required");
+assert.equal(required.next_valid_action.action, "preview_storyboard_breakdown");
+assert.equal(required.next_valid_action.label, "拆分并审阅分镜");
+assert.equal(required.gate.image, false);
+assert.equal(required.gate.video, false);
+assert.doesNotMatch(required.ready_summary, /从一个想法开始/);
+
+const failedState = structuredClone(base);
+failedState.nodes.script_any.params.embeddedCreativeAction = {
+  action_type: "shot_breakdown",
+  status: "unavailable",
+  provider_lineage: { provider_dispatch_count: 1 },
+};
+const failed = deriveProductionCopilotState({
+  studioState: failedState,
+  capabilityGates: { llm: true, image: true, video: true },
+});
+assert.equal(failed.stage, "storyboard_breakdown_recovery");
+assert.equal(failed.next_valid_action.label, "重新预览分镜");
+assert.equal(failed.gate.image, false);
+assert.equal(failed.gate.video, false);
+'''
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=STUDIO_ROOT.parents[1],
+        check=True,
+    )
+
+
+def test_fastapi_array_validation_error_is_creator_safe_chinese() -> None:
+    script = r'''
+import assert from "node:assert/strict";
+
+globalThis.window = {
+  location: { origin: "https://afstudio.art", search: "?project=validation-project" },
+  localStorage: {
+    getItem: () => "",
+    setItem: () => {},
+    removeItem: () => {},
+  },
+  dispatchEvent: () => {},
+};
+globalThis.localStorage = window.localStorage;
+globalThis.fetch = async () => ({
+  ok: false,
+  status: 422,
+  statusText: "Unprocessable Entity",
+  headers: { get: () => "" },
+  text: async () => JSON.stringify({
+    detail: [{
+      type: "string_too_short",
+      loc: ["body", "source_text"],
+      msg: "Value error, creator input is required",
+    }],
+  }),
+});
+const { commitProjectIdentity } = await import("./apps/studio/src/project-identity-gate.js");
+commitProjectIdentity({ projectId: "validation-project" });
+const { createRuntimeClient } = await import("./apps/studio/src/runtime-client.js");
+const runtime = createRuntimeClient("validation-project");
+await assert.rejects(
+  runtime.previewEmbeddedCreativeAction({
+    action_type: "script_revision",
+    node_id: "script",
+    node_type: "script",
+    source_text: "",
+    generated_at: "2026-07-27T00:00:00Z",
+  }, { clientRequestId: "cli_validation_array" }),
+  (error) => {
+    assert.equal(error.message, "请先输入创作想法或剧本文本。");
+    assert.doesNotMatch(error.message, /Value error|source_text|字段|schema/i);
+    return true;
+  },
+);
+'''
+    subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=STUDIO_ROOT.parents[1],
+        check=True,
+    )
+
+
+def test_explicit_project_url_never_falls_back_to_cached_project() -> None:
+    script = r'''
+import assert from "node:assert/strict";
+const values = new Map([["afs_studio_active_project_id", "cached-project"]]);
+globalThis.localStorage = { getItem: (key) => values.get(key) || "" };
+globalThis.window = {
+  location: { search: "?project=exact-project" },
+  localStorage: globalThis.localStorage,
+};
+const { initialProjectId } = await import("./apps/studio/src/studio-project-session.js");
+assert.equal(initialProjectId(), "exact-project");
+window.location.search = "?project=";
+assert.equal(initialProjectId(), "studio-invalid-project");
+window.location.search = "?project=bad/project";
+assert.equal(initialProjectId(), "studio-invalid-project");
+window.location.search = "";
+assert.equal(initialProjectId(), "cached-project");
 '''
     subprocess.run(
         ["node", "--input-type=module", "-e", script],
