@@ -220,18 +220,18 @@ def video_admission_readiness(
         return {
             "status": "blocked",
             "reason": str(exc),
-            "next_action": "请先批准镜头 01 关键帧与所需参考图片。",
+            "next_action": "请先确认 Asset Bible 并批准本镜头所需资产参考图。",
             "provider_dispatch_count": 0,
         }
     if lineage and lineage.get("status") == "stale":
-        generation_modes = mode_options(capability)
+        generation_modes = mode_options(capability, source=source)
         suggested_mode = default_mode(capability, len(source["references"]))
         return {
             "status": "stale",
             "reason": "production_graph_updated",
             "shot_id": source["shot"]["shot_id"],
             "shot_label": source["shot"]["label"],
-            "first_frame_label": source["keyframe"]["label"],
+            "first_frame_label": (source.get("keyframe") or {}).get("label", ""),
             "reference_count": len(source["references"]),
             "generation_modes": generation_modes,
             "suggested_generation_mode": suggested_mode,
@@ -257,13 +257,13 @@ def video_admission_readiness(
             ),
             "provider_dispatch_count": 0,
         }
-    generation_modes = mode_options(capability)
+    generation_modes = mode_options(capability, source=source)
     suggested_mode = default_mode(capability, len(source["references"]))
     readiness = {
         "status": "ready",
         "shot_id": source["shot"]["shot_id"],
         "shot_label": source["shot"]["label"],
-        "first_frame_label": source["keyframe"]["label"],
+        "first_frame_label": (source.get("keyframe") or {}).get("label", ""),
         "reference_count": len(source["references"]),
         "generation_modes": generation_modes,
         "suggested_generation_mode": suggested_mode,
@@ -371,7 +371,6 @@ def video_admission_capability() -> dict[str, Any]:
         reference_slots >= 1
         and duration_supported
         and resolution_supported
-        and first_frame_mode_supported
         and reference_mode_supported
         and artifact_hosts_configured
         and exact_input_upload_endpoint
@@ -865,7 +864,7 @@ def video_admission_generation_request(manifest: Mapping[str, Any], *, generated
         ],
         "duration_sec": DURATION_SEC,
         "resolution": RESOLUTION,
-        "aspect_ratio": source["keyframe"].get("aspect_ratio") or "16:9",
+        "aspect_ratio": (source.get("keyframe") or {}).get("aspect_ratio") or "16:9",
         "motion": source["prompt_contract"]["motion"],
         "candidate_count": 1,
         "video_admission_manifest_id": manifest["manifest_id"],
@@ -1151,52 +1150,22 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     if not graph_has_authority(store, project_id):
         raise ValueError("video readiness requires an authoritative ProductionGraph")
     graph = ProductionGraphStore(store).load(project_id)
-    image_manifests = _image_admission_manifests(store, project_id)
-    if not image_manifests:
-        raise ValueError("video readiness requires an approved shot keyframe")
-    image_manifest = image_manifests[0]
-    if image_manifest.get("status") != "locked":
-        raise ValueError("video readiness requires a locked image admission manifest")
-    shot = _shot_one_grounding(image_manifest)
+    shot = _canonical_video_shot_grounding(graph)
     shot_id = str(shot.get("shot_id") or "")
-    keyframe, _ = _approved_shot_one_keyframe(
-        image_manifests,
-        graph,
-        shot_id,
-        image_manifest,
-        shot,
-    )
-    candidate = keyframe["candidate"]
-    first_frame = _validated_approved_image(
-        store,
-        project_id,
-        graph,
-        str(candidate.get("image_asset_id") or ""),
-    )
     media_by_target = _approved_media_by_target(graph)
-    if first_frame["image_asset_id"] not in media_by_target.get(shot_id, set()):
-        raise ValueError("approved shot 01 keyframe is not bound to shot 01 in ProductionGraph")
     canonical_target_ids = _canonical_target_ids_for_shot(graph, shot_id)
-    declared_target_ids = {
-        str(item) for item in keyframe.get("reference_asset_ids", []) if str(item)
-    }
-    if not canonical_target_ids or declared_target_ids != canonical_target_ids:
-        raise ValueError("approved shot 01 keyframe reference pack is not bound to every canonical shot asset")
-    selected_reference_ids = {
-        str(item)
-        for item in keyframe.get("reference_media_ids", [])
-        if str(item) and str(item) != first_frame["image_asset_id"]
-    }
-    reference_ids: list[tuple[str, str]] = []
-    for target_id in sorted(canonical_target_ids):
-        selected_for_target = sorted(
-            selected_reference_ids & media_by_target.get(target_id, set())
+    if not canonical_target_ids:
+        raise ValueError("reference-conditioned video requires confirmed canonical shot assets")
+    reference_ids = _approved_reference_ids_for_targets(
+        graph,
+        media_by_target,
+        canonical_target_ids,
+    )
+    slot_limit = max(1, int(video_admission_capability().get("reference_image_slots") or 4))
+    if len(reference_ids) > slot_limit:
+        raise ValueError(
+            f"reference-conditioned video can send at most {slot_limit} approved asset reference images"
         )
-        if len(selected_for_target) != 1:
-            raise ValueError("approved reference pack must select exactly one image for each canonical shot asset")
-        reference_ids.append((target_id, selected_for_target[0]))
-    if not reference_ids or len(reference_ids) > 3:
-        raise ValueError("approved reference pack must contain one to three canonical reference images")
     references = [
         {
             **_validated_approved_image(store, project_id, graph, asset_id),
@@ -1205,48 +1174,205 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         }
         for target_id, asset_id in reference_ids
     ]
+    image_manifests = _image_admission_manifests(store, project_id)
+    keyframe = _optional_approved_shot_keyframe(
+        store,
+        project_id,
+        graph,
+        image_manifests,
+        shot_id,
+        shot,
+    )
     current_snapshot = {
         "version": int(graph["version"]),
         "graph_digest": str(graph["graph_digest"]),
     }
-    accepted = {
-        (int(item.get("version") or 0), str(item.get("graph_digest") or ""))
-        for item in image_manifest.get("accepted_graph_snapshots", [])
-        if isinstance(item, Mapping)
-    }
-    approved_video_exists = any(
-        node.get("state") == "active"
-        and (node.get("metadata") or {}).get("kind") == "approved_video"
-        for node in (graph.get("nodes") or {}).values()
-    )
-    if (
-        (current_snapshot["version"], current_snapshot["graph_digest"])
-        not in accepted
-        and not approved_video_exists
-    ):
-        raise ValueError("approved keyframe lineage is stale against the current ProductionGraph")
     labels = _canonical_labels_for_shot(graph, shot_id)
     shot_semantics = _normalized_video_shot_semantics(graph, shot_id, shot)
     prompt_contract = _prompt_contract(shot_semantics, labels)
     return {
         "production_graph": current_snapshot,
-        "asset_bible_revision_id": str(image_manifest.get("source", {}).get("asset_bible_revision_id") or ""),
-        "shot_candidate_id": str(image_manifest.get("source", {}).get("shot_candidate_id") or ""),
+        "asset_bible_revision_id": _latest_image_manifest_source_value(
+            image_manifests,
+            "asset_bible_revision_id",
+        ),
+        "shot_candidate_id": _latest_image_manifest_source_value(
+            image_manifests,
+            "shot_candidate_id",
+        ),
         "shot": {
             "shot_id": shot_id,
             "number": 1,
             "label": str(shot.get("title") or "镜头 01"),
         },
-        "keyframe": {
-            **first_frame,
-            "label": str(keyframe.get("label") or "镜头关键帧"),
-            "aspect_ratio": str(keyframe.get("aspect_ratio") or "16:9"),
-        },
+        "keyframe": keyframe,
         "references": references,
         "canonical_entities": labels,
         "shot_semantics": shot_semantics,
+        "strict_first_frame_required": _shot_requires_strict_first_frame(shot, shot_semantics),
         "prompt_contract": prompt_contract,
     }
+
+
+def _canonical_video_shot_grounding(graph: Mapping[str, Any]) -> dict[str, Any]:
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), Mapping) else {}
+    active = {
+        str(node_id): node
+        for node_id, node in nodes.items()
+        if isinstance(node, Mapping) and node.get("state", "active") == "active"
+    }
+    scene_ids = {
+        str(relation.get("from_id") or "")
+        for relation in graph.get("relations", [])
+        if relation.get("relation_type") == "contains"
+        and (active.get(str(relation.get("from_id") or "")) or {}).get("category") == "location"
+        and (active.get(str(relation.get("to_id") or "")) or {}).get("category") == "unit"
+    }
+    for relation in graph.get("relations", []):
+        if relation.get("relation_type") != "contains":
+            continue
+        scene_id = str(relation.get("from_id") or "")
+        shot_id = str(relation.get("to_id") or "")
+        if scene_id not in scene_ids or (active.get(shot_id) or {}).get("category") != "unit":
+            continue
+        metadata = active[shot_id].get("metadata") if isinstance(active[shot_id].get("metadata"), Mapping) else {}
+        return {
+            "shot_id": shot_id,
+            "title": str(
+                metadata.get("title")
+                or metadata.get("display_name")
+                or metadata.get("intent")
+                or "镜头 01"
+            ),
+            "number": 1,
+            "action": str(metadata.get("action") or metadata.get("blocking") or metadata.get("intent") or ""),
+            "composition": str(metadata.get("composition") or metadata.get("shot_size") or ""),
+            "camera_angle": str(metadata.get("camera_angle") or ""),
+            "movement": str(metadata.get("movement") or metadata.get("camera_movement") or ""),
+            "emotion": str(metadata.get("emotion") or metadata.get("narrative_purpose") or metadata.get("intent") or ""),
+            "purpose": str(metadata.get("narrative_purpose") or metadata.get("intent") or ""),
+            "continuity_cues": [
+                str(item).strip()
+                for item in metadata.get("continuity_cues", [])
+                if str(item).strip()
+            ],
+            "strict_first_frame_required": metadata.get("strict_first_frame_required"),
+            "first_frame_required": metadata.get("first_frame_required"),
+            "exact_opening_frame": metadata.get("exact_opening_frame"),
+        }
+    raise ValueError("video readiness requires at least one applied shot in ProductionGraph")
+
+
+def _approved_reference_ids_for_targets(
+    graph: Mapping[str, Any],
+    media_by_target: Mapping[str, set[str]],
+    target_ids: set[str],
+) -> list[tuple[str, str]]:
+    reference_ids: list[tuple[str, str]] = []
+    for target_id in sorted(target_ids):
+        selected_for_target = sorted(media_by_target.get(target_id, set()))
+        if len(selected_for_target) != 1:
+            label = _canonical_target_label(graph, target_id)
+            raise ValueError(
+                f"reference-conditioned video requires exactly one approved image for {label}"
+            )
+        reference_ids.append((target_id, selected_for_target[0]))
+    return reference_ids
+
+
+def _optional_approved_shot_keyframe(
+    store: RuntimeStore,
+    project_id: str,
+    graph: Mapping[str, Any],
+    manifests: list[Mapping[str, Any]],
+    shot_id: str,
+    current_shot: Mapping[str, Any],
+) -> dict[str, Any]:
+    current_snapshot = (int(graph["version"]), str(graph["graph_digest"]))
+    for manifest in manifests:
+        if manifest.get("status") != "locked":
+            continue
+        accepted = {
+            (int(item.get("version") or 0), str(item.get("graph_digest") or ""))
+            for item in manifest.get("accepted_graph_snapshots", [])
+            if isinstance(item, Mapping)
+        }
+        approved_video_exists = any(
+            node.get("state") == "active"
+            and (node.get("metadata") or {}).get("kind") == "approved_video"
+            for node in (graph.get("nodes") or {}).values()
+        )
+        if current_snapshot not in accepted and not approved_video_exists:
+            continue
+        try:
+            keyframe, _source_manifest = _approved_shot_one_keyframe(
+                [manifest],
+                graph,
+                shot_id,
+                manifest,
+                current_shot,
+            )
+            candidate = keyframe["candidate"]
+            first_frame = _validated_approved_image(
+                store,
+                project_id,
+                graph,
+                str(candidate.get("image_asset_id") or ""),
+            )
+            media_by_target = _approved_media_by_target(graph)
+            if first_frame["image_asset_id"] not in media_by_target.get(shot_id, set()):
+                continue
+            canonical_target_ids = _canonical_target_ids_for_shot(graph, shot_id)
+            declared_target_ids = {
+                str(item)
+                for item in keyframe.get("reference_asset_ids", [])
+                if str(item)
+            }
+            if declared_target_ids != canonical_target_ids:
+                continue
+            selected_reference_ids = {
+                str(item)
+                for item in keyframe.get("reference_media_ids", [])
+                if str(item) and str(item) != first_frame["image_asset_id"]
+            }
+            if any(
+                len(selected_reference_ids & media_by_target.get(target_id, set())) != 1
+                for target_id in canonical_target_ids
+            ):
+                continue
+        except (KeyError, ValueError, ProductionGraphError):
+            continue
+        return {
+            **first_frame,
+            "label": str(keyframe.get("label") or "镜头关键帧"),
+            "aspect_ratio": str(keyframe.get("aspect_ratio") or "16:9"),
+        }
+    return {}
+
+
+def _latest_image_manifest_source_value(
+    manifests: list[Mapping[str, Any]],
+    key: str,
+) -> str:
+    for manifest in manifests:
+        value = str(manifest.get("source", {}).get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _shot_requires_strict_first_frame(
+    shot: Mapping[str, Any],
+    shot_semantics: Mapping[str, Any],
+) -> bool:
+    for key in (
+        "strict_first_frame_required",
+        "first_frame_required",
+        "exact_opening_frame",
+    ):
+        if shot.get(key) is True:
+            return True
+    return bool(shot_semantics.get("strict_first_frame_required") is True)
 
 
 def _canonical_labels_for_shot(graph: Mapping[str, Any], shot_id: str) -> dict[str, list[str]]:
@@ -1749,7 +1875,7 @@ def _provider_input_contract(
             "width": int(keyframe.get("width") or 0),
             "height": int(keyframe.get("height") or 0),
             "byte_count": int(keyframe.get("byte_count") or 0),
-        }
+        } if keyframe.get("image_asset_id") else None
     reference_images = [
         {
             "image_asset_id": str(item.get("image_asset_id") or ""),
@@ -1770,7 +1896,7 @@ def _provider_input_contract(
         else []
     )
     excluded = []
-    if generation_mode != FIRST_FRAME:
+    if generation_mode != FIRST_FRAME and first_frame:
         excluded.append(
             {
                 "label": str(keyframe.get("label") or "已批准关键帧"),

@@ -273,7 +273,132 @@ def build_graph_asset_candidate_set(
     project_id: str,
     graph: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Project confirmed canonical graph assets without re-inferring from prose."""
+    """Build reviewable Asset Bible candidates from the canonical graph.
+
+    Confirmed graph asset nodes remain authoritative. When the graph only has an
+    applied story structure, deterministic local recognition proposes missing
+    character and prop candidates from scene and shot semantics without calling a
+    provider or copying legacy studio_state truth.
+    """
+    story = _graph_story_structure(graph)
+    active = story["active"]
+    revision_id = str(story["revision_id"])
+    scene_ids = list(story["scene_ids"])
+    shot_ids = list(story["shot_ids"])
+    shots_by_scene = story["shots_by_scene"]
+    shot_scene = story["shot_scene"]
+    required_shots = story["required_shots"]
+
+    items: list[dict[str, Any]] = []
+    for scene_id in scene_ids:
+        items.append(
+            _graph_candidate_item(
+                scene_id,
+                active[scene_id],
+                asset_type="scene",
+                scene_ids=[scene_id],
+                shot_ids=shots_by_scene.get(scene_id, []),
+            )
+        )
+    for node_id in sorted(story["asset_ids"]):
+        node = active[node_id]
+        asset_type = _graph_asset_type(node)
+        if asset_type not in {"character", "prop"}:
+            continue
+        occurrence_shots = required_shots.get(node_id, [])
+        items.append(
+            _graph_candidate_item(
+                node_id,
+                node,
+                asset_type=asset_type,
+                scene_ids=sorted({shot_scene[shot_id] for shot_id in occurrence_shots}),
+                shot_ids=occurrence_shots,
+            )
+        )
+
+    explicit_types = {item["asset_type"] for item in items}
+    recognition = recognize_asset_occurrences(
+        story["source_text"],
+        [],
+        story["recognition_scenes"],
+    )
+    for item in recognition["assets"]:
+        asset_type = str(item.get("asset_type") or "")
+        if asset_type not in {"character", "prop"} or asset_type in explicit_types:
+            continue
+        items.append(item)
+
+    if not items:
+        raise ValueError("confirmed canonical graph contains no reviewable assets")
+
+    assets = [
+        _candidate_asset(
+            project_id,
+            item,
+            source_node_id=revision_id,
+            revision_id=revision_id,
+        )
+        for item in items
+    ]
+    scene_index = [
+        {
+            "scene_id": scene_id,
+            "name": _graph_node_label(active[scene_id], fallback=f"场景 {index}"),
+            "number": index,
+        }
+        for index, scene_id in enumerate(scene_ids, start=1)
+    ]
+    shot_index = []
+    shot_number = 0
+    for scene_id in scene_ids:
+        for shot_id in shots_by_scene.get(scene_id, []):
+            shot_number += 1
+            shot_index.append(
+                _graph_shot_index_row(
+                    active[shot_id],
+                    shot_id=shot_id,
+                    scene_id=scene_id,
+                    number=shot_number,
+                )
+            )
+    assets_by_id = {asset["stable_id"]: asset for asset in assets}
+    anchors = [
+        {
+            "anchor_id": f"anchor-{asset['stable_id']}",
+            "asset_type": asset["asset_type"],
+            "display_name": asset["display_name"],
+            "aliases": sorted({asset["display_name"], *asset.get("aliases", [])}),
+            "scene_ids": list(asset.get("occurrences", {}).get("scene_ids", [])),
+            "shot_ids": list(asset.get("occurrences", {}).get("shot_ids", [])),
+            "ambiguity": "",
+            "source_asset_id": asset["stable_id"],
+        }
+        for asset in assets_by_id.values()
+    ]
+    graph_digest = str(graph.get("graph_digest") or "")
+    return {
+        "candidate_set_id": f"asset-candidates-{canonical_digest({'project': project_id, 'graph': graph_digest})[:16]}",
+        "version": 1,
+        "source_node_id": revision_id,
+        "script_revision_id": revision_id,
+        "shot_candidate_id": graph_digest[:64],
+        "scene_count": len(scene_index),
+        "shot_count": len(shot_index),
+        "scene_index": scene_index,
+        "shot_index": shot_index,
+        "required_asset_anchors": anchors,
+        "recognition_ambiguities": recognition["recognition_ambiguities"],
+        "source_digest": canonical_digest({"graph": graph_digest, "source_text": story["source_text"]}),
+        "source_graph_version": int(graph.get("version") or 0),
+        "source_graph_digest": graph_digest,
+        "source_graph_asset_ids": sorted(asset["stable_id"] for asset in assets),
+        "style_domains": story["style_domains"],
+        "reference_candidates": story["reference_candidates"],
+        "assets": assets,
+    }
+
+
+def _graph_story_structure(graph: Mapping[str, Any]) -> dict[str, Any]:
     nodes = graph.get("nodes") if isinstance(graph.get("nodes"), Mapping) else {}
     relations = [
         dict(item)
@@ -292,185 +417,325 @@ def build_graph_asset_candidate_set(
     )
     if len(revision_ids) != 1:
         raise ValueError("asset candidates require exactly one active canonical script revision")
-    source_node_ids = {
-        str(item.get("to_id") or "")
-        for item in relations
-        if item.get("relation_type") == "derived_from"
-        and str(item.get("from_id") or "") in revision_ids
-    }
-    canonical_records = [
-        (node_id, active[node_id])
-        for node_id in sorted(source_node_ids)
-        if node_id in active
-        and active[node_id].get("category") in {"entity", "location", "resource"}
-    ]
-    scene_ids = {
+    revision_id = revision_ids[0]
+    direct_targets = _relation_targets(relations, {revision_id}, "derived_from")
+    sequence_ids = [
         node_id
-        for node_id, node in canonical_records
-        if node.get("category") == "location"
-    }
-    shot_ids = {
-        str(item.get("to_id") or "")
-        for item in relations
-        if item.get("relation_type") == "contains"
-        and str(item.get("from_id") or "") in scene_ids
-        and str(item.get("to_id") or "") in active
-        and active[str(item.get("to_id") or "")].get("category") == "unit"
-    }
-    if not scene_ids or not shot_ids:
+        for node_id in direct_targets
+        if (active.get(node_id) or {}).get("category") == "collection"
+    ]
+    scene_ids = [
+        node_id
+        for node_id in direct_targets
+        if (active.get(node_id) or {}).get("category") == "location"
+    ]
+    for node_id in _relation_targets(relations, sequence_ids, "contains"):
+        if (active.get(node_id) or {}).get("category") == "location" and node_id not in scene_ids:
+            scene_ids.append(node_id)
+    if not scene_ids:
         raise ValueError("asset candidates require confirmed scenes and shots")
 
-    shots_by_scene = {
-        scene_id: sorted(
-            str(item.get("to_id") or "")
-            for item in relations
-            if item.get("relation_type") == "contains"
-            and str(item.get("from_id") or "") == scene_id
-            and str(item.get("to_id") or "") in shot_ids
-        )
-        for scene_id in scene_ids
-    }
-    required_shots = {
-        node_id: sorted(
-            str(item.get("to_id") or "")
-            for item in relations
-            if item.get("relation_type") == "required_by"
-            and str(item.get("from_id") or "") == node_id
-            and str(item.get("to_id") or "") in shot_ids
-        )
-        for node_id, _node_value in canonical_records
-    }
-    shot_scene = {
-        shot_id: scene_id
-        for scene_id, scene_shots in shots_by_scene.items()
-        for shot_id in scene_shots
-    }
-
-    items: list[dict[str, Any]] = []
-    for node_id, node in canonical_records:
-        metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
-        category = str(node.get("category") or "")
-        kind = str(metadata.get("kind") or "")
-        classification = str(metadata.get("classification") or "")
-        if category == "resource" and (
-            kind != "prop" or classification == "production_aid"
+    shots_by_scene: dict[str, list[str]] = {scene_id: [] for scene_id in scene_ids}
+    shot_scene: dict[str, str] = {}
+    shot_ids: list[str] = []
+    for relation in relations:
+        if relation.get("relation_type") != "contains":
+            continue
+        scene_id = str(relation.get("from_id") or "")
+        shot_id = str(relation.get("to_id") or "")
+        if (
+            scene_id not in shots_by_scene
+            or (active.get(shot_id) or {}).get("category") != "unit"
         ):
             continue
-        asset_type = {
-            "entity": "character",
-            "location": "scene",
-            "resource": "prop",
-        }.get(category, "")
-        display_name = str(
-            metadata.get("display_name")
-            or metadata.get("name")
-            or ""
-        ).strip()
-        if not asset_type or not display_name:
-            raise ValueError("confirmed canonical graph assets require stable names")
-        occurrence_shots = (
-            shots_by_scene.get(node_id, [])
-            if asset_type == "scene"
-            else required_shots.get(node_id, [])
+        shots_by_scene[scene_id].append(shot_id)
+        shot_scene[shot_id] = scene_id
+        if shot_id not in shot_ids:
+            shot_ids.append(shot_id)
+    if not shot_ids:
+        raise ValueError("asset candidates require confirmed scenes and shots")
+
+    asset_ids = [
+        node_id
+        for node_id in direct_targets
+        if _graph_asset_type(active.get(node_id) or {}) in {"character", "prop"}
+    ]
+    required_shots: dict[str, list[str]] = {}
+    for relation in relations:
+        if relation.get("relation_type") != "required_by":
+            continue
+        asset_id = str(relation.get("from_id") or "")
+        shot_id = str(relation.get("to_id") or "")
+        if _graph_asset_type(active.get(asset_id) or {}) not in {"character", "prop"}:
+            continue
+        if shot_id not in shot_scene:
+            continue
+        required_shots.setdefault(asset_id, []).append(shot_id)
+        if asset_id not in asset_ids:
+            asset_ids.append(asset_id)
+
+    recognition_scenes = _graph_recognition_scenes(active, scene_ids, shots_by_scene)
+    source_text = "\n\n".join(
+        "\n".join(
+            str(item).strip()
+            for item in [
+                scene.get("name", ""),
+                scene.get("description", ""),
+                *[
+                    " ".join(
+                        str(shot.get(key) or "")
+                        for key in ("title", "description", "purpose", "action")
+                        if str(shot.get(key) or "").strip()
+                    )
+                    for shot in scene.get("shots", [])
+                ],
+            ]
+            if str(item).strip()
         )
-        occurrence_scenes = (
-            [node_id]
-            if asset_type == "scene"
-            else sorted({shot_scene[shot_id] for shot_id in occurrence_shots})
-        )
-        items.append(
+        for scene in recognition_scenes
+    ).strip()
+    if not source_text:
+        source_text = str(graph.get("graph_digest") or revision_id)
+    style_domains = _graph_style_domains(active, scene_ids, shots_by_scene)
+    return {
+        "active": active,
+        "revision_id": revision_id,
+        "relations": relations,
+        "scene_ids": scene_ids,
+        "shot_ids": shot_ids,
+        "shots_by_scene": shots_by_scene,
+        "shot_scene": shot_scene,
+        "asset_ids": asset_ids,
+        "required_shots": required_shots,
+        "recognition_scenes": recognition_scenes,
+        "source_text": source_text,
+        "style_domains": style_domains,
+        "reference_candidates": [
             {
-                "stable_id": node_id,
-                "asset_type": asset_type,
-                "display_name": display_name,
-                "aliases": {
-                    display_name,
-                    *[
-                        str(alias).strip()
-                        for alias in metadata.get("aliases", [])
-                        if str(alias).strip()
-                    ],
-                },
-                "scene_ids": set(occurrence_scenes),
-                "shot_ids": set(occurrence_shots),
-                "confidence": 1.0,
-                "evidence": _graph_asset_evidence(metadata, display_name),
+                "reference_id": f"reference-{item['domain_id']}",
+                "kind": "style_reference",
+                "label": item["label"],
+                "scene_ids": item["scene_ids"],
+                "shot_ids": item["shot_ids"],
+                "status": "candidate",
+            }
+            for item in style_domains
+        ],
+    }
+
+
+def _relation_targets(
+    relations: list[Mapping[str, Any]],
+    from_ids: set[str] | list[str],
+    relation_type: str,
+) -> list[str]:
+    source_ids = {str(item) for item in from_ids if str(item)}
+    result: list[str] = []
+    for relation in relations:
+        if relation.get("relation_type") != relation_type:
+            continue
+        if str(relation.get("from_id") or "") not in source_ids:
+            continue
+        node_id = str(relation.get("to_id") or "")
+        if node_id and node_id not in result:
+            result.append(node_id)
+    return result
+
+
+def _graph_asset_type(node: Mapping[str, Any]) -> str:
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+    category = str(node.get("category") or "")
+    if category == "entity":
+        return "character"
+    if category == "location":
+        return "scene"
+    if (
+        category == "resource"
+        and str(metadata.get("kind") or "") == "prop"
+        and str(metadata.get("classification") or "") != "production_aid"
+    ):
+        return "prop"
+    return ""
+
+
+def _graph_candidate_item(
+    node_id: str,
+    node: Mapping[str, Any],
+    *,
+    asset_type: str,
+    scene_ids: list[str],
+    shot_ids: list[str],
+) -> dict[str, Any]:
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+    display_name = _graph_node_label(node)
+    if not display_name:
+        raise ValueError("confirmed canonical graph assets require stable names")
+    return {
+        "stable_id": node_id,
+        "asset_type": asset_type,
+        "display_name": display_name,
+        "aliases": {
+            display_name,
+            *[
+                str(alias).strip()
+                for alias in metadata.get("aliases", [])
+                if str(alias).strip()
+            ],
+        },
+        "scene_ids": set(scene_ids),
+        "shot_ids": set(shot_ids),
+        "confidence": 1.0,
+        "evidence": _graph_asset_evidence(metadata, display_name),
+    }
+
+
+def _graph_node_label(node: Mapping[str, Any], *, fallback: str = "") -> str:
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+    return str(
+        metadata.get("display_name")
+        or metadata.get("name")
+        or metadata.get("title")
+        or metadata.get("intent")
+        or fallback
+        or ""
+    ).strip()
+
+
+def _graph_recognition_scenes(
+    active: Mapping[str, Mapping[str, Any]],
+    scene_ids: list[str],
+    shots_by_scene: Mapping[str, list[str]],
+) -> list[dict[str, Any]]:
+    scenes: list[dict[str, Any]] = []
+    for scene_id in scene_ids:
+        scene = active[scene_id]
+        metadata = scene.get("metadata") if isinstance(scene.get("metadata"), Mapping) else {}
+        scene_style = _scene_style_domain(metadata, scene_id=scene_id)
+        scenes.append(
+            {
+                "scene_id": scene_id,
+                "name": _graph_node_label(scene, fallback=scene_id),
+                "description": " ".join(
+                    str(metadata.get(key) or "").strip()
+                    for key in (
+                        "space",
+                        "action",
+                        "summary",
+                        "narrative_purpose",
+                        "style",
+                        "style_domain",
+                        "genre_domain",
+                    )
+                    if str(metadata.get(key) or "").strip()
+                ),
+                "style_domain": scene_style["label"],
+                "shots": [
+                    _graph_shot_index_row(
+                        active[shot_id],
+                        shot_id=shot_id,
+                        scene_id=scene_id,
+                        number=index,
+                    )
+                    for index, shot_id in enumerate(shots_by_scene.get(scene_id, []), start=1)
+                ],
             }
         )
-    if not items:
-        raise ValueError("confirmed canonical graph contains no reviewable assets")
+    return scenes
 
-    assets = [
-        _candidate_asset(
-            project_id,
-            item,
-            source_node_id=revision_ids[0],
-            revision_id=revision_ids[0],
-        )
-        for item in items
-    ]
-    scene_index = [
-        {
-            "scene_id": scene_id,
-            "name": str(active[scene_id].get("metadata", {}).get("name") or ""),
-            "number": index,
-        }
-        for index, scene_id in enumerate(sorted(scene_ids), start=1)
-    ]
-    shot_index = [
-        {
-            "shot_id": shot_id,
-            "scene_id": shot_scene[shot_id],
-            "title": str(
-                active[shot_id].get("metadata", {}).get("title")
-                or active[shot_id].get("metadata", {}).get("intent")
-                or f"镜头 {index}"
-            ),
-            "number": index,
-            "description": str(active[shot_id].get("metadata", {}).get("blocking") or "")[:600],
-            "purpose": str(active[shot_id].get("metadata", {}).get("narrative_purpose") or "")[:400],
-            "shot_size": str(active[shot_id].get("metadata", {}).get("shot_size") or "")[:80],
-            "camera_angle": str(active[shot_id].get("metadata", {}).get("camera_angle") or "")[:160],
-            "movement": str(active[shot_id].get("metadata", {}).get("camera_movement") or "")[:240],
-            "action": str(active[shot_id].get("metadata", {}).get("blocking") or "")[:400],
-            "dialogue": "",
-            "emotion": "",
-            "continuity_cues": [],
-        }
-        for index, shot_id in enumerate(sorted(shot_ids), start=1)
-    ]
-    anchors = [
-        {
-            "anchor_id": f"anchor-{item['stable_id']}",
-            "asset_type": item["asset_type"],
-            "display_name": item["display_name"],
-            "aliases": sorted(item["aliases"]),
-            "scene_ids": sorted(item["scene_ids"]),
-            "shot_ids": sorted(item["shot_ids"]),
-            "ambiguity": "",
-            "source_asset_id": item["stable_id"],
-        }
-        for item in items
-    ]
-    graph_digest = str(graph.get("graph_digest") or "")
+
+def _graph_shot_index_row(
+    node: Mapping[str, Any],
+    *,
+    shot_id: str,
+    scene_id: str,
+    number: int,
+) -> dict[str, Any]:
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
     return {
-        "candidate_set_id": f"asset-candidates-{canonical_digest({'project': project_id, 'graph': graph_digest})[:16]}",
-        "version": 1,
-        "source_node_id": revision_ids[0],
-        "script_revision_id": revision_ids[0],
-        "shot_candidate_id": graph_digest[:64],
-        "scene_count": len(scene_index),
-        "shot_count": len(shot_index),
-        "scene_index": scene_index,
-        "shot_index": shot_index,
-        "required_asset_anchors": anchors,
-        "recognition_ambiguities": [],
-        "source_digest": graph_digest,
-        "source_graph_version": int(graph.get("version") or 0),
-        "source_graph_digest": graph_digest,
-        "source_graph_asset_ids": sorted(item["stable_id"] for item in items),
-        "assets": assets,
+        "shot_id": shot_id,
+        "scene_id": scene_id,
+        "title": str(
+            metadata.get("title")
+            or metadata.get("display_name")
+            or metadata.get("intent")
+            or f"镜头 {number}"
+        )[:120],
+        "number": number,
+        "description": " ".join(
+            str(metadata.get(key) or "").strip()
+            for key in ("blocking", "action", "intent", "narrative_purpose")
+            if str(metadata.get(key) or "").strip()
+        )[:600],
+        "purpose": str(
+            metadata.get("narrative_purpose")
+            or metadata.get("intent")
+            or ""
+        )[:400],
+        "shot_size": str(metadata.get("shot_size") or "")[:80],
+        "composition": str(metadata.get("composition") or metadata.get("shot_size") or "")[:240],
+        "camera_angle": str(metadata.get("camera_angle") or "")[:160],
+        "movement": str(metadata.get("movement") or metadata.get("camera_movement") or "")[:240],
+        "action": str(metadata.get("action") or metadata.get("blocking") or "")[:400],
+        "dialogue": str(metadata.get("dialogue") or "")[:400],
+        "emotion": str(metadata.get("emotion") or metadata.get("narrative_purpose") or "")[:240],
+        "continuity_cues": [
+            str(item).strip()
+            for item in metadata.get("continuity_cues", [])
+            if str(item).strip()
+        ][:16],
     }
+
+
+def _graph_style_domains(
+    active: Mapping[str, Mapping[str, Any]],
+    scene_ids: list[str],
+    shots_by_scene: Mapping[str, list[str]],
+) -> list[dict[str, Any]]:
+    domains: dict[str, dict[str, Any]] = {}
+    for scene_id in scene_ids:
+        metadata = active[scene_id].get("metadata") if isinstance(active[scene_id].get("metadata"), Mapping) else {}
+        style = _scene_style_domain(metadata, scene_id=scene_id)
+        entry = domains.setdefault(
+            style["domain_id"],
+            {
+                "domain_id": style["domain_id"],
+                "label": style["label"],
+                "scene_ids": [],
+                "shot_ids": [],
+                "status": "candidate",
+            },
+        )
+        entry["scene_ids"].append(scene_id)
+        entry["shot_ids"].extend(shots_by_scene.get(scene_id, []))
+    return list(domains.values())
+
+
+def _scene_style_domain(metadata: Mapping[str, Any], *, scene_id: str) -> dict[str, str]:
+    explicit = str(
+        metadata.get("style_domain")
+        or metadata.get("genre_domain")
+        or metadata.get("domain")
+        or ""
+    ).strip()
+    if explicit:
+        return {"domain_id": f"style-{safe_id(explicit)}", "label": explicit}
+    text = " ".join(
+        str(metadata.get(key) or "")
+        for key in ("name", "display_name", "space", "action", "summary", "style")
+    )
+    if re.search(r"古言|古代|王府|侯府|朝堂|世子|王爷|王妃|将军|宫廷|仙侠", text):
+        return {"domain_id": "style-ancient-romance", "label": "古言作品推广"}
+    if re.search(r"现代|重生|甜虐|医院|公司|公寓|手机|电梯|总裁|都市", text):
+        return {"domain_id": "style-modern-rebirth", "label": "现代重生甜虐"}
+    return {"domain_id": f"style-{safe_id(scene_id)}", "label": _text_domain_label(metadata, scene_id)}
+
+
+def _text_domain_label(metadata: Mapping[str, Any], scene_id: str) -> str:
+    return str(
+        metadata.get("name")
+        or metadata.get("display_name")
+        or f"风格域 {scene_id}"
+    ).strip()
 
 
 def _graph_asset_evidence(metadata: Mapping[str, Any], display_name: str) -> list[str]:

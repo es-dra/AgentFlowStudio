@@ -114,33 +114,21 @@ export function productionGraphAssetBibleSourceContext(workspace = null) {
   if (revisions.length !== 1) return null;
   const relations = array(sequence.dependencies);
   const revisionId = String(revisions[0].node_id || "");
-  const sourceNodeIds = new Set(
-    relations
-      .filter((relation) => relation.relation_type === "derived_from"
-        && String(relation.from_id || "") === revisionId)
-      .map((relation) => String(relation.to_id || "")),
-  );
-  const scenes = active(sequence.scenes).filter(
-    (item) => sourceNodeIds.has(String(item.node_id || "")),
-  );
-  const sceneIds = new Set(scenes.map((item) => String(item.node_id || "")));
-  const shots = active(sequence.shots).filter((shot) => relations.some(
-    (relation) => relation.relation_type === "contains"
-      && sceneIds.has(String(relation.from_id || ""))
-      && String(relation.to_id || "") === String(shot.node_id || ""),
-  ));
+  const graphShape = productionGraphAssetBibleShape(sequence, relations, revisionId);
+  if (!graphShape) return null;
+  const { sceneIds: graphSceneIds, shotIds, assetIds, shotsByScene } = graphShape;
+  const scenes = active(sequence.scenes).filter((item) => graphSceneIds.has(String(item.node_id || "")));
+  const shots = active(sequence.shots).filter((shot) => shotIds.has(String(shot.node_id || "")));
   if (!scenes.length || !shots.length) return null;
-  const shotsByScene = new Map(
+  const orderedShotsByScene = new Map(
     scenes.map((scene) => [
       String(scene.node_id || ""),
-      shots.filter((shot) => relations.some(
-        (relation) => relation.relation_type === "contains"
-          && String(relation.from_id || "") === String(scene.node_id || "")
-          && String(relation.to_id || "") === String(shot.node_id || ""),
-      )),
+      (shotsByScene.get(String(scene.node_id || "")) || [])
+        .map((shotId) => shots.find((shot) => String(shot.node_id || "") === shotId))
+        .filter(Boolean),
     ]),
   );
-  if ([...shotsByScene.values()].flat().length !== shots.length) return null;
+  if ([...orderedShotsByScene.values()].flat().length !== shots.length) return null;
 
   const shotPlan = {
     candidate_id: graphDigest,
@@ -150,31 +138,40 @@ export function productionGraphAssetBibleSourceContext(workspace = null) {
       scene_id: String(scene.node_id || ""),
       name: String(scene.metadata?.name || ""),
       number: sceneIndex + 1,
-      description: String(scene.metadata?.space || scene.metadata?.action || ""),
-      shots: (shotsByScene.get(String(scene.node_id || "")) || []).map((shot, shotIndex) => ({
+      description: graphSceneDescription(scene),
+      shots: (orderedShotsByScene.get(String(scene.node_id || "")) || []).map((shot, shotIndex) => ({
         shot_id: String(shot.node_id || ""),
         number: shotIndex + 1,
         title: String(shot.metadata?.title || shot.metadata?.intent || `镜头 ${shotIndex + 1}`),
-        description: String(shot.metadata?.blocking || shot.metadata?.intent || ""),
+        description: graphShotDescription(shot),
         duration_sec: Number(shot.metadata?.duration_seconds || 0),
-        narrative_purpose: String(shot.metadata?.narrative_purpose || ""),
+        narrative_purpose: String(shot.metadata?.narrative_purpose || shot.metadata?.intent || ""),
         shot_size: String(shot.metadata?.shot_size || ""),
         camera_angle: String(shot.metadata?.camera_angle || ""),
-        camera_movement: String(shot.metadata?.camera_movement || ""),
+        camera_movement: String(shot.metadata?.camera_movement || shot.metadata?.movement || ""),
+        movement: String(shot.metadata?.movement || shot.metadata?.camera_movement || ""),
         blocking: String(shot.metadata?.blocking || ""),
+        action: String(shot.metadata?.action || shot.metadata?.blocking || ""),
         sound: String(shot.metadata?.sound || ""),
         transition: String(shot.metadata?.transition || ""),
+        review_state: String(shot.metadata?.review_state || ""),
+        review_reason: String(
+          shot.metadata?.review_reason
+          || shot.metadata?.revision_reason
+          || shot.metadata?.review_note
+          || "",
+        ),
       })),
     })),
     total_shots: shots.length,
   };
   const canonicalAssets = [
     ...active(sequence.characters)
-      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .filter((item) => assetIds.has(String(item.node_id || "")))
       .map((item) => sourceAsset(item, "character")),
     ...scenes.map((item) => sourceAsset(item, "scene")),
     ...active(sequence.props)
-      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .filter((item) => assetIds.has(String(item.node_id || "")))
       .map((item) => sourceAsset(item, "prop")),
   ].filter((item) => item.display_name);
   return {
@@ -182,6 +179,8 @@ export function productionGraphAssetBibleSourceContext(workspace = null) {
     source_node_id: revisionId,
     script_revision_id: revisionId,
     shot_candidate_id: graphDigest,
+    source_text: graphSourceText(shotPlan),
+    source_context_texts: [],
     shot_plan: shotPlan,
     scene_count: scenes.length,
     shot_count: shots.length,
@@ -191,17 +190,120 @@ export function productionGraphAssetBibleSourceContext(workspace = null) {
     ),
     canonical_assets: canonicalAssets,
     production_aids: active(sequence.production_aids)
-      .filter((item) => sourceNodeIds.has(String(item.node_id || "")))
+      .filter((item) => assetIds.has(String(item.node_id || "")))
       .map((item) => ({
         source_node_id: String(item.node_id || ""),
         display_name: String(item.metadata?.name || item.metadata?.display_name || ""),
         classification: "production_aid",
       })),
+    planning_issues: productionGraphPlanningIssues(shotPlan),
     graph_version: graphVersion,
     graph_digest: graphDigest,
     provider_dispatch_count: 0,
     external_cost_usd: 0,
   };
+}
+
+function productionGraphAssetBibleShape(sequence, relations, revisionId) {
+  const active = (value) => array(value).filter((item) => item?.state !== "invalidated");
+  const sequenceIds = new Set(active(sequence.sequences).map((item) => String(item.node_id || "")));
+  const sceneIdsKnown = new Set(active(sequence.scenes).map((item) => String(item.node_id || "")));
+  const shotIdsKnown = new Set(active(sequence.shots).map((item) => String(item.node_id || "")));
+  const assetIdsKnown = new Set([
+    ...active(sequence.characters).map((item) => String(item.node_id || "")),
+    ...active(sequence.props).map((item) => String(item.node_id || "")),
+    ...active(sequence.production_aids).map((item) => String(item.node_id || "")),
+  ]);
+  const directTargets = relationTargets(relations, [revisionId], "derived_from");
+  const canonicalSequenceIds = new Set([...directTargets].filter((id) => sequenceIds.has(id)));
+  const sceneIds = new Set([...directTargets].filter((id) => sceneIdsKnown.has(id)));
+  const assetIds = new Set([...directTargets].filter((id) => assetIdsKnown.has(id)));
+  for (const id of relationTargets(relations, [...canonicalSequenceIds], "contains")) {
+    if (sceneIdsKnown.has(id)) sceneIds.add(id);
+  }
+  const shotsByScene = new Map([...sceneIds].map((sceneId) => [sceneId, []]));
+  const shotIds = new Set();
+  for (const relation of relations) {
+    if (relation?.relation_type !== "contains") continue;
+    const fromId = String(relation.from_id || "");
+    const toId = String(relation.to_id || "");
+    if (!sceneIds.has(fromId) || !shotIdsKnown.has(toId)) continue;
+    shotIds.add(toId);
+    if (!shotsByScene.has(fromId)) shotsByScene.set(fromId, []);
+    shotsByScene.get(fromId).push(toId);
+  }
+  for (const relation of relations) {
+    if (relation?.relation_type !== "required_by") continue;
+    const fromId = String(relation.from_id || "");
+    const toId = String(relation.to_id || "");
+    if (assetIdsKnown.has(fromId) && shotIds.has(toId)) assetIds.add(fromId);
+  }
+  const sourceNodeIds = new Set([...directTargets, ...canonicalSequenceIds, ...sceneIds, ...shotIds, ...assetIds]);
+  if (!sceneIds.size || !shotIds.size) return null;
+  return { sourceNodeIds, sceneIds, shotIds, assetIds, shotsByScene };
+}
+
+function relationTargets(relations, fromIds, relationType) {
+  const sources = new Set(fromIds.map((item) => String(item || "")).filter(Boolean));
+  return new Set(
+    relations
+      .filter((relation) => relation?.relation_type === relationType && sources.has(String(relation.from_id || "")))
+      .map((relation) => String(relation.to_id || ""))
+      .filter(Boolean),
+  );
+}
+
+function graphSceneDescription(scene) {
+  const metadata = scene?.metadata || {};
+  return [
+    metadata.space,
+    metadata.action,
+    metadata.summary,
+    metadata.narrative_purpose,
+    metadata.style_domain,
+  ].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+}
+
+function graphShotDescription(shot) {
+  const metadata = shot?.metadata || {};
+  return [
+    metadata.blocking,
+    metadata.action,
+    metadata.intent,
+    metadata.narrative_purpose,
+  ].map((value) => String(value || "").trim()).filter(Boolean).join(" ");
+}
+
+function graphSourceText(shotPlan) {
+  return array(shotPlan.scenes).map((scene) => [
+    scene.name,
+    scene.description,
+    ...array(scene.shots).map((shot) => [
+      shot.title,
+      shot.description,
+      shot.narrative_purpose,
+    ].filter(Boolean).join(" ")),
+  ].filter(Boolean).join("\n")).join("\n\n").trim();
+}
+
+function productionGraphPlanningIssues(shotPlan) {
+  return array(shotPlan.scenes).flatMap((scene) => array(scene.shots)
+    .filter((shot) => shot.review_state === "needs_revision")
+    .map((shot) => ({
+      issue_code: shot.review_reason
+        ? "shot_needs_revision"
+        : "shot_needs_revision_without_reason",
+      severity: "planning",
+      scene_id: scene.scene_id,
+      scene_name: scene.name,
+      shot_id: shot.shot_id,
+      shot_name: shot.title,
+      review_state: shot.review_state,
+      review_reason: shot.review_reason,
+      next_action: shot.review_reason
+        ? "处理该镜头的返修原因后再进入媒体制作。"
+        : "补充返修原因或确认镜头修订后再进入媒体制作。",
+    })));
 }
 
 function sourceAsset(item, assetType) {

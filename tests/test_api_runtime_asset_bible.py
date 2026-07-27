@@ -545,6 +545,71 @@ def test_canonical_graph_owns_asset_bible_without_copying_or_invalidating_source
     assert "exactly one active canonical script revision" in ambiguous.text
 
 
+def test_nested_sequence_graph_generates_zero_provider_two_domain_candidates(tmp_path) -> None:
+    from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
+    from apps.api.runtime_store import RuntimeStore
+
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    graph_store = ProductionGraphStore(store)
+    graph_store.append(
+        PROJECT_ID,
+        expected_version=0,
+        idempotency_key="seed-nested-sequence-story",
+        semantic_digest=canonical_digest({"seed": "nested-sequence"}),
+        events=[
+            {"type": "node_upserted", "node": {"node_id": "revision-v3", "category": "revision", "metadata": {"source_digest": "c" * 64}}},
+            {"type": "node_upserted", "node": {"node_id": "sequence-v3", "category": "collection", "metadata": {"kind": "story_sequence"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-modern", "category": "location", "metadata": {"name": "现代重生域 医院走廊", "style_domain": "M-modern-rebirth", "space": "冷白医院走廊"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-ancient", "category": "location", "metadata": {"name": "古言棋局域 王府密室", "style_domain": "A-ancient-chess", "space": "烛火王府密室"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-modern-a", "category": "unit", "metadata": {"title": "重逢对峙", "duration_seconds": 8, "blocking": "林晚面对傅行舟，手握红绳，压住重生后的情绪。", "intent": "建立现代重生甜虐身份冲突"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-modern-b", "category": "unit", "metadata": {"title": "证据浮现", "duration_seconds": 7, "blocking": "傅行舟拿起手机，林晚抢回照片。", "intent": "推进现代证据线"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-ancient-a", "category": "unit", "metadata": {"title": "棋局开场", "duration_seconds": 6, "blocking": "容华面对白筱，握紧竹简，盯住棋盘。", "intent": "建立古言棋局推广设定"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-ancient-b", "category": "unit", "metadata": {"title": "密令反转", "duration_seconds": 6, "blocking": "白筱拔出长剑，容华展开旧军籍册。", "intent": "推进古言密令反转"}}},
+            {"type": "relation_upserted", "from_id": "revision-v3", "to_id": "sequence-v3", "relation_type": "derived_from"},
+            {"type": "relation_upserted", "from_id": "sequence-v3", "to_id": "scene-modern", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "sequence-v3", "to_id": "scene-ancient", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-modern", "to_id": "shot-modern-a", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-modern", "to_id": "shot-modern-b", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-ancient", "to_id": "shot-ancient-a", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-ancient", "to_id": "shot-ancient-b", "relation_type": "contains"},
+        ],
+    )
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    preview = client.post(
+        f"/projects/{PROJECT_ID}/m6/asset-bible/commands/preview",
+        json={
+            "command": {"type": "generate_candidates"},
+            "requested_at": "2026-07-24T00:00:00Z",
+        },
+    )
+
+    assert preview.status_code == 200, preview.text
+    result = preview.json()
+    assert result["provider_dispatch_count"] == 0
+    assert result["result"]["graph_mutation"] == 0
+    assert graph_store.load(PROJECT_ID)["version"] == 1
+    candidate_set = result["result"]["asset_bible"]["candidate_set"]
+    assert candidate_set["source_graph_version"] == 1
+    assert candidate_set["scene_count"] == 2
+    assert candidate_set["shot_count"] == 4
+    assert {
+        item["label"]
+        for item in candidate_set["style_domains"]
+    } == {"M-modern-rebirth", "A-ancient-chess"}
+    assert len(candidate_set["reference_candidates"]) == 2
+    assets = result["result"]["asset_bible"]["assets"]
+    by_type = {
+        asset_type: {item["display_name"] for item in assets if item["asset_type"] == asset_type}
+        for asset_type in ("character", "scene", "prop")
+    }
+    assert {"林晚", "傅行舟", "容华", "白筱"} <= by_type["character"]
+    assert "现代重生域 医院走廊" in by_type["scene"]
+    assert "古言棋局域 王府密室" in by_type["scene"]
+    assert {"红绳", "手机", "照片", "竹简", "长剑", "旧军籍册"} & by_type["prop"]
+    assert not any("林晚" in name and "容华" in name for name in by_type["character"])
+
+
 def test_split_rejects_duplicate_occurrence_assignment() -> None:
     candidate = build_asset_candidate_set(PROJECT_ID, generation_body())
     state = preview_asset_bible_command_result(

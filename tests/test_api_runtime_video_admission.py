@@ -269,6 +269,8 @@ def _seed_ready_project(
     manifest_semantics: bool = True,
     graph_semantics: bool = True,
     manifest_status: str = "locked",
+    strict_first_frame_required: bool = True,
+    include_keyframe: bool = True,
 ) -> tuple[TestClient, RuntimeStore, str, dict[str, str]]:
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
@@ -279,12 +281,16 @@ def _seed_ready_project(
         json={"project_id": project_id, "goal": "Reference-driven shot 01 video"},
     )
     assert response.status_code == 200
-    media = {
-        "keyframe": _upload(client, project_id, "shot-01-keyframe"),
-        "character": _upload(client, project_id, "character-reference"),
-        "scene": _upload(client, project_id, "scene-reference"),
-        "prop": _upload(client, project_id, "prop-reference"),
-    }
+    media = {}
+    if include_keyframe:
+        media["keyframe"] = _upload(client, project_id, "shot-01-keyframe")
+    media.update(
+        {
+            "character": _upload(client, project_id, "character-reference"),
+            "scene": _upload(client, project_id, "scene-reference"),
+            "prop": _upload(client, project_id, "prop-reference"),
+        }
+    )
     graph_store = ProductionGraphStore(store)
     graph = graph_store.ensure(project_id)
     events = [
@@ -320,6 +326,7 @@ def _seed_ready_project(
                 "metadata": {
                     "kind": "shot",
                     "display_name": "镜头 01",
+                    "strict_first_frame_required": strict_first_frame_required,
                     **(
                         {
                             "intent": "建立检修任务",
@@ -328,6 +335,7 @@ def _seed_ready_project(
                             "camera_angle": "平视",
                             "camera_movement": "沿操作台缓慢向前推进",
                             "narrative_purpose": "保持克制专注的检修压力",
+                            "continuity_cues": ["服装、工具位置与北侧检修站照明保持连续"],
                         }
                         if graph_semantics
                         else {}
@@ -390,69 +398,71 @@ def _seed_ready_project(
         semantic_digest=canonical_digest({"media": media}),
         events=events,
     )
-    image_manifest = {
-        "schema_version": "afs.image_admission_manifest.v0.1",
-        "project_id": project_id,
-        "manifest_id": "image-manifest-for-video",
-        "manifest_hash": "a" * 64,
-        "status": manifest_status,
-        "source": {
-            "asset_bible_revision_id": "asset-bible-r9",
-            "shot_candidate_id": "shots-r1",
-            "shot_grounding": {
-                "shots": [
-                    {
-                        "shot_id": "shot-01",
-                        "title": "镜头 01",
-                        "number": 1,
-                        "action": (
-                            "巡夜人甲用六角校准器完成一次精确校准"
-                            if manifest_semantics
-                            else ""
-                        ),
-                        "composition": (
-                            "中景，人物与操作台保持清晰层次"
-                            if manifest_semantics
-                            else ""
-                        ),
-                        "camera_angle": "平视" if manifest_semantics else "",
-                        "movement": "缓慢向前推进" if manifest_semantics else "",
-                        "emotion": "克制而专注" if manifest_semantics else "",
-                        "continuity_cues": (
-                            ["服装、工具位置与北侧检修站照明保持连续"]
-                            if manifest_semantics
-                            else []
-                        ),
-                    }
-                ]
+    if include_keyframe:
+        image_manifest = {
+            "schema_version": "afs.image_admission_manifest.v0.1",
+            "project_id": project_id,
+            "manifest_id": "image-manifest-for-video",
+            "manifest_hash": "a" * 64,
+            "status": manifest_status,
+            "source": {
+                "asset_bible_revision_id": "asset-bible-r9",
+                "shot_candidate_id": "shots-r1",
+                "shot_grounding": {
+                    "shots": [
+                        {
+                            "shot_id": "shot-01",
+                            "title": "镜头 01",
+                            "number": 1,
+                            "action": (
+                                "巡夜人甲在操作台前校准六角校准器"
+                                if manifest_semantics
+                                else ""
+                            ),
+                            "composition": (
+                                "中景"
+                                if manifest_semantics
+                                else ""
+                            ),
+                            "camera_angle": "平视" if manifest_semantics else "",
+                            "movement": "沿操作台缓慢向前推进" if manifest_semantics else "",
+                            "emotion": "保持克制专注的检修压力" if manifest_semantics else "",
+                            "purpose": "保持克制专注的检修压力" if manifest_semantics else "",
+                            "continuity_cues": (
+                                ["服装、工具位置与北侧检修站照明保持连续"]
+                                if manifest_semantics
+                                else []
+                            ),
+                        }
+                    ]
+                },
             },
-        },
-        "accepted_graph_snapshots": [
-            {"version": graph["version"], "graph_digest": graph["graph_digest"]}
-        ],
-        "items": [
-            {
-                "item_id": "keyframe-shot-01",
-                "item_type": "shot_keyframe",
-                "target_shot_id": "shot-01",
-                "label": "镜头 01 已批准关键帧",
-                "aspect_ratio": "16:9",
-                "state": "approved",
-                "candidate": {"image_asset_id": media["keyframe"]},
-                "reference_asset_ids": ["character-a", "scene-a", "prop-a"],
-                "reference_media_ids": [
-                    media["character"],
-                    media["scene"],
-                    media["prop"],
-                ],
-            }
-        ],
-    }
-    image_manifest_path = (
-        store.projects_dir / project_id / "image_admission" / "manifest.json"
-    )
-    image_manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    write_json(image_manifest_path, image_manifest)
+            "accepted_graph_snapshots": [
+                {"version": graph["version"], "graph_digest": graph["graph_digest"]}
+            ],
+            "items": [
+                {
+                    "item_id": "keyframe-shot-01",
+                    "item_type": "shot_keyframe",
+                    "target_shot_id": "shot-01",
+                    "label": "镜头 01 已批准关键帧",
+                    "aspect_ratio": "16:9",
+                    "state": "approved",
+                    "candidate": {"image_asset_id": media["keyframe"]},
+                    "reference_asset_ids": ["character-a", "scene-a", "prop-a"],
+                    "reference_media_ids": [
+                        media["character"],
+                        media["scene"],
+                        media["prop"],
+                    ],
+                }
+            ],
+        }
+        image_manifest_path = (
+            store.projects_dir / project_id / "image_admission" / "manifest.json"
+        )
+        image_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(image_manifest_path, image_manifest)
     return client, store, project_id, media
 
 
@@ -469,7 +479,9 @@ def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_
     preview = _command(
         client,
         project_id,
-        {"type": "compile", "idempotency_key": "compile-normalized-shot"},
+        _reference_video_setup_command(
+            {"type": "compile", "idempotency_key": "compile-normalized-shot"}
+        ),
         confirm=False,
     )
     prompt_contract = preview["result"]["manifest"]["source"]["prompt_contract"]
@@ -563,6 +575,87 @@ def test_reference_conditioned_manifest_sends_real_identity_references_without_f
     assert load_video_admission_manifest(store, project_id) == reserved
 
 
+def test_reference_conditioned_manifest_does_not_require_approved_shot_keyframe(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+        include_keyframe=False,
+    )
+
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission").json()[
+        "readiness"
+    ]
+    assert readiness["status"] == "ready"
+    assert readiness["suggested_generation_mode"] == "reference_conditioned"
+    assert {
+        item["mode"]: item["supported"]
+        for item in readiness["generation_modes"]
+    } == {
+        "reference_conditioned": True,
+        "first_frame": False,
+        "text_to_video": False,
+    }
+
+    preview = _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-reference-no-keyframe",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+        confirm=False,
+    )
+    manifest = preview["result"]["manifest"]
+    assert manifest["source"]["keyframe"] == {}
+    assert manifest["provider_input_contract"]["first_frame"] is None
+    assert {
+        item["image_asset_id"]
+        for item in manifest["provider_input_contract"]["reference_images"]
+    } == {media["character"], media["scene"], media["prop"]}
+    request = video_admission_generation_request(
+        {
+            **manifest,
+            "item": {
+                **manifest["item"],
+                "state": "reserved",
+                "reservation_token": "test-reservation",
+            },
+        },
+        generated_at=REQUESTED_AT,
+    )
+    assert request["generation_path"] == "reference_images"
+    assert request["first_frame_image_asset_id"] is None
+    assert request["aspect_ratio"] == "16:9"
+    assert load_video_admission_manifest(store, project_id) == {}
+
+
+def test_first_frame_mode_requires_explicit_opening_frame_semantics(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+    )
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-first-frame-without-semantics",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert response.status_code == 422
+    assert "只在镜头明确要求" in response.json()["detail"]["details"]["raw_detail"]
+    assert load_video_admission_manifest(store, project_id) == {}
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -622,7 +715,7 @@ def test_video_readiness_still_fails_closed_when_creative_semantics_are_absent(t
 
 
 @pytest.mark.parametrize("manifest_status", ["draft", "cancelled"])
-def test_video_readiness_requires_locked_image_manifest(
+def test_first_frame_readiness_requires_locked_image_manifest(
     tmp_path,
     manifest_status: str,
 ) -> None:
@@ -635,17 +728,21 @@ def test_video_readiness_requires_locked_image_manifest(
     preview = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/preview",
         json={
-            "command": {
-                "type": "compile",
-                "idempotency_key": f"compile-{manifest_status}-manifest",
-            },
+            "command": _video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": f"compile-{manifest_status}-manifest",
+                }
+            ),
             "requested_at": REQUESTED_AT,
         },
     )
 
     assert readiness.status_code == 200
-    assert readiness.json()["readiness"]["status"] == "blocked"
+    assert readiness.json()["readiness"]["status"] == "ready"
+    assert readiness.json()["readiness"]["suggested_generation_mode"] == "reference_conditioned"
     assert preview.status_code == 422
+    assert "首帧图生视频需要明确选择" in preview.json()["detail"]["details"]["raw_detail"]
     assert load_video_admission_manifest(store, project_id) == {}
     assert ProductionGraphStore(store).load(project_id)["version"] == 1
 
@@ -654,6 +751,15 @@ def _video_setup_command(command: dict) -> dict:
     return {
         "generation_mode": "first_frame",
         "selection_reason": "测试明确要求从批准关键帧开始。",
+        "temporal_staging": TEMPORAL_STAGING,
+        **command,
+    }
+
+
+def _reference_video_setup_command(command: dict) -> dict:
+    return {
+        "generation_mode": "reference_conditioned",
+        "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
         "temporal_staging": TEMPORAL_STAGING,
         **command,
     }
@@ -757,13 +863,13 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert state["readiness"]["status"] == "stale"
     assert state["readiness"]["prepared_graph_version"] == old_video["source"]["production_graph"]["version"]
     assert state["readiness"]["current_graph_version"] == graph["version"]
-    assert state["lineage"]["keyframe_reuse"] == "verified_current"
+    assert state["lineage"]["keyframe_reuse"] == "updated_approved_source"
     assert state["lineage"]["rebuild_allowed"] is True
-    assert state["lineage"]["affected_objects"] == ["镜头 01 视频来源未受此次更新影响"]
+    assert state["lineage"]["affected_objects"] == ["镜头 01 已批准关键帧"]
     assert state["provider_dispatch_count"] == 0
 
     body = {
-        "command": _video_setup_command({
+        "command": _reference_video_setup_command({
             "type": "recompile_current",
             "idempotency_key": "recompile-current-v2",
         }),
@@ -781,7 +887,7 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
         "version": graph["version"],
         "graph_digest": graph["graph_digest"],
     }
-    assert candidate["source"]["keyframe"]["image_asset_id"] == media["keyframe"]
+    assert candidate["source"]["keyframe"] == {}
     assert [item["image_asset_id"] for item in candidate["source"]["references"]] == [
         media["character"],
         media["prop"],
@@ -840,7 +946,7 @@ def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmatio
     old_video = deepcopy(load_video_admission_manifest(store, project_id))
     _rotate_image_manifest_after_graph_update(store, project_id)
     body = {
-        "command": _video_setup_command({
+        "command": _reference_video_setup_command({
             "type": "recompile_current",
             "idempotency_key": "recompile-racing-graph",
         }),
@@ -901,42 +1007,111 @@ def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmatio
     assert old_video["provider_dispatch_count"] == 0
 
 
-def test_stale_video_manifest_requires_new_keyframe_when_shot_visual_semantics_change(
+def test_stale_video_manifest_can_rebuild_reference_conditioned_when_keyframe_lineage_changes(
     tmp_path,
 ) -> None:
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     _command(client, project_id, {"type": "compile", "idempotency_key": "compile-before-change"})
     old_video = deepcopy(load_video_admission_manifest(store, project_id))
     _, _ = _rotate_image_manifest_after_graph_update(store, project_id)
-    image_path = store.projects_dir / project_id / "image_admission" / "manifest.json"
-    current_image = read_json(image_path)
-    current_image["source"]["shot_grounding"]["shots"][0]["action"] = (
-        "巡夜人甲离开操作台并走向站台另一端"
-    )
-    write_json(image_path, current_image)
 
     state = client.get(f"/projects/{project_id}/m6/video-admission").json()
 
-    assert state["readiness"]["status"] == "blocked"
+    assert state["readiness"]["status"] == "stale"
     assert state["lineage"]["status"] == "stale"
-    assert state["lineage"]["keyframe_reuse"] == "requires_new_keyframe"
-    assert state["lineage"]["rebuild_allowed"] is False
-    assert "新的镜头 01 关键帧" in state["lineage"]["next_action"]
+    assert state["lineage"]["keyframe_reuse"] == "updated_approved_source"
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["readiness"]["suggested_generation_mode"] == "reference_conditioned"
     response = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/preview",
         json={
-            "command": {
+            "command": _reference_video_setup_command({
                 "type": "recompile_current",
-                "idempotency_key": "unsafe-recompile",
-            },
+                "idempotency_key": "safe-reference-recompile",
+            }),
             "requested_at": REQUESTED_AT,
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200, response.text
+    assert response.json()["result"]["manifest"]["provider_input_contract"]["first_frame"] is None
     assert load_video_admission_manifest(store, project_id) == old_video
     assert not (
         store.projects_dir / project_id / "video_admission" / "history"
     ).exists()
+
+
+def test_stale_keyframe_does_not_reenable_first_frame_when_graph_shot_changes(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-before-graph-shot-change"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    _rotate_image_manifest_after_graph_update(store, project_id)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="change-canonical-shot-semantics",
+        semantic_digest=canonical_digest({"shot": "changed"}),
+        events=[
+            {
+                "type": "node_metadata_updated",
+                "node_id": "shot-01",
+                "patch": {
+                    "blocking": "巡夜人甲离开操作台并走向站台另一端",
+                    "camera_movement": "横移跟随人物远离操作台",
+                    "narrative_purpose": "转入新的空间调度",
+                },
+            }
+        ],
+    )
+
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+    assert state["readiness"]["status"] == "stale"
+    assert state["readiness"]["suggested_generation_mode"] == "reference_conditioned"
+    assert {
+        item["mode"]: item["supported"]
+        for item in state["readiness"]["generation_modes"]
+    } == {
+        "reference_conditioned": True,
+        "first_frame": False,
+        "text_to_video": False,
+    }
+
+    first_frame_preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _video_setup_command(
+                {
+                    "type": "recompile_current",
+                    "idempotency_key": "unsafe-first-frame-after-graph-shot-change",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert first_frame_preview.status_code == 422
+    assert "首帧图生视频需要明确选择" in first_frame_preview.json()["detail"]["details"]["raw_detail"]
+
+    reference_preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "recompile_current",
+                    "idempotency_key": "reference-after-graph-shot-change",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert reference_preview.status_code == 200, reference_preview.text
+    manifest = reference_preview.json()["result"]["manifest"]
+    assert manifest["source"]["keyframe"] == {}
+    assert manifest["provider_input_contract"]["first_frame"] is None
+    assert manifest["provider_input_contract"]["mode"] == "reference_conditioned"
+    assert load_video_admission_manifest(store, project_id) == old_video
 
 
 def _claim_for_test(
@@ -1057,7 +1232,7 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
         "北侧检修站",
         "六角校准器",
         "缓慢向前推进",
-        "克制而专注",
+        "保持克制专注的检修压力",
     ):
         assert value in prompt
     assert manifest["source"]["prompt_contract"]["keyword_rewrite"] is False
@@ -1837,15 +2012,35 @@ def test_video_readiness_requires_literal_shot_one_and_exact_reference_pack(tmp_
 
     response = client.get(f"/projects/{project_id}/m6/video-admission")
     assert response.status_code == 200
-    assert response.json()["readiness"]["status"] == "blocked"
-    assert "numbered 1" in response.json()["readiness"]["reason"]
+    assert response.json()["readiness"]["status"] == "ready"
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _video_setup_command(
+                {"type": "compile", "idempotency_key": "compile-bad-shot-number"}
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert preview.status_code == 422
+    assert "首帧图生视频需要明确选择" in preview.json()["detail"]["details"]["raw_detail"]
 
     manifest["source"]["shot_grounding"]["shots"][0]["number"] = 1
     manifest["items"][0]["reference_asset_ids"] = ["character-a", "scene-a"]
     write_json(path, manifest)
     response = client.get(f"/projects/{project_id}/m6/video-admission")
-    assert response.json()["readiness"]["status"] == "blocked"
-    assert "every canonical shot asset" in response.json()["readiness"]["reason"]
+    assert response.json()["readiness"]["status"] == "ready"
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _video_setup_command(
+                {"type": "compile", "idempotency_key": "compile-bad-reference-pack"}
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert preview.status_code == 422
+    assert "首帧图生视频需要明确选择" in preview.json()["detail"]["details"]["raw_detail"]
 
 
 def test_video_readiness_rejects_keyframe_bound_to_another_shot(tmp_path) -> None:
@@ -1856,8 +2051,18 @@ def test_video_readiness_rejects_keyframe_bound_to_another_shot(tmp_path) -> Non
     write_json(path, manifest)
 
     response = client.get(f"/projects/{project_id}/m6/video-admission")
-    assert response.json()["readiness"]["status"] == "blocked"
-    assert "bound exactly to shot 01" in response.json()["readiness"]["reason"]
+    assert response.json()["readiness"]["status"] == "ready"
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _video_setup_command(
+                {"type": "compile", "idempotency_key": "compile-wrong-keyframe-shot"}
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert preview.status_code == 422
+    assert "首帧图生视频需要明确选择" in preview.json()["detail"]["details"]["raw_detail"]
 
 
 def test_video_candidate_preview_is_bound_to_current_project_and_job(tmp_path) -> None:

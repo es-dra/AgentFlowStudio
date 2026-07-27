@@ -87,7 +87,7 @@ export function videoAdmissionGenerationRequest(manifest, generatedAt) {
     reference_image_asset_ids: referenceImages.map((item) => item.image_asset_id),
     duration_sec: Number(contract.duration_sec || 6),
     resolution: String(contract.resolution || "720p"),
-    aspect_ratio: source.keyframe.aspect_ratio || "16:9",
+    aspect_ratio: (source.keyframe || {}).aspect_ratio || "16:9",
     motion: source.prompt_contract.camera_movement || source.prompt_contract.motion || "",
     candidate_count: 1,
     video_admission_manifest_id: manifest.manifest_id,

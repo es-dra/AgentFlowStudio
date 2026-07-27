@@ -38,7 +38,19 @@ TEMPORAL_STAGING_LABELS = {
 }
 
 
-def mode_options(capability: Mapping[str, Any]) -> list[dict[str, Any]]:
+def mode_options(
+    capability: Mapping[str, Any],
+    *,
+    source: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    keyframe = (source or {}).get("keyframe") or {}
+    first_frame_source_ready = (
+        source is None
+        or (
+            bool(keyframe.get("image_asset_id"))
+            and (source or {}).get("strict_first_frame_required") is True
+        )
+    )
     options = [
         {
             "mode": REFERENCE_CONDITIONED,
@@ -49,7 +61,8 @@ def mode_options(capability: Mapping[str, Any]) -> list[dict[str, Any]]:
         {
             "mode": FIRST_FRAME,
             "label": "首帧图生视频",
-            "supported": capability.get("first_frame_mode_supported") is True,
+            "supported": capability.get("first_frame_mode_supported") is True
+            and first_frame_source_ready,
             "reason": "仅在镜头明确要求从已批准关键帧开始时使用。",
         },
         {
@@ -116,8 +129,15 @@ def validate_generation_mode(
     selected = _text(mode)
     if selected not in GENERATION_MODES:
         raise ValueError("请选择受支持的视频生成方式")
+    if selected == FIRST_FRAME:
+        if capability.get("first_frame_mode_supported") is not True:
+            raise ValueError("首帧图生视频当前未由视频服务开放，不能静默替换")
+        if not (source.get("keyframe") or {}).get("image_asset_id"):
+            raise ValueError("首帧图生视频需要明确选择一张已批准关键帧")
+        if source.get("strict_first_frame_required") is not True:
+            raise ValueError("首帧图生视频只在镜头明确要求从精确开场画面开始时开放")
     option = next(
-        item for item in mode_options(capability)
+        item for item in mode_options(capability, source=source)
         if item["mode"] == selected
     )
     if option["supported"] is not True:
@@ -128,8 +148,6 @@ def validate_generation_mode(
     ]
     if selected == REFERENCE_CONDITIONED and not references:
         raise ValueError("参考图约束视频需要至少一张已批准资产参考图")
-    if selected == FIRST_FRAME and not (source.get("keyframe") or {}).get("image_asset_id"):
-        raise ValueError("首帧图生视频需要明确选择一张已批准关键帧")
     return deepcopy(option)
 
 

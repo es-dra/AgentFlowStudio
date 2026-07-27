@@ -821,3 +821,156 @@ def test_confirmed_graph_projects_asset_bible_source_across_refresh_without_prev
     ) == 3
     assert "source?.canonical_assets?.length" in shell
     assert "项来源已确认" in shell
+
+
+def test_asset_bible_source_context_follows_nested_sequence_before_stale_legacy_state() -> None:
+    bible_uri = (STUDIO / "src" / "asset-bible-workspace.js").as_uri()
+    script = f"""
+      import {{ assetBibleSourceContext }} from {json.dumps(bible_uri)};
+      const legacyShotPlan = {{
+        candidate_id: "legacy-candidate",
+        scenes: [{{
+          scene_id: "legacy-scene",
+          name: "Legacy Stage",
+          shots: [{{ shot_id: "legacy-shot", title: "Legacy Shot", duration_sec: 5 }}],
+        }}],
+      }};
+      const staleLegacyState = {{
+        nodes: {{
+          story: {{
+            id: "story",
+            type: "text",
+            content: "Legacy source must not override canonical graph v3.",
+            params: {{
+              currentRevisionId: "legacy-revision",
+              revisions: [{{
+                revision_id: "legacy-revision",
+                screenplay_candidate: {{
+                  screenplay_text: "Legacy source must not override canonical graph v3.",
+                }},
+              }}],
+              shotPlanDraft: {{ ...legacyShotPlan, source_revision_id: "legacy-revision" }},
+              embeddedCreativeAction: {{
+                action_type: "shot_breakdown",
+                status: "applied",
+                applied_graph_version: 0,
+                applied_revision_id: "legacy-revision",
+                applied_subgraph: {{ candidate_id: "legacy-candidate", shot_plan: legacyShotPlan }},
+              }},
+            }},
+          }},
+          sequence: {{
+            id: "sequence",
+            type: "sequence",
+            params: {{
+              nodeRole: "m6_6_shot_sequence_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+            }},
+          }},
+          scene: {{
+            id: "scene",
+            type: "scene",
+            title: "Legacy Stage",
+            params: {{
+              nodeRole: "m6_6_scene_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+              source_sequence_node_id: "sequence",
+            }},
+          }},
+          shot: {{
+            id: "shot",
+            type: "shot",
+            title: "Legacy Shot",
+            params: {{
+              nodeRole: "m6_6_shot_candidate",
+              candidate_id: "legacy-candidate",
+              source_revision_id: "legacy-revision",
+              source_scene_node_id: "scene",
+              duration_sec: 5,
+            }},
+          }},
+        }},
+        edges: {{
+          source: {{ from: "story", to: "sequence", relation_type: "proposed" }},
+          scene: {{ from: "sequence", to: "scene", relation_type: "sequence" }},
+          shot: {{ from: "scene", to: "shot", relation_type: "sequence" }},
+        }},
+      }};
+      const workspace = {{
+        status: "ready",
+        graph_version: 3,
+        graph_digest: "graph-v3-digest",
+        storyboard: {{ graph_version: 3, graph_digest: "graph-v3-digest" }},
+        sequence: {{
+          script_revisions: [
+            {{ node_id: "revision-v3", state: "active", metadata: {{ source_digest: "source" }} }},
+          ],
+          sequences: [
+            {{ node_id: "sequence-v3", state: "active", metadata: {{ kind: "story_sequence" }} }},
+          ],
+          characters: [],
+          scenes: [
+            {{ node_id: "scene-modern", state: "active", metadata: {{ name: "现代重生域", space: "雨夜医院" }} }},
+            {{ node_id: "scene-ancient", state: "active", metadata: {{ name: "古言棋局域", space: "王府密室" }} }},
+          ],
+          props: [],
+          production_aids: [],
+          shots: [
+            {{ node_id: "shot-modern-01", state: "active", metadata: {{ title: "深海坠落", review_state: "needs_revision", duration_seconds: 8, blocking: "林晚面对傅行舟，濒死感打开重生设定。", intent: "保留返修问题" }} }},
+            {{ node_id: "shot-modern-02", state: "active", metadata: {{ title: "医院醒来", duration_seconds: 7, blocking: "林晚从病床坐起。", intent: "现代重生域推进" }} }},
+            {{ node_id: "shot-ancient-01", state: "active", metadata: {{ title: "棋局开场", duration_seconds: 6, blocking: "容华面对白筱，烛火照亮棋盘。", intent: "古言棋局域推进" }} }},
+          ],
+          dependencies: [
+            {{ from_id: "revision-v3", to_id: "sequence-v3", relation_type: "derived_from" }},
+            {{ from_id: "sequence-v3", to_id: "scene-modern", relation_type: "contains" }},
+            {{ from_id: "sequence-v3", to_id: "scene-ancient", relation_type: "contains" }},
+            {{ from_id: "scene-modern", to_id: "shot-modern-01", relation_type: "contains" }},
+            {{ from_id: "scene-modern", to_id: "shot-modern-02", relation_type: "contains" }},
+            {{ from_id: "scene-ancient", to_id: "shot-ancient-01", relation_type: "contains" }},
+          ],
+        }},
+      }};
+      const source = assetBibleSourceContext(staleLegacyState, workspace);
+      const legacyOnly = assetBibleSourceContext(staleLegacyState, null);
+      console.log(JSON.stringify({{ source, legacyOnly }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+    source = result["source"]
+
+    assert result["legacyOnly"]["script_revision_id"] == "legacy-revision"
+    assert source["authority_mode"] == "canonical_production_graph"
+    assert source["script_revision_id"] == "revision-v3"
+    assert source["shot_candidate_id"] == "graph-v3-digest"
+    assert source["scene_count"] == 2
+    assert source["shot_count"] == 3
+    assert source["duration_sec"] == 21
+    assert [item["display_name"] for item in source["canonical_assets"]] == [
+        "现代重生域",
+        "古言棋局域",
+    ]
+    assert source["planning_issues"] == [
+        {
+            "issue_code": "shot_needs_revision_without_reason",
+            "severity": "planning",
+            "scene_id": "scene-modern",
+            "scene_name": "现代重生域",
+            "shot_id": "shot-modern-01",
+            "shot_name": "深海坠落",
+            "review_state": "needs_revision",
+            "review_reason": "",
+            "next_action": "补充返修原因或确认镜头修订后再进入媒体制作。",
+        }
+    ]
+    assert "Legacy source" not in source["source_text"]
+    assert "林晚面对傅行舟" in source["source_text"]
+    assert source["provider_dispatch_count"] == 0
+    assert source["external_cost_usd"] == 0

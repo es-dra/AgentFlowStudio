@@ -2779,7 +2779,7 @@ export function createProductShell(options = {}) {
       ),
       node("h2", "", isApprovedResult ? `${shotLabel} 视频` : "准备单镜头视频"),
       node("p", "", view.status === "empty"
-        ? `先确认${shotLabel} 关键帧与参考图片；确认前不会发送视频任务。`
+        ? `先确认${shotLabel} 资产参考图；仅在镜头明确要求时使用首帧。确认前不会发送视频任务。`
         : `${view.generation_contract.model || "doubao-seedance-2-0"}（非 fast） · 720p · 6 秒`),
     );
     const close = node("button", "studio-icon-button");
@@ -2867,8 +2867,8 @@ export function createProductShell(options = {}) {
     if (view.readiness?.status !== "ready" && view.status === "empty") {
       const blocked = node("div", "image-admission-empty");
       blocked.append(
-        node("strong", "", `等待${shotLabel} 关键帧`),
-        node("p", "", view.readiness?.next_action || `批准${shotLabel} 关键帧后可准备视频。`),
+        node("strong", "", `等待${shotLabel} 资产参考图`),
+        node("p", "", view.readiness?.next_action || `批准${shotLabel} 所需资产参考图后可准备视频。`),
       );
       panel.appendChild(blocked);
       return panel;
@@ -2896,7 +2896,7 @@ export function createProductShell(options = {}) {
       ["实际发送参考图", `${inputContract.reference_images?.length || 0} 张`],
       ["未发送的批准图片", `${excludedGroundingCount} 张`],
       ["费用停止线", `$${view.budget_contract.hard_ceiling_usd} 项目停止线 · 非供应商限额/估算/实际账单`],
-      ["发送规则", "最多 1 次 · 自动重试 0"],
+      ["发送规则", "固定 1 段 × 6 秒 · 最多 1 次 · 自动重试 0"],
     ]) {
       const metric = node("div", "");
       metric.append(node("span", "", label), node("strong", "", value));
@@ -3128,7 +3128,7 @@ export function createProductShell(options = {}) {
             ? "拒绝视频候选"
             : "确认视频准备"),
       node("p", "", commandType === "reserve_dispatch"
-        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · ${videoGenerationModeLabel(manifest)} · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
+        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 固定 1 段 × 6 秒 · ${videoGenerationModeLabel(manifest)} · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
         : commandType === "create_comparison_round"
           ? "旧批准视频保持不变；确认只保存一个独立叙事镜头对照清单，不发送视频。"
         : commandType === "create_new_round"

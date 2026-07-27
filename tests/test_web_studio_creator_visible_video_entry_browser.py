@@ -295,7 +295,7 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                     exact=False,
                 ).is_visible()
                 assert final_review.get_by_text(
-                    "720p · 6 秒 · 参考图约束视频",
+                    "720p · 固定 1 段 × 6 秒 · 参考图约束视频",
                     exact=False,
                 ).is_visible()
                 assert final_review.get_by_text(
