@@ -562,8 +562,14 @@ export function createProductShell(options = {}) {
     }
     status.append(
       node("strong", "", `制作序列 v${view.graphVersion}`),
-      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.summary.tasks} 任务`),
+      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.mediaSummary?.approvedVideos || 0} 条视频已批准`),
     );
+    if (view.mediaSummary?.approvedVideos) {
+      const watch = node("button", "studio-text-button", "播放已批准视频");
+      watch.type = "button";
+      watch.addEventListener("click", showApprovedVideo);
+      status.appendChild(watch);
+    }
     const details = node("button", "studio-text-button", "制作详情");
     details.type = "button";
     details.addEventListener("click", () => { projectDrawerOpen = true; render(); });
@@ -1159,9 +1165,18 @@ export function createProductShell(options = {}) {
         });
         headerActions.appendChild(admission);
         if (["ready", "stale"].includes(videoAdmissionView().readiness?.status)) {
-          const video = node("button", "studio-secondary-button", "准备视频");
+          const videoApproved = (graphView().mediaSummary?.approvedVideos || 0) > 0;
+          const video = node(
+            "button",
+            "studio-secondary-button",
+            videoApproved ? "查看已批准视频" : "准备视频",
+          );
           video.type = "button";
           video.addEventListener("click", () => {
+            if (videoApproved) {
+              showApprovedVideo();
+              return;
+            }
             videoAdmissionOpen = true;
             render();
             requestAnimationFrame(() => {
@@ -1215,8 +1230,8 @@ export function createProductShell(options = {}) {
         : imageAdmissionView().counts.candidate
           ? `${imageAdmissionView().counts.candidate} 张待审看`
           : "尚未生成"],
-      ["视频", videoAdmissionView().item?.state === "approved"
-        ? "1 条已确认"
+      ["视频", graphView().mediaSummary?.approvedVideos
+        ? `${graphView().mediaSummary.approvedVideos} 条已确认`
         : videoAdmissionView().item?.state === "candidate"
           ? "1 条待审看"
           : videoAdmissionView().readiness?.status === "stale"
@@ -1229,6 +1244,12 @@ export function createProductShell(options = {}) {
       const item = node("div", "");
       item.append(node("span", "", label), node("strong", "", value));
       bar.appendChild(item);
+    }
+    if (graphView().mediaSummary?.approvedVideos) {
+      const watch = node("button", "studio-text-button", "在故事板播放");
+      watch.type = "button";
+      watch.addEventListener("click", showApprovedVideo);
+      bar.appendChild(watch);
     }
     return bar;
   }
@@ -2652,15 +2673,26 @@ export function createProductShell(options = {}) {
 
   function buildVideoAdmissionPanel() {
     const view = videoAdmissionView();
+    const item = view.item || {};
+    const approvedShot = graphApprovedShotForAdmission(view);
+    const isApprovedResult = Boolean(approvedShot?.video);
+    const shotLabel = videoShotLabel(view);
     const panel = node("section", "image-admission-panel video-admission-panel");
-    panel.setAttribute("aria-label", "镜头 01 视频准备");
+    panel.setAttribute(
+      "aria-label",
+      isApprovedResult ? "已批准镜头视频" : "镜头视频准备",
+    );
     const head = node("div", "image-admission-head");
     const copy = node("div", "");
     copy.append(
-      node("span", "eyebrow", "镜头 01 · 已批准关键帧驱动"),
-      node("h2", "", "准备单镜头视频"),
+      node(
+        "span",
+        "eyebrow",
+        isApprovedResult ? "已批准视频" : "已批准关键帧驱动",
+      ),
+      node("h2", "", isApprovedResult ? `${shotLabel} 视频` : "准备单镜头视频"),
       node("p", "", view.status === "empty"
-        ? "先确认镜头 01 关键帧与参考图片；确认前不会发送视频任务。"
+        ? `先确认${shotLabel} 关键帧与参考图片；确认前不会发送视频任务。`
         : `${view.generation_contract.model || "doubao-seedance-2-0"}（非 fast） · 720p · 6 秒`),
     );
     const close = node("button", "studio-icon-button");
@@ -2684,6 +2716,27 @@ export function createProductShell(options = {}) {
       panel.appendChild(buildVideoAdmissionReview());
       return panel;
     }
+    if (item.state === "approved" && !isApprovedResult) {
+      const mismatch = node("div", "image-admission-empty");
+      mismatch.append(
+        node("strong", "", "批准记录需要核对"),
+        node("p", "", "当前制作图没有可验证的对应视频结果；不会把旧记录当作项目媒体显示。"),
+      );
+      panel.appendChild(mismatch);
+      return panel;
+    }
+    if (isApprovedResult) {
+      panel.appendChild(buildApprovedShotVideo(approvedShot));
+      if (view.lineage?.status === "stale") {
+        const details = node("details", "approved-video-lineage-details");
+        details.append(
+          node("summary", "", "制作详情"),
+          node("p", "", "视频已按批准时的制作版本保存；后续制作图变化不会撤销这个已批准结果。"),
+        );
+        panel.appendChild(details);
+      }
+      return panel;
+    }
     if (view.lineage?.status === "stale") {
       const stale = node("div", "image-admission-empty video-admission-stale");
       const preparedVersion = Number(view.lineage.prepared_graph_version || 0);
@@ -2704,7 +2757,7 @@ export function createProductShell(options = {}) {
         "p",
         "",
         view.lineage.keyframe_reuse === "verified_current"
-          ? `镜头 01 的画面语义未变化；已批准关键帧与 ${view.source?.references?.length || 0} 张参考图可复用。`
+          ? `${shotLabel} 的画面语义未变化；已批准关键帧与 ${view.source?.references?.length || 0} 张参考图可复用。`
           : view.readiness?.next_action || "当前镜头画面来源需要重新确认。",
       ));
       if (view.lineage.rebuild_allowed) {
@@ -2726,8 +2779,8 @@ export function createProductShell(options = {}) {
     if (view.readiness?.status !== "ready" && view.status === "empty") {
       const blocked = node("div", "image-admission-empty");
       blocked.append(
-        node("strong", "", "等待镜头 01 关键帧"),
-        node("p", "", view.readiness?.next_action || "批准镜头 01 关键帧后可准备视频。"),
+        node("strong", "", `等待${shotLabel} 关键帧`),
+        node("p", "", view.readiness?.next_action || `批准${shotLabel} 关键帧后可准备视频。`),
       );
       panel.appendChild(blocked);
       return panel;
@@ -2767,7 +2820,6 @@ export function createProductShell(options = {}) {
       metrics.appendChild(metric);
     }
     panel.appendChild(metrics);
-    const item = view.item || {};
     if (item.state === "planned") {
       if (view.readiness?.status !== "ready") {
         const blocked = node("div", "image-admission-empty");
@@ -2822,7 +2874,7 @@ export function createProductShell(options = {}) {
       video.controls = true;
       video.playsInline = true;
       video.preload = "metadata";
-      video.setAttribute("aria-label", "镜头 01 视频候选");
+      video.setAttribute("aria-label", `${shotLabel} 视频候选`);
       if (videoAdmissionMediaState !== "loaded") {
         video.addEventListener("loadeddata", () => {
           videoAdmissionMediaState = "loaded";
@@ -2845,8 +2897,6 @@ export function createProductShell(options = {}) {
       approve.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "approve" }));
       actions.append(reject, approve);
       panel.appendChild(actions);
-    } else if (item.state === "approved") {
-      panel.appendChild(node("p", "", "视频候选已批准并保存到当前项目。"));
     } else if (item.state === "failed") {
       panel.appendChild(node("p", "", "视频任务未产生可审核候选；不会自动重试。"));
     }
@@ -2858,11 +2908,12 @@ export function createProductShell(options = {}) {
     const commandType = preview.command?.type;
     const manifest = preview.result?.manifest || {};
     const reviewView = videoAdmissionProjection({ manifest });
+    const shotLabel = videoShotLabel(reviewView);
     const review = node("section", "image-admission-review");
     review.setAttribute("aria-live", "polite");
     review.append(
       node("strong", "", commandType === "reserve_dispatch"
-        ? "确认发送镜头 01 视频"
+        ? `确认发送${shotLabel} 视频`
         : commandType === "create_new_round"
           ? "确认建立新的单次视频清单"
         : commandType === "recompile_current"
@@ -3213,7 +3264,7 @@ export function createProductShell(options = {}) {
     });
     aside.appendChild(list);
     const progress = node("div", "scene-progress");
-    progress.innerHTML = `<span>媒体生产</span><strong>已生成媒体 ${generatedMediaCount()} / ${totalShots()}</strong><div><i style="width:${mediaCompletionPercent()}%"></i></div>`;
+    progress.innerHTML = `<span>媒体生产</span><strong>已生成媒体 ${generatedMediaCount()} / ${totalShots()}${approvedVideoCount() ? ` · 已批准视频 ${approvedVideoCount()}` : ""}</strong><div><i style="width:${mediaCompletionPercent()}%"></i></div>`;
     aside.appendChild(progress);
     return aside;
   }
@@ -3288,6 +3339,9 @@ export function createProductShell(options = {}) {
     grid.classList.toggle("is-sparse", sparse);
     scene.shots.forEach((shot, index) => grid.appendChild(buildShotCard(shot, index)));
     sectionEl.appendChild(grid);
+    if (currentShot().video) {
+      sectionEl.appendChild(buildApprovedShotVideo(currentShot()));
+    }
     return sectionEl;
   }
 
@@ -3617,6 +3671,9 @@ export function createProductShell(options = {}) {
       node("span", "shot-index", String(index + 1).padStart(2, "0")),
       node("span", "shot-duration", shot.duration),
     );
+    if (shot.video) {
+      media.appendChild(node("span", "shot-video-approved", "视频已保存"));
+    }
     const copy = node("span", "shot-copy");
     copy.append(
       node("strong", "", shot.title),
@@ -3626,6 +3683,47 @@ export function createProductShell(options = {}) {
     card.append(media, copy);
     card.addEventListener("click", () => selectContext(selection.sceneIndex, index));
     return card;
+  }
+
+  function buildApprovedShotVideo(shot) {
+    const sectionEl = node("section", "approved-shot-video");
+    sectionEl.setAttribute("aria-label", `${shot.title || "当前镜头"}已批准视频`);
+    const copy = node("div", "approved-shot-video-copy");
+    copy.append(
+      node("span", "eyebrow", "已保存到项目"),
+      node("h2", "", `${shot.title || "当前镜头"}视频`),
+      node("p", "", "这是当前制作图已批准的视频结果；刷新或切换视图不会重新生成。"),
+    );
+    const facts = node("dl", "approved-shot-video-facts");
+    for (const [label, value] of [
+      ["模型", shot.video.model || "已批准模型"],
+      ["规格", [shot.video.resolution, shot.video.durationSeconds ? `${shot.video.durationSeconds} 秒` : ""].filter(Boolean).join(" · ") || "已保存"],
+      ["状态", "视频已保存到项目"],
+    ]) {
+      facts.append(node("dt", "", label), node("dd", "", value));
+    }
+    copy.appendChild(facts);
+    sectionEl.appendChild(copy);
+    if (shot.video.previewUrl) {
+      const frame = node("div", "approved-shot-video-frame");
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", `${shot.title || "当前镜头"}已批准视频播放器`);
+      video.addEventListener("loadeddata", () => {
+        frame.dataset.mediaState = "ready";
+      }, { once: true });
+      video.addEventListener("error", () => {
+        frame.dataset.mediaState = "error";
+      }, { once: true });
+      void setRuntimeMediaSource(video, shot.video.previewUrl);
+      frame.appendChild(video);
+      sectionEl.appendChild(frame);
+    } else {
+      sectionEl.appendChild(node("p", "approved-shot-video-unavailable", "视频记录已保存，但当前媒体文件不可播放。"));
+    }
+    return sectionEl;
   }
 
   function buildVersionBar() {
@@ -3769,6 +3867,10 @@ export function createProductShell(options = {}) {
         video?.focus();
         void video?.play?.().catch(() => {});
       });
+      return;
+    }
+    if (action.action === "view_approved_video") {
+      showApprovedVideo();
       return;
     }
     if (action.action === "prepare_shot_video") {
@@ -4263,6 +4365,9 @@ export function createProductShell(options = {}) {
     context.video_model = String(video.capability?.model || video.generation_contract?.model || "");
     context.video_resolution = String(video.capability?.resolution || video.generation_contract?.resolution || "");
     context.video_duration_sec = Number(video.capability?.duration_sec || video.generation_contract?.duration_sec || 0);
+    context.approved_video_count = Number(graphView().mediaSummary?.approvedVideos || 0);
+    context.current_shot_has_approved_video = Boolean(currentShot().video);
+    context.current_shot_video_state = currentShot().video ? "approved" : "not_approved";
     if (mediaOperationsReady()) {
       const ops = mediaOperationsView();
       const selected = currentShot();
@@ -4490,6 +4595,24 @@ export function createProductShell(options = {}) {
     render();
   }
 
+  function showApprovedVideo() {
+    const scenes = sceneModel();
+    for (let sceneIndex = 0; sceneIndex < scenes.length; sceneIndex += 1) {
+      const shotIndex = scenes[sceneIndex].shots.findIndex((shot) => Boolean(shot.video));
+      if (shotIndex < 0) continue;
+      selection = { sceneIndex, shotIndex };
+      section = "storyboard";
+      videoAdmissionOpen = true;
+      closeResponsiveAgentOverlay();
+      render();
+      requestAnimationFrame(() => {
+        document.querySelector(".approved-shot-video video")?.focus();
+      });
+      return;
+    }
+    showStoryboard();
+  }
+
   function showAssetBible() {
     section = "asset_bible";
     closeResponsiveAgentOverlay();
@@ -4646,7 +4769,9 @@ export function createProductShell(options = {}) {
   function graphShotModel() {
     return graphView().shots.map((shot, index) => ({ nodeId: shot.nodeId, graphNodeId: shot.graphNodeId,
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
-      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview), state: shot.state, sceneId: shot.sceneNodeId }));
+      duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview),
+      video: shot.video ? { ...shot.video, previewUrl: safePreview(shot.video.previewUrl) } : null,
+      state: shot.state, sceneId: shot.sceneNodeId }));
   }
 
   function graphSceneModel() {
@@ -4670,6 +4795,21 @@ export function createProductShell(options = {}) {
   }
   function videoAdmissionView() {
     return videoAdmissionProjection(snapshot.videoAdmission, videoAdmissionMediaState);
+  }
+  function graphApprovedShotForAdmission(view = videoAdmissionView()) {
+    const sourceShotId = String(view.source?.shot?.shot_id || "");
+    const selected = currentShot();
+    if (!selected.video) return null;
+    if (sourceShotId && selected.graphNodeId !== sourceShotId) return null;
+    return selected;
+  }
+  function videoShotLabel(view = videoAdmissionView()) {
+    return cleanTitle(
+      view.source?.shot?.label
+      || view.readiness?.shot_label
+      || currentShot().title
+      || "当前镜头",
+    );
   }
   function selectedAsset() {
     const view = assetBibleView();
@@ -4732,7 +4872,16 @@ export function createProductShell(options = {}) {
     const durationSec = scenes.reduce((sum, scene) => sum + scene.shots.reduce((shotSum, shot) => shotSum + Number.parseFloat(shot.duration || 0), 0), 0);
     return { scene_count: scenes.length, shot_count: shotCount, duration_sec: durationSec };
   }
-  function generatedMediaCount() { return sceneModel().flatMap((scene) => scene.shots).filter((shot) => Boolean(shot.preview)).length; }
+  function generatedMediaCount() {
+    return sceneModel().flatMap((scene) => scene.shots).filter(
+      (shot) => Boolean(shot.preview || shot.video),
+    ).length;
+  }
+  function approvedVideoCount() {
+    return sceneModel().flatMap((scene) => scene.shots).filter(
+      (shot) => Boolean(shot.video),
+    ).length;
+  }
   function mediaCompletionPercent() { return totalShots() ? Math.round((generatedMediaCount() / totalShots()) * 100) : 0; }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
   function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }

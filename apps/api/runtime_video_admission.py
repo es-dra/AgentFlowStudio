@@ -1366,6 +1366,7 @@ def _approve_to_graph(
         raise ValueError("video candidate differs from its review metadata")
     if (candidate.get("technical_qa") or {}).get("status") != "pass":
         raise ValueError("video candidate has not passed technical review")
+    technical_qa = candidate.get("technical_qa") or {}
     node_id = f"video-media-{safe_id(manifest['manifest_id'])}"
     events = [
         {
@@ -1380,11 +1381,16 @@ def _approve_to_graph(
                     "manifest_hash": manifest["manifest_hash"],
                     "job_id": job_id,
                     "candidate_id": candidate_id,
+                    "source_shot_id": manifest["source"]["shot"]["shot_id"],
                     "sha256": candidate["sha256"],
                     "byte_count": candidate["byte_count"],
                     "model": MODEL_ID,
                     "resolution": RESOLUTION,
                     "duration_sec": DURATION_SEC,
+                    "mime_type": str(technical_qa.get("container") or ""),
+                    "width": int(technical_qa.get("width") or 0),
+                    "height": int(technical_qa.get("height") or 0),
+                    "codec": str(technical_qa.get("codec") or ""),
                     "billing_verification_state": "unverified",
                     "actual_usd": None,
                     "provider_reported_output_tokens": (

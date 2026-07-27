@@ -34,6 +34,15 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const pop = el("div");
   pop.style.minWidth = "188px";
   const anchor = resolveAnchor(anchorOrPoint);
+  if (node.params?.productionGraphProjection) {
+    addDisabledItem(
+      "lock",
+      "已批准项目结果",
+      "此节点只读投影当前制作图；生成与修改请从故事板的明确操作进入。",
+    );
+    showPopover(anchor.el, pop, { place: "bottom", onClose: anchor.cleanup });
+    return;
+  }
 
   addItem("pencil", "重命名", () => renameNode(store, nodeId, anchor.point || anchor.el));
   addItem("copy", "复制节点", () => duplicateNode(store, nodeId));

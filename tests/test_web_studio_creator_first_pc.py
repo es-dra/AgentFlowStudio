@@ -450,6 +450,150 @@ def test_approved_keyframe_projects_into_storyboard_from_the_same_graph_after_re
     assert "image.src = shot.preview" not in shot_card
 
 
+def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh() -> None:
+    projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    script = f"""
+      import {{
+        applyProductionGraphCanvasProjection,
+        productionGraphWorkspaceProjection,
+      }} from {json.dumps(projection_uri)};
+      const workspace = {{
+        status: "ready",
+        project_id: "video-project",
+        graph_version: 16,
+        graph_digest: "graph-v16",
+        storyboard: {{ graph_version: 16, graph_digest: "graph-v16" }},
+        sequence: {{
+          shots: [
+            {{ node_id: "shot-alpha", state: "active", metadata: {{ title: "Alpha", duration_seconds: 6 }} }},
+            {{ node_id: "shot-beta", state: "active", metadata: {{ title: "Beta", duration_seconds: 8 }} }},
+          ],
+          scenes: [{{ node_id: "scene-main", state: "active", metadata: {{ name: "Main" }} }}],
+          approved_media: [
+            {{
+              media_node_id: "image-alpha",
+              media_kind: "image",
+              preview_url: "/projects/video-project/image-assets/image-alpha/preview",
+              width: 1280,
+              height: 720,
+              target_node_ids: ["shot-alpha"],
+            }},
+            {{
+              media_node_id: "video-alpha",
+              media_kind: "video",
+              preview_url: "/projects/video-project/approved-video-assets/video-alpha/preview",
+              mime_type: "video/mp4",
+              container: "video/mp4",
+              width: 1280,
+              height: 720,
+              duration_sec: 6.04,
+              codec: "h264",
+              model: "model-alpha",
+              resolution: "720p",
+              approval_graph_version: 16,
+              target_node_ids: ["shot-alpha"],
+              lineage: {{ source_kind: "approved_video_receipt", target_relation: "approved_video" }},
+            }},
+            {{
+              media_node_id: "video-cross-project",
+              media_kind: "video",
+              preview_url: "/projects/other/approved-video-assets/video-cross-project/preview",
+              target_node_ids: ["shot-beta"],
+            }},
+            {{
+              media_node_id: "video-beta-a",
+              media_kind: "video",
+              preview_url: "/projects/video-project/approved-video-assets/video-beta-a/preview",
+              target_node_ids: ["shot-beta"],
+            }},
+            {{
+              media_node_id: "video-beta-b",
+              media_kind: "video",
+              preview_url: "/projects/video-project/approved-video-assets/video-beta-b/preview",
+              target_node_ids: ["shot-beta"],
+            }},
+          ],
+          dependencies: [
+            {{ from_id: "scene-main", to_id: "shot-alpha", relation_type: "contains" }},
+            {{ from_id: "scene-main", to_id: "shot-beta", relation_type: "contains" }},
+            {{ from_id: "shot-alpha", to_id: "video-alpha", relation_type: "approved_video" }},
+          ],
+        }},
+      }};
+      const first = productionGraphWorkspaceProjection(workspace);
+      const refreshed = productionGraphWorkspaceProjection(JSON.parse(JSON.stringify(workspace)));
+      const state = {{
+        nodes: {{}},
+        edges: {{}},
+        order: [],
+        selection: {{ nodeIds: [], edgeId: null }},
+        production: {{}},
+      }};
+      applyProductionGraphCanvasProjection(state, workspace);
+      const canvasVideo = Object.values(state.nodes).find(
+        (node) => node.type === "video" && node.params?.productionGraphProjection
+      );
+      console.log(JSON.stringify({{
+        first,
+        refreshed,
+        canvasVideo,
+        approvedVideoEdges: Object.values(state.edges).filter(
+          (edge) => edge.relation_type === "production_graph_approved_video"
+        ).length,
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    for projection in (result["first"], result["refreshed"]):
+        alpha, beta = projection["shots"]
+        assert alpha["preview"].endswith("/image-alpha/preview")
+        assert alpha["video"] == {
+            "mediaNodeId": "video-alpha",
+            "mediaKind": "video",
+            "previewUrl": (
+                "/projects/video-project/approved-video-assets/"
+                "video-alpha/preview"
+            ),
+            "mimeType": "video/mp4",
+            "container": "video/mp4",
+            "width": 1280,
+            "height": 720,
+            "durationSeconds": 6.04,
+            "codec": "h264",
+            "model": "model-alpha",
+            "resolution": "720p",
+            "approvalGraphVersion": 16,
+            "targetNodeIds": ["shot-alpha"],
+            "lineage": {
+                "sourceKind": "approved_video_receipt",
+                "targetRelation": "approved_video",
+            },
+        }
+        assert beta["video"] is None
+        assert projection["mediaSummary"] == {
+            "approvedImages": 1,
+            "approvedVideos": 1,
+            "readyShots": 1,
+        }
+
+    canvas_video = result["canvasVideo"]
+    assert canvas_video["status"] == "complete"
+    assert canvas_video["result"] == "视频已保存到当前项目。"
+    assert canvas_video["previewUrl"].startswith(
+        "/projects/video-project/approved-video-assets/"
+    )
+    assert canvas_video["params"]["approvedMedia"]["model"] == "model-alpha"
+    assert canvas_video["params"]["approvedMedia"]["source_node_ids"] == ["shot-alpha"]
+    assert result["approvedVideoEdges"] == 1
+
+
 def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection() -> None:
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     projection = (STUDIO / "src" / "production-graph-workspace-projection.js").read_text(encoding="utf-8")

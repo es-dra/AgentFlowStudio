@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import VideoGenerationRequest
+from apps.api.runtime_film_production_graph import _approved_media_projection
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore, read_json
@@ -1125,7 +1126,243 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
     ]
     assert len(approved_videos) == 1
     assert approved_videos[0]["metadata"]["model"] == MODEL_ID
+    assert approved_videos[0]["metadata"]["source_shot_id"] == approved.json()[
+        "result"
+    ]["manifest"]["source"]["shot"]["shot_id"]
     assert approved_videos[0]["metadata"]["actual_usd"] is None
+    assert approved_videos[0]["metadata"]["mime_type"] == "video/mp4"
+    assert approved_videos[0]["metadata"]["width"] == 1280
+    assert approved_videos[0]["metadata"]["height"] == 720
+    assert approved_videos[0]["metadata"]["codec"] == "mpeg4"
+
+    workspace = client.get(
+        f"/projects/{project_id}/m5/sequence-workspace"
+    ).json()
+    approved_media = workspace["sequence"]["approved_media"]
+    approved_video = next(
+        item for item in approved_media if item["media_kind"] == "video"
+    )
+    assert approved_video == {
+        "media_node_id": approved.json()["result"]["manifest"]["item"]["promotion"][
+            "production_graph_node_id"
+        ],
+        "media_kind": "video",
+        "preview_url": (
+            f"/projects/{project_id}/approved-video-assets/"
+            f"{approved.json()['result']['manifest']['item']['promotion']['production_graph_node_id']}/preview"
+        ),
+        "mime_type": "video/mp4",
+        "container": "video/mp4",
+        "width": 1280,
+        "height": 720,
+        "duration_sec": 6.0,
+        "codec": "mpeg4",
+        "model": MODEL_ID,
+        "resolution": RESOLUTION,
+        "approval_graph_version": graph["version"],
+        "lineage": {
+            "source_kind": "approved_video_receipt",
+            "target_relation": "approved_video",
+        },
+        "target_node_ids": [approved.json()["result"]["manifest"]["source"]["shot"]["shot_id"]],
+    }
+    assert workspace["provider_dispatch_count"] == 0
+    assert workspace["cost_usd"] == 0
+    assert client.get(approved_video["preview_url"]).status_code == 200
+
+    candidate_path.write_bytes(b"tampered-after-approval")
+    assert client.get(approved_video["preview_url"]).status_code == 404
+    tampered_workspace = client.get(
+        f"/projects/{project_id}/m5/sequence-workspace"
+    ).json()
+    assert not any(
+        item["media_kind"] == "video"
+        for item in tampered_workspace["sequence"]["approved_media"]
+    )
+    assert graph_store.load(project_id)["version"] == graph["version"]
+
+
+def test_typed_media_projection_keeps_images_and_multiple_approved_videos_separate(
+    tmp_path,
+) -> None:
+    store = RuntimeStore(tmp_path / "runtime")
+    project_id = "typed-media-projection"
+    nodes: dict[str, dict] = {
+        "shot-a": {"category": "unit", "state": "active", "metadata": {}},
+        "shot-b": {"category": "unit", "state": "active", "metadata": {}},
+        "image-node": {
+            "category": "artifact",
+            "state": "active",
+            "metadata": {
+                "kind": "approved_image",
+                "image_asset_id": "image-safe",
+                "width": 960,
+                "height": 1280,
+                "approval_graph_version": 4,
+            },
+        },
+    }
+    relations = [
+        {
+            "from_id": "shot-a",
+            "to_id": "image-node",
+            "relation_type": "approved_image",
+        },
+    ]
+    admission_dir = store.projects_dir / project_id / "video_admission"
+    history_dir = admission_dir / "history"
+    for index, shot_id in enumerate(("shot-a", "shot-b"), start=1):
+        manifest_id = f"video-manifest-{index}"
+        manifest_hash = str(index) * 64
+        job_id = f"video-job-{index}"
+        candidate_id = f"candidate_{index:03d}"
+        node_id = f"video-node-{index}"
+        video_path = (
+            store.run_dir(project_id, job_id)
+            / "video_candidates"
+            / f"{candidate_id}.mp4"
+        )
+        video_path.parent.mkdir(parents=True, exist_ok=True)
+        video_path.write_bytes(f"video-{index}".encode())
+        manifest = {
+            "manifest_id": manifest_id,
+            "manifest_hash": manifest_hash,
+            "status": "locked",
+            "source": {
+                "shot": {
+                    "shot_id": shot_id,
+                    "label": f"Shot {index}",
+                },
+            },
+            "item": {
+                "state": "approved",
+                "candidate": {
+                    "job_id": job_id,
+                    "candidate_id": candidate_id,
+                    "sha256": hashlib.sha256(video_path.read_bytes()).hexdigest(),
+                    "byte_count": video_path.stat().st_size,
+                    "technical_qa": {
+                        "status": "pass",
+                        "container": "video/mp4",
+                        "width": 1280,
+                        "height": 720,
+                        "duration_sec": 5.0 + index,
+                        "codec": "h264",
+                    },
+                },
+                "promotion": {
+                    "production_graph_node_id": node_id,
+                    "graph_version": 4 + index,
+                },
+            },
+        }
+        manifest_path = (
+            admission_dir / "manifest.json"
+            if index == 2
+            else history_dir / f"{manifest_id}.json"
+        )
+        write_json(manifest_path, manifest)
+        nodes[node_id] = {
+            "category": "artifact",
+            "state": "active",
+            "metadata": {
+                "kind": "approved_video",
+                "manifest_id": manifest_id,
+                "manifest_hash": manifest_hash,
+                "job_id": job_id,
+                "candidate_id": candidate_id,
+                "sha256": manifest["item"]["candidate"]["sha256"],
+                "byte_count": video_path.stat().st_size,
+                "model": MODEL_ID,
+                "resolution": RESOLUTION,
+                "duration_sec": 5 + index,
+            },
+        }
+        relations.append(
+            {
+                "from_id": shot_id,
+                "to_id": node_id,
+                "relation_type": "approved_video",
+            }
+        )
+
+    projection = _approved_media_projection(
+        nodes,
+        relations,
+        project_id=project_id,
+        store=store,
+    )
+    assert [(item["media_kind"], item["target_node_ids"]) for item in projection] == [
+        ("image", ["shot-a"]),
+        ("video", ["shot-a"]),
+        ("video", ["shot-b"]),
+    ]
+    assert [item["duration_sec"] for item in projection if item["media_kind"] == "video"] == [
+        6.0,
+        7.0,
+    ]
+    assert all(
+        item["preview_url"].startswith(
+            f"/projects/{project_id}/approved-video-assets/"
+        )
+        for item in projection
+        if item["media_kind"] == "video"
+    )
+
+    first_video = next(
+        item
+        for item in projection
+        if item["media_kind"] == "video"
+        and item["target_node_ids"] == ["shot-a"]
+    )
+    first_relation = next(
+        relation
+        for relation in relations
+        if relation["to_id"] == "video-node-1"
+    )
+    first_relation["from_id"] = "shot-b"
+    wrong_shot_projection = _approved_media_projection(
+        nodes,
+        relations,
+        project_id=project_id,
+        store=store,
+    )
+    assert [
+        (item["media_kind"], item["target_node_ids"])
+        for item in wrong_shot_projection
+    ] == [
+        ("image", ["shot-a"]),
+        ("video", ["shot-b"]),
+    ]
+    first_relation["from_id"] = "shot-a"
+
+    tampered_path = (
+        store.run_dir(project_id, "video-job-1")
+        / "video_candidates"
+        / "candidate_001.mp4"
+    )
+    tampered_path.write_bytes(b"tampered-approved-video")
+    tampered_projection = _approved_media_projection(
+        nodes,
+        relations,
+        project_id=project_id,
+        store=store,
+    )
+    assert first_video not in tampered_projection
+    assert [
+        (item["media_kind"], item["target_node_ids"])
+        for item in tampered_projection
+    ] == [
+        ("image", ["shot-a"]),
+        ("video", ["shot-b"]),
+    ]
+
+    legacy_projection = _approved_media_projection(
+        nodes,
+        relations,
+        project_id=project_id,
+    )
+    assert [item["media_kind"] for item in legacy_projection] == ["image"]
 
 
 def test_video_approval_reconciles_graph_append_after_ledger_write_crash(

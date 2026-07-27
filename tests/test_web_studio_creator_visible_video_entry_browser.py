@@ -10,6 +10,22 @@ from playwright.sync_api import Page, sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[1]
+VIDEO_BYTES = base64.b64decode(
+    "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAJ2"
+    "EU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHYTbuMU6uEElTDZ1OsggEe"
+    "TbuMU6uEHFO7a1OsggJg7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAVSalmsirXsYMPQkBNgI1MYXZmNjAuMTYuMTAwV0GNTGF2ZjYwLjE2LjEw"
+    "MESJiEBpAAAAAAAAFlSua8GuAQAAAAAAADjXgQFzxYi/M570D1wDI5yBACK1nIN1"
+    "bmSIgQCGhVZfVlA5g4EBI+ODhAJiWgDgibCBoLqBWpqBAhJUw2dAgHNzoGPAgGf"
+    "ImkWjh0VOQ09ERVJEh41MYXZmNjAuMTYuMTAwc3PaY8CLY8WIvzOe9A9cAyNnyK"
+    "VFo4dFTkNPREVSRIeYTGF2YzYwLjMxLjEwMiBsaWJ2cHgtdnA5Z8ihRaOIRFVS"
+    "QVRJT05Eh5MwMDowMDowMC4yMDAwMDAwMDAAH0O2dUC254EAo9WBAACAgkmDQgAJ"
+    "8AWWCjgkHBhyAADQR9j9Ygzb6cw2Dr2gAGslMWDMNQ/sM6Elcq6VDPKPDufmuVw"
+    "5+LCOWEZtEOxtKusYz72cgDb8ccOpfZ1FyJVwo5WBACgAhgBAkpw8TkAAA3AAAFn"
+    "5huCjlYEAUACGAECSnKxXQAADcAAAWfmG4KOVgQB4AIYAQJKceFSgAANwAABZ+Y"
+    "bgo5WBAKAAhgBAkpxUUaAAA3AAAFn5huAcU7trkbuPs4EAt4r3gQHxggGk8IED"
+)
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -21,6 +37,18 @@ class QuietHandler(SimpleHTTPRequestHandler):
             body = _contract_html().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if self.path == (
+            "/projects/browser-video-entry/approved-video-assets/"
+            "video-media-approved/preview"
+        ):
+            body = VIDEO_BYTES
+            self.send_response(200)
+            self.send_header("Content-Type", "video/webm")
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -98,6 +126,151 @@ def test_desktop_storyboard_and_agent_use_the_same_zero_provider_video_entry() -
                 page.locator(".agent-primary-action").get_by_text("准备镜头视频").click()
                 page.get_by_text("确认视频准备", exact=True).wait_for()
                 assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert not console_errors
+            finally:
+                browser.close()
+
+
+def test_approved_video_is_playable_and_consistent_across_refresh_and_views() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type in {"error", "warning"}
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html#approved",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+
+                approved = page.locator(".approved-shot-video").first
+                assert approved.get_by_text("视频已保存到项目", exact=True).is_visible()
+                assert approved.get_by_text("doubao-seedance-2-0", exact=True).is_visible()
+                assert approved.get_by_text("720p · 6.04 秒", exact=True).is_visible()
+                video = approved.locator("video")
+                page.wait_for_function(
+                    """() => {
+                      const video = document.querySelector(".approved-shot-video video");
+                      return video && video.readyState >= 2 && !video.error;
+                    }"""
+                )
+                assert video.evaluate("(element) => element.src.startsWith('blob:')")
+                assert video.evaluate(
+                    "(element) => element.dataset.afsMediaResolved"
+                ).endswith(
+                    "/projects/browser-video-entry/approved-video-assets/"
+                    "video-media-approved/preview"
+                )
+                assert "browser-contract-token" not in page.locator("body").inner_text()
+                assert not page.evaluate(
+                    """() => [...document.querySelectorAll("*")].some(
+                      (element) => [...element.attributes].some(
+                        (attribute) => attribute.value.includes("browser-contract-token")
+                      )
+                    )"""
+                )
+                assert page.get_by_text("制作图已更新", exact=True).count() == 0
+                assert page.locator(".agent-primary-action").get_by_text(
+                    "播放已批准视频",
+                    exact=True,
+                ).is_visible()
+                assert page.get_by_text(
+                    "已生成媒体 1 / 3 · 已批准视频 1",
+                    exact=True,
+                ).is_visible()
+
+                page.evaluate("window.__setVideoSection('asset_bible')")
+                assert page.get_by_text("1 条已确认", exact=True).is_visible()
+                assert page.get_by_role(
+                    "button",
+                    name="在故事板播放",
+                    exact=True,
+                ).is_visible()
+                assert page.locator(".agent-primary-action").get_by_text(
+                    "播放已批准视频",
+                    exact=True,
+                ).is_visible()
+
+                page.evaluate("window.__setVideoSection('canvas')")
+                assert page.get_by_text("1 条视频已批准", exact=False).is_visible()
+                assert page.locator(".graph-canvas-status").get_by_role(
+                    "button",
+                    name="播放已批准视频",
+                    exact=True,
+                ).is_visible()
+                assert page.evaluate(
+                    """() => Object.values(window.__videoStudioState.nodes).some(
+                      (node) => node.type === "video"
+                        && node.status === "complete"
+                        && node.previewUrl.startsWith("/projects/browser-video-entry/")
+                    )"""
+                )
+
+                page.evaluate("window.__refreshVideoEntry()")
+                page.wait_for_function(
+                    """() => {
+                      const video = document.querySelector(".approved-shot-video video");
+                      return video && video.readyState >= 2 && !video.error;
+                    }"""
+                )
+                assert page.get_by_text("视频已保存到项目", exact=True).first.is_visible()
+                assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert page.evaluate("window.__sideEffects.generateVideo") == 0
+                assert not console_errors
+            finally:
+                browser.close()
+
+
+def test_approved_ledger_without_graph_media_does_not_become_a_second_ui_truth() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type in {"error", "warning"}
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html#approved-mismatch",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+
+                assert page.locator(".approved-shot-video").count() == 0
+                assert page.get_by_text("批准记录需要核对", exact=True).is_visible()
+                assert page.get_by_text(
+                    "当前制作图没有可验证的对应视频结果",
+                    exact=False,
+                ).is_visible()
+                assert page.locator(".agent-primary-action").get_by_text(
+                    "播放已批准视频",
+                    exact=True,
+                ).count() == 0
+                assert not page.evaluate(
+                    """() => Object.values(window.__videoStudioState.nodes).some(
+                      (node) => node.type === "video"
+                        && node.params?.productionGraphProjection
+                    )"""
+                )
+                assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert page.evaluate("window.__sideEffects.generateVideo") == 0
                 assert not console_errors
             finally:
                 browser.close()
@@ -445,6 +618,8 @@ def _contract_html() -> str:
         oldManifestArchived: 0,
       };
       const projectId = "browser-video-entry";
+      const approvedLedgerState = ["#approved", "#approved-mismatch"].includes(window.location.hash);
+      const approvedGraphState = window.location.hash === "#approved";
       const bible = {
         schema_version: "afs.asset_bible.v0.1",
         status: "locked",
@@ -497,9 +672,12 @@ def _contract_html() -> str:
       const workspace = {
         status: "ready",
         project_id: projectId,
-        graph_version: 14,
-        graph_digest: "graph-v14",
-        storyboard: { graph_version: 14, graph_digest: "graph-v14" },
+        graph_version: approvedGraphState ? 16 : 14,
+        graph_digest: approvedGraphState ? "graph-v16" : "graph-v14",
+        storyboard: {
+          graph_version: approvedGraphState ? 16 : 14,
+          graph_digest: approvedGraphState ? "graph-v16" : "graph-v14",
+        },
         sequence: {
           script_revisions: [{ node_id: "script-r1", state: "active", metadata: { source_digest: "source" } }],
           sequences: [{ node_id: "sequence-01", state: "active", metadata: { name: "制作序列" } }],
@@ -513,16 +691,42 @@ def _contract_html() -> str:
             { node_id: "shot-02", state: "active", metadata: { title: "镜头 02", duration_seconds: 7, intent: "修复过程" } },
             { node_id: "shot-03", state: "active", metadata: { title: "镜头 03", duration_seconds: 5, intent: "完成修复" } },
           ],
-          approved_media: [{
-            media_node_id: "approved-shot-01",
-            media_kind: "image",
-            preview_url: "/projects/browser-video-entry/image-assets/keyframe-approved/preview",
-            target_node_ids: ["shot-01"],
-          }],
+          approved_media: [
+            {
+              media_node_id: "approved-shot-01",
+              media_kind: "image",
+              preview_url: "/projects/browser-video-entry/image-assets/keyframe-approved/preview",
+              target_node_ids: ["shot-01"],
+            },
+            ...(approvedGraphState ? [{
+              media_node_id: "approved-video-shot-01",
+              media_kind: "video",
+              preview_url: "/projects/browser-video-entry/approved-video-assets/video-media-approved/preview",
+              mime_type: "video/webm",
+              container: "video/webm",
+              width: 1280,
+              height: 720,
+              duration_sec: 6.04,
+              codec: "vp9",
+              model: "doubao-seedance-2-0",
+              resolution: "720p",
+              approval_graph_version: 16,
+              target_node_ids: ["shot-01"],
+              lineage: {
+                source_kind: "approved_video_receipt",
+                target_relation: "approved_video",
+              },
+            }] : []),
+          ],
           dependencies: [
             { from_id: "scene-01", to_id: "shot-01", relation_type: "contains" },
             { from_id: "scene-01", to_id: "shot-02", relation_type: "contains" },
             { from_id: "scene-01", to_id: "shot-03", relation_type: "contains" },
+            ...(approvedGraphState ? [{
+              from_id: "shot-01",
+              to_id: "approved-video-shot-01",
+              relation_type: "approved_video",
+            }] : []),
           ],
           tasks: [],
           candidates: [],
@@ -597,6 +801,45 @@ def _contract_html() -> str:
         budget: { dispatches_reserved: 0, remaining_dispatches: 1 },
         item: { item_id: "video-shot-01", state: "planned" },
         provider_dispatch_count: 0,
+      };
+      const approvedManifest = {
+        ...compiledManifest,
+        version: 3,
+        manifest_id: "video-manifest-approved",
+        manifest_hash: "d".repeat(64),
+        source: {
+          ...source,
+          production_graph: { version: 15, graph_digest: "graph-v15" },
+        },
+        item: {
+          ...compiledManifest.item,
+          state: "approved",
+          candidate: {
+            job_id: "video-job-approved",
+            candidate_id: "candidate-approved",
+            preview_url: "/projects/browser-video-entry/video-generations/video-job-approved/candidates/candidate-approved/preview",
+            sha256: "e".repeat(64),
+            byte_count: 678,
+            technical_qa: {
+              status: "pass",
+              container: "video/webm",
+              width: 1280,
+              height: 720,
+              duration_sec: 6.04,
+              codec: "vp9",
+              decode_probe: "passed",
+            },
+            usage_evidence: {
+              actual_charge_verification: "unverified",
+            },
+          },
+          promotion: {
+            graph_version: 16,
+            graph_digest: "graph-v16",
+          },
+        },
+        budget: { dispatches_reserved: 1, remaining_dispatches: 0 },
+        provider_dispatch_count: 1,
       };
       const newRoundManifest = {
         ...compiledManifest,
@@ -835,17 +1078,38 @@ def _contract_html() -> str:
           status: "locked",
           provider_dispatch_count: 1,
           budget: { dispatches_reserved: 0 },
-          items: [{ item_id: "approved-keyframe", state: "approved" }],
+          items: [{
+            item_id: "approved-keyframe",
+            item_type: "shot_keyframe",
+            label: "镜头 01 关键帧",
+            aspect_ratio: "16:9",
+            size: "1280x720",
+            occurrence_references: { shot_ids: ["shot-01"] },
+            reference_media_ids: ["角色甲", "月台甲", "怀表甲"],
+            state: "approved",
+          }],
         },
       };
       const startPlanned = ["#planned", "#stale", "#rejected"].includes(window.location.hash);
       const startStale = window.location.hash === "#stale";
       const startRejected = window.location.hash === "#rejected";
       const videoAdmission = {
-        status: startPlanned ? "locked" : "empty",
-        manifest: startRejected ? rejectedManifest : startPlanned ? compiledManifest : null,
+        status: startPlanned || approvedLedgerState ? "locked" : "empty",
+        manifest: approvedLedgerState
+          ? approvedManifest
+          : startRejected
+            ? rejectedManifest
+            : startPlanned
+              ? compiledManifest
+              : null,
         readiness: {
-          status: startStale ? "stale" : startRejected ? "new_round_ready" : "ready",
+          status: approvedLedgerState
+            ? "stale"
+            : startStale
+              ? "stale"
+              : startRejected
+                ? "new_round_ready"
+                : "ready",
           shot_id: "shot-01",
           shot_label: "镜头 01",
           first_frame_label: "已批准关键帧",
@@ -856,7 +1120,16 @@ def _contract_html() -> str:
             next_action: "建立新的单次视频清单；旧失败记录保持不变。",
           } : {}),
         },
-        lineage: startStale
+        lineage: approvedLedgerState
+          ? {
+              status: "stale",
+              prepared_graph_version: 15,
+              current_graph_version: 16,
+              keyframe_reuse: "verified_current",
+              affected_objects: [],
+              rebuild_allowed: false,
+            }
+          : startStale
           ? {
               status: "stale",
               prepared_graph_version: 14,
@@ -875,10 +1148,18 @@ def _contract_html() -> str:
         provider_dispatch_count: 0,
       };
       persistedVideoAdmission = videoAdmission;
+      window.__videoCanvasShell = document.createElement("div");
+      window.__videoCanvasShell.id = "studio-editor-shell";
+      const studioStore = {
+        get: () => studioState,
+        set: (mutate) => mutate(studioState),
+        setRuntimePersistenceMode: () => {},
+      };
       const shell = createProductShell({
         getStudioState: () => studioState,
         getRuntime: () => runtime,
-        getStore: () => ({ get: () => studioState }),
+        getStore: () => studioStore,
+        getCanvasShell: () => window.__videoCanvasShell,
         formatError: (error) => String(error?.message || error),
       });
       const authUser = { user_id: "browser-owner", display_name: "Owner" };
@@ -888,6 +1169,8 @@ def _contract_html() -> str:
         await shell.refresh(runtime, authUser);
         shell.setSection("storyboard");
       };
+      window.__setVideoSection = (section) => shell.setSection(section);
+      window.__videoStudioState = studioState;
       window.__persistedVideoState = () => ({
         status: persistedVideoAdmission?.manifest?.status || persistedVideoAdmission?.status || "",
         itemState: persistedVideoAdmission?.manifest?.item?.state || "",

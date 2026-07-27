@@ -5,11 +5,13 @@ from prose, manufacture a plan, or provide sample-content fallbacks.
 """
 from __future__ import annotations
 
+import hashlib
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_production_graph import (
@@ -22,7 +24,9 @@ from apps.api.runtime_production_graph import (
     graph_projection,
     impacted_descendants,
 )
-from apps.api.runtime_store import RuntimeStore, safe_id
+from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
+from apps.api.runtime_video_candidates import candidate_file
+from apps.api.runtime_video_constants import VIDEO_SUFFIX_TYPES
 
 
 FILM_DOMAIN_PACK_SCHEMA_VERSION = "afs.film_domain_pack.v0.1"
@@ -179,7 +183,50 @@ def register_runtime_film_production_graph_routes(app: FastAPI, store: RuntimeSt
         if not graph["nodes"]:
             return {"status": "planning_required", "message": "请导入剧本或确认可信的制作方案。", "graph_version": graph["version"],
                     "graph_digest": graph["graph_digest"], "provider_dispatch_count": 0}
-        return _sequence_workspace_projection(graph, project_id=project_id)
+        return _sequence_workspace_projection(graph, project_id=project_id, store=store)
+
+    @app.get("/projects/{project_id}/approved-video-assets/{media_node_id}/preview")
+    def approved_video_preview(
+        project_id: str,
+        media_node_id: str,
+        request: Request,
+    ) -> FileResponse:
+        require_access(request, project_id)
+        if safe_id(media_node_id) != media_node_id:
+            raise HTTPException(status_code=404, detail="approved video not found")
+        try:
+            graph = graph_store.load(project_id)
+        except ProductionGraphError as exc:
+            raise HTTPException(status_code=404, detail="approved video not found") from exc
+        record = graph.get("nodes", {}).get(media_node_id)
+        metadata = (
+            record.get("metadata")
+            if isinstance(record, Mapping) and isinstance(record.get("metadata"), Mapping)
+            else {}
+        )
+        receipt = _approved_video_receipts(store, project_id).get(media_node_id)
+        approved_relation_sources = {
+            str(relation.get("from_id") or "")
+            for relation in graph.get("relations", [])
+            if relation.get("to_id") == media_node_id
+            and relation.get("relation_type") == "approved_video"
+        }
+        if (
+            not receipt
+            or approved_relation_sources != {receipt["source_shot_id"]}
+            or receipt["source_shot_id"] not in graph.get("nodes", {})
+            or not isinstance(record, Mapping)
+            or record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or metadata.get("kind") != "approved_video"
+            or not _video_receipt_matches_node(receipt, metadata)
+        ):
+            raise HTTPException(status_code=404, detail="approved video not found")
+        return FileResponse(
+            receipt["_media_path"],
+            media_type=receipt["mime_type"],
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.post("/projects/{project_id}/m5/impact-preview")
     def impact_preview(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
@@ -265,6 +312,7 @@ def _sequence_workspace_projection(
     graph: Mapping[str, Any],
     *,
     project_id: str,
+    store: RuntimeStore | None = None,
 ) -> dict[str, Any]:
     nodes = graph["nodes"]
     sequences = [node for node in nodes.values() if node.get("category") == "collection"]
@@ -286,6 +334,7 @@ def _sequence_workspace_projection(
         nodes,
         graph["relations"],
         project_id=project_id,
+        store=store,
     )
     versions = sorted(({"version": item["version"]} for item in graph["idempotency"].values()), key=lambda item: item["version"], reverse=True)
     return {"status": "ready", "project_id": safe_id(project_id),
@@ -307,23 +356,37 @@ def _approved_media_projection(
     relations: list[Mapping[str, Any]],
     *,
     project_id: str,
+    store: RuntimeStore | None = None,
 ) -> list[dict[str, Any]]:
-    targets_by_media: dict[str, list[str]] = {}
+    targets_by_media: dict[str, tuple[str, list[str]]] = {}
     for relation in relations:
-        if relation.get("relation_type") != "approved_image":
+        relation_type = str(relation.get("relation_type") or "")
+        media_kind = {
+            "approved_image": "image",
+            "approved_video": "video",
+        }.get(relation_type)
+        if not media_kind:
             continue
         media_id = str(relation.get("to_id") or "")
         target_id = str(relation.get("from_id") or "")
         if media_id and target_id in nodes:
-            targets_by_media.setdefault(media_id, []).append(target_id)
+            current_kind, targets = targets_by_media.setdefault(
+                media_id,
+                (media_kind, []),
+            )
+            if current_kind == media_kind:
+                targets.append(target_id)
 
     media_records: dict[str, dict[str, Any]] = {}
+    video_receipts = _approved_video_receipts(store, project_id)
     for node_id, record in nodes.items():
         metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        relation_kind = targets_by_media.get(node_id, ("", []))[0]
         image_asset_id = str(metadata.get("image_asset_id") or "")
         if (
             record.get("category") != "artifact"
             or record.get("state") != "active"
+            or relation_kind != "image"
             or metadata.get("kind") != "approved_image"
             or not image_asset_id
             or safe_id(image_asset_id) != image_asset_id
@@ -344,20 +407,177 @@ def _approved_media_projection(
             ),
         }
 
-    media_by_target: dict[str, list[dict[str, Any]]] = {}
-    for media_id, targets in targets_by_media.items():
+    for node_id, record in nodes.items():
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        relation_kind = targets_by_media.get(node_id, ("", []))[0]
+        if (
+            record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or relation_kind != "video"
+            or metadata.get("kind") != "approved_video"
+        ):
+            continue
+        receipt = video_receipts.get(node_id)
+        relation_targets = set(targets_by_media.get(node_id, ("", []))[1])
+        if (
+            not receipt
+            or relation_targets != {receipt["source_shot_id"]}
+            or not _video_receipt_matches_node(receipt, metadata)
+        ):
+            continue
+        media_records[node_id] = {
+            "media_node_id": node_id,
+            "media_kind": "video",
+            "preview_url": receipt["preview_url"],
+            "mime_type": receipt["mime_type"],
+            "container": receipt["container"],
+            "width": receipt["width"],
+            "height": receipt["height"],
+            "duration_sec": receipt["duration_sec"],
+            "codec": receipt["codec"],
+            "model": str(metadata.get("model") or ""),
+            "resolution": str(metadata.get("resolution") or ""),
+            "approval_graph_version": receipt["approval_graph_version"],
+            "lineage": {
+                "source_kind": "approved_video_receipt",
+                "target_relation": "approved_video",
+            },
+        }
+
+    media_by_target: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for media_id, (media_kind, targets) in targets_by_media.items():
         if media_id not in media_records:
             continue
         for target_id in sorted(set(targets)):
-            media_by_target.setdefault(target_id, []).append(media_records[media_id])
+            media_by_target.setdefault(
+                (target_id, media_kind),
+                [],
+            ).append(media_records[media_id])
 
     approved_media: list[dict[str, Any]] = []
-    for target_id, candidates in sorted(media_by_target.items()):
+    for (target_id, _media_kind), candidates in sorted(media_by_target.items()):
         selected = _current_approved_media(candidates)
         if selected is None:
             continue
         approved_media.append({**selected, "target_node_ids": [target_id]})
     return approved_media
+
+
+def _approved_video_receipts(
+    store: RuntimeStore | None,
+    project_id: str,
+) -> dict[str, dict[str, Any]]:
+    if store is None:
+        return {}
+    root = store.projects_dir / safe_id(project_id) / "video_admission"
+    paths = [root / "manifest.json", *sorted((root / "history").glob("*.json"))]
+    receipts: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            manifest = read_json(path)
+            reject_unsafe_payload(manifest)
+        except (OSError, TypeError, ValueError):
+            continue
+        item = manifest.get("item") if isinstance(manifest.get("item"), Mapping) else {}
+        candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+        promotion = item.get("promotion") if isinstance(item.get("promotion"), Mapping) else {}
+        source = manifest.get("source") if isinstance(manifest.get("source"), Mapping) else {}
+        source_shot = (
+            source.get("shot")
+            if isinstance(source.get("shot"), Mapping)
+            else {}
+        )
+        technical_qa = (
+            candidate.get("technical_qa")
+            if isinstance(candidate.get("technical_qa"), Mapping)
+            else {}
+        )
+        node_id = str(promotion.get("production_graph_node_id") or "")
+        job_id = str(candidate.get("job_id") or "")
+        candidate_id = str(candidate.get("candidate_id") or "")
+        source_shot_id = str(source_shot.get("shot_id") or "")
+        if (
+            item.get("state") != "approved"
+            or technical_qa.get("status") != "pass"
+            or not node_id
+            or not job_id
+            or safe_id(job_id) != job_id
+            or not candidate_id
+            or safe_id(candidate_id) != candidate_id
+            or not source_shot_id
+            or safe_id(source_shot_id) != source_shot_id
+        ):
+            continue
+        media_path = candidate_file(store.run_dir(project_id, job_id), candidate_id)
+        if media_path is None:
+            continue
+        mime_type = VIDEO_SUFFIX_TYPES.get(media_path.suffix.lower(), "")
+        if not mime_type or mime_type != str(technical_qa.get("container") or ""):
+            continue
+        receipts[node_id] = {
+            "manifest_id": str(manifest.get("manifest_id") or ""),
+            "manifest_hash": str(manifest.get("manifest_hash") or ""),
+            "job_id": job_id,
+            "candidate_id": candidate_id,
+            "source_shot_id": source_shot_id,
+            "sha256": str(candidate.get("sha256") or ""),
+            "byte_count": _positive_int(candidate.get("byte_count")),
+            "preview_url": (
+                f"/projects/{safe_id(project_id)}/approved-video-assets/"
+                f"{safe_id(node_id)}/preview"
+            ),
+            "mime_type": mime_type,
+            "container": str(technical_qa.get("container") or ""),
+            "width": int(technical_qa.get("width") or 0),
+            "height": int(technical_qa.get("height") or 0),
+            "duration_sec": float(technical_qa.get("duration_sec") or 0),
+            "codec": str(technical_qa.get("codec") or ""),
+            "approval_graph_version": _positive_int(promotion.get("graph_version")),
+            "_media_path": media_path,
+        }
+    return receipts
+
+
+def _video_receipt_matches_node(
+    receipt: Mapping[str, Any],
+    metadata: Mapping[str, Any],
+) -> bool:
+    media_path = receipt.get("_media_path")
+    expected_sha = str(receipt.get("sha256") or "")
+    if (
+        not hasattr(media_path, "is_file")
+        or not media_path.is_file()
+        or len(expected_sha) != 64
+        or int(receipt.get("byte_count") or 0) <= 0
+        or media_path.stat().st_size != int(receipt["byte_count"])
+        or _file_sha256(media_path) != expected_sha
+    ):
+        return False
+    return (
+        receipt.get("manifest_id") == metadata.get("manifest_id")
+        and receipt.get("manifest_hash") == metadata.get("manifest_hash")
+        and receipt.get("job_id") == metadata.get("job_id")
+        and receipt.get("candidate_id") == metadata.get("candidate_id")
+        and (
+            not metadata.get("source_shot_id")
+            or receipt.get("source_shot_id") == metadata.get("source_shot_id")
+        )
+        and receipt.get("sha256") == metadata.get("sha256")
+        and receipt.get("byte_count") == _positive_int(metadata.get("byte_count"))
+        and int(receipt.get("width") or 0) > 0
+        and int(receipt.get("height") or 0) > 0
+        and float(receipt.get("duration_sec") or 0) > 0
+    )
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _current_approved_media(
