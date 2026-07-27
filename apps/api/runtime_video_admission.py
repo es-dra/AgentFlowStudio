@@ -11,6 +11,10 @@ from typing import Any, Mapping
 from fastapi import FastAPI, HTTPException, Request
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
+from agentflow_studio.model_gateway.artifact_host_policy import (
+    VOLCENGINE_TOS_BEIJING_SUFFIX,
+    artifact_host_policy_from_service,
+)
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from agentflow_studio.slicing_sop.video_metadata import probe_video_metadata
@@ -273,11 +277,12 @@ def video_admission_capability() -> dict[str, Any]:
             str(service.get("input_upload_endpoint") or "/v1/files/uploads/base64")
             == "/v1/files/uploads/base64"
         )
-        artifact_hosts_configured = "media.crazyrouter.com" in {
-            str(item).lower().strip()
-            for item in service.get("allowed_artifact_hosts", [])
-            if str(item).strip()
-        }
+        artifact_policy = artifact_host_policy_from_service(service)
+        artifact_hosts_configured = (
+            artifact_policy.exact_hosts == ("media.crazyrouter.com",)
+            and artifact_policy.bucket_host_suffixes
+            == (VOLCENGINE_TOS_BEIJING_SUFFIX,)
+        )
         configured_input_hosts = (
             service.get("allowed_input_hosts")
             if isinstance(service.get("allowed_input_hosts"), list)
