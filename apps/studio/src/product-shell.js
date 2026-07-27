@@ -1051,7 +1051,7 @@ export function createProductShell(options = {}) {
     main.id = "product-main";
     main.tabIndex = -1;
     main.append(buildContextBar(), buildStoryboardContent(), buildVersionBar());
-    if (videoAdmissionOpen || videoAdmissionView().status !== "empty") {
+    if (shouldRenderVideoAdmissionPanel()) {
       main.appendChild(buildVideoAdmissionPanel());
     }
     return main;
@@ -1197,7 +1197,7 @@ export function createProductShell(options = {}) {
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
       main.appendChild(buildImageAdmissionPanel());
     }
-    if (videoAdmissionOpen || videoAdmissionView().status !== "empty") {
+    if (shouldRenderVideoAdmissionPanel()) {
       main.appendChild(buildVideoAdmissionPanel());
     }
     if (assetCommandError && !assetCommandPreview) main.appendChild(assetBibleFailure());
@@ -3340,7 +3340,9 @@ export function createProductShell(options = {}) {
     scene.shots.forEach((shot, index) => grid.appendChild(buildShotCard(shot, index)));
     sectionEl.appendChild(grid);
     if (currentShot().video) {
-      sectionEl.appendChild(buildApprovedShotVideo(currentShot()));
+      sectionEl.appendChild(buildApprovedShotVideo(currentShot(), {
+        lineage: approvedVideoLineageForShot(currentShot()),
+      }));
     }
     return sectionEl;
   }
@@ -3685,7 +3687,7 @@ export function createProductShell(options = {}) {
     return card;
   }
 
-  function buildApprovedShotVideo(shot) {
+  function buildApprovedShotVideo(shot, { lineage = null } = {}) {
     const sectionEl = node("section", "approved-shot-video");
     sectionEl.setAttribute("aria-label", `${shot.title || "当前镜头"}已批准视频`);
     const copy = node("div", "approved-shot-video-copy");
@@ -3722,6 +3724,14 @@ export function createProductShell(options = {}) {
       sectionEl.appendChild(frame);
     } else {
       sectionEl.appendChild(node("p", "approved-shot-video-unavailable", "视频记录已保存，但当前媒体文件不可播放。"));
+    }
+    if (lineage?.status === "stale") {
+      const details = node("details", "approved-video-lineage-details");
+      details.append(
+        node("summary", "", "制作详情"),
+        node("p", "", "视频已按批准时的制作版本保存；后续制作图变化不会撤销这个已批准结果。"),
+      );
+      sectionEl.appendChild(details);
     }
     return sectionEl;
   }
@@ -4798,10 +4808,25 @@ export function createProductShell(options = {}) {
   }
   function graphApprovedShotForAdmission(view = videoAdmissionView()) {
     const sourceShotId = String(view.source?.shot?.shot_id || "");
+    const shots = sceneModel().flatMap((scene) => scene.shots || []);
+    if (sourceShotId) {
+      return shots.find((shot) => shot.graphNodeId === sourceShotId && shot.video) || null;
+    }
     const selected = currentShot();
-    if (!selected.video) return null;
-    if (sourceShotId && selected.graphNodeId !== sourceShotId) return null;
-    return selected;
+    return selected.video ? selected : shots.find((shot) => shot.video) || null;
+  }
+  function approvedVideoLineageForShot(shot) {
+    const view = videoAdmissionView();
+    const sourceShotId = String(view.source?.shot?.shot_id || "");
+    if (sourceShotId && sourceShotId !== String(shot?.graphNodeId || "")) return null;
+    return view.item?.state === "approved" ? view.lineage || null : null;
+  }
+  function shouldRenderVideoAdmissionPanel() {
+    const view = videoAdmissionView();
+    const approvedTerminal = view.item?.state === "approved"
+      && Boolean(graphApprovedShotForAdmission(view)?.video);
+    if (approvedTerminal && !videoAdmissionPreview && !videoAdmissionError) return false;
+    return videoAdmissionOpen || view.status !== "empty";
   }
   function videoShotLabel(view = videoAdmissionView()) {
     return cleanTitle(

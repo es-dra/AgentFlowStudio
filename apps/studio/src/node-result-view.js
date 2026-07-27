@@ -440,9 +440,24 @@ function segmentLabel(name) {
   return SEGMENT_LABELS[name] || name;
 }
 
-function previewAspectRatio(node) {
+export function previewAspectRatio(node) {
   const value = String(node.params?.previewAspectRatio || node.params?.spec?.ratio || "9:16");
-  return /^\d+:\d+$/.test(value) ? value.replace(":", " / ") : "9 / 16";
+  const match = value.match(/^\s*(\d+)\s*(?::|\/)\s*(\d+)\s*$/);
+  if (!match) return "9 / 16";
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width <= 0 || height <= 0) return "9 / 16";
+  const divisor = greatestCommonDivisor(width, height);
+  return `${width / divisor} / ${height / divisor}`;
+}
+
+function greatestCommonDivisor(left, right) {
+  let a = left;
+  let b = right;
+  while (b) {
+    [a, b] = [b, a % b];
+  }
+  return a || 1;
 }
 
 function downloadPreviewButton(node) {

@@ -452,11 +452,13 @@ def test_approved_keyframe_projects_into_storyboard_from_the_same_graph_after_re
 
 def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh() -> None:
     projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    result_view_uri = (STUDIO / "src" / "node-result-view.js").as_uri()
     script = f"""
       import {{
         applyProductionGraphCanvasProjection,
         productionGraphWorkspaceProjection,
       }} from {json.dumps(projection_uri)};
+      import {{ previewAspectRatio }} from {json.dumps(result_view_uri)};
       const workspace = {{
         status: "ready",
         project_id: "video-project",
@@ -537,6 +539,7 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
         first,
         refreshed,
         canvasVideo,
+        canvasVideoAspectRatio: previewAspectRatio(canvasVideo),
         approvedVideoEdges: Object.values(state.edges).filter(
           (edge) => edge.relation_type === "production_graph_approved_video"
         ).length,
@@ -591,6 +594,10 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
     )
     assert canvas_video["params"]["approvedMedia"]["model"] == "model-alpha"
     assert canvas_video["params"]["approvedMedia"]["source_node_ids"] == ["shot-alpha"]
+    assert canvas_video["params"]["approvedMedia"]["width"] == 1280
+    assert canvas_video["params"]["approvedMedia"]["height"] == 720
+    assert canvas_video["params"]["previewAspectRatio"] == "1280:720"
+    assert result["canvasVideoAspectRatio"] == "16 / 9"
     assert result["approvedVideoEdges"] == 1
 
 

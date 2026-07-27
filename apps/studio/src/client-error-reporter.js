@@ -16,6 +16,10 @@ export function installClientErrorReporter({ getRuntime, getProjectId } = {}) {
   if (state.installed || typeof window === "undefined") return;
   state.installed = true;
   window.addEventListener("error", (event) => {
+    if (isNonActionableBrowserNotification(event)) {
+      if (event.cancelable) event.preventDefault();
+      return;
+    }
     reportClientError({
       event_type: "window_error",
       severity: "error",
@@ -42,6 +46,19 @@ export function installClientErrorReporter({ getRuntime, getProjectId } = {}) {
       getProjectId,
     });
   });
+}
+
+export function isNonActionableBrowserNotification(eventOrMessage) {
+  const event = typeof eventOrMessage === "object" && eventOrMessage !== null
+    ? eventOrMessage
+    : null;
+  if (event?.error || Number(event?.lineno || 0) > 0 || Number(event?.colno || 0) > 0) {
+    return false;
+  }
+  const message = event ? event.message : eventOrMessage;
+  const normalized = String(message || "").trim().replace(/\.$/, "").toLowerCase();
+  return normalized === "resizeobserver loop limit exceeded"
+    || normalized === "resizeobserver loop completed with undelivered notifications";
 }
 
 export function reportClientError({
