@@ -12,7 +12,9 @@ import {
   cancelEmbeddedCreativeAction,
   clearEmbeddedCreativeAction,
   editEmbeddedCreativePreview,
+  prepareEmbeddedShotBreakdown,
   startEmbeddedCreativeAction,
+  updateEmbeddedStoryboardBrief,
 } from "./embedded-creative-actions.js";
 
 export function handleCanvasNodeClick(store, runtime, e) {
@@ -35,6 +37,20 @@ export function handleCanvasNodeClick(store, runtime, e) {
     void applyEmbeddedCreativeAction(store, nodeId, runtime);
   } else if (action === "embedded-creative-cancel") cancelEmbeddedCreativeAction(store, nodeId);
   else if (action === "embedded-creative-clear") clearEmbeddedCreativeAction(store, nodeId);
+  else if (action === "embedded-storyboard-brief-confirm") {
+    const input = nodeEl.querySelector(".embedded-storyboard-duration-input");
+    const productionBrief = updateEmbeddedStoryboardBrief(store, nodeId, input?.value || "");
+    if (productionBrief) {
+      void startEmbeddedCreativeAction(store, runtime, store.get().nodes[nodeId], "shot_breakdown", {
+        mode: node.params?.embeddedCreativeAction?.mode || "dynamic_shot_breakdown",
+        productionBrief,
+      });
+    }
+  } else if (action === "embedded-storyboard-adjust-duration") {
+    prepareEmbeddedShotBreakdown(store, node, {
+      mode: node.params?.embeddedCreativeAction?.mode || "dynamic_shot_breakdown",
+    });
+  }
   else if (action === "embedded-creative-retry") {
     void startEmbeddedCreativeAction(store, runtime, node, actionEl.dataset.creativeAction || node.params?.embeddedCreativeAction?.action_type || "script_revision", {
       mode: actionEl.dataset.creativeMode || node.params?.embeddedCreativeAction?.mode || "",

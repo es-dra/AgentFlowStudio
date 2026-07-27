@@ -353,7 +353,20 @@ let state = {
           source_node_version: "",
           creative_task: { task_id: "task_m6731", state: "preview_ready", phase: "preview_ready", action_type: "shot_breakdown", mode: "dynamic_shot_breakdown" },
           provider_lineage: { service_id: "server_codex", provider: "codex_local", provider_dispatch_count: 1, external_paid_cost_usd: 0 },
-          preview: { revised_text: "INT. 控制室 - 夜\n主角确认最后一次广播。", shot_plan: plan },
+          production_brief: {
+            target_duration_seconds: 161,
+            duration_source: "creator_selected",
+            tolerance_seconds: 1,
+          },
+          preview: {
+            revised_text: "INT. 控制室 - 夜\n主角确认最后一次广播。",
+            shot_plan: plan,
+            production_brief: {
+              target_duration_seconds: 161,
+              duration_source: "creator_selected",
+              tolerance_seconds: 1,
+            },
+          },
           graph_mutation: { mutated: false, scope: "preview_only" },
           cost_usd: 0,
         },

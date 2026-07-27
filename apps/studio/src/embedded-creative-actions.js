@@ -12,6 +12,11 @@ import { visibleCanvasFrame } from "./canvas-safe-area.js";
 import { clampScale, nodesBounds } from "./geometry.js";
 import { defaultParams } from "./nodes.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+import {
+  isValidStoryboardDuration,
+  productionBriefForSource,
+  shotPlanDurationAssessment,
+} from "./storyboard-duration-contract.js";
 
 const ACTION_MODES = {
   script_revision: "professional_expansion",
@@ -27,11 +32,19 @@ export function canUseEmbeddedCreativeAction(node, actionType = "script_revision
 export async function startEmbeddedCreativeAction(store, runtime, node, actionType = "script_revision", options = {}) {
   if (!canUseEmbeddedCreativeAction(node, actionType)) return null;
   const sourceText = sourceTextForNode(node);
+  if (actionType === "shot_breakdown" && !options.productionBrief) {
+    return prepareEmbeddedShotBreakdown(store, node, {
+      mode: options.mode || ACTION_MODES.shot_breakdown,
+    });
+  }
   const actionId = `embedded_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const clientRequestId = options.clientRequestId
     || runtime?.newEmbeddedCreativeClientRequestId?.()
     || `cli_embedded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const mode = options.mode || ACTION_MODES[actionType] || "professional_expansion";
+  const productionBrief = actionType === "shot_breakdown"
+    ? productionBriefForNode(node, sourceText, options.productionBrief)
+    : null;
   const localTask = createLocalCreativeTask(node, actionId, actionType, mode, sourceText);
   store.set((state) => {
     const target = state.nodes[node.id];
@@ -48,6 +61,7 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       requested_at: new Date().toISOString(),
       client_request_id: clientRequestId,
       source_node_version: nodeVersion(target, sourceText),
+      production_brief: productionBrief,
       creative_task: localTask,
       preview: null,
       error: "",
@@ -81,6 +95,9 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       mode,
       context_summary: safeNodeContext(store.get(), node),
       constraints: embeddedConstraints(actionType),
+      production_brief: productionBrief,
+      source_revision_id: cleanToken(node?.params?.scriptRevision?.revision_id, 140),
+      source_digest: cleanDigest(node?.params?.scriptRevision?.source_digest),
       provider_service_id: "server_codex",
       generated_at: new Date().toISOString(),
     }, { clientRequestId });
@@ -105,6 +122,67 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
     markEmbeddedCreativeUnavailable(store, node.id, actionId, safeEmbeddedActionError(error, actionType), localTask);
     return null;
   }
+}
+
+export function prepareEmbeddedShotBreakdown(store, node, options = {}) {
+  if (!canUseEmbeddedCreativeAction(node, "shot_breakdown")) return null;
+  const sourceText = sourceTextForNode(node);
+  const existing = node?.params?.embeddedCreativeAction;
+  const productionBrief = productionBriefForNode(
+    node,
+    sourceText,
+    options.productionBrief || existing?.production_brief,
+  );
+  const actionId = `embedded_brief_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  store.set((state) => {
+    const target = state.nodes[node.id];
+    if (!target) return;
+    target.params.embeddedCreativeAction = {
+      action_id: actionId,
+      action_type: "shot_breakdown",
+      mode: options.mode || ACTION_MODES.shot_breakdown,
+      status: sourceText.trim() ? "briefing" : "needs_input",
+      source_text: sourceText,
+      source_node_version: nodeVersion(target, sourceText),
+      production_brief: productionBrief,
+      message: productionBrief.source_duration_conflict
+        ? "剧本中出现多个总时长，请先确认一个目标时长。"
+        : "先确认目标总时长，再生成分镜预览。",
+      requested_at: new Date().toISOString(),
+      provider_lineage: { provider_calls_started: false, provider_dispatch_count: 0 },
+      graph_mutation: { mutated: false, scope: "brief_only" },
+      ...(existing?.preview
+        ? {
+            previous_preview: existing.preview,
+            previous_client_request_id: existing.client_request_id || "",
+            previous_preview_preserved: true,
+          }
+        : {}),
+    };
+    state.selection = { nodeIds: [node.id], edgeId: null };
+  }, { history: false });
+  void store.flushRuntimeSave?.();
+  dispatchBrowserEvent("afs:agent-chat-open-task", {
+    detail: { node_id: node.id, action_type: "shot_breakdown", task_id: actionId },
+  });
+  return { mode: "briefing", production_brief: productionBrief, provider_calls_started: false };
+}
+
+export function updateEmbeddedStoryboardBrief(store, nodeId, targetDurationSeconds) {
+  if (!isValidStoryboardDuration(targetDurationSeconds)) return null;
+  let updated = null;
+  store.set((state) => {
+    const action = state.nodes?.[nodeId]?.params?.embeddedCreativeAction;
+    if (!action || action.action_type !== "shot_breakdown" || action.status !== "briefing") return;
+    action.production_brief = productionBriefForSource(action.source_text, {
+      target_duration_seconds: targetDurationSeconds,
+      duration_source: "creator_selected",
+    });
+    action.message = "目标时长已设置；确认后只调用文本模型生成分镜预览。";
+    updated = action.production_brief;
+  }, { history: false });
+  void store.flushRuntimeSave?.();
+  return updated;
 }
 
 export async function recoverPendingEmbeddedCreativeActions(store, runtime) {
@@ -224,6 +302,24 @@ export async function applyEmbeddedCreativeAction(store, nodeId, runtime = null)
   const projectedAction = projected?.params?.embeddedCreativeAction;
   const revisedText = String(projectedAction?.preview?.revised_text || "").trim();
   const scriptRevisionId = String(projected?.params?.scriptRevision?.revision_id || "").trim();
+  const shotDurationAssessment = projectedAction?.action_type === "shot_breakdown" && projectedAction?.preview?.shot_plan
+    ? shotPlanDurationAssessment(
+        projectedAction.preview.shot_plan,
+        projectedAction.preview.production_brief
+          || projectedAction.production_brief
+          || productionBriefForNode(projected, projectedAction.source_text),
+      )
+    : null;
+  if (shotDurationAssessment && !shotDurationAssessment.apply_allowed) {
+    store.set((state) => {
+      const action = state.nodes[nodeId]?.params?.embeddedCreativeAction;
+      if (!action) return;
+      action.message = "候选总时长超出当前目标，不能直接应用。请调整时长并重新规划。";
+      action.duration_assessment = shotDurationAssessment;
+    }, { history: false });
+    await store.flushRuntimeSave?.();
+    return false;
+  }
   if (
     runtime?.applyEmbeddedCreativeShotPlan
     && projectedAction?.status === "preview"
@@ -250,6 +346,7 @@ export async function applyEmbeddedCreativeAction(store, nodeId, runtime = null)
             store.get()?.production?.production_graph_projection?.graph_version || 0,
           ),
           expected_request_digest: projectedAction.safe_manifest.request_digest,
+          expected_production_brief: durationAssessmentToBrief(shotDurationAssessment),
         },
       );
       store.set((state) => {
@@ -572,7 +669,10 @@ function defaultNextAction(category, actionType) {
 function resultReadyMessage(actionType, preview) {
   if (actionType === "shot_breakdown") {
     const summary = shotPlanSummary(preview?.shot_plan);
-    return `分镜候选已生成：${summary.scene_count} 场 · ${summary.shot_count} 镜头。请在右侧审阅后应用或取消。`;
+    const assessment = shotPlanDurationAssessment(preview?.shot_plan, preview?.production_brief);
+    return assessment.apply_allowed
+      ? `分镜候选已生成：${summary.scene_count} 场 · ${summary.shot_count} 镜头。请在右侧审阅后应用或取消。`
+      : `分镜候选已保留，但总时长超出 ${Math.round(assessment.target_duration_seconds)} 秒目标；请调整时长并重新规划。`;
   }
   const scenes = Array.isArray(preview?.screenplay_candidate?.scenes) ? preview.screenplay_candidate.scenes.length : 0;
   return scenes
@@ -943,6 +1043,33 @@ function embeddedConstraints(actionType) {
     "专业扩写需要补足角色目标、冲突、关系、动作、对白、节奏和视觉表达。",
     "确认前不改动画布；不要输出空泛标题模板。",
   ];
+}
+
+function productionBriefForNode(node, sourceText, override) {
+  return {
+    ...productionBriefForSource(sourceText, override),
+    source_revision_id: cleanToken(node?.params?.scriptRevision?.revision_id, 140),
+    source_digest: cleanDigest(node?.params?.scriptRevision?.source_digest),
+  };
+}
+
+function durationAssessmentToBrief(assessment) {
+  return {
+    target_duration_seconds: Number(assessment.target_duration_seconds || 0),
+    duration_source: String(assessment.duration_source || "creator_default"),
+    tolerance_seconds: Number(assessment.tolerance_seconds || 0),
+    source_revision_id: String(assessment.source_revision_id || ""),
+    source_digest: String(assessment.source_digest || ""),
+  };
+}
+
+function cleanToken(value, limit) {
+  return String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, limit);
+}
+
+function cleanDigest(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return /^[a-f0-9]{64}$/.test(text) ? text : "";
 }
 
 function dispatchBrowserEvent(name, options) {

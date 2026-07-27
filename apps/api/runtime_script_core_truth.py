@@ -410,6 +410,16 @@ def public_projection(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def current_script_revision_binding(store: RuntimeStore, project_id: str) -> dict[str, str]:
+    revision = _current_revision(_load_state(store, project_id))
+    if not revision:
+        return {"revision_id": "", "source_digest": ""}
+    return {
+        "revision_id": str(revision.get("revision_id") or ""),
+        "source_digest": str(revision.get("source_digest") or ""),
+    }
+
+
 def script_core_truth_projection_for_project(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     store.ensure_project_manifest(project_id)
     return public_projection(_load_state(store, project_id))

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import json
 
 from fastapi.testclient import TestClient
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_embedded_creative_actions import (
+    EmbeddedCreativeActionRequest,
+    _embedded_request_digest,
+)
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -20,6 +23,15 @@ def _create_project(client: TestClient, project_id: str) -> None:
         },
     )
     assert response.status_code == 200, response.text
+
+
+def _create_script_revision(client: TestClient, project_id: str, source_text: str) -> dict:
+    response = client.post(
+        f"/projects/{project_id}/script-revisions",
+        json={"source_kind": "script", "source_text": source_text},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["revision"]
 
 
 def _creative_action_request(**overrides) -> dict:
@@ -38,11 +50,23 @@ def _creative_action_request(**overrides) -> dict:
             "section": "canvas",
         },
         "constraints": ["普通优化必须保持同一节点身份。", "确认前不改动画布。"],
+        "production_brief": None,
+        "source_revision_id": "",
+        "source_digest": "",
         "provider_service_id": "server_codex",
         "generated_at": "2026-07-22T12:00:00Z",
     }
     payload.update(overrides)
     return payload
+
+
+def test_embedded_action_openapi_exposes_required_storyboard_bindings() -> None:
+    request_schema = EmbeddedCreativeActionRequest.model_json_schema()
+    brief_schema = request_schema["$defs"]["EmbeddedProductionBrief"]
+    assert {"production_brief", "source_revision_id", "source_digest"} <= set(
+        request_schema["required"],
+    )
+    assert {"source_revision_id", "source_digest"} <= set(brief_schema["required"])
 
 
 def test_embedded_creative_action_gate_closed_is_preview_only_unavailable(tmp_path, monkeypatch) -> None:
@@ -523,6 +547,8 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "embedded-action-shot-plan"
     _create_project(client, project_id)
+    source_text = "悟空和八戒因为供果争执，最后发现妖怪踪迹。"
+    revision = _create_script_revision(client, project_id, source_text)
     before = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
 
     response = client.post(
@@ -531,7 +557,16 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
             action_type="shot_breakdown",
             mode="dynamic_shot_breakdown",
             node_type="script",
-            source_text="悟空和八戒因为供果争执，最后发现妖怪踪迹。",
+            source_text=source_text,
+            source_revision_id=revision["revision_id"],
+            source_digest=revision["source_digest"],
+            production_brief={
+                "target_duration_seconds": 14,
+                "duration_source": "creator_selected",
+                "tolerance_seconds": 1,
+                "source_revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+            },
         ),
         headers={"X-Client-Request-ID": "cli_dynamic_storyboard_once"},
     )
@@ -540,7 +575,11 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     payload = response.json()
     assert payload["mode"] == "llm"
     assert payload["preview"]["shot_plan"]["total_shots"] == 2
-    assert payload["preview"]["shot_plan"]["estimated_duration_sec"] == 21
+    assert payload["preview"]["shot_plan"]["estimated_duration_sec"] == 14
+    assert payload["preview"]["shot_plan"]["provider_estimated_duration_sec"] == 21
+    assert payload["preview"]["production_brief"]["target_duration_seconds"] == 14
+    assert payload["preview"]["duration_assessment"]["apply_allowed"] is True
+    assert "目标总时长为 14.00 秒" in calls[0][2].prompt
     assert payload["graph_mutation"]["mutated"] is False
     after = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert after["version"] == before["version"]
@@ -550,6 +589,7 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     apply_body = {
         "expected_graph_version": 0,
         "expected_request_digest": payload["safe_manifest"]["request_digest"],
+        "expected_production_brief": payload["preview"]["production_brief"],
     }
     applied = client.post(
         f"/projects/{project_id}/embedded-creative-actions/by-client/cli_dynamic_storyboard_once/apply-shot-plan",
@@ -565,7 +605,6 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     assert len(applied_payload["workspace"]["sequence"]["scenes"]) == 1
     assert len(applied_payload["workspace"]["sequence"]["shots"]) == 2
     assert len(calls) == 1
-
     replay = client.post(
         f"/projects/{project_id}/embedded-creative-actions/by-client/cli_dynamic_storyboard_once/apply-shot-plan",
         json=apply_body,
@@ -574,6 +613,290 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     assert replay.json()["graph_version"] == 1
     assert replay.json()["idempotent_replay"] is True
     assert len(calls) == 1
+
+
+def test_embedded_shot_breakdown_preserves_overlong_preview_but_blocks_apply(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id))
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "shot_breakdown",
+                    "mode": "dynamic_shot_breakdown",
+                    "revised_text": "这一版分镜候选保留完整场景与镜头结构，但总时长远超当前短片目标，需要重新规划后才可应用。",
+                    "change_summary": ["保留完整候选供审阅", "逐镜头时长可机器核验"],
+                    "rationale": "候选必须保留，但不能自行定义目标总时长。",
+                    "unresolved_decisions": [],
+                    "quality_flags": ["duration_review_required"],
+                    "shot_plan": {
+                        "total_shots": 5,
+                        "estimated_duration_sec": 150,
+                        "scenes": [{
+                            "title": "任意空间",
+                            "purpose": "验证超长候选保持可审",
+                            "shots": [
+                                {
+                                    "title": f"镜头 {index}",
+                                    "duration_sec": 30,
+                                    "shot_size": "中景",
+                                    "camera_angle": "平视",
+                                    "movement": "缓慢移动",
+                                    "blocking": "人物完成连续动作",
+                                    "sound": "环境声",
+                                    "transition": "切",
+                                    "narrative_purpose": "推进情节",
+                                }
+                                for index in range(1, 6)
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-overlong-preserved"
+    _create_project(client, project_id)
+    source_text = "一段没有明确总时长的完整 Unicode 剧本。"
+    revision = _create_script_revision(client, project_id, source_text)
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(
+            action_type="shot_breakdown",
+            mode="dynamic_shot_breakdown",
+            node_type="script",
+            source_text=source_text,
+            source_revision_id=revision["revision_id"],
+            source_digest=revision["source_digest"],
+            production_brief={
+                "target_duration_seconds": 120,
+                "duration_source": "creator_default",
+                "tolerance_seconds": 12,
+                "source_revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+            },
+        ),
+        headers={"X-Client-Request-ID": "cli_overlong_storyboard_once"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["preview"]["shot_plan"]["estimated_duration_sec"] == 150
+    assert payload["preview"]["production_brief"]["target_duration_seconds"] == 120
+    assert payload["preview"]["duration_assessment"]["duration_delta_seconds"] == 30
+    assert payload["preview"]["duration_assessment"]["apply_allowed"] is False
+    recovered = client.get(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_overlong_storyboard_once",
+    )
+    assert recovered.status_code == 200
+    assert recovered.json()["preview"]["shot_plan"]["estimated_duration_sec"] == 150
+    blocked = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_overlong_storyboard_once/apply-shot-plan",
+        json={
+            "expected_graph_version": 0,
+            "expected_request_digest": payload["safe_manifest"]["request_digest"],
+            "expected_production_brief": payload["preview"]["production_brief"],
+        },
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["error"] == "embedded_shot_plan_duration_out_of_range"
+    graph = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph["version"] == 0
+    assert len(calls) == 1
+
+
+def test_embedded_shot_breakdown_preserves_explicit_six_minute_contract_through_apply(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id, request))
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "shot_breakdown",
+                    "mode": "dynamic_shot_breakdown",
+                    "revised_text": (
+                        "这份通用长片段分镜严格沿用创作者明确声明的六分钟目标，"
+                        "每个镜头都有完整动作、空间变化、声音和叙事目的，等待审看后才会应用。"
+                    ),
+                    "change_summary": ["保留明确时长", "按内容分配镜头"],
+                    "rationale": "验证显式 production brief 不会被短片缺省覆盖。",
+                    "unresolved_decisions": [],
+                    "quality_flags": [],
+                    "shot_plan": {
+                        "total_shots": 6,
+                        "estimated_duration_sec": 360,
+                        "scenes": [{
+                            "title": "任意连续空间",
+                            "purpose": "完成六个连续叙事阶段",
+                            "shots": [
+                                {
+                                    "title": f"阶段 {index}",
+                                    "duration_sec": 60,
+                                    "shot_size": "中景",
+                                    "camera_angle": "平视",
+                                    "movement": "跟随主体移动",
+                                    "blocking": "主体完成一个完整动作阶段",
+                                    "sound": "连续环境声",
+                                    "transition": "动作切",
+                                    "narrative_purpose": f"推进叙事阶段 {index}",
+                                }
+                                for index in range(1, 7)
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-explicit-six-minute"
+    _create_project(client, project_id)
+    source_text = "这是一部目标总时长约 6 分钟的任意完整故事，包含连续动作与场景变化。"
+    revision = _create_script_revision(client, project_id, source_text)
+    brief = {
+        "target_duration_seconds": 360,
+        "duration_source": "script_explicit",
+        "tolerance_seconds": 36,
+        "source_revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+    }
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        headers={"X-Client-Request-ID": "cli_explicit_six_minute"},
+        json=_creative_action_request(
+            action_type="shot_breakdown",
+            mode="dynamic_shot_breakdown",
+            node_type="script",
+            source_text=source_text,
+            source_revision_id=revision["revision_id"],
+            source_digest=revision["source_digest"],
+            production_brief=brief,
+        ),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["preview"]["shot_plan"]["estimated_duration_sec"] == 360
+    assert payload["preview"]["duration_assessment"] == {
+        **brief,
+        "provider_estimated_duration_seconds": 360,
+        "candidate_duration_seconds": 360,
+        "duration_delta_seconds": 0,
+        "within_tolerance": True,
+        "apply_allowed": True,
+        "status": "within_target",
+    }
+    applied = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_explicit_six_minute/apply-shot-plan",
+        json={
+            "expected_graph_version": 0,
+            "expected_request_digest": payload["safe_manifest"]["request_digest"],
+            "expected_production_brief": brief,
+        },
+    )
+    assert applied.status_code == 200, applied.text
+    workspace = applied.json()["workspace"]
+    sequence_node = next(
+        node for node in workspace["sequence"]["sequences"] if node["category"] == "collection"
+    )
+    assert sequence_node["metadata"]["target_duration_seconds"] == 360
+    assert sum(
+        shot["metadata"]["duration_seconds"] for shot in workspace["sequence"]["shots"]
+    ) == 360
+    assert len(workspace["sequence"]["shots"]) == 6
+    assert len(calls) == 1
+
+
+def test_embedded_shot_breakdown_rejects_stale_script_revision_before_dispatch(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id))
+            raise AssertionError("stale ScriptRevision must fail before provider dispatch")
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-stale-script-binding"
+    _create_project(client, project_id)
+    source_text = "任意完整剧本正文：人物在清晨站台完成一次告别，并把未寄出的信留在长椅上。"
+    revision = client.post(
+        f"/projects/{project_id}/script-revisions",
+        json={
+            "source_kind": "script",
+            "source_text": source_text,
+            "provenance": {"source": "test"},
+        },
+    ).json()["revision"]
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(
+            action_type="shot_breakdown",
+            mode="dynamic_shot_breakdown",
+            node_type="script",
+            source_text=source_text,
+            source_revision_id="revision-stale",
+            source_digest=revision["source_digest"],
+            production_brief={
+                "target_duration_seconds": 60,
+                "duration_source": "creator_selected",
+                "tolerance_seconds": 1,
+                "source_revision_id": "revision-stale",
+                "source_digest": revision["source_digest"],
+            },
+        ),
+        headers={"X-Client-Request-ID": "cli_stale_script_binding"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "embedded_source_revision_changed"
+    assert calls == []
+    assert not (
+        tmp_path
+        / "projects"
+        / project_id
+        / "embedded_creative_action_requests"
+        / "cli_stale_script_binding.json"
+    ).exists()
+
+
+def test_embedded_shot_breakdown_rejects_missing_script_binding_before_dispatch(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id))
+            raise AssertionError("unbound shot breakdown must fail before provider dispatch")
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-missing-script-binding"
+    _create_project(client, project_id)
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(
+            action_type="shot_breakdown",
+            mode="dynamic_shot_breakdown",
+            node_type="script",
+            source_text="任意完整剧本正文。",
+            production_brief={
+                "target_duration_seconds": 60,
+                "duration_source": "creator_selected",
+                "tolerance_seconds": 1,
+            },
+        ),
+    )
+    assert response.status_code == 422
+    assert calls == []
 
 
 def test_embedded_preview_running_claim_never_redispatches(tmp_path, monkeypatch) -> None:
@@ -591,11 +914,7 @@ def test_embedded_preview_running_claim_never_redispatches(tmp_path, monkeypatch
     client_request_id = "cli_embedded_running_claim"
     _create_project(client, project_id)
     request_payload = _creative_action_request()
-    stable_payload = dict(request_payload)
-    stable_payload.pop("generated_at")
-    request_digest = hashlib.sha256(
-        json.dumps(stable_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"),
-    ).hexdigest()
+    request_digest = _embedded_request_digest(EmbeddedCreativeActionRequest.model_validate(request_payload))
     record_path = (
         tmp_path
         / "projects"

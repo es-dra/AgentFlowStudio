@@ -41,7 +41,7 @@ import {
   syncAssetBibleCommandAssistantReceipt,
 } from "./asset-bible-command-recovery.js";
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
-import { startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
+import { prepareEmbeddedShotBreakdown, startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 
 export function createProductShell(options = {}) {
@@ -670,19 +670,15 @@ export function createProductShell(options = {}) {
     const textarea = document.createElement("textarea");
     textarea.rows = 4;
     textarea.value = m6SourceText;
-    textarea.placeholder = "可粘贴想法、已有剧本、场景、镜头、角色、参考图用途或制作目标";
-    textarea.setAttribute("aria-label", "输入想法或已有剧本");
-    textarea.addEventListener("input", () => {
-      m6SourceText = textarea.value;
-      m6SourceDraftDirty = true;
-      writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
-    });
+    textarea.placeholder = "先保存并应用剧本，再准备制作方案";
+    textarea.setAttribute("aria-label", "当前已应用剧本");
+    textarea.readOnly = true;
     const preview = node("button", "studio-primary-button", "生成剧本制作方案");
     preview.type = "button";
     const previewBusy = ["queued", "running"].includes(String(m6PreviewRun?.phase || ""));
     preview.disabled = previewBusy;
     preview.textContent = previewBusy ? "制作方案处理中" : "生成剧本制作方案";
-    preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
+    preview.addEventListener("click", () => previewM6ScriptPlan());
     planner.append(textarea, preview, ...planningImportControls());
     if (m6PreviewRun) planner.appendChild(buildM6PreviewRunStatus());
     status.append(planner, planResizeHandle());
@@ -854,15 +850,23 @@ export function createProductShell(options = {}) {
     requestCanvasSafeAreaUpdate();
   }
 
-  async function previewM6ScriptPlan(sourceText) {
+  async function previewM6ScriptPlan() {
     const runtime = options.getRuntime?.();
     if (!runtime) return;
     const expectedProjectId = currentM6ProjectId();
     if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+    const sourceText = currentScriptTruthSourceText();
+    const sourceBinding = currentScriptTruthBinding();
+    if (!sourceText || !sourceBinding.revision_id || !sourceBinding.source_digest) {
+      notice = "请先保存并应用当前剧本，再准备制作方案。";
+      render();
+      return;
+    }
     const clientRequestId = runtime.newM6PreviewClientRequestId?.() || `m6_${Date.now()}`;
-    m6SourceText = String(sourceText || "");
+    m6SourceText = sourceText;
     writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     writeM6SourceDraft(currentM6SubmittedSourceKey(), m6SourceText);
+    writeM6SourceDraft(currentM6SourceRevisionKey(), currentScriptTruthRevisionBinding());
     m6PreviewRun = {
       run_id: "",
       project_id: expectedProjectId,
@@ -876,8 +880,10 @@ export function createProductShell(options = {}) {
     render();
     try {
       const run = await runtime.previewM6ScriptPlanAssetBible({
-        source_kind: "idea",
+        source_kind: "script",
         source_text: sourceText,
+        source_revision_id: sourceBinding.revision_id,
+        source_revision_digest: sourceBinding.source_digest,
       }, clientRequestId);
       if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
       await observeM6PreviewRun(run, runtime, expectedProjectId);
@@ -1282,8 +1288,13 @@ export function createProductShell(options = {}) {
   function assetBibleStatusBar(view, source) {
     const bar = node("section", "asset-bible-status-bar");
     bar.setAttribute("aria-live", "polite");
+    const currentScriptRevisionId = String(
+      source?.script_revision_id
+      || snapshot.studioState?.production?.script_core_truth_projection?.current_revision_id
+      || "",
+    );
     const items = [
-      ["剧本", source?.script_revision_id ? "已选择" : "待选择"],
+      ["剧本", currentScriptRevisionId ? "已选择" : "待选择"],
       ["镜头", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待安排"],
       ["创作资产", view.counts.total
         ? `${view.counts.approved}/${view.counts.total} 已确认`
@@ -1416,12 +1427,21 @@ export function createProductShell(options = {}) {
 
   function assetBibleEmpty(source) {
     const wrap = node("section", "asset-bible-empty");
-    wrap.appendChild(node("strong", "", source ? "可以建立资产候选" : "等待已应用分镜"));
+    const hasCurrentScript = Boolean(
+      snapshot.studioState?.production?.script_core_truth_projection?.current_revision_id,
+    );
+    wrap.appendChild(node(
+      "strong",
+      "",
+      source ? "可以建立资产候选" : hasCurrentScript ? "剧本已选择，等待应用分镜" : "等待已应用分镜",
+    ));
     wrap.appendChild(node(
       "p",
       "",
       source
         ? `将读取当前剧本版本和 ${source.scene_count} 场 / ${source.shot_count} 镜头，仅识别角色、场景、道具及连续性待确认项。`
+        : hasCurrentScript
+          ? "当前剧本版本已保存；先审看并应用分镜。未应用的候选不会提前进入镜头或资产事实。"
         : "先在 Canvas 完成剧本并应用拆镜；预览、失败或已取消的分镜不会进入 Asset Bible。",
     ));
     if (source?.canonical_assets?.length) {
@@ -3970,13 +3990,10 @@ export function createProductShell(options = {}) {
       }, { history: false });
       setAgentChatExpanded(true);
       render();
-      void startEmbeddedCreativeAction(
-        options.getStore?.(),
-        options.getRuntime?.(),
-        target,
-        "shot_breakdown",
-        { mode: "dynamic_shot_breakdown" },
-      );
+      prepareEmbeddedShotBreakdown(options.getStore?.(), target, {
+        mode: "dynamic_shot_breakdown",
+      });
+      render();
       return;
     }
     if (action.action === "review_storyboard_breakdown") {
@@ -4319,7 +4336,10 @@ export function createProductShell(options = {}) {
 
   function syncPlanningPanelPreference({ force = false } = {}) {
     const nextKey = currentPlanningPanelPreferenceKey();
-    if (!force && planningPanelPreferenceKey === nextKey) return;
+    if (!force && planningPanelPreferenceKey === nextKey) {
+      syncM6SourceRevision();
+      return;
+    }
     const enteringLoadedProject = planningPanelPreferenceKey === "afs:m6:plan-panel:studio"
       && nextKey !== planningPanelPreferenceKey;
     const leavingLoadedProject = planningPanelPreferenceKey
@@ -4332,17 +4352,36 @@ export function createProductShell(options = {}) {
     }
     planningPanelPreferenceKey = nextKey;
     planningPanelOpen = readPlanningPanelPreference(nextKey);
-    const restoredSource = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
-      ? readM6SourceDraft(currentM6SubmittedSourceKey())
-        || readM6SourceDraft(currentM6SourceDraftKey())
-        || currentScriptTruthSourceText()
-      : readM6SourceDraft(currentM6SourceDraftKey()) || currentScriptTruthSourceText();
+    const currentSource = currentScriptTruthSourceText();
+    const currentBinding = currentScriptTruthRevisionBinding();
+    const storedBinding = readM6SourceDraft(currentM6SourceRevisionKey());
+    const storedDraft = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
+      ? readM6SourceDraft(currentM6SubmittedSourceKey()) || readM6SourceDraft(currentM6SourceDraftKey())
+      : readM6SourceDraft(currentM6SourceDraftKey());
+    const restoredSource = currentSource && storedBinding !== currentBinding
+      ? currentSource
+      : storedDraft || currentSource;
     if (enteringLoadedProject && m6SourceDraftDirty && m6SourceText) {
       writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     } else {
       m6SourceText = restoredSource;
     }
     m6SourceDraftDirty = false;
+    if (currentBinding && restoredSource === currentSource) {
+      writeM6SourceDraft(currentM6SourceDraftKey(), currentSource);
+      writeM6SourceDraft(currentM6SourceRevisionKey(), currentBinding);
+    }
+  }
+
+  function syncM6SourceRevision() {
+    if (m6SourceDraftDirty) return;
+    const currentSource = currentScriptTruthSourceText();
+    const currentBinding = currentScriptTruthRevisionBinding();
+    if (!currentSource || !currentBinding) return;
+    if (readM6SourceDraft(currentM6SourceRevisionKey()) === currentBinding) return;
+    m6SourceText = currentSource;
+    writeM6SourceDraft(currentM6SourceDraftKey(), currentSource);
+    writeM6SourceDraft(currentM6SourceRevisionKey(), currentBinding);
   }
 
   function currentM6ProjectId() {
@@ -4394,6 +4433,27 @@ export function createProductShell(options = {}) {
     return `afs:m6:submitted-source:${snapshot.project?.project_id || "studio"}`;
   }
 
+  function currentM6SourceRevisionKey() {
+    return `afs:m6:plan-source-revision:${snapshot.project?.project_id || "studio"}`;
+  }
+
+  function currentScriptTruthRevisionBinding() {
+    const binding = currentScriptTruthBinding();
+    return [binding.revision_id, binding.source_digest].filter(Boolean).join(":");
+  }
+
+  function currentScriptTruthBinding() {
+    const projection = snapshot.studioState?.production?.script_core_truth_projection || {};
+    return {
+      revision_id: String(projection.current_revision_id || ""),
+      source_digest: String(
+        projection.source_digest
+        || projection.current_revision?.source_digest
+        || "",
+      ),
+    };
+  }
+
   function currentScriptTruthSourceText() {
     return String(
       snapshot.studioState?.production?.script_core_truth_projection?.source_text
@@ -4417,19 +4477,18 @@ export function createProductShell(options = {}) {
   }
 
   function currentReadyScriptNode(state = options.getStudioState?.() || snapshot.studioState) {
+    const projection = state?.production?.script_core_truth_projection || {};
     const projected = currentScriptTruthNode(state);
-    if (projected && String(projected.params?.scriptRevision?.source_text || projected.content || "").trim()) {
-      return projected;
-    }
-    const selectedId = state?.selection?.nodeIds?.[0] || "";
-    const selected = selectedId ? state?.nodes?.[selectedId] : null;
-    const nodes = [selected, ...Object.values(state?.nodes || {})];
-    return nodes.find((item, index) => (
-      item
-      && nodes.indexOf(item) === index
-      && item.type === "script"
-      && String(item.params?.scriptRevision?.source_text || item.content || item.prompt || "").trim()
-    )) || null;
+    const binding = projected?.params?.scriptRevision || {};
+    const sourceText = String(binding.source_text || projected?.content || "").trim();
+    return (
+      projected
+      && sourceText
+      && String(binding.revision_id || "") === String(projection.current_revision_id || "")
+      && String(binding.source_digest || "") === String(
+        projection.source_digest || projection.current_revision?.source_digest || "",
+      )
+    ) ? projected : null;
   }
 
   async function previewCurrentIdeaExpansion(sourceText) {

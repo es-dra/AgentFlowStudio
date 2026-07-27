@@ -267,19 +267,40 @@ import assert from "node:assert/strict";
 import { deriveProductionCopilotState } from "./apps/studio/src/asset-bible-workspace.js";
 
 const source = "第一场\n外景，河岸，清晨。邮差把一封无人认领的信放进纸船，纸船逆流而上。\n第二场\n内景，旧邮局，夜。";
+const sourceDigest = "b".repeat(64);
+const scriptNodeId = "script_truth_revision_revision-any";
 const base = {
   nodes: {
-    script_any: {
-      id: "script_any",
+    [scriptNodeId]: {
+      id: scriptNodeId,
       type: "script",
       title: "完整剧本",
       content: source,
-      params: {},
+      params: {
+        scriptCoreProjection: "script_core_truth_projection",
+        scriptRevision: {
+          project_id: "project-any",
+          revision_id: "revision-any",
+          source_kind: "script",
+          source_digest: sourceDigest,
+          source_text: source,
+          analysis_state: "ready",
+        },
+      },
     },
   },
   edges: {},
-  production: {},
-  selection: { nodeIds: ["script_any"], edgeId: null },
+  production: {
+    script_core_truth_projection: {
+      project_id: "project-any",
+      current_revision_id: "revision-any",
+      source_digest: sourceDigest,
+      source_text: source,
+      source_kind: "script",
+      analysis_state: "ready",
+    },
+  },
+  selection: { nodeIds: [scriptNodeId], edgeId: null },
 };
 const required = deriveProductionCopilotState({
   studioState: structuredClone(base),
@@ -293,7 +314,7 @@ assert.equal(required.gate.video, false);
 assert.doesNotMatch(required.ready_summary, /从一个想法开始/);
 
 const failedState = structuredClone(base);
-failedState.nodes.script_any.params.embeddedCreativeAction = {
+failedState.nodes[scriptNodeId].params.embeddedCreativeAction = {
   action_type: "shot_breakdown",
   status: "unavailable",
   provider_lineage: { provider_dispatch_count: 1 },

@@ -342,7 +342,6 @@ export function deriveProductionCopilotState({
     studioState?.production?.script_core_truth_projection?.current_revision_id
     || assetBibleSourceContext(studioState)?.script_revision_id
     || bible.candidate_set?.script_revision_id
-    || readyScriptNode
   );
   const scriptProjection = studioState?.production?.script_core_truth_projection || {};
   const ideaNeedsExpansion = scriptReady
@@ -421,20 +420,23 @@ export function deriveProductionCopilotState({
     scriptReady
     && readyScriptNode
     && !graphReady
-    && (
-      !studioState?.production?.script_core_truth_projection?.current_revision_id
-      || readyScriptNode.params?.embeddedCreativeAction?.action_type === "shot_breakdown"
+    && !(
+      readyScriptNode.params?.embeddedCreativeAction?.action_type === "script_revision"
+      && readyScriptNode.params?.embeddedCreativeAction?.status === "applied"
     )
   ) {
     const action = readyScriptNode.params?.embeddedCreativeAction || {};
     const isBreakdown = action.action_type === "shot_breakdown";
+    const briefing = isBreakdown && action.status === "briefing";
     const running = isBreakdown && ["running", "recovering", "applying"].includes(action.status);
     const previewReady = isBreakdown && action.status === "preview";
     const failed = isBreakdown && action.status === "unavailable";
-    if (running || previewReady || failed || !shotTruth.status || shotTruth.status !== "ready") {
+    if (briefing || running || previewReady || failed || !shotTruth.status || shotTruth.status !== "ready") {
       return {
         stage: previewReady
           ? "storyboard_breakdown_review"
+          : briefing
+            ? "storyboard_duration_brief"
           : running
             ? "storyboard_breakdown_in_progress"
             : failed
@@ -459,6 +461,13 @@ export function deriveProductionCopilotState({
             reason: "场景、镜头顺序和时长已准备好；应用前制作内容不会改变。",
             enabled: true,
           }
+          : briefing
+            ? {
+              action: "review_storyboard_breakdown",
+              label: "确认分镜目标时长",
+              reason: "目标总时长已准备好；确认后只调用文本模型生成分镜预览。",
+              enabled: true,
+            }
           : failed
             ? {
               action: "retry_storyboard_breakdown",
@@ -476,6 +485,8 @@ export function deriveProductionCopilotState({
             },
         ready_summary: previewReady
           ? "分镜候选已准备好。"
+          : briefing
+            ? "完整剧本已保存，等待确认目标时长。"
           : running
             ? "完整剧本已保存，正在处理分镜文本。"
             : failed
@@ -483,6 +494,8 @@ export function deriveProductionCopilotState({
               : "完整剧本已保存。",
         needs_input: previewReady
           ? "审看场景、镜头顺序和时长，再决定应用或取消。"
+          : briefing
+            ? "确认或调整目标总时长，再生成分镜预览。"
           : running
             ? "等待同一文本预览完成。"
             : failed
@@ -850,18 +863,18 @@ function creatorReadySummary({
 }
 
 function readyScriptNodeFromState(studioState = {}) {
-  const selectedId = studioState?.selection?.nodeIds?.[0] || "";
-  const selected = selectedId ? studioState?.nodes?.[selectedId] : null;
-  const candidates = [
-    selected,
-    ...Object.values(studioState?.nodes || {}),
-  ];
-  return candidates.find((node, index) => (
+  const projection = studioState?.production?.script_core_truth_projection || {};
+  const revisionId = String(projection.current_revision_id || "");
+  const node = revisionId ? studioState?.nodes?.[`script_truth_revision_${revisionId}`] : null;
+  const binding = node?.params?.scriptRevision || {};
+  return (
     node
-    && candidates.indexOf(node) === index
-    && node.type === "script"
-    && String(node.params?.scriptRevision?.source_text || node.content || node.prompt || "").trim()
-  )) || null;
+    && String(binding.source_text || node.content || "").trim()
+    && String(binding.revision_id || "") === revisionId
+    && String(binding.source_digest || "") === String(
+      projection.source_digest || projection.current_revision?.source_digest || "",
+    )
+  ) ? node : null;
 }
 
 export function assetTypeLabel(value) {
