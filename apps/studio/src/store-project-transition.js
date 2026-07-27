@@ -172,6 +172,7 @@ export function createStoreProjectTransition({
       readOnly: true,
       reason: prepared.reason || "project_load_failed",
       message: state.ui.saveMessage,
+      retryable: prepared.retryable !== false,
     };
     clearHistory(history);
     blockProjectIdentity(projectId, {

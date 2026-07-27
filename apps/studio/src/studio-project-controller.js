@@ -27,6 +27,10 @@ import {
   isReadOnlyProjectionProject,
   safeProjectRuntimeError as safeError,
 } from "./studio-project-controller-policy.js";
+import {
+  projectIdentityFailure,
+  terminalProjectLoadMessage,
+} from "./studio-project-identity-recovery.js";
 
 const EMPTY_PROJECT_ID = "studio-empty";
 
@@ -36,11 +40,13 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   let currentAuthUser = null;
   let projectAccessRecovery = null;
   let projectTransitionEpoch = 0;
+  const identityRetryAttempts = new Map();
 
   async function applyProject(projectId, runtimeClient, {
     projectName,
     syncAssets = true,
     navigation = "replace",
+    identityRetry = false,
   } = {}) {
     const safe = safeProjectId(projectId);
     if (!safe) {
@@ -60,12 +66,30 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     });
     if (!transitionCurrent()) return { status: "stale" };
     if (prepared.status === "blocked") {
+      const retryCount = identityRetry
+        ? identityRetryAttempts.get(safe) || 1
+        : 0;
+      const failure = projectIdentityFailure(prepared.error);
+      const retryable = failure.retryable && retryCount < 1;
+      const terminal = identityRetry && !retryable;
       setRuntime(runtimeClient, { attachStore: false });
-      store.blockProject(safe, prepared);
-      blockProjectIdentity(safe, { accountId, reason: prepared.reason });
+      store.blockProject(safe, {
+        ...prepared,
+        reason: failure.reason,
+        message: terminal
+          ? terminalProjectLoadMessage(failure.reason)
+          : failure.message,
+        retryable,
+      });
+      blockProjectIdentity(safe, { accountId, reason: failure.reason });
       syncProjectUrl(safe, { replace: navigation !== "push" });
       render();
-      return { status: "blocked", reason: prepared.reason, error: prepared.error };
+      return {
+        status: "blocked",
+        reason: failure.reason,
+        retryable,
+        error: prepared.error,
+      };
     }
     setRuntime(runtimeClient, { attachStore: false });
     await store.commitPreparedProject(prepared, runtimeClient, {
@@ -141,9 +165,14 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       const runtime = getRuntime();
       const currentId = runtime.projectId || store.get().meta.projectId;
       const failure = projectIdentityFailure(error);
+      const retryCount = identityRetryAttempts.get(currentId) || 0;
+      const retryable = failure.retryable && retryCount < 1;
       const prepared = {
         reason: failure.reason,
-        message: failure.message,
+        message: retryable
+          ? failure.message
+          : terminalProjectLoadMessage(failure.reason),
+        retryable,
         error,
       };
       store.blockProject(currentId, prepared);
@@ -181,7 +210,16 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   async function retryCurrentProject() {
     const currentId = safeProjectId(getRuntime().projectId || store.get().meta.projectId);
     if (!currentId || currentId === EMPTY_PROJECT_ID) return { status: "empty" };
-    return applyProject(currentId, createRuntimeClient(currentId), { navigation: "replace" });
+    identityRetryAttempts.set(currentId, (identityRetryAttempts.get(currentId) || 0) + 1);
+    return applyProject(currentId, createRuntimeClient(currentId), {
+      navigation: "replace",
+      identityRetry: true,
+    });
+  }
+
+  function markProjectSurfaceReady(projectId) {
+    const safe = safeProjectId(projectId);
+    if (safe) identityRetryAttempts.delete(safe);
   }
 
   async function createNewProject() {
@@ -288,6 +326,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     switchProject,
     loadRequestedProject,
     retryCurrentProject,
+    markProjectSurfaceReady,
     createNewProject,
     deleteProject,
     projectOptions,
@@ -336,42 +375,6 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     }, { history: false, persist: false });
     render();
   }
-}
-
-function isProjectAccessDeniedError(error) {
-  if (!error) return false;
-  const code = String(error.errorCode || error.payload?.error || error.payload?.detail?.error || "").trim();
-  if (code === "project_access_denied") return true;
-  const status = Number(error.status || 0);
-  const message = error instanceof Error ? error.message : String(error || "");
-  return status === 403 && /project[_ ]access[_ ]denied|没有访问该项目的权限/i.test(message);
-}
-
-function projectIdentityFailure(error) {
-  const status = Number(error?.status || 0);
-  const code = String(error?.errorCode || "").trim();
-  if (isProjectAccessDeniedError(error)) {
-    return {
-      reason: "project_access_denied",
-      message: "当前账号无权访问此项目。没有加载其他项目，也未发送任何修改请求。",
-    };
-  }
-  if (status === 404 || code === "project_not_found") {
-    return {
-      reason: "project_not_found",
-      message: "项目不存在或已被移除。没有加载其他项目，也未发送任何修改请求。",
-    };
-  }
-  if (code === "project_identity_mismatch") {
-    return {
-      reason: "project_identity_mismatch",
-      message: "服务返回的项目身份不一致。当前视图已清空，未发送任何修改请求。",
-    };
-  }
-  return {
-    reason: "project_load_failed",
-    message: "项目身份校验失败。当前视图已清空，未发送任何修改请求。",
-  };
 }
 
 function showProjectCreateError(error) {

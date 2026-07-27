@@ -4671,9 +4671,6 @@ export function createProductShell(options = {}) {
         node("p", "product-state-preserved", "没有自动切换到其他项目，也未发送修改、生成或 AI 请求。"),
       );
       const actions = node("div", "product-state-actions");
-      const retry = node("button", "studio-primary-button", "重试加载");
-      retry.type = "button";
-      retry.addEventListener("click", () => options.onRetry?.());
       const choose = node("button", "studio-secondary-button", "选择其他项目");
       choose.type = "button";
       choose.addEventListener("click", () => {
@@ -4681,7 +4678,13 @@ export function createProductShell(options = {}) {
         render();
         requestAnimationFrame(() => document.querySelector(".studio-project-menu button")?.focus());
       });
-      actions.append(retry, choose);
+      if (identity.retryable !== false) {
+        const retry = node("button", "studio-primary-button", "重新加载当前项目");
+        retry.type = "button";
+        retry.addEventListener("click", () => options.onRetry?.());
+        actions.appendChild(retry);
+      }
+      actions.appendChild(choose);
       wrap.appendChild(actions);
     } else if (kind === "error") {
       wrap.append(node("h1", "", message("error", locale)), node("p", "", snapshot.error), node("p", "", message("recovery", locale)));
@@ -4756,10 +4759,8 @@ export function createProductShell(options = {}) {
         if (!refreshIsCurrent(activeProjectId)) return;
         project = payload?.project || null;
         if (project && String(project.project_id || "") !== activeProjectId) {
-          const mismatch = new Error("Runtime returned a different project identity");
-          mismatch.status = 409;
-          mismatch.errorCode = "project_identity_mismatch";
-          options.onProjectIdentityInvalid?.(mismatch);
+          const mismatch = projectIdentityMismatch();
+          await options.onProjectIdentityInvalid?.(mismatch);
           throw mismatch;
         }
       }
@@ -4768,7 +4769,9 @@ export function createProductShell(options = {}) {
         try { sequenceWorkspace = await (activeProjectId === requestRuntime.projectId ? requestRuntime : options.createRuntime?.(activeProjectId))?.sequenceWorkspace?.(); } catch { sequenceWorkspace = null; }
         if (!refreshIsCurrent(activeProjectId)) return;
         if (sequenceWorkspace && String(sequenceWorkspace.project_id || "") !== activeProjectId) {
-          throw projectIdentityMismatch();
+          const mismatch = projectIdentityMismatch();
+          await options.onProjectIdentityInvalid?.(mismatch);
+          throw mismatch;
         }
       }
       let mediaOperations = null;
@@ -4816,9 +4819,19 @@ export function createProductShell(options = {}) {
         await restoreLatestM6PreviewRun(projectRuntime, activeProjectId);
         if (!refreshIsCurrent(activeProjectId)) return;
       }
+      options.onProjectSurfaceReady?.(activeProjectId);
     } catch (error) {
       if (!refreshIsCurrent()) return;
-      snapshot = { ...snapshot, loading: false, project: null, error: options.formatError?.(error) || message("error", locale), authUser };
+      const identityMismatch = String(error?.errorCode || "") === "project_identity_mismatch";
+      snapshot = {
+        ...snapshot,
+        loading: false,
+        project: null,
+        error: identityMismatch
+          ? "当前项目尚未正确载入。请重新加载当前项目。"
+          : options.formatError?.(error) || message("error", locale),
+        authUser,
+      };
     }
     render();
   }

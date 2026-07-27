@@ -141,6 +141,8 @@ def test_m5_sequence_workspace_is_graph_backed_and_mutations_are_impact_confirme
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     empty = client.get("/projects/m5-api/m5/sequence-workspace")
     assert empty.json()["status"] == "planning_required"
+    assert empty.json()["project_id"] == "m5-api"
+    assert empty.json()["provider_dispatch_count"] == 0
     candidate = _candidate("m5", durations=[4, 8, 3], character_names=["许静", "卫南"], scene_count=2)
     confirmed = client.post("/projects/m5-api/m4/film-candidates/confirm", json={"expected_graph_version": 0, "idempotency_key": "confirm-m5", "candidate": candidate})
     graph = confirmed.json()["graph"]

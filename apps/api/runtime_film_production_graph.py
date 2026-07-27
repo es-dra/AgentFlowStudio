@@ -181,7 +181,8 @@ def register_runtime_film_production_graph_routes(app: FastAPI, store: RuntimeSt
         require_access(request, project_id)
         graph = graph_store.ensure(project_id)
         if not graph["nodes"]:
-            return {"status": "planning_required", "message": "请导入剧本或确认可信的制作方案。", "graph_version": graph["version"],
+            return {"status": "planning_required", "project_id": project_id,
+                    "message": "请导入剧本或确认可信的制作方案。", "graph_version": graph["version"],
                     "graph_digest": graph["graph_digest"], "provider_dispatch_count": 0}
         return _sequence_workspace_projection(graph, project_id=project_id, store=store)
 
