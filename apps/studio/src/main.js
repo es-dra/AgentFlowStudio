@@ -137,6 +137,7 @@ function initializeStudio(authUser) {
     isRuntimeCurrent: (candidate) => candidate === runtime,
     formatError: safeError,
     onProjectIdentityInvalid: (error) => projectController.recoverProjectAccessDenied(error),
+    onProjectSurfaceReady: (projectId) => projectController.markProjectSurfaceReady(projectId),
   });
   productShell.render({ authUser });
   installClientErrorReporter({
