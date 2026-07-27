@@ -124,9 +124,9 @@ def test_complete_script_recovers_same_preview_then_applies_one_graph_update() -
             name="当前项目：人工测试项目 · 第一集。打开项目详情与切换菜单",
             exact=True,
         ).is_visible()
-        script_node = page.locator('.node[data-node-id="script-complete"]')
+        script_node = page.locator('.node[data-node-id="script_truth_revision_revision-script-1"]')
         assert script_node.is_visible()
-        assert "邮差把无人认领的信放进纸船" in script_node.locator("textarea").input_value()
+        assert "邮差把无人认领的信放进纸船" in script_node.inner_text()
         assert page.get_by_role("button", name="拆分并审阅分镜", exact=True).is_visible()
         page.get_by_role("button", name="拆分并审阅分镜", exact=True).click()
         task_panel = page.locator(".agent-current-task-review")
@@ -222,12 +222,12 @@ def test_historical_overlong_preview_is_preserved_and_cannot_apply() -> None:
                 narrative_purpose: "推进叙事",
               }));
               window.__store.set((state) => {
-                state.nodes["script-complete"].params.embeddedCreativeAction = {
+                state.nodes["script_truth_revision_revision-script-1"].params.embeddedCreativeAction = {
                   action_id: "historical-overlong",
                   action_type: "shot_breakdown",
                   mode: "dynamic_shot_breakdown",
                   status: "preview",
-                  source_text: state.nodes["script-complete"].content,
+                  source_text: state.nodes["script_truth_revision_revision-script-1"].content,
                   message: "分镜候选已生成。",
                   preview: {
                     revised_text: "历史候选保留供审看。",
@@ -287,8 +287,8 @@ def test_explicit_url_projects_never_cross_project_on_switch_or_refresh() -> Non
         ).is_visible()
         body = page.locator("body").inner_text()
         script_value = page.locator(
-            '.node[data-node-id="script-complete"] textarea',
-        ).input_value()
+            '.node[data-node-id="script_truth_revision_revision-script-1"]',
+        ).inner_text()
         assert "邮差把无人认领的信放进纸船" in script_value
         assert "月光下，一只纸船逆流" not in body
         page.reload(wait_until="domcontentloaded")
@@ -296,8 +296,8 @@ def test_explicit_url_projects_never_cross_project_on_switch_or_refresh() -> Non
         body = page.locator("body").inner_text()
         assert "人工测试项目" in body
         script_value = page.locator(
-            '.node[data-node-id="script-complete"] textarea',
-        ).input_value()
+            '.node[data-node-id="script_truth_revision_revision-script-1"]',
+        ).inner_text()
         assert "邮差把无人认领的信放进纸船" in script_value
         assert "项目甲：纸船" not in body
         assert "月光下，一只纸船逆流" not in body
@@ -428,12 +428,10 @@ def _contract_html() -> str:
       }
       if (!stored && !isIdea) {
         const fullScriptDigest = "b2b1c1dc40e2f7c061dd5375ff483a0f235d8494959f33677deca6b7c401bc2f";
-        studioState.production.script_core_truth_projection = {
+        applyScriptCoreTruthProjection(studioState, {
           schema_version: "afs.script_core_truth.v0.1",
           project_id: projectId,
           current_revision_id: "revision-script-1",
-          source_digest: fullScriptDigest,
-          source_text: fullScript,
           current_revision: {
             project_id: projectId,
             revision_id: "revision-script-1",
@@ -444,29 +442,14 @@ def _contract_html() -> str:
             analysis_state: "ready",
           },
           revision_history: [],
+          assets: [],
+          asset_counts: { characters: 0, main_scenes: 0, manual_props: 0 },
           analysis_state: "ready",
+        });
+        studioState.selection = {
+          nodeIds: ["script_truth_revision_revision-script-1"],
+          edgeId: null,
         };
-        studioState.nodes["script-complete"] = {
-          id: "script-complete",
-          type: "script",
-          title: "完整剧本",
-          x: 80,
-          y: 80,
-          w: 340,
-          h: 300,
-          content: fullScript,
-          prompt: fullScript,
-          status: "complete",
-          params: {
-            scriptRevision: {
-              revision_id: "revision-script-1",
-              source_digest: fullScriptDigest,
-              source_text: fullScript,
-            },
-          },
-        };
-        studioState.order = ["script-complete"];
-        studioState.selection = { nodeIds: ["script-complete"], edgeId: null };
       }
       window.__workspace = stored?.workspace || {
         status: "planning_required",

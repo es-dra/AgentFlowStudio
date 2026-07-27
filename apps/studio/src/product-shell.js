@@ -4477,19 +4477,18 @@ export function createProductShell(options = {}) {
   }
 
   function currentReadyScriptNode(state = options.getStudioState?.() || snapshot.studioState) {
+    const projection = state?.production?.script_core_truth_projection || {};
     const projected = currentScriptTruthNode(state);
-    if (projected && String(projected.params?.scriptRevision?.source_text || projected.content || "").trim()) {
-      return projected;
-    }
-    const selectedId = state?.selection?.nodeIds?.[0] || "";
-    const selected = selectedId ? state?.nodes?.[selectedId] : null;
-    const nodes = [selected, ...Object.values(state?.nodes || {})];
-    return nodes.find((item, index) => (
-      item
-      && nodes.indexOf(item) === index
-      && item.type === "script"
-      && String(item.params?.scriptRevision?.source_text || item.content || item.prompt || "").trim()
-    )) || null;
+    const binding = projected?.params?.scriptRevision || {};
+    const sourceText = String(binding.source_text || projected?.content || "").trim();
+    return (
+      projected
+      && sourceText
+      && String(binding.revision_id || "") === String(projection.current_revision_id || "")
+      && String(binding.source_digest || "") === String(
+        projection.source_digest || projection.current_revision?.source_digest || "",
+      )
+    ) ? projected : null;
   }
 
   async function previewCurrentIdeaExpansion(sourceText) {

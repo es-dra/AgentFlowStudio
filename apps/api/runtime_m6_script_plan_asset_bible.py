@@ -1295,7 +1295,7 @@ def _clean_text(value: Any) -> str:
 
 def _clean_source_text(value: Any) -> str:
     normalized = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
-    return "\n".join(line.strip() for line in normalized.split("\n")).strip()
+    return normalized.strip()
 
 
 def _clean_label(value: str) -> str:

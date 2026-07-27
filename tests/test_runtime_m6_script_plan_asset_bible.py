@@ -95,6 +95,19 @@ def test_m6_preview_request_rejects_unbound_or_non_script_sources() -> None:
         )
 
 
+def test_m6_preview_request_preserves_indented_script_revision_digest() -> None:
+    source = "第一场\n    人物进入车站。\n        她低声说出决定。"
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    request = M6ScriptPlanPreviewRequest(
+        source_kind="script",
+        source_text=source,
+        source_revision_id="revision-indented",
+        source_revision_digest=digest,
+    )
+    assert request.source_text == source
+    assert request.source_revision_digest == digest
+
+
 def _clean_source_text_for_assertion(value: str) -> str:
     return value.strip()
 

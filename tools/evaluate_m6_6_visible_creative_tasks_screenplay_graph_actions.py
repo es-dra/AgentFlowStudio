@@ -268,7 +268,14 @@ assert(state.order.length === 1, 'screenplay apply must preserve stable node ide
 assert(state.nodes.n1.params.revisions[0].screenplay_candidate?.scenes?.length === 1, 'revision must store typed screenplay candidate');
 assert(state.nodes.n1.content.includes('外景 - 花果山'), 'screenplay apply must use formatted screenplay projection');
 
-await startEmbeddedCreativeAction(store, runtime, state.nodes.n1, 'shot_breakdown', { mode: 'dynamic_shot_breakdown' });
+await startEmbeddedCreativeAction(store, runtime, state.nodes.n1, 'shot_breakdown', {
+  mode: 'dynamic_shot_breakdown',
+  productionBrief: {
+    target_duration_seconds: 18,
+    duration_source: 'creator_selected',
+    tolerance_seconds: 1,
+  },
+});
 const beforeShotNodeCount = state.order.length;
 applyEmbeddedCreativeAction(store, 'n1');
 const roles = Object.values(state.nodes).map((node) => node.params?.nodeRole).filter(Boolean);

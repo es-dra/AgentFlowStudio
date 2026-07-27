@@ -40,21 +40,40 @@ class ExplicitProjectIdentityHandler(SimpleHTTPRequestHandler):
                         "seq": 1,
                     },
                     "nodes": {
-                        "script-a": {
-                            "id": "script-a",
+                        "script_truth_revision_revision-a": {
+                            "id": "script_truth_revision_revision-a",
                             "type": "script",
                             "title": "甲项目剧本",
                             "content": "甲项目原始故事：纸船逆流而上。",
                             "prompt": "甲项目原始故事：纸船逆流而上。",
                             "status": "complete",
-                            "params": {},
+                            "params": {
+                                "scriptCoreProjection": "script_core_truth_projection",
+                                "scriptRevision": {
+                                    "project_id": "project-a",
+                                    "revision_id": "revision-a",
+                                    "source_kind": "script",
+                                    "source_digest": "a" * 64,
+                                    "source_text": "甲项目原始故事：纸船逆流而上。",
+                                    "analysis_state": "ready",
+                                },
+                            },
                         },
                     },
                     "edges": {},
-                    "order": ["script-a"],
+                    "order": ["script_truth_revision_revision-a"],
                     "assets": [],
                     "assetBible": {},
-                    "production": {},
+                    "production": {
+                        "script_core_truth_projection": {
+                            "project_id": "project-a",
+                            "current_revision_id": "revision-a",
+                            "source_digest": "a" * 64,
+                            "source_text": "甲项目原始故事：纸船逆流而上。",
+                            "source_kind": "script",
+                            "analysis_state": "ready",
+                        },
+                    },
                 },
             })
             return
@@ -140,7 +159,7 @@ def test_explicit_project_url_replaces_stale_store_and_survives_refresh() -> Non
         ).is_visible()
         body = page.locator("body").inner_text()
         assert page.evaluate(
-            'window.__studioState.nodes["script-a"].content',
+            'window.__studioState.nodes["script_truth_revision_revision-a"].params.scriptRevision.source_text',
         ) == "甲项目原始故事：纸船逆流而上。"
         assert "完整剧本已保存。" in body
         assert "乙项目不应出现" not in body
@@ -159,7 +178,7 @@ def test_explicit_project_url_replaces_stale_store_and_survives_refresh() -> Non
         body = page.locator("body").inner_text()
         assert "项目甲" in body
         assert page.evaluate(
-            'window.__studioState.nodes["script-a"].content',
+            'window.__studioState.nodes["script_truth_revision_revision-a"].params.scriptRevision.source_text',
         ) == "甲项目原始故事：纸船逆流而上。"
         assert "完整剧本已保存。" in body
         assert "乙项目不应出现" not in body
@@ -280,6 +299,7 @@ def _contract_html() -> str:
       import { beginProjectIdentityLoad } from "/apps/studio/src/project-identity-gate.js";
       import { createStore } from "/apps/studio/src/store.js";
       import { createProjectController } from "/apps/studio/src/studio-project-controller.js";
+      import { applyScriptCoreTruthProjection } from "/apps/studio/src/script-core-truth-projection.js";
       import {
         createStudioProductShell,
         mountStudioDom,
@@ -326,8 +346,8 @@ def _contract_html() -> str:
           seq: 1,
         },
         nodes: {
-          "script-a": {
-            id: "script-a",
+          "script_truth_revision_revision-a": {
+            id: "script_truth_revision_revision-a",
             type: "script",
             title: "甲项目剧本",
             content: "甲项目原始故事：纸船逆流而上。",
@@ -337,16 +357,35 @@ def _contract_html() -> str:
             w: 360,
             h: 240,
             status: "complete",
-            params: {},
+            params: {
+              scriptCoreProjection: "script_core_truth_projection",
+              scriptRevision: {
+                project_id: requestedProjectId,
+                revision_id: "revision-a",
+                source_kind: "script",
+                source_digest: "a".repeat(64),
+                source_text: "甲项目原始故事：纸船逆流而上。",
+                analysis_state: "ready",
+              },
+            },
           },
         },
         edges: {},
-        order: ["script-a"],
+        order: ["script_truth_revision_revision-a"],
         assets: [],
         assetBible: {},
-        production: {},
+        production: {
+          script_core_truth_projection: {
+            project_id: requestedProjectId,
+            current_revision_id: "revision-a",
+            source_digest: "a".repeat(64),
+            source_text: "甲项目原始故事：纸船逆流而上。",
+            source_kind: "script",
+            analysis_state: "ready",
+          },
+        },
         viewport: { x: 0, y: 0, scale: 1 },
-        selection: { nodeIds: ["script-a"], edgeId: null },
+        selection: { nodeIds: ["script_truth_revision_revision-a"], edgeId: null },
       };
       const planningWorkspace = {
         status: "planning_required",
@@ -445,6 +484,27 @@ def _contract_html() -> str:
       });
       render();
       await controller.ensureAccessibleStartupProject();
+      store.set((state) => {
+        applyScriptCoreTruthProjection(state, {
+          schema_version: "afs.script_core_truth.v0.1",
+          project_id: requestedProjectId,
+          current_revision_id: "revision-a",
+          current_revision: {
+            project_id: requestedProjectId,
+            revision_id: "revision-a",
+            source_kind: "script",
+            source_text: "甲项目原始故事：纸船逆流而上。",
+            source_digest: "a".repeat(64),
+            source_length: 16,
+            analysis_state: "ready",
+          },
+          revision_history: [],
+          assets: [],
+          asset_counts: { characters: 0, main_scenes: 0, manual_props: 0 },
+          analysis_state: "ready",
+        });
+      }, { history: false });
+      render();
       await shell.refresh(runtime);
       window.__studioState = store.get();
       window.__runtimeProjectId = runtime.projectId;

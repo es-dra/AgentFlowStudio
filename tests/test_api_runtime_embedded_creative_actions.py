@@ -5,7 +5,10 @@ import json
 from fastapi.testclient import TestClient
 
 from agentflow.harness.json_io import write_json
-from apps.api.runtime_embedded_creative_actions import EmbeddedCreativeActionRequest, _embedded_request_digest
+from apps.api.runtime_embedded_creative_actions import (
+    EmbeddedCreativeActionRequest,
+    _embedded_request_digest,
+)
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -47,11 +50,23 @@ def _creative_action_request(**overrides) -> dict:
             "section": "canvas",
         },
         "constraints": ["普通优化必须保持同一节点身份。", "确认前不改动画布。"],
+        "production_brief": None,
+        "source_revision_id": "",
+        "source_digest": "",
         "provider_service_id": "server_codex",
         "generated_at": "2026-07-22T12:00:00Z",
     }
     payload.update(overrides)
     return payload
+
+
+def test_embedded_action_openapi_exposes_required_storyboard_bindings() -> None:
+    request_schema = EmbeddedCreativeActionRequest.model_json_schema()
+    brief_schema = request_schema["$defs"]["EmbeddedProductionBrief"]
+    assert {"production_brief", "source_revision_id", "source_digest"} <= set(
+        request_schema["required"],
+    )
+    assert {"source_revision_id", "source_digest"} <= set(brief_schema["required"])
 
 
 def test_embedded_creative_action_gate_closed_is_preview_only_unavailable(tmp_path, monkeypatch) -> None:
@@ -690,6 +705,113 @@ def test_embedded_shot_breakdown_preserves_overlong_preview_but_blocks_apply(tmp
     assert blocked.json()["detail"]["error"] == "embedded_shot_plan_duration_out_of_range"
     graph = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert graph["version"] == 0
+    assert len(calls) == 1
+
+
+def test_embedded_shot_breakdown_preserves_explicit_six_minute_contract_through_apply(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id, request))
+            return {
+                "provider_calls_started": True,
+                "structured_output": {
+                    "action_type": "shot_breakdown",
+                    "mode": "dynamic_shot_breakdown",
+                    "revised_text": (
+                        "这份通用长片段分镜严格沿用创作者明确声明的六分钟目标，"
+                        "每个镜头都有完整动作、空间变化、声音和叙事目的，等待审看后才会应用。"
+                    ),
+                    "change_summary": ["保留明确时长", "按内容分配镜头"],
+                    "rationale": "验证显式 production brief 不会被短片缺省覆盖。",
+                    "unresolved_decisions": [],
+                    "quality_flags": [],
+                    "shot_plan": {
+                        "total_shots": 6,
+                        "estimated_duration_sec": 360,
+                        "scenes": [{
+                            "title": "任意连续空间",
+                            "purpose": "完成六个连续叙事阶段",
+                            "shots": [
+                                {
+                                    "title": f"阶段 {index}",
+                                    "duration_sec": 60,
+                                    "shot_size": "中景",
+                                    "camera_angle": "平视",
+                                    "movement": "跟随主体移动",
+                                    "blocking": "主体完成一个完整动作阶段",
+                                    "sound": "连续环境声",
+                                    "transition": "动作切",
+                                    "narrative_purpose": f"推进叙事阶段 {index}",
+                                }
+                                for index in range(1, 7)
+                            ],
+                        }],
+                    },
+                },
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-explicit-six-minute"
+    _create_project(client, project_id)
+    source_text = "这是一部目标总时长约 6 分钟的任意完整故事，包含连续动作与场景变化。"
+    revision = _create_script_revision(client, project_id, source_text)
+    brief = {
+        "target_duration_seconds": 360,
+        "duration_source": "script_explicit",
+        "tolerance_seconds": 36,
+        "source_revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+    }
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        headers={"X-Client-Request-ID": "cli_explicit_six_minute"},
+        json=_creative_action_request(
+            action_type="shot_breakdown",
+            mode="dynamic_shot_breakdown",
+            node_type="script",
+            source_text=source_text,
+            source_revision_id=revision["revision_id"],
+            source_digest=revision["source_digest"],
+            production_brief=brief,
+        ),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["preview"]["shot_plan"]["estimated_duration_sec"] == 360
+    assert payload["preview"]["duration_assessment"] == {
+        **brief,
+        "provider_estimated_duration_seconds": 360,
+        "candidate_duration_seconds": 360,
+        "duration_delta_seconds": 0,
+        "within_tolerance": True,
+        "apply_allowed": True,
+        "status": "within_target",
+    }
+    applied = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_explicit_six_minute/apply-shot-plan",
+        json={
+            "expected_graph_version": 0,
+            "expected_request_digest": payload["safe_manifest"]["request_digest"],
+            "expected_production_brief": brief,
+        },
+    )
+    assert applied.status_code == 200, applied.text
+    workspace = applied.json()["workspace"]
+    sequence_node = next(
+        node for node in workspace["sequence"]["sequences"] if node["category"] == "collection"
+    )
+    assert sequence_node["metadata"]["target_duration_seconds"] == 360
+    assert sum(
+        shot["metadata"]["duration_seconds"] for shot in workspace["sequence"]["shots"]
+    ) == 360
+    assert len(workspace["sequence"]["shots"]) == 6
     assert len(calls) == 1
 
 

@@ -342,7 +342,6 @@ export function deriveProductionCopilotState({
     studioState?.production?.script_core_truth_projection?.current_revision_id
     || assetBibleSourceContext(studioState)?.script_revision_id
     || bible.candidate_set?.script_revision_id
-    || readyScriptNode
   );
   const scriptProjection = studioState?.production?.script_core_truth_projection || {};
   const ideaNeedsExpansion = scriptReady
@@ -864,18 +863,18 @@ function creatorReadySummary({
 }
 
 function readyScriptNodeFromState(studioState = {}) {
-  const selectedId = studioState?.selection?.nodeIds?.[0] || "";
-  const selected = selectedId ? studioState?.nodes?.[selectedId] : null;
-  const candidates = [
-    selected,
-    ...Object.values(studioState?.nodes || {}),
-  ];
-  return candidates.find((node, index) => (
+  const projection = studioState?.production?.script_core_truth_projection || {};
+  const revisionId = String(projection.current_revision_id || "");
+  const node = revisionId ? studioState?.nodes?.[`script_truth_revision_${revisionId}`] : null;
+  const binding = node?.params?.scriptRevision || {};
+  return (
     node
-    && candidates.indexOf(node) === index
-    && node.type === "script"
-    && String(node.params?.scriptRevision?.source_text || node.content || node.prompt || "").trim()
-  )) || null;
+    && String(binding.source_text || node.content || "").trim()
+    && String(binding.revision_id || "") === revisionId
+    && String(binding.source_digest || "") === String(
+      projection.source_digest || projection.current_revision?.source_digest || "",
+    )
+  ) ? node : null;
 }
 
 export function assetTypeLabel(value) {

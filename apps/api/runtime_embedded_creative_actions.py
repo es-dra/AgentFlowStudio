@@ -91,8 +91,8 @@ class EmbeddedProductionBrief(BaseModel):
     target_duration_seconds: float = Field(ge=5, le=MAX_STORYBOARD_DURATION_SECONDS)
     duration_source: Literal["script_explicit", "creator_default", "creator_selected"]
     tolerance_seconds: float = Field(ge=0, le=MAX_STORYBOARD_DURATION_SECONDS)
-    source_revision_id: str = Field(default="", max_length=140)
-    source_digest: str = Field(default="", max_length=64)
+    source_revision_id: str = Field(min_length=1, max_length=140)
+    source_digest: str = Field(min_length=64, max_length=64)
     requires_creator_confirmation: bool = True
     source_duration_conflict: bool = False
 
@@ -123,9 +123,9 @@ class EmbeddedCreativeActionRequest(BaseModel):
     ] = "professional_expansion"
     context_summary: dict[str, Any] = Field(default_factory=dict)
     constraints: list[str] = Field(default_factory=list, max_length=8)
-    production_brief: EmbeddedProductionBrief | None = None
-    source_revision_id: str = Field(default="", max_length=140)
-    source_digest: str = Field(default="", max_length=64)
+    production_brief: EmbeddedProductionBrief | None
+    source_revision_id: str = Field(max_length=140)
+    source_digest: str = Field(max_length=64)
     provider_service_id: str = SERVER_CODEX_SERVICE_ID
     generated_at: str = Field(min_length=1, max_length=80)
 
@@ -733,7 +733,11 @@ def _creative_action_output_schema(action_type: str) -> dict[str, Any]:
                                     ],
                                     "properties": {
                                         "title": {"type": "string", "minLength": 2},
-                                        "duration_sec": {"type": "number", "minimum": 1},
+                                        "duration_sec": {
+                                            "type": "number",
+                                            "minimum": 1,
+                                            "maximum": MAX_STORYBOARD_DURATION_SECONDS,
+                                        },
                                         "shot_size": {"type": "string", "minLength": 2},
                                         "camera_angle": {"type": "string", "minLength": 2},
                                         "movement": {"type": "string", "minLength": 2},
@@ -1214,9 +1218,12 @@ def _safe_shot_plan(plan: dict[str, Any]) -> dict[str, Any]:
         for shot in scene.get("shots") or []:
             if not isinstance(shot, dict):
                 continue
+            duration_sec = _safe_number(shot.get("duration_sec"), 0)
+            if duration_sec < 1 or duration_sec > MAX_STORYBOARD_DURATION_SECONDS:
+                raise ValueError("shot duration is outside the production brief range")
             shots.append({
                 "title": _safe_text(shot.get("title"), 120),
-                "duration_sec": max(1.0, min(30.0, _safe_number(shot.get("duration_sec"), 4.0))),
+                "duration_sec": duration_sec,
                 "shot_size": _safe_text(shot.get("shot_size"), 80),
                 "camera_angle": _safe_text(shot.get("camera_angle"), 80),
                 "movement": _safe_text(shot.get("movement"), 120),

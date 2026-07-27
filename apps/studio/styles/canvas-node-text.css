@@ -297,6 +297,11 @@
   color: var(--text-primary);
 }
 
+.embedded-storyboard-duration-error {
+  min-height: 1.25rem;
+  color: #ffb4a8;
+}
+
 .duration-blocked {
   color: #ffb4a8;
 }

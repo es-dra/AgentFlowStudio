@@ -10,6 +10,7 @@ import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 import { creativeActionFailureInfo, screenplayCandidateSummary, shotPlanSummary, taskPhaseLabel, taskStateLabel } from "./creative-task-contract.js";
 import {
+  isValidStoryboardDuration,
   productionBriefForSource,
   productionBriefLabel,
   shotPlanDurationAssessment,
@@ -436,8 +437,17 @@ function storyboardBriefEditor(action) {
     "确认目标并预览分镜",
     "studio-primary-button",
   );
+  const validation = textBlock("embedded-storyboard-duration-error", "");
+  validation.setAttribute("aria-live", "polite");
+  const syncValidity = () => {
+    const valid = isValidStoryboardDuration(input.value);
+    confirm.disabled = !valid;
+    validation.textContent = valid ? "" : "请输入 5 到 3600 秒之间的目标时长。";
+  };
+  input.addEventListener("input", syncValidity);
+  syncValidity();
   const later = actionButton("embedded-creative-clear", "稍后", "studio-secondary-button");
-  wrap.append(label, hint, confirm, later);
+  wrap.append(label, hint, validation, confirm, later);
   return wrap;
 }
 
