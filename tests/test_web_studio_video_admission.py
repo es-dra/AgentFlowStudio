@@ -153,7 +153,7 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
 
     for creator_text in (
         "准备单镜头视频",
-        "镜头 01 · 已批准关键帧驱动",
+        "已批准关键帧驱动",
         "doubao-seedance-2-0",
         "非 fast",
         "720p",
@@ -180,6 +180,7 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
     assert "video_admission_reservation_token" not in source
     assert "doubao-seedance-2-0-fast" not in source
     assert "写入当前 ProductionGraph" not in source
+    assert "镜头 01" not in source
     assert "videoAdmissionView().item?.job_id === result.job_id" in source
     assert "manifest.source?.references" in source
 

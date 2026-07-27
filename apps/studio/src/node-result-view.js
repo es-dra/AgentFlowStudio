@@ -44,7 +44,12 @@ export function resultView(node) {
     frame.appendChild(previewOverlay(node));
     frame.addEventListener("dblclick", () => openNodeMediaPreview(node));
     result.appendChild(frame);
-    if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result, candidates.length > 1));
+    if (
+      ["image", "video"].includes(node.type)
+      && !node.params?.productionGraphProjection
+    ) {
+      result.appendChild(resultActions(node, result, candidates.length > 1));
+    }
   }
   if (candidates.length > 1) result.appendChild(candidateSelectionPanel(node, candidates));
   const delivery = productionDeliveryView(node, candidates);

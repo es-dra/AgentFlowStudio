@@ -421,6 +421,7 @@ export function deriveProductionCopilotState({
     && videoAdmission?.lineage?.rebuild_allowed === true;
   const videoStatus = String(videoAdmission?.status || "empty");
   const videoItemState = String(videoAdmission?.item?.state || "");
+  const approvedVideoCount = Number(productionGraph?.mediaSummary?.approvedVideos || 0);
   const qualityIssues = bible.recognition_quality.issues;
   let next = {
     action: "start_idea",
@@ -476,6 +477,13 @@ export function deriveProductionCopilotState({
     };
   } else if (candidatesReady && !bibleLocked) {
     next = { action: "lock_asset_bible", label: "锁定 Asset Bible", reason: "资产审核与镜头覆盖已完成，可以锁定当前版本。", enabled: true };
+  } else if (contentReady && approvedVideoCount > 0) {
+    next = {
+      action: "view_approved_video",
+      label: "播放已批准视频",
+      reason: `${Math.max(approvedVideoCount, 1)} 条镜头视频已保存到当前项目；可以在故事板播放并继续审看。`,
+      enabled: true,
+    };
   } else if (contentReady && admissionStatus === "empty") {
     next = {
       action: "image_admission_ready",
@@ -588,7 +596,8 @@ export function deriveProductionCopilotState({
     next = { action: "image_admission_ready", label: "进入图片准入", reason: "结构与锁定版本已满足图片生产前置条件。", enabled: true };
   }
   return {
-    stage: !scriptReady ? "script_required"
+    stage: contentReady && approvedVideoCount > 0 ? "video_approved"
+      : !scriptReady ? "script_required"
       : !shotReady ? "shot_plan_required"
         : !candidatesReady ? "asset_recognition_ready"
           : !contentReady ? "asset_review"
@@ -607,6 +616,9 @@ export function deriveProductionCopilotState({
       { key: "visual_identity", label: "视觉身份", state: visualBlockers.length ? "blocked" : "ready" },
       { key: "art_direction", label: "美术方向", state: artDirectionReady ? "ready" : "blocked" },
       { key: "bible", label: "Bible 锁定", state: bibleLocked ? "ready" : "blocked" },
+      ...(approvedVideoCount > 0
+        ? [{ key: "approved_video", label: "已批准视频", state: "ready" }]
+        : []),
     ],
     blockers: [
       ...(!scriptReady ? ["缺少当前剧本版本"] : []),
@@ -631,15 +643,17 @@ export function deriveProductionCopilotState({
       cost_state: Number(imageAdmission?.budget?.dispatches_reserved || 0) > 0 ? "estimated_reserved" : "not_admitted",
     },
     next_valid_action: next,
-    ready_summary: creatorReadySummary({
-      scriptReady,
-      shotReady,
-      candidatesReady,
-      bible,
-      contentReady,
-      admissionStatus,
-      admissionCounts,
-    }),
+    ready_summary: contentReady && approvedVideoCount > 0
+      ? `${approvedVideoCount} 条镜头视频已批准并保存到当前项目。`
+      : creatorReadySummary({
+        scriptReady,
+        shotReady,
+        candidatesReady,
+        bible,
+        contentReady,
+        admissionStatus,
+        admissionCounts,
+      }),
     needs_input: next.reason,
     asset_bible: bible,
     provider_dispatch_count: Number(imageAdmission?.provider_dispatch_count || 0),
