@@ -56,10 +56,28 @@ def test_short_idea_routes_to_text_expansion_then_refreshes_durable_revision() -
 
         page.locator(".agent-primary-action").click()
         page.get_by_text("故事扩写已准备好。", exact=True).wait_for()
-        assert page.get_by_role("button", name="审看扩写结果", exact=True).is_visible()
+        assert page.locator(".agent-primary-action").get_by_text(
+            "审看扩写结果",
+            exact=True,
+        ).is_visible()
         assert page.get_by_label("编辑剧本化预览文本").input_value() == (
             "月光下，纸船逆流而上，送回一封迟到多年的信。"
         )
+        expansion_surface = page.locator(".story-expansion-entry")
+        assert expansion_surface.get_by_role(
+            "button",
+            name="扩写并分析故事",
+            exact=True,
+        ).count() == 0
+        review_existing = expansion_surface.get_by_role(
+            "button",
+            name="审看扩写结果",
+            exact=True,
+        )
+        assert review_existing.is_visible()
+        review_existing.click()
+        assert page.evaluate("window.__calls.textPreview") == 1
+        assert page.get_by_label("编辑剧本化预览文本").is_visible()
         _capture(page, "02-story-expansion-review-real-canvas-1440x900.png")
 
         page.get_by_role("button", name="应用", exact=True).click()

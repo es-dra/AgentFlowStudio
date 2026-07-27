@@ -716,11 +716,22 @@ export function createProductShell(options = {}) {
     textarea.placeholder = "补充或调整你的创作想法";
     textarea.setAttribute("aria-label", "已保存的创作想法");
     const currentAction = currentScriptTruthNode()?.params?.embeddedCreativeAction;
-    const busy = ["running", "recovering", "applying"].includes(String(currentAction?.status || ""));
-    const preview = node("button", "studio-primary-button", busy ? "文本处理中" : "扩写并分析故事");
+    const actionStatus = String(currentAction?.status || "");
+    const busy = ["running", "recovering", "applying"].includes(actionStatus);
+    const reviewing = actionStatus === "preview";
+    textarea.readOnly = busy || reviewing;
+    const preview = node(
+      "button",
+      "studio-primary-button",
+      busy ? "文本处理中" : reviewing ? "审看扩写结果" : "扩写并分析故事",
+    );
     preview.type = "button";
     preview.disabled = busy || !textarea.value.trim();
     preview.addEventListener("click", () => {
+      if (reviewing) {
+        handleCopilotAction({ action: "review_story_expansion" });
+        return;
+      }
       void previewCurrentIdeaExpansion(textarea.value);
     });
     planner.append(textarea, preview);
