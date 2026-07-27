@@ -275,6 +275,7 @@
       "watermark": false,
       "generate_audio": false,
       "allowed_artifact_hosts": ["media.example.invalid"],
+      "allowed_artifact_host_suffixes": ["tos-cn-beijing.volces.com"],
       "pricing_exposure_contract": {
         "verification_state": "unverified",
         "billing_mode": "provider_output_tokens",

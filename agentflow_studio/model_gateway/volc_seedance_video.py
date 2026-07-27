@@ -15,8 +15,13 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
+from agentflow_studio.model_gateway.artifact_host_policy import (
+    ArtifactHostPolicy,
+    artifact_host_policy,
+    artifact_host_policy_from_service,
+)
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError, ModelProviderError
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
@@ -29,6 +34,8 @@ DEFAULT_QUERY_ENDPOINT = f"{DEFAULT_CREATE_ENDPOINT}/{{id}}"
 DEFAULT_INPUT_UPLOAD_ENDPOINT = "/v1/files/uploads/base64"
 EXACT_MODEL_ID = "doubao-seedance-2-0"
 MAX_ERROR_BODY_BYTES = 8192
+MAX_ARTIFACT_REDIRECTS = 3
+ARTIFACT_REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 SAFE_TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
 PUBLIC_REQUEST_FIELDS = {
     "model",
@@ -100,8 +107,8 @@ class VolcSeedanceVideoAdapter:
             raise ModelConfigError(
                 f"Seedance video service must use native task poll endpoint: {DEFAULT_QUERY_ENDPOINT}"
             )
-        allowed_url_hosts = _allowed_url_hosts(service)
-        if not allowed_url_hosts:
+        output_host_policy = artifact_host_policy_from_service(service)
+        if not output_host_policy.configured:
             raise ModelConfigError("Seedance video artifact host allowlist must not be empty")
         exposure = _verified_exposure_contract(service)
         return {
@@ -114,8 +121,9 @@ class VolcSeedanceVideoAdapter:
             "auth_scheme": str(service.get("auth_scheme") or account.get("auth_scheme") or "Bearer"),
             "timeout_sec": float(service.get("submit_timeout_sec") or self.descriptor.async_timeout_sec or request.timeout_sec or 120.0),
             "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
-            "allowed_url_hosts": allowed_url_hosts,
-            "allowed_input_hosts": _allowed_input_hosts(service, allowed_url_hosts),
+            "artifact_host_policy": output_host_policy.as_task_contract(),
+            "allowed_url_hosts": output_host_policy.exact_hosts,
+            "allowed_input_hosts": _allowed_input_hosts(service, output_host_policy.exact_hosts),
             "input_upload_endpoint": str(
                 service.get("input_upload_endpoint") or DEFAULT_INPUT_UPLOAD_ENDPOINT
             ),
@@ -149,6 +157,7 @@ class VolcSeedanceVideoAdapter:
             "timeout_sec": float(plan.get("timeout_sec") or 120.0),
             "download_timeout_sec": float(plan.get("download_timeout_sec") or 180.0),
             "allowed_url_hosts": tuple(plan.get("allowed_url_hosts") or ()),
+            "artifact_host_policy": dict(plan.get("artifact_host_policy") or {}),
             "pricing_exposure": dict(plan["pricing_exposure"]),
             "output_dir": str(plan["output_dir"]),
         }
@@ -176,10 +185,13 @@ class VolcSeedanceVideoAdapter:
         if status not in {"succeeded", "success", "completed", "done"}:
             raise ModelProviderError(_task_failure_reason(response, status))
         video_url = _video_url(response)
+        current_host_policy = artifact_host_policy_from_service(
+            self.store.service(self.service_id)
+        )
         video_bytes, content_type = _download_video(
             video_url,
             timeout_sec=float(task.get("download_timeout_sec") or task.get("timeout_sec") or 120.0),
-            allowed_url_hosts=tuple(task.get("allowed_url_hosts") or ()),
+            artifact_policy=current_host_policy,
         )
         output_dir = Path(str(task.get("output_dir") or "."))
         video_ref = f"video_candidates/candidate_001{_video_extension(content_type)}"
@@ -323,7 +335,7 @@ def _validated_input_url(
 ) -> str:
     url = str(response.get("url") or "")
     parsed = urlparse(url)
-    host = (parsed.hostname or "").lower().rstrip(".")
+    host = (parsed.hostname or "").lower()
     normalized = {
         str(item).lower().strip().rstrip(".")
         for item in allowed_hosts
@@ -337,8 +349,8 @@ def _validated_input_url(
         parsed.scheme.lower() != "https"
         or not host
         or host not in normalized
-        or parsed.username
-        or parsed.password
+        or parsed.username is not None
+        or parsed.password is not None
         or port not in {None, 443}
         or not parsed.path.startswith("/task-artifacts/tmp-inputs/")
     ):
@@ -398,37 +410,65 @@ def _request_json(
     return decoded
 
 
-def _download_video(url: str, *, timeout_sec: float, allowed_url_hosts: tuple[str, ...]) -> tuple[bytes, str]:
-    parsed, addresses = _validate_artifact_url(url, allowed_url_hosts)
-    connection: http.client.HTTPSConnection | None = None
-    try:
-        connection = _PinnedHTTPSConnection(
-            parsed.hostname or "",
-            parsed.port or 443,
-            addresses=addresses,
-            timeout=timeout_sec,
-        )
-        path = parsed.path or "/"
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-        connection.request("GET", path, headers={"Accept": "video/*"})
-        response = connection.getresponse()
-        if int(response.status) != 200:
-            raise ModelProviderError(
-                f"Seedance video download HTTP error {int(response.status)}"
+def _download_video(
+    url: str,
+    *,
+    timeout_sec: float,
+    allowed_url_hosts: tuple[str, ...] = (),
+    allowed_url_host_suffixes: tuple[str, ...] = (),
+    artifact_policy: ArtifactHostPolicy | None = None,
+) -> tuple[bytes, str]:
+    policy = artifact_policy or artifact_host_policy(
+        exact_hosts=allowed_url_hosts,
+        bucket_host_suffixes=allowed_url_host_suffixes,
+    )
+    current_url = str(url)
+    for redirect_count in range(MAX_ARTIFACT_REDIRECTS + 1):
+        parsed, addresses = _validate_artifact_url(current_url, policy)
+        connection: http.client.HTTPSConnection | None = None
+        try:
+            connection = _PinnedHTTPSConnection(
+                parsed.hostname or "",
+                parsed.port or 443,
+                addresses=addresses,
+                timeout=timeout_sec,
             )
-        body = response.read()
-        content_type = str(response.getheader("Content-Type") or "").split(";")[0].strip().lower()
-    except ModelProviderError:
-        raise
-    except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
-        raise ModelProviderError(f"Seedance video download failed: {_safe_error(str(exc))}") from exc
-    finally:
-        if connection is not None:
-            connection.close()
-    if not body:
-        raise ModelProviderError("Seedance video download returned empty content")
-    return body, content_type
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+            connection.request("GET", path, headers={"Accept": "video/*"})
+            response = connection.getresponse()
+            status = int(response.status)
+            if status in ARTIFACT_REDIRECT_STATUSES:
+                if redirect_count >= MAX_ARTIFACT_REDIRECTS:
+                    raise ModelProviderError("Seedance video download exceeded redirect limit")
+                location = str(response.getheader("Location") or "").strip()
+                if not location:
+                    raise ModelProviderError("Seedance video download redirect is invalid")
+                current_url = urljoin(current_url, location)
+                continue
+            if status != 200:
+                raise ModelProviderError(f"Seedance video download HTTP error {status}")
+            body = response.read()
+            content_type = (
+                str(response.getheader("Content-Type") or "")
+                .split(";")[0]
+                .strip()
+                .lower()
+            )
+            if not body:
+                raise ModelProviderError("Seedance video download returned empty content")
+            return body, content_type
+        except ModelProviderError:
+            raise
+        except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+            raise ModelProviderError(
+                f"Seedance video download failed: {_safe_error(str(exc))}"
+            ) from exc
+        finally:
+            if connection is not None:
+                connection.close()
+    raise ModelProviderError("Seedance video download exceeded redirect limit")
 
 
 def _safe_usage(response: dict[str, Any]) -> dict[str, Any]:
@@ -655,24 +695,25 @@ def _video_extension(content_type: str) -> str:
 
 def _validate_artifact_url(
     url: str,
-    allowed: tuple[str, ...],
+    policy: ArtifactHostPolicy | tuple[str, ...],
 ) -> tuple[Any, tuple[tuple[int, tuple[Any, ...]], ...]]:
-    if not allowed:
+    if not isinstance(policy, ArtifactHostPolicy):
+        policy = artifact_host_policy(exact_hosts=policy)
+    if not policy.configured:
         raise ModelProviderError("Seedance video artifact host allowlist is empty")
     parsed = urlparse(url)
     try:
         port = parsed.port
     except ValueError as exc:
         raise ModelProviderError("Seedance video download URL is not allowed") from exc
-    host = (parsed.hostname or "").lower().rstrip(".")
-    normalized = tuple(item.lower().strip().rstrip(".") for item in allowed if item.strip())
+    host = (parsed.hostname or "").lower()
     if (
         parsed.scheme.lower() != "https"
         or not host
-        or parsed.username
-        or parsed.password
+        or parsed.username is not None
+        or parsed.password is not None
         or port not in {None, 443}
-        or host not in normalized
+        or not policy.allows(host)
     ):
         raise ModelProviderError("Seedance video download URL is not allowed")
     try:
@@ -751,13 +792,6 @@ def _join_url(base_url: str, endpoint: str) -> str:
     if not base_url:
         raise ModelGatewayError("Seedance video base_url is not configured")
     return f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-
-def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
-    value = service.get("allowed_artifact_hosts")
-    if not isinstance(value, list):
-        return ()
-    return tuple(str(item).lower().strip() for item in value if str(item).strip())
-
 
 def _allowed_input_hosts(
     service: dict[str, Any],

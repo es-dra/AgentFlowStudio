@@ -715,24 +715,185 @@ def test_seedance_artifact_download_rejects_unsafe_urls_before_network(
     assert called == 0
 
 
-def test_seedance_artifact_download_rejects_redirect_before_following(monkeypatch) -> None:
-    followed = 0
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://bucket.tos-cn-beijing.volces.com/result.mp4",
+        "https://tos-cn-beijing.volces.com/result.mp4",
+        "https://bucket.tos-cn-beijing.volces.com.evil.test/result.mp4",
+        "https://bucket.evil-tos-cn-beijing.volces.com/result.mp4",
+        "https://user@bucket.tos-cn-beijing.volces.com/result.mp4",
+        "https://@bucket.tos-cn-beijing.volces.com/result.mp4",
+        "https://user:@bucket.tos-cn-beijing.volces.com/result.mp4",
+        "https://:password@bucket.tos-cn-beijing.volces.com/result.mp4",
+        "https://bucket.tos-cn-beijing.volces.com.:443/result.mp4",
+        "https://bucket.tos-cn-beijing.volces.com:444/result.mp4",
+        "https://xn--bcher-kva.tos-cn-beijing.volces.com/result.mp4",
+        "https://bücher.tos-cn-beijing.volces.com/result.mp4",
+        "https://nested.bucket.tos-cn-beijing.volces.com/result.mp4",
+    ],
+)
+def test_seedance_tos_artifact_policy_rejects_bypass_urls_before_network(
+    url,
+    monkeypatch,
+) -> None:
+    called = 0
 
-    def connection(*_args, **_kwargs):
-        nonlocal followed
-        followed += 1
-        return _FakePinnedConnection(_PinnedResponse(b"", "text/plain", status=302))
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("unsafe TOS artifact URL must fail before network")
+
+    monkeypatch.setattr(volc_seedance_video, "_PinnedHTTPSConnection", forbidden)
+    with pytest.raises(ModelProviderError):
+        volc_seedance_video._download_video(
+            url,
+            timeout_sec=5,
+            allowed_url_host_suffixes=("tos-cn-beijing.volces.com",),
+        )
+    assert called == 0
+
+
+def test_seedance_tos_artifact_policy_accepts_one_valid_bucket_label(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        lambda *_args, **_kwargs: _FakePinnedConnection(
+            _PinnedResponse(b"valid-video", "video/mp4")
+        ),
+    )
+
+    body, content_type = volc_seedance_video._download_video(
+        "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/result.mp4?signature=redacted",
+        timeout_sec=5,
+        allowed_url_host_suffixes=("tos-cn-beijing.volces.com",),
+    )
+
+    assert body == b"valid-video"
+    assert content_type == "video/mp4"
+
+
+def test_seedance_poll_recovers_existing_task_with_current_artifact_policy(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    output_dir = tmp_path / "existing-run"
+    output_dir.mkdir()
+    config = _seedance_provider_config(tmp_path)
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(config))
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_request_json",
+        lambda *_args, **_kwargs: {
+            "id": "existing-task",
+            "status": "succeeded",
+            "content": {
+                "video_url": (
+                    "https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/"
+                    "existing.mp4?signature=redacted"
+                )
+            },
+        },
+    )
+    monkeypatch.setattr(
+        volc_seedance_video,
+        "_PinnedHTTPSConnection",
+        lambda *_args, **_kwargs: _FakePinnedConnection(
+            _PinnedResponse(b"existing-task-video", "video/mp4")
+        ),
+    )
+    legacy_task = {
+        "service_id": "seedance_i2v",
+        "capability": "video",
+        "task": {
+            "task_id": "existing-task",
+            "query_url_template": (
+                "https://relay.test/volc/v1/contents/generations/tasks/{id}"
+            ),
+            "allowed_url_hosts": ("media.seedance.test",),
+            "output_dir": str(output_dir),
+        },
+    }
+
+    result = registry.poll("video", "seedance_i2v", legacy_task)
+
+    assert result["status"] == "succeeded"
+    assert result["provider_raw_response_stored"] is False
+    assert result["outputs"][0]["byte_count"] == len(b"existing-task-video")
+    assert (output_dir / result["outputs"][0]["video_path"]).read_bytes() == (
+        b"existing-task-video"
+    )
+
+
+def test_seedance_artifact_download_revalidates_each_allowed_redirect(
+    monkeypatch,
+) -> None:
+    connections = iter(
+        [
+            _FakePinnedConnection(
+                _PinnedResponse(
+                    b"",
+                    "text/plain",
+                    status=302,
+                    location="https://ark-acg-cn-beijing.tos-cn-beijing.volces.com/result.mp4",
+                )
+            ),
+            _FakePinnedConnection(_PinnedResponse(b"redirected-video", "video/mp4")),
+        ]
+    )
+    hosts: list[str] = []
+
+    def connection(host, *_args, **_kwargs):
+        hosts.append(host)
+        return next(connections)
 
     monkeypatch.setattr(
         volc_seedance_video,
         "_PinnedHTTPSConnection",
         connection,
     )
-    with pytest.raises(ModelProviderError, match="HTTP error 302"):
+    body, content_type = volc_seedance_video._download_video(
+        "https://media.crazyrouter.com/result.mp4",
+        timeout_sec=5,
+        allowed_url_hosts=("media.crazyrouter.com",),
+        allowed_url_host_suffixes=("tos-cn-beijing.volces.com",),
+    )
+
+    assert hosts == [
+        "media.crazyrouter.com",
+        "ark-acg-cn-beijing.tos-cn-beijing.volces.com",
+    ]
+    assert body == b"redirected-video"
+    assert content_type == "video/mp4"
+
+
+def test_seedance_artifact_download_rejects_redirect_outside_policy(
+    monkeypatch,
+) -> None:
+    followed = 0
+
+    def connection(*_args, **_kwargs):
+        nonlocal followed
+        followed += 1
+        return _FakePinnedConnection(
+            _PinnedResponse(
+                b"",
+                "text/plain",
+                status=302,
+                location="https://bucket.tos-cn-beijing.volces.com.evil.test/result.mp4",
+            )
+        )
+
+    monkeypatch.setattr(volc_seedance_video, "_PinnedHTTPSConnection", connection)
+    with pytest.raises(ModelProviderError, match="URL is not allowed"):
         volc_seedance_video._download_video(
-            "https://media.seedance.test/result.mp4",
+            "https://media.crazyrouter.com/result.mp4",
             timeout_sec=5,
-            allowed_url_hosts=("media.seedance.test",),
+            allowed_url_hosts=("media.crazyrouter.com",),
+            allowed_url_host_suffixes=("tos-cn-beijing.volces.com",),
         )
     assert followed == 1
 
@@ -1015,6 +1176,9 @@ def _seedance_provider_config(
                 "reference_roles": ["first_frame", "last_frame"],
                 "watermark": False,
                 "allowed_artifact_hosts": ["media.seedance.test"],
+                "allowed_artifact_host_suffixes": [
+                    "tos-cn-beijing.volces.com",
+                ],
                 "pricing_exposure_contract": {
                     "verification_state": "verified",
                     "billing_mode": "provider_output_tokens",
@@ -1108,16 +1272,28 @@ class _BytesResponse:
 
 
 class _PinnedResponse:
-    def __init__(self, payload: bytes, content_type: str, *, status: int = 200):
+    def __init__(
+        self,
+        payload: bytes,
+        content_type: str,
+        *,
+        status: int = 200,
+        location: str = "",
+    ):
         self.payload = payload
         self.content_type = content_type
         self.status = status
+        self.location = location
 
     def read(self) -> bytes:
         return self.payload
 
     def getheader(self, name: str) -> str:
-        return self.content_type if name.lower() == "content-type" else ""
+        if name.lower() == "content-type":
+            return self.content_type
+        if name.lower() == "location":
+            return self.location
+        return ""
 
 
 class _FakePinnedConnection:

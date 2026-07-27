@@ -56,6 +56,9 @@ def _exact_seedance_capability(monkeypatch) -> None:
                 "endpoint": CREATE_ENDPOINT,
                 "query_endpoint": QUERY_ENDPOINT,
                 "allowed_artifact_hosts": ["media.crazyrouter.com"],
+                "allowed_artifact_host_suffixes": [
+                    "tos-cn-beijing.volces.com",
+                ],
                 "pricing_exposure_contract": {
                     "verification_state": "verified",
                     "billing_mode": "provider_output_tokens",
@@ -123,6 +126,47 @@ def test_video_admission_capability_rejects_incomplete_reference_contract(monkey
     assert capability["configured"] is False
     assert capability["reference_image_slots"] == 2
     assert capability["reference_mode_supported"] is False
+
+
+def test_video_admission_capability_requires_shared_tos_artifact_policy(
+    monkeypatch,
+) -> None:
+    registry = SimpleNamespace(
+        store=SimpleNamespace(
+            service=lambda service_id: {
+                "model": MODEL_ID,
+                "endpoint": CREATE_ENDPOINT,
+                "query_endpoint": QUERY_ENDPOINT,
+                "input_upload_endpoint": "/v1/files/uploads/base64",
+                "allowed_artifact_hosts": ["media.crazyrouter.com"],
+                "allowed_input_hosts": ["media.crazyrouter.com"],
+                "pricing_exposure_contract": {
+                    "verification_state": "verified",
+                    "billing_mode": "provider_output_tokens",
+                    "output_token_usd": "0.01",
+                    "worst_case_output_tokens": 100,
+                    "worst_case_cost_usd": "1.00",
+                    "source_checked_at": REQUESTED_AT,
+                    "provider_enforced_cost_cap": False,
+                },
+            }
+        ),
+        descriptor=lambda service_id: SimpleNamespace(
+            reference_image_slots=4,
+            supported_durations_sec=[6],
+            supported_resolutions=["720p"],
+            frame_modes=["first_frame", "reference_images"],
+        ),
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_video_admission.load_provider_registry",
+        lambda: registry,
+    )
+
+    capability = video_admission_capability()
+
+    assert capability["artifact_hosts_configured"] is False
+    assert capability["configured"] is False
 
 
 def test_video_admission_capability_blocks_unverified_pricing_exposure(monkeypatch) -> None:
