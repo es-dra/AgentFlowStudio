@@ -90,6 +90,7 @@ export function createProductShell(options = {}) {
   let videoAdmissionPreview = null;
   let videoAdmissionError = "";
   let videoAdmissionPending = false;
+  let videoAdmissionPendingCommand = "";
   let videoAdmissionMediaState = "idle";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
@@ -2707,11 +2708,21 @@ export function createProductShell(options = {}) {
         );
         panel.appendChild(blocked);
       } else {
-        const generate = node("button", "studio-primary-button", "预览并确认生成");
+        const reservePending = videoAdmissionPending
+          && videoAdmissionPendingCommand === "reserve_dispatch";
+        const generate = node(
+          "button",
+          "studio-primary-button",
+          reservePending ? "正在准备最终确认…" : "预览并确认生成",
+        );
         generate.type = "button";
-        generate.disabled = !snapshot.mediaGates?.video;
-        generate.title = generate.disabled ? "视频能力尚未启用；不会发送任务。" : "";
-        generate.addEventListener("click", () => void stageVideoAdmissionCommand({ type: "reserve_dispatch" }));
+        generate.disabled = !snapshot.mediaGates?.video || reservePending;
+        generate.title = !snapshot.mediaGates?.video
+          ? "视频能力尚未启用；不会发送任务。"
+          : reservePending
+            ? "正在准备最终确认，不会发送外部任务。"
+            : "";
+        generate.dataset.videoAdmissionCommand = "reserve_dispatch";
         panel.appendChild(generate);
       }
     } else if (item.state === "reserved") {
@@ -2806,10 +2817,16 @@ export function createProductShell(options = {}) {
   }
 
   async function stageVideoAdmissionCommand(command) {
-    if (videoAdmissionPreview || videoAdmissionPending) return;
+    if (videoAdmissionPreview || videoAdmissionPending) {
+      videoAdmissionOpen = true;
+      render();
+      focusVideoAdmissionPanel();
+      return;
+    }
     videoAdmissionError = "";
     videoAdmissionOpen = true;
     videoAdmissionPending = true;
+    videoAdmissionPendingCommand = String(command?.type || "");
     render();
     focusVideoAdmissionPanel();
     try {
@@ -2823,6 +2840,7 @@ export function createProductShell(options = {}) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备预览失败");
     } finally {
       videoAdmissionPending = false;
+      videoAdmissionPendingCommand = "";
     }
     render();
     focusVideoAdmissionPanel();
@@ -3791,6 +3809,16 @@ export function createProductShell(options = {}) {
   }
 
   function bindShellEvents() {
+    window.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const action = target?.closest("[data-video-admission-command]");
+      const root = document.getElementById("product-shell-root");
+      if (!action || !root?.contains(action) || action.disabled) return;
+      const command = String(action.dataset.videoAdmissionCommand || "");
+      if (command !== "reserve_dispatch") return;
+      event.preventDefault();
+      void stageVideoAdmissionCommand({ type: command });
+    });
     window.addEventListener("afs:agent-chat-submit", (event) => {
       submitToAgentChat(event.detail?.message || "").catch((error) => {
         const context = currentAgentChatContext();

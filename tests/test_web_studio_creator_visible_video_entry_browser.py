@@ -103,6 +103,102 @@ def test_desktop_storyboard_and_agent_use_the_same_zero_provider_video_entry() -
                 browser.close()
 
 
+def test_refreshed_planned_manifest_reopens_final_confirmation_without_reserving() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type == "error"
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html#planned",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+
+                page.evaluate("window.__refreshVideoEntry()")
+                assert page.locator("#product-main").get_by_role(
+                    "button",
+                    name="确认镜头视频",
+                    exact=True,
+                ).is_visible()
+                assert page.locator(".agent-primary-action").get_by_text(
+                    "确认镜头视频",
+                    exact=True,
+                ).is_visible()
+                page.evaluate(
+                    """() => {
+                      const button = [...document.querySelectorAll("button")]
+                        .find((item) => item.textContent.trim() === "预览并确认生成");
+                      button.replaceWith(button.cloneNode(true));
+                    }"""
+                )
+                page.evaluate("window.__deferReservePreview = true")
+                page.get_by_role(
+                    "button",
+                    name="预览并确认生成",
+                    exact=True,
+                ).click()
+                assert page.get_by_role(
+                    "button",
+                    name="正在准备最终确认…",
+                    exact=True,
+                ).is_disabled()
+                assert page.evaluate("window.__calls") == {
+                    "compilePreview": 0,
+                    "compileConfirm": 0,
+                    "reservePreview": 1,
+                    "agentConversation": 0,
+                    "videoDispatch": 0,
+                }
+                assert page.evaluate("window.__sideEffects") == {
+                    "reserveConfirm": 0,
+                    "persistedWrites": 0,
+                    "preflightVideo": 0,
+                    "generateVideo": 0,
+                }
+                assert page.evaluate("window.__persistedVideoState()") == {
+                    "status": "locked",
+                    "itemState": "planned",
+                    "reserved": 0,
+                    "remaining": 1,
+                    "dispatches": 0,
+                }
+                page.evaluate("window.__releaseReservePreview()")
+                page.get_by_text("确认发送镜头 01 视频", exact=True).wait_for()
+                assert page.get_by_role(
+                    "button",
+                    name="确认并发送",
+                    exact=True,
+                ).is_visible()
+                assert page.evaluate("window.__sideEffects") == {
+                    "reserveConfirm": 0,
+                    "persistedWrites": 0,
+                    "preflightVideo": 0,
+                    "generateVideo": 0,
+                }
+                assert page.evaluate("window.__persistedVideoState()") == {
+                    "status": "locked",
+                    "itemState": "planned",
+                    "reserved": 0,
+                    "remaining": 1,
+                    "dispatches": 0,
+                }
+                assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert not console_errors
+            finally:
+                browser.close()
+
+
 def _assert_storyboard_entry(page: Page) -> None:
     main_entry = page.locator("#product-main").get_by_role(
         "button",
@@ -187,6 +283,12 @@ def _contract_html() -> str:
         reservePreview: 0,
         agentConversation: 0,
         videoDispatch: 0,
+      };
+      window.__sideEffects = {
+        reserveConfirm: 0,
+        persistedWrites: 0,
+        preflightVideo: 0,
+        generateVideo: 0,
       };
       const projectId = "browser-video-entry";
       const bible = {
@@ -333,7 +435,39 @@ def _contract_html() -> str:
               },
         },
       });
+      let persistedVideoAdmission = null;
       const runtime = {
+        projectId,
+        workspaceOverview() {
+          return Promise.resolve({
+            projects: [{ project_id: projectId, project_type: "production" }],
+          });
+        },
+        projectOverview() {
+          return Promise.resolve({
+            project: { project_id: projectId, name: "视频入口验收", status: "in_progress" },
+          });
+        },
+        sequenceWorkspace() {
+          return Promise.resolve(workspace);
+        },
+        loadAssetBible() {
+          return Promise.resolve({
+            authority_mode: "canonical_production_graph",
+            asset_bible: bible,
+          });
+        },
+        loadImageAdmission() {
+          return Promise.resolve(imageAdmission);
+        },
+        loadVideoAdmission() {
+          return Promise.resolve(persistedVideoAdmission);
+        },
+        health() {
+          return Promise.resolve({
+            provider_gates: { llm: true, image: true, video: true },
+          });
+        },
         previewVideoAdmissionCommand(request) {
           if (request.command.type === "compile") window.__calls.compilePreview += 1;
           if (request.command.type === "reserve_dispatch") window.__calls.reservePreview += 1;
@@ -345,14 +479,42 @@ def _contract_html() -> str:
               };
             });
           }
+          if (request.command.type === "reserve_dispatch" && window.__deferReservePreview) {
+            return new Promise((resolve) => {
+              window.__releaseReservePreview = () => {
+                window.__deferReservePreview = false;
+                resolve(preview(request.command));
+              };
+            });
+          }
           return Promise.resolve(preview(request.command));
         },
         confirmVideoAdmissionCommand(request) {
           if (request.command.type === "compile") window.__calls.compileConfirm += 1;
+          if (request.command.type === "reserve_dispatch") window.__sideEffects.reserveConfirm += 1;
+          if (request.command.type === "compile") {
+            window.__sideEffects.persistedWrites += 1;
+            persistedVideoAdmission = {
+              status: "locked",
+              manifest: compiledManifest,
+              readiness: videoAdmission.readiness,
+              capability: { configured: true },
+              provider_dispatch_count: 0,
+            };
+          }
           return Promise.resolve({
             result: { manifest: compiledManifest },
             provider_dispatch_count: 0,
           });
+        },
+        preflightVideo() {
+          window.__sideEffects.preflightVideo += 1;
+          throw new Error("video preflight must not run in preview-only browser coverage");
+        },
+        generateVideo() {
+          window.__sideEffects.generateVideo += 1;
+          window.__calls.videoDispatch += 1;
+          throw new Error("video generation must not run in preview-only browser coverage");
         },
         agentChatConversation(payload) {
           window.__calls.agentConversation += 1;
@@ -390,9 +552,10 @@ def _contract_html() -> str:
           items: [{ item_id: "approved-keyframe", state: "approved" }],
         },
       };
+      const startPlanned = window.location.hash === "#planned";
       const videoAdmission = {
-        status: "empty",
-        manifest: null,
+        status: startPlanned ? "locked" : "empty",
+        manifest: startPlanned ? compiledManifest : null,
         readiness: {
           status: "ready",
           shot_id: "shot-01",
@@ -404,24 +567,27 @@ def _contract_html() -> str:
         capability: { configured: true },
         provider_dispatch_count: 0,
       };
+      persistedVideoAdmission = videoAdmission;
       const shell = createProductShell({
         getStudioState: () => studioState,
         getRuntime: () => runtime,
         getStore: () => ({ get: () => studioState }),
         formatError: (error) => String(error?.message || error),
       });
-      shell.render({
-        loading: false,
-        project: { project_id: projectId, name: "视频入口验收", status: "in_progress" },
-        studioState,
-        sequenceWorkspace: workspace,
-        runtimeAssetBible: { authority_mode: "canonical_production_graph", asset_bible: bible },
-        imageAdmission,
-        videoAdmission,
-        mediaGates: { llm: true, image: true, video: true },
-        authUser: { user_id: "browser-owner", display_name: "Owner" },
-      });
+      const authUser = { user_id: "browser-owner", display_name: "Owner" };
+      await shell.refresh(runtime, authUser);
       shell.setSection("storyboard");
+      window.__refreshVideoEntry = async () => {
+        await shell.refresh(runtime, authUser);
+        shell.setSection("storyboard");
+      };
+      window.__persistedVideoState = () => ({
+        status: persistedVideoAdmission?.manifest?.status || persistedVideoAdmission?.status || "",
+        itemState: persistedVideoAdmission?.manifest?.item?.state || "",
+        reserved: persistedVideoAdmission?.manifest?.budget?.dispatches_reserved ?? -1,
+        remaining: persistedVideoAdmission?.manifest?.budget?.remaining_dispatches ?? -1,
+        dispatches: persistedVideoAdmission?.manifest?.provider_dispatch_count ?? -1,
+      });
       window.__videoEntryReady = true;
     </script>
   </body>
