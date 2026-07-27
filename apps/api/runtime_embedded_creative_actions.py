@@ -19,8 +19,9 @@ from agentflow_studio.model_gateway.provider_adapter import (
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement import llm_provider_gate
+from apps.api.runtime_logging import client_request_id_from_request
 from apps.api.runtime_production_graph import ProductionGraphStore
-from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
+from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
 
@@ -113,6 +114,7 @@ def register_runtime_embedded_creative_action_routes(
     ) -> dict[str, Any]:
         require_access(request, project_id)
         store.ensure_project_manifest(project_id)
+        client_request_id = client_request_id_from_request(request)
         job_id = store.new_job_id("embedded_creative_action", project_id)
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -122,6 +124,8 @@ def register_runtime_embedded_creative_action_routes(
         result["latency_ms"] = round((time.perf_counter() - started) * 1000, 2)
         graph_after = graph_store.ensure(project_id)
         result["graph_mutation"] = _graph_mutation_summary(graph_before, graph_after)
+        if client_request_id:
+            result["safe_manifest"]["client_request_id"] = client_request_id
         artifacts = _write_embedded_action_artifacts(
             store,
             output_dir,
@@ -135,6 +139,8 @@ def register_runtime_embedded_creative_action_routes(
                 "preview": result.get("preview") or {},
                 "provider_lineage": result.get("provider_lineage") or {},
                 "graph_mutation": result["graph_mutation"],
+                "client_request_id": client_request_id,
+                "latency_ms": result["latency_ms"],
             },
         )
         trace_path = write_run_trace(
@@ -174,6 +180,22 @@ def register_runtime_embedded_creative_action_routes(
         }
         reject_unsafe_payload(response)
         return response
+
+    @app.get("/projects/{project_id}/embedded-creative-actions/by-client/{client_request_id}")
+    def recover_embedded_creative_action(
+        project_id: str,
+        client_request_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        require_access(request, project_id)
+        normalized = _safe_client_request_id(client_request_id)
+        if normalized != client_request_id:
+            raise HTTPException(status_code=422, detail="invalid client request id")
+        recovered = _recover_embedded_creative_action(store, project_id, normalized)
+        if recovered is None:
+            raise HTTPException(status_code=404, detail="text preview is still processing")
+        reject_unsafe_payload(recovered)
+        return recovered
 
 
 def _preview_creative_action(
@@ -1073,6 +1095,59 @@ def _write_embedded_action_artifacts(
             role="embedded_creative_action_preview",
         ),
     }
+
+
+def _safe_client_request_id(value: str) -> str:
+    normalized = safe_id(str(value or "").strip())
+    return normalized[:120] if normalized.startswith("cli_") else ""
+
+
+def _recover_embedded_creative_action(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+) -> dict[str, Any] | None:
+    project_runs = store.runs_dir / safe_id(project_id)
+    if not project_runs.is_dir():
+        return None
+    run_dirs = sorted(
+        (path for path in project_runs.iterdir() if path.is_dir()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for run_dir in run_dirs:
+        manifest_path = run_dir / "embedded_creative_action_safe_manifest.json"
+        preview_path = run_dir / "embedded_creative_action_preview.json"
+        if not manifest_path.is_file() or not preview_path.is_file():
+            continue
+        manifest = read_json(manifest_path)
+        if str(manifest.get("project_id") or "") != project_id:
+            continue
+        if str(manifest.get("client_request_id") or "") != client_request_id:
+            continue
+        preview_payload = read_json(preview_path)
+        if str(preview_payload.get("project_id") or "") != project_id:
+            continue
+        response = {
+            "project_id": project_id,
+            "mode": str(preview_payload.get("mode") or manifest.get("mode") or ""),
+            "action_type": str(preview_payload.get("action_type") or ""),
+            "target": dict(preview_payload.get("target") or manifest.get("target") or {}),
+            "creative_task": dict(preview_payload.get("creative_task") or {}),
+            "preview": dict(preview_payload.get("preview") or {}),
+            "provider_gate": dict(manifest.get("provider_gate") or {}),
+            "provider_calls_started": manifest.get("provider_calls_started") is True,
+            "provider_lineage": dict(preview_payload.get("provider_lineage") or manifest.get("provider_lineage") or {}),
+            "safe_manifest": manifest,
+            "graph_mutation": dict(preview_payload.get("graph_mutation") or {}),
+            "latency_ms": float(preview_payload.get("latency_ms") or 0),
+            "cost_usd": 0,
+            "recovered": True,
+            "non_claims": EMBEDDED_CREATIVE_NON_CLAIMS,
+        }
+        reject_unsafe_payload(response)
+        return response
+    return None
 
 
 def _graph_mutation_summary(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

@@ -6,9 +6,10 @@ export function applyScriptCoreTruthProjection(state, projection) {
   if (!projectId || projectId !== cleanToken(state?.meta?.projectId, 128)) {
     throw new Error("script truth project does not match the active canvas");
   }
-  removePreviousProjection(state);
   const revision = safeProjection.current_revision || null;
   const revisionId = cleanToken(safeProjection.current_revision_id || revision?.revision_id, 140);
+  const previousRevisionNode = state.nodes?.[`script_truth_revision_${revisionId}`] || null;
+  removePreviousProjection(state);
   const sourceDigest = cleanDigest(revision?.source_digest || "");
   state.production = state.production || {};
   state.production.script_core_truth_projection = {
@@ -16,6 +17,8 @@ export function applyScriptCoreTruthProjection(state, projection) {
     project_id: projectId,
     current_revision_id: revisionId,
     source_digest: sourceDigest,
+    source_text: cleanSourceText(revision?.source_text),
+    source_kind: cleanToken(revision?.source_kind || "", 40),
     analysis_state: cleanToken(safeProjection.analysis_state || "analysis_required", 80),
     asset_counts: safeCounts(safeProjection.asset_counts),
     projection_source: "runtime_script_core_truth",
@@ -26,7 +29,7 @@ export function applyScriptCoreTruthProjection(state, projection) {
     state.selection = { nodeIds: [], edgeId: null };
     return state.production.script_core_truth_projection;
   }
-  const revisionNode = revisionNodeFor(projectId, revision, safeProjection);
+  const revisionNode = revisionNodeFor(projectId, revision, safeProjection, previousRevisionNode);
   state.nodes[revisionNode.id] = revisionNode;
   pushOrder(state, revisionNode.id);
   const assets = Array.isArray(safeProjection.assets) ? safeProjection.assets : [];
@@ -69,12 +72,14 @@ function removePreviousProjection(state) {
   }
 }
 
-function revisionNodeFor(projectId, revision, projection) {
+function revisionNodeFor(projectId, revision, projection, previousNode = null) {
   const revisionId = cleanToken(revision.revision_id, 140);
   const analysisState = cleanToken(projection.analysis_state || revision.analysis_state || "analysis_required", 80);
   const sourceKind = cleanToken(revision.source_kind || "script", 40);
   const sourceDigest = cleanDigest(revision.source_digest || "");
   const counts = safeCounts(projection.asset_counts);
+  const sourceText = cleanSourceText(revision.source_text);
+  const previousParams = previousNode?.params && typeof previousNode.params === "object" ? previousNode.params : {};
   return {
     id: `script_truth_revision_${revisionId}`,
     type: "script",
@@ -96,13 +101,20 @@ function revisionNodeFor(projectId, revision, projection) {
         source_kind: sourceKind,
         source_digest: sourceDigest,
         source_length: Number(revision.source_length || 0),
+        source_text: sourceText,
         analysis_state: analysisState,
       },
       coreAssetCounts: counts,
       provider_dispatch_count: 0,
       remote_dispatch_count: 0,
+      ...(previousParams.embeddedCreativeAction
+        ? { embeddedCreativeAction: safeProjectedCreativeAction(previousParams.embeddedCreativeAction) }
+        : {}),
+      ...(Array.isArray(previousParams.revisions) ? { revisions: previousParams.revisions } : {}),
+      ...(previousParams.currentRevisionId ? { currentRevisionId: previousParams.currentRevisionId } : {}),
     },
     content: [
+      sourceText ? `${sourceKind === "idea" ? "创作想法" : "剧本文本"}：${sourceExcerpt(sourceText)}` : "创作内容：待补充",
       `来源：${sourceKindLabel(sourceKind)}`,
       `分析：${analysisStateLabel(analysisState)}`,
       `角色：${counts.characters || 0}`,
@@ -193,6 +205,30 @@ function cleanDigest(value) {
 
 function cleanLabel(value) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, 120) || "Core Asset";
+}
+
+function cleanSourceText(value) {
+  return String(value || "").replace(/\r\n?/g, "\n").trim().slice(0, 200000);
+}
+
+function sourceExcerpt(value, limit = 520) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function safeProjectedCreativeAction(value) {
+  if (!value || typeof value !== "object") return null;
+  if (value.action_type !== "script_revision" || value.status !== "unavailable") return value;
+  return {
+    ...value,
+    message: "文本优化未完成；原始想法已保留。",
+    error: "文本优化未完成；原始想法已保留。",
+    error_category: value.error_category === "timeout" ? "timeout" : "task_failed",
+    error_owner: "runtime",
+    error_detail: "",
+    preserved_state: "原文已保留并可继续编辑；制作内容没有改变。",
+    next_action: "检查后可重新运行文本优化。",
+  };
 }
 
 function sourceKindLabel(value) {

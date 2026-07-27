@@ -41,6 +41,8 @@ import {
   syncAssetBibleCommandAssistantReceipt,
 } from "./asset-bible-command-recovery.js";
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
+import { startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
+import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -597,7 +599,11 @@ export function createProductShell(options = {}) {
   function buildInlinePlanAction(status) {
     status.className = "graph-canvas-status planning-required contextual-inline compact";
     status.dataset.expanded = "false";
-    const action = node("button", "studio-text-button plan-inline-action", "制作方案");
+    const action = node(
+      "button",
+      "studio-text-button plan-inline-action",
+      currentScriptTruthNeedsExpansion() ? "扩写故事" : "制作方案",
+    );
     action.type = "button";
     action.title = "展开制作方案输入区";
     action.addEventListener("click", () => {
@@ -627,6 +633,7 @@ export function createProductShell(options = {}) {
   }
 
   function buildExpandedPlanSurface(status) {
+    if (currentScriptTruthNeedsExpansion()) return buildStoryExpansionSurface(status);
     status.style.setProperty("--graph-plan-height", `${planningPanelHeight}px`);
     const head = node("div", "graph-plan-head");
     head.append(
@@ -676,7 +683,46 @@ export function createProductShell(options = {}) {
     preview.textContent = previewBusy ? "制作方案处理中" : "生成剧本制作方案";
     preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
     planner.append(textarea, preview, ...planningImportControls());
-    if (m6PreviewRun?.run_id) planner.appendChild(buildM6PreviewRunStatus());
+    if (m6PreviewRun) planner.appendChild(buildM6PreviewRunStatus());
+    status.append(planner, planResizeHandle());
+    return status;
+  }
+
+  function buildStoryExpansionSurface(status) {
+    status.style.setProperty("--graph-plan-height", `${planningPanelHeight}px`);
+    const head = node("div", "graph-plan-head");
+    head.append(
+      node("span", "eyebrow", "故事扩写"),
+      node("strong", "", "想法已保存"),
+      node("span", "", "先生成可编辑的故事预览；确认前不会改变当前内容。"),
+    );
+    const controls = node("div", "graph-plan-controls");
+    const collapse = node("button", "studio-text-button", "收起");
+    collapse.type = "button";
+    collapse.addEventListener("click", () => {
+      setPlanningPanelOpen(false);
+      render();
+      requestCanvasSafeAreaUpdate();
+    });
+    controls.appendChild(collapse);
+    head.appendChild(controls);
+    status.appendChild(head);
+
+    const planner = node("div", "m6-script-plan-entry story-expansion-entry");
+    const textarea = document.createElement("textarea");
+    textarea.rows = 4;
+    textarea.value = currentScriptTruthSourceText();
+    textarea.placeholder = "补充或调整你的创作想法";
+    textarea.setAttribute("aria-label", "已保存的创作想法");
+    const currentAction = currentScriptTruthNode()?.params?.embeddedCreativeAction;
+    const busy = ["running", "recovering", "applying"].includes(String(currentAction?.status || ""));
+    const preview = node("button", "studio-primary-button", busy ? "文本处理中" : "扩写并分析故事");
+    preview.type = "button";
+    preview.disabled = busy || !textarea.value.trim();
+    preview.addEventListener("click", () => {
+      void previewCurrentIdeaExpansion(textarea.value);
+    });
+    planner.append(textarea, preview);
     status.append(planner, planResizeHandle());
     return status;
   }
@@ -837,7 +883,15 @@ export function createProductShell(options = {}) {
           notice = recoveryError?.message || "同一制作方案状态暂时无法读取；项目事实未改变。";
         }
       } else {
-        notice = error?.message || "制作方案生成失败，项目内容没有改变。";
+        const message = error?.message || "文本处理未完成；原始创作内容已保留。";
+        m6PreviewRun = {
+          ...m6PreviewRun,
+          phase: "failed",
+          status: "failed",
+          project_id: expectedProjectId,
+          error: { message },
+        };
+        notice = message;
       }
     }
     render();
@@ -3870,6 +3924,27 @@ export function createProductShell(options = {}) {
       });
       return;
     }
+    if (["expand_story", "retry_story_expansion"].includes(action.action)) {
+      showCanvas();
+      setPlanningPanelOpen(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      void previewCurrentIdeaExpansion(currentScriptTruthSourceText());
+      return;
+    }
+    if (action.action === "review_story_expansion") {
+      showCanvas();
+      const target = currentScriptTruthNode();
+      if (target) {
+        options.getStore?.().set((state) => {
+          state.selection = { nodeIds: [target.id], edgeId: null };
+        }, { history: false });
+      }
+      setAgentChatExpanded(true);
+      render();
+      requestCanvasSafeAreaUpdate();
+      return;
+    }
     if (action.action === "review_current_shot") {
       showStoryboard();
       requestAnimationFrame(() => {
@@ -4188,8 +4263,10 @@ export function createProductShell(options = {}) {
     planningPanelPreferenceKey = nextKey;
     planningPanelOpen = readPlanningPanelPreference(nextKey);
     const restoredSource = ["failed", "unknown"].includes(String(m6PreviewRun?.phase || ""))
-      ? readM6SourceDraft(currentM6SubmittedSourceKey()) || readM6SourceDraft(currentM6SourceDraftKey())
-      : readM6SourceDraft(currentM6SourceDraftKey());
+      ? readM6SourceDraft(currentM6SubmittedSourceKey())
+        || readM6SourceDraft(currentM6SourceDraftKey())
+        || currentScriptTruthSourceText()
+      : readM6SourceDraft(currentM6SourceDraftKey()) || currentScriptTruthSourceText();
     if (enteringLoadedProject && m6SourceDraftDirty && m6SourceText) {
       writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     } else {
@@ -4245,6 +4322,66 @@ export function createProductShell(options = {}) {
 
   function currentM6SubmittedSourceKey() {
     return `afs:m6:submitted-source:${snapshot.project?.project_id || "studio"}`;
+  }
+
+  function currentScriptTruthSourceText() {
+    return String(
+      snapshot.studioState?.production?.script_core_truth_projection?.source_text
+      || snapshot.studioState?.production?.script_core_truth_projection?.current_revision?.source_text
+      || "",
+    ).trim();
+  }
+
+  function currentScriptTruthNeedsExpansion() {
+    const projection = snapshot.studioState?.production?.script_core_truth_projection || {};
+    return Boolean(
+      projection.current_revision_id
+      && projection.source_kind === "idea"
+      && String(projection.analysis_state || "analysis_required") === "analysis_required",
+    );
+  }
+
+  function currentScriptTruthNode(state = options.getStudioState?.() || snapshot.studioState) {
+    const revisionId = String(state?.production?.script_core_truth_projection?.current_revision_id || "");
+    return revisionId ? state?.nodes?.[`script_truth_revision_${revisionId}`] || null : null;
+  }
+
+  async function previewCurrentIdeaExpansion(sourceText) {
+    const runtime = options.getRuntime?.();
+    const store = options.getStore?.();
+    const cleanSource = String(sourceText || "").trim();
+    if (!runtime || !store || !cleanSource) return;
+    try {
+      let sourceNode = currentScriptTruthNode(store.get());
+      if (!sourceNode) {
+        notice = "已保存的创作想法暂时无法读取，请刷新后再试。";
+        render();
+        return;
+      }
+      const currentSource = String(sourceNode.params?.scriptRevision?.source_text || "").trim();
+      if (cleanSource !== currentSource) {
+        const response = await runtime.createScriptRevision({
+          source_kind: "idea",
+          source_text: cleanSource,
+          parent_revision_id: sourceNode.params?.scriptRevision?.revision_id || null,
+          provenance: { source: "creator_story_expansion_edit" },
+          created_at: new Date().toISOString(),
+        });
+        store.set((state) => applyScriptCoreTruthProjection(state, response?.projection || {}), {
+          history: false,
+        });
+        sourceNode = currentScriptTruthNode(store.get());
+        await store.flushRuntimeSave?.();
+      }
+      if (!sourceNode) return;
+      await startEmbeddedCreativeAction(store, runtime, sourceNode, "script_revision", {
+        mode: "professional_expansion",
+      });
+      render();
+    } catch {
+      notice = "文本优化暂时无法开始；原始想法已保留，可以稍后重试。";
+      render();
+    }
   }
 
   function closeResponsiveAgentOverlay() {

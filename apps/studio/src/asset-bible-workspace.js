@@ -338,11 +338,85 @@ export function deriveProductionCopilotState({
     };
   }
   const scriptReady = Boolean(
-    assetBibleSourceContext(studioState)?.script_revision_id
+    studioState?.production?.script_core_truth_projection?.current_revision_id
+    || assetBibleSourceContext(studioState)?.script_revision_id
     || bible.candidate_set?.script_revision_id,
   );
+  const scriptProjection = studioState?.production?.script_core_truth_projection || {};
+  const ideaNeedsExpansion = scriptReady
+    && scriptProjection.source_kind === "idea"
+    && String(scriptProjection.analysis_state || "analysis_required") === "analysis_required";
+  if (ideaNeedsExpansion) {
+    const revisionNode = studioState?.nodes?.[`script_truth_revision_${scriptProjection.current_revision_id}`];
+    const expansionStatus = String(revisionNode?.params?.embeddedCreativeAction?.status || "");
+    const expansionRunning = ["running", "recovering", "applying"].includes(expansionStatus);
+    const expansionReady = expansionStatus === "preview";
+    const expansionFailed = expansionStatus === "unavailable";
+    const nextAction = expansionReady
+      ? {
+        action: "review_story_expansion",
+        label: "审看扩写结果",
+        reason: "扩写结果已准备好；可以编辑、应用或取消。",
+        enabled: true,
+      }
+      : expansionFailed
+        ? {
+          action: "retry_story_expansion",
+          label: "重新运行文本优化",
+          reason: "原始想法已保留；重新运行只使用文本能力。",
+          enabled: capabilityGates.llm === true,
+        }
+        : {
+          action: "expand_story",
+          label: expansionRunning ? "查看文本处理进度" : "扩写并分析故事",
+          reason: expansionRunning
+            ? "正在恢复或生成同一文本预览，不会重复提交。"
+            : "先生成仅使用文本能力的可编辑预览；确认后再准备结构化制作方案。",
+          enabled: capabilityGates.llm === true,
+        };
+    return {
+      stage: expansionReady
+        ? "story_expansion_review"
+        : expansionRunning
+          ? "story_expansion_in_progress"
+          : expansionFailed
+            ? "story_expansion_recovery"
+            : "story_expansion_required",
+      dependencies: [
+        { key: "idea", label: "创作想法", state: "ready" },
+        { key: "story", label: "故事扩写与分析", state: "pending" },
+        { key: "plan", label: "制作方案", state: "pending" },
+      ],
+      blockers: [],
+      gate: {
+        llm: capabilityGates.llm === true,
+        image: false,
+        video: false,
+        admission: "text_preview_required",
+        cost_state: "not_admitted",
+      },
+      next_valid_action: nextAction,
+      ready_summary: expansionReady
+        ? "故事扩写已准备好。"
+        : expansionRunning
+          ? "想法已保存，正在处理文本。"
+          : expansionFailed
+            ? "文本优化未完成，原始想法已保留。"
+            : "想法已保存。",
+      needs_input: expansionReady
+        ? "审看并编辑扩写结果，再决定应用或取消。"
+        : expansionRunning
+          ? "等待同一文本预览完成。"
+          : expansionFailed
+            ? "检查后可重新运行文本优化。"
+            : "先审看扩写结果，确认后再准备制作方案。",
+      asset_bible: bible,
+      provider_dispatch_count: 0,
+      external_cost_usd: null,
+    };
+  }
   const planningPhase = String(planningRun?.phase || "");
-  if (!scriptReady && ["queued", "running", "running_cancel_requested"].includes(planningPhase)) {
+  if (["queued", "running", "running_cancel_requested"].includes(planningPhase)) {
     const stopping = planningPhase === "running_cancel_requested";
     return {
       stage: "plan_in_progress",
@@ -373,7 +447,8 @@ export function deriveProductionCopilotState({
       external_cost_usd: planningRun?.cost?.actual_usd ?? null,
     };
   }
-  if (!scriptReady && ["failed", "unknown"].includes(planningPhase)) {
+  if (["failed", "unknown"].includes(planningPhase)) {
+    const recoverable = Boolean(planningRun?.run_id);
     return {
       stage: "plan_recovery_required",
       dependencies: [
@@ -389,13 +464,15 @@ export function deriveProductionCopilotState({
         cost_state: "not_admitted",
       },
       next_valid_action: {
-        action: "recover_plan_preview",
-        label: "恢复制作方案",
-        reason: "查看同一任务的失败状态和原始输入，不会再次提交文本任务。",
-        enabled: Boolean(planningRun?.run_id),
+        action: recoverable ? "recover_plan_preview" : "revise_plan_input",
+        label: recoverable ? "恢复制作方案" : "检查创作内容",
+        reason: recoverable
+          ? "查看同一任务的失败状态和原始输入，不会再次提交文本任务。"
+          : "原始创作内容已保留；检查后可重新运行文本处理。",
+        enabled: true,
       },
       ready_summary: "制作方案未通过检查，现有项目内容未改变。",
-      needs_input: "检查失败原因并恢复同一预览。",
+      needs_input: recoverable ? "检查失败原因并恢复同一预览。" : "检查已保留的创作内容，再决定是否重新处理。",
       asset_bible: bible,
       provider_dispatch_count: Number(planningRun?.dispatch_count || 0),
       external_cost_usd: planningRun?.cost?.actual_usd ?? null,

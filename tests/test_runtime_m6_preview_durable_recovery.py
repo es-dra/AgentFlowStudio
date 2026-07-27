@@ -23,6 +23,51 @@ from apps.api.runtime_store import RuntimeStore
 from tests.test_runtime_m6_script_plan_asset_bible import IDEA_TEXT, SCRIPT_TEXT
 
 
+@pytest.mark.parametrize("source_text", ["灯亮", "第一行。\n第二行？", "🌧️ 雨夜，纸船逆流。"])
+def test_short_unicode_ideas_enter_durable_planning_without_schema_rejection_or_graph_mutation(
+    tmp_path,
+    monkeypatch,
+    source_text: str,
+) -> None:
+    monkeypatch.setattr(m6_routes, "_server_codex_m6_enabled", lambda: False)
+    runtime_root = tmp_path / "runtime"
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+
+    response = client.post(
+        "/projects/short-unicode/m6/script-plan-asset-bible/preview",
+        headers={"X-Client-Request-ID": f"short-{len(source_text)}"},
+        json={"source_kind": "idea", "source_text": source_text},
+    )
+    assert response.status_code == 200, response.text
+    run = _wait_for_phase(
+        client,
+        "short-unicode",
+        response.json()["run_id"],
+        "failed",
+    )
+
+    assert run["phase"] == "failed"
+    assert run["error"]["category"] == "planning_rejected"
+    assert run["provider"] == {
+        "service": "local_deterministic",
+        "provider": "local_runtime",
+        "model": "deterministic_contract",
+    }
+    assert run["dispatch_count"] == 0
+    assert run["cost"]["actual_usd"] is None
+    assert run["cost"]["reported_external_paid_cost_usd"] == 0
+    assert not (runtime_root / "projects" / "short-unicode" / "production_graph.json").exists()
+    ledger_text = (
+        runtime_root
+        / "projects"
+        / "short-unicode"
+        / "m6_preview_runs"
+        / run["run_id"]
+        / "run.json"
+    ).read_text(encoding="utf-8")
+    assert source_text not in ledger_text
+
+
 def test_disconnect_recovery_reuses_one_dispatch_and_confirm_is_exactly_once(tmp_path, monkeypatch) -> None:
     original = m6_routes.build_m6_script_plan_asset_bible
     started = threading.Event()

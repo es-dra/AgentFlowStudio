@@ -5,7 +5,7 @@ from difflib import SequenceMatcher
 from typing import Any, Literal, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_error_detail
@@ -50,12 +50,19 @@ class M6ScriptPlanPreviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_kind: Literal["idea", "script", "uploaded_text"] = "idea"
-    source_text: str = Field(min_length=40, max_length=200_000)
+    source_text: str = Field(min_length=1, max_length=200_000)
     revision_instruction: str | None = Field(default=None, max_length=2000)
     parent_candidate_digest: str | None = Field(default=None, max_length=64)
     requested_language: str = Field(default="zh-CN", max_length=24)
     provider_dispatch_count: int = Field(default=0, ge=0, le=0)
     cost_usd: int = Field(default=0, ge=0, le=0)
+
+    @field_validator("source_text")
+    @classmethod
+    def source_text_must_contain_creator_input(cls, value: str) -> str:
+        if not _clean_source_text(value):
+            raise ValueError("creator input is required")
+        return value
 
 
 class M6ScriptPlanConfirmRequest(BaseModel):

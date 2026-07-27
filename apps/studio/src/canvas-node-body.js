@@ -216,7 +216,7 @@ function embeddedCreativeActionPanel(node) {
   const head = document.createElement("header");
   head.className = "embedded-creative-head";
   head.innerHTML = [
-    `<span>${icon(action.status === "running" ? "clock" : "sparkles", 12)}</span>`,
+    `<span>${icon(["running", "recovering"].includes(action.status) ? "clock" : "sparkles", 12)}</span>`,
     `<strong>${escapeHtml(title)}</strong>`,
     `<small>${escapeHtml(creativeModeLabel(action.mode))} · 确认前不改动画布</small>`,
   ].join("");
@@ -225,16 +225,18 @@ function embeddedCreativeActionPanel(node) {
   message.className = "embedded-creative-message";
   if (action.status === "unavailable") {
     const failure = creativeActionFailureInfo(action);
-    message.textContent = `${failure.label}：${failure.preserved_state}`;
+    message.textContent = `${failure.label}；原文已保留。`;
     panel.appendChild(message);
-    panel.appendChild(textBlock("embedded-creative-compact-line", failure.next_action));
+    panel.appendChild(textBlock("embedded-creative-compact-line", "在右侧查看并决定是否重新运行文本优化。"));
   } else {
     message.textContent = action.message || "等待 AI 预览。";
     panel.appendChild(message);
   }
-  if (action.status === "running") panel.appendChild(progressStrip("正在生成可审查预览"));
+  if (["running", "recovering"].includes(action.status)) {
+    panel.appendChild(progressStrip(action.status === "recovering" ? "正在恢复同一文本预览" : "正在生成可审查预览"));
+  }
   if (action.status === "needs_input") panel.appendChild(actionButtons(action, { clear: true }));
-  if (action.status === "unavailable") panel.appendChild(actionButtons(action, { clear: true, reviewHintText: "请在 AI 创作搭档中重新预览。" }));
+  if (action.status === "unavailable") panel.appendChild(actionButtons(action, { clear: true, reviewHintText: "详细原因和文本重试在右侧。" }));
   if (action.status === "preview") {
     panel.appendChild(compactCreativeTaskResult(action));
     panel.appendChild(actionButtons(action, { cancel: true, retry: true, reviewHint: true }));

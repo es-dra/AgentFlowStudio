@@ -109,6 +109,10 @@ def test_script_core_truth_auth_scope_covers_revision_and_projection(tmp_path, m
     )
     assert created.status_code == 200, created.text
     assert created.json()["revision"]["source_digest"] == hashlib.sha256(b"A short idea enters a traceable revision.").hexdigest()
+    refreshed = client.get("/projects/alpha-script-truth/script-truth", headers=alpha_headers)
+    assert refreshed.status_code == 200
+    assert refreshed.json()["projection"]["current_revision"]["source_text"] == "A short idea enters a traceable revision."
+    assert "source_text" not in refreshed.json()["projection"]["revision_history"][0]
     assert client.post(
         "/projects/alpha-script-truth/script-revisions",
         json={"source_kind": "idea", "source_text": "blocked"},

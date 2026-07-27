@@ -406,7 +406,7 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
     assert "markKeyframeStillProcessing(store, nodeId, jobId)" in keyframe_actions
     assert "await startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request)" not in keyframe_actions
     assert "source_node_id" in keyframe_recovery
-    assert "Gateway timeout while waiting for image generation" in runtime_client
+    assert "图片处理等待超时；可以检查同一任务的已保存结果。" in runtime_client
     assert "MiniMax keyframe request failed" not in node_actions
     for forbidden in ("Codex", "codex", "handoff", "request.json", "codex_image_job"):
         assert forbidden not in node_actions + keyframe_actions

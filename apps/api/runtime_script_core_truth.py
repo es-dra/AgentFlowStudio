@@ -376,7 +376,10 @@ def public_projection(state: dict[str, Any]) -> dict[str, Any]:
         "schema_version": SCRIPT_TRUTH_SCHEMA_VERSION,
         "project_id": state["project_id"],
         "current_revision_id": revision_id,
-        "current_revision": public_revision(revision, include_source=False) if revision else None,
+        # The authenticated Studio needs the current source to render and resume
+        # the creator's text workflow after a refresh. Historical revisions stay
+        # metadata-only to keep the projection bounded.
+        "current_revision": public_revision(revision, include_source=True) if revision else None,
         "revision_history": [
             public_revision(item, include_source=False)
             for item in sorted((state.get("revisions") or {}).values(), key=lambda value: str(value.get("created_at") or ""))

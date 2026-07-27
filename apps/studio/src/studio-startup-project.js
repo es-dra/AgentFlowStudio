@@ -1,4 +1,5 @@
 import { restoreCandidateSelectionsAfterLoad } from "./candidate-selection-controller.js";
+import { recoverPendingEmbeddedCreativeActions } from "./embedded-creative-actions.js";
 import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { syncRuntimeAssets } from "./runtime-asset-sync.js";
 
@@ -69,5 +70,6 @@ export async function refreshProjectRuntimeDecorations({
   await refreshScriptCoreTruth(runtimeClient);
   if (!current()) return { skipped: "stale_project_transition" };
   await refreshProductionPlanTruth(runtimeClient);
+  if (current()) void recoverPendingEmbeddedCreativeActions(store, runtimeClient);
   return current() ? { refreshed: true } : { skipped: "stale_project_transition" };
 }

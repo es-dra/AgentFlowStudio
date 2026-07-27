@@ -18,6 +18,7 @@ def embedded_creative_action(value: Any, *, text: TextSanitizer, number: NumberS
         "action_type": action_type,
         "mode": text(value.get("mode"), "", 80),
         "status": text(value.get("status"), "", 40),
+        "client_request_id": text(value.get("client_request_id"), "", 120),
         "source_text": text(value.get("source_text"), "", 24000),
         "source_node_version": text(value.get("source_node_version"), "", 160),
         "message": text(value.get("message"), "", 600),

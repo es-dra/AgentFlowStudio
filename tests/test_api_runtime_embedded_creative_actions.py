@@ -133,6 +133,7 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     response = client.post(
         f"/projects/{project_id}/embedded-creative-actions/preview",
         json=_creative_action_request(),
+        headers={"X-Client-Request-ID": "cli_embedded_recovery_contract"},
     )
 
     assert response.status_code == 200, response.text
@@ -163,6 +164,20 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     assert "孙悟空大战猪八戒" in request.prompt
     assert "固定4x15/10x6" in request.prompt
     assert "screenplay_candidate" in request.prompt
+    recovered = client.get(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_embedded_recovery_contract",
+    )
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["recovered"] is True
+    assert recovered.json()["preview"] == payload["preview"]
+    assert recovered.json()["graph_mutation"] == payload["graph_mutation"]
+    assert recovered.json()["safe_manifest"]["image_video_generation_enabled"] is False
+    assert len(calls) == 1
+    cross_project = client.get(
+        "/projects/another-project/embedded-creative-actions/by-client/cli_embedded_recovery_contract",
+    )
+    assert cross_project.status_code == 404
+    assert len(calls) == 1
 
 
 def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp_path, monkeypatch) -> None:

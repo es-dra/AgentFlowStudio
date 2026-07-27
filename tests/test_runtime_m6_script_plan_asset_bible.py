@@ -9,6 +9,7 @@ import pytest
 from apps.api.runtime_film_production_graph import compile_film_candidate
 from apps.api.runtime_m6_script_plan_asset_bible import (
     M6PlanningError,
+    M6ScriptPlanPreviewRequest,
     REVIEW_ROLES,
     build_m6_script_plan_asset_bible,
     validate_m6_candidate,
@@ -45,6 +46,32 @@ EXPLICIT_NAME_BRIEF = (
     "规划3个连续镜头，总时长约25秒。"
     "不要新增其他人物、场景或道具；制作参考必须明确标为辅助内容。"
 )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("灯亮", "灯亮"),
+        ("  一句话，带标点！  ", "一句话，带标点！"),
+        ("第一行。\n第二行？", "第一行。\n第二行？"),
+        ("🌧️ 雨夜", "🌧️ 雨夜"),
+    ],
+)
+def test_m6_preview_request_accepts_nonempty_creator_ideas_of_any_length(raw: str, expected: str) -> None:
+    request = M6ScriptPlanPreviewRequest(source_kind="idea", source_text=raw)
+    assert _clean_source_text_for_assertion(request.source_text) == expected
+    assert request.source_text == raw
+    assert request.provider_dispatch_count == 0
+
+
+@pytest.mark.parametrize("raw", ["", " ", "\n\t"])
+def test_m6_preview_request_rejects_empty_creator_input(raw: str) -> None:
+    with pytest.raises(ValueError):
+        M6ScriptPlanPreviewRequest(source_kind="idea", source_text=raw)
+
+
+def _clean_source_text_for_assertion(value: str) -> str:
+    return value.strip()
 
 
 def test_m6_preview_builds_varied_professional_candidates_without_fixed_profiles() -> None:

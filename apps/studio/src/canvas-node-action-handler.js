@@ -32,7 +32,7 @@ export function handleCanvasNodeClick(store, runtime, e) {
   } else if (action === "embedded-creative-apply") {
     const textarea = nodeEl.querySelector(".embedded-creative-preview-editor");
     if (textarea) editEmbeddedCreativePreview(store, nodeId, textarea.value || "");
-    applyEmbeddedCreativeAction(store, nodeId);
+    void applyEmbeddedCreativeAction(store, nodeId, runtime);
   } else if (action === "embedded-creative-cancel") cancelEmbeddedCreativeAction(store, nodeId);
   else if (action === "embedded-creative-clear") clearEmbeddedCreativeAction(store, nodeId);
   else if (action === "embedded-creative-retry") {
