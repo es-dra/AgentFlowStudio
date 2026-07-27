@@ -40,6 +40,17 @@ PNG_BYTES = base64.b64decode(
 )
 VIDEO_CANDIDATE_BYTES = b"afs-deterministic-video-candidate-v1"
 REQUESTED_AT = "2026-07-26T03:00:00Z"
+TEMPORAL_STAGING = {
+    "subject_action_arc": "值守人员从观察仪表转为拿起校准器完成校准",
+    "spatial_displacement": "身体由操作台左侧前倾移向仪表中央",
+    "interaction_object": "双手操作六角校准器与仪表旋钮",
+    "camera_movement": "沿操作台缓慢向前推进",
+    "environment_dynamics": "仪表指针轻微摆动，检修灯稳定闪烁",
+    "pacing": "前缓后稳，在校准完成处停顿",
+    "start_state": "值守人员坐在操作台前观察异常读数",
+    "end_state": "校准器归位，仪表读数稳定",
+    "narrative_purpose": "建立孤立环境中的检修任务并完成一次动作转折",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -462,13 +473,124 @@ def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_
         confirm=False,
     )
     prompt_contract = preview["result"]["manifest"]["source"]["prompt_contract"]
-    assert prompt_contract["shot_action"] == "巡夜人甲在操作台前校准六角校准器"
+    assert preview["result"]["manifest"]["source"]["shot_semantics"]["action"] == (
+        "巡夜人甲在操作台前校准六角校准器"
+    )
+    assert prompt_contract["shot_action"] == TEMPORAL_STAGING["subject_action_arc"]
     assert prompt_contract["composition"] == "中景"
     assert prompt_contract["camera_movement"] == "沿操作台缓慢向前推进"
     assert prompt_contract["emotion"] == "保持克制专注的检修压力"
     assert prompt_contract["keyword_rewrite"] is False
     assert prompt_contract["sample_fallback"] is False
     assert preview["provider_dispatch_count"] == 0
+
+
+def test_reference_conditioned_manifest_sends_real_identity_references_without_first_frame(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission").json()[
+        "readiness"
+    ]
+    assert readiness["suggested_generation_mode"] == "reference_conditioned"
+    assert {
+        item["mode"]: item["supported"]
+        for item in readiness["generation_modes"]
+    } == {
+        "reference_conditioned": True,
+        "first_frame": True,
+        "text_to_video": False,
+    }
+    command = {
+        "type": "compile",
+        "idempotency_key": "compile-reference-conditioned",
+        "generation_mode": "reference_conditioned",
+        "selection_reason": "使用角色、场景和道具参考约束连续性，不锁定首帧。",
+        "temporal_staging": TEMPORAL_STAGING,
+    }
+    body = {"command": command, "requested_at": REQUESTED_AT}
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    input_contract = candidate["provider_input_contract"]
+    assert input_contract["mode"] == "reference_conditioned"
+    assert input_contract["first_frame"] is None
+    assert input_contract["last_frame"] is None
+    assert [item["role"] for item in input_contract["reference_images"]] == [
+        "reference_image",
+        "reference_image",
+        "reference_image",
+    ]
+    assert {
+        item["image_asset_id"] for item in input_contract["reference_images"]
+    } == {media["character"], media["scene"], media["prop"]}
+    assert input_contract["frame_role_cardinality"] == {
+        "first_frame": 0,
+        "last_frame": 0,
+        "reference_image": 3,
+    }
+    assert candidate["source"]["temporal_staging"] == TEMPORAL_STAGING
+    assert candidate["source"]["prompt_contract"]["generation_mode"] == (
+        "reference_conditioned"
+    )
+    assert "Reference images" not in candidate["source"]["prompt_contract"][
+        "provider_prompt"
+    ]
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-reference"},
+    )["result"]["manifest"]
+    request = video_admission_generation_request(
+        reserved,
+        generated_at=REQUESTED_AT,
+    )
+    assert request["generation_path"] == "reference_images"
+    assert request["first_frame_image_asset_id"] is None
+    assert set(request["reference_image_asset_ids"]) == {
+        media["character"],
+        media["scene"],
+        media["prop"],
+    }
+    assert load_video_admission_manifest(store, project_id) == reserved
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        {"temporal_staging": {**TEMPORAL_STAGING, "end_state": ""}},
+        {"generation_mode": "text_to_video"},
+        {"generation_mode": ""},
+    ],
+)
+def test_video_setup_fails_closed_before_manifest_or_provider(
+    tmp_path,
+    mutation,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    command = {
+        "type": "compile",
+        "idempotency_key": "invalid-video-setup",
+        "generation_mode": "reference_conditioned",
+        "selection_reason": "使用资产参考约束连续性。",
+        "temporal_staging": TEMPORAL_STAGING,
+        **mutation,
+    }
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={"command": command, "requested_at": REQUESTED_AT},
+    )
+    assert response.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == {}
+    assert response.json()["detail"]["details"]["raw_detail"]
 
 
 def test_video_readiness_still_fails_closed_when_creative_semantics_are_absent(tmp_path) -> None:
@@ -528,6 +650,15 @@ def test_video_readiness_requires_locked_image_manifest(
     assert ProductionGraphStore(store).load(project_id)["version"] == 1
 
 
+def _video_setup_command(command: dict) -> dict:
+    return {
+        "generation_mode": "first_frame",
+        "selection_reason": "测试明确要求从批准关键帧开始。",
+        "temporal_staging": TEMPORAL_STAGING,
+        **command,
+    }
+
+
 def _command(
     client: TestClient,
     project_id: str,
@@ -535,6 +666,12 @@ def _command(
     *,
     confirm: bool = True,
 ) -> dict:
+    if command.get("type") in {
+        "compile",
+        "recompile_current",
+        "create_new_round",
+    }:
+        command = _video_setup_command(command)
     body = {
         "command": command,
         "requested_at": REQUESTED_AT,
@@ -626,10 +763,10 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert state["provider_dispatch_count"] == 0
 
     body = {
-        "command": {
+        "command": _video_setup_command({
             "type": "recompile_current",
             "idempotency_key": "recompile-current-v2",
-        },
+        }),
         "requested_at": REQUESTED_AT,
     }
     preview = client.post(
@@ -703,10 +840,10 @@ def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmatio
     old_video = deepcopy(load_video_admission_manifest(store, project_id))
     _rotate_image_manifest_after_graph_update(store, project_id)
     body = {
-        "command": {
+        "command": _video_setup_command({
             "type": "recompile_current",
             "idempotency_key": "recompile-racing-graph",
-        },
+        }),
         "requested_at": REQUESTED_AT,
     }
     preview = client.post(
@@ -1134,6 +1271,67 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
     assert approved_videos[0]["metadata"]["width"] == 1280
     assert approved_videos[0]["metadata"]["height"] == 720
     assert approved_videos[0]["metadata"]["codec"] == "mpeg4"
+    assert approved_videos[0]["metadata"]["generation_mode"] == "first_frame"
+    assert approved_videos[0]["metadata"]["first_frame_count"] == 1
+    assert approved_videos[0]["metadata"]["reference_image_count"] == 0
+    assert approved_videos[0]["metadata"]["temporal_staging"] == TEMPORAL_STAGING
+    approved_manifest = approved.json()["result"]["manifest"]
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission").json()
+    assert readiness["readiness"]["comparison_round_allowed"] is True
+    assert readiness["manifest"] == approved_manifest
+
+    comparison_command = {
+        "type": "create_comparison_round",
+        "idempotency_key": "reference-comparison",
+        "generation_mode": "reference_conditioned",
+        "selection_reason": "让批准资产约束身份与连续性，不将关键帧锁为首帧。",
+        "temporal_staging": TEMPORAL_STAGING,
+    }
+    comparison_body = {
+        "command": comparison_command,
+        "requested_at": REQUESTED_AT,
+    }
+    comparison = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=comparison_body,
+    )
+    assert comparison.status_code == 200, comparison.text
+    comparison_manifest = comparison.json()["result"]["manifest"]
+    assert comparison_manifest["round_contract"] == {
+        "kind": "independent_comparison",
+        "prior_manifest_id": approved_manifest["manifest_id"],
+        "prior_manifest_hash": approved_manifest["manifest_hash"],
+        "prior_round_preserved": True,
+        "prior_round_replay_allowed": False,
+        "prior_approved_result_immutable": True,
+    }
+    assert comparison_manifest["provider_input_contract"]["mode"] == (
+        "reference_conditioned"
+    )
+    assert comparison_manifest["provider_input_contract"]["first_frame"] is None
+    assert len(comparison_manifest["provider_input_contract"]["reference_images"]) == 3
+    assert comparison_manifest["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == approved_manifest
+    graph_before_comparison = graph_store.load(project_id)
+
+    comparison_confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={
+            **comparison_body,
+            "preview_digest": comparison.json()["preview_digest"],
+        },
+    )
+    assert comparison_confirmed.status_code == 200, comparison_confirmed.text
+    assert graph_store.load(project_id) == graph_before_comparison
+    assert comparison_confirmed.json()["provider_dispatch_count"] == 0
+    archived_approved = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{approved_manifest['manifest_id']}.json"
+    )
+    assert archived_approved == approved_manifest
 
     workspace = client.get(
         f"/projects/{project_id}/m5/sequence-workspace"
@@ -1159,6 +1357,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         "codec": "mpeg4",
         "model": MODEL_ID,
         "resolution": RESOLUTION,
+        "generation_mode": "first_frame",
         "approval_graph_version": graph["version"],
         "lineage": {
             "source_kind": "approved_video_receipt",
@@ -1555,10 +1754,10 @@ def test_rejected_video_round_creates_one_independent_first_frame_round_without_
     assert readiness["manifest"] == old_manifest
 
     body = {
-        "command": {
+        "command": _video_setup_command({
             "type": "create_new_round",
             "idempotency_key": "new-independent-round",
-        },
+        }),
         "requested_at": REQUESTED_AT,
     }
     preview = client.post(

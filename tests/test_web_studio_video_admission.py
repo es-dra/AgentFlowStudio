@@ -101,6 +101,7 @@ process.stdout.write(JSON.stringify({ projection, request }));
     assert projection["provider_dispatch_count"] == 0
     assert request == {
         "node_id": "shot-01",
+        "generation_path": "i2v_first_frame",
         "prompt_text": "Canonical shot action and continuity.",
         "provider_service_id": "seedance_i2v",
         "first_frame_image_asset_id": "keyframe-approved",
@@ -143,9 +144,60 @@ process.stdout.write(JSON.stringify({ outcomes }));
     )
 
     assert payload["outcomes"] == [
-        "视频生成确认缺少已批准关键帧或单次额度",
-        "视频生成确认缺少已批准关键帧或单次额度",
+        "视频生成确认与所选生成方式不一致",
+        "视频生成确认与所选生成方式不一致",
     ]
+
+
+def test_video_admission_workspace_builds_reference_conditioned_request() -> None:
+    payload = _run_node(
+        r'''
+import { videoAdmissionGenerationRequest } from "./apps/studio/src/video-admission-workspace.js";
+const refs = ["character-ref", "scene-ref", "prop-ref"].map((image_asset_id) => ({
+  image_asset_id,
+  role: "reference_image",
+}));
+const request = videoAdmissionGenerationRequest({
+  manifest_id: "reference-manifest",
+  manifest_hash: "b".repeat(64),
+  provider_contract: { duration_sec: 6, resolution: "720p" },
+  provider_input_contract: {
+    mode: "reference_conditioned",
+    first_frame: null,
+    last_frame: null,
+    reference_images: refs,
+    frame_role_cardinality: {
+      first_frame: 0,
+      last_frame: 0,
+      reference_image: 3,
+    },
+  },
+  source: {
+    shot: { shot_id: "arbitrary-shot" },
+    keyframe: { image_asset_id: "approved-keyframe", aspect_ratio: "16:9" },
+    prompt_contract: {
+      provider_prompt: "A complete temporal narrative prompt.",
+      camera_movement: "track laterally",
+    },
+  },
+  item: {
+    item_id: "video-arbitrary-shot",
+    state: "reserved",
+    reservation_token: "reservation-reference",
+  },
+}, "2026-07-27T00:00:00Z");
+process.stdout.write(JSON.stringify(request));
+'''
+    )
+
+    assert payload["generation_path"] == "reference_images"
+    assert payload["first_frame_image_asset_id"] is None
+    assert payload["reference_image_asset_ids"] == [
+        "character-ref",
+        "scene-ref",
+        "prop-ref",
+    ]
+    assert payload["candidate_count"] == 1
 
 
 def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> None:
@@ -153,15 +205,24 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
 
     for creator_text in (
         "准备单镜头视频",
-        "已批准关键帧驱动",
+        "设计镜头内叙事",
         "doubao-seedance-2-0",
         "非 fast",
         "720p",
         "6 秒",
         "已批准关键帧",
         "参考图",
-        "项目参考组",
-        "$2.00 项目停止线（当前新轮次",
+        "参考图约束视频",
+        "首帧图生视频",
+        "文生视频（仅文字叙事）",
+        "主体动作弧",
+        "空间位移",
+        "环境动态",
+        "起始状态",
+        "结束状态",
+        "准备叙事镜头对照",
+        "实际发送参考图",
+        "$2.00 项目停止线",
         "1 次发送",
         "自动重试 0",
         "建立新的单次视频清单",
@@ -182,7 +243,7 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
     assert "写入当前 ProductionGraph" not in source
     assert "镜头 01" not in source
     assert "videoAdmissionView().item?.job_id === result.job_id" in source
-    assert "manifest.source?.references" in source
+    assert "inputContract.reference_images" in source
 
 
 def test_video_admission_runtime_client_uses_project_scoped_authenticated_routes() -> None:

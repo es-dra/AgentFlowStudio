@@ -48,26 +48,43 @@ export function videoAdmissionGenerationRequest(manifest, generatedAt) {
     ? inputContract.reference_images
     : [];
   const cardinality = inputContract?.frame_role_cardinality || {};
+  const mode = String(inputContract.mode || "");
+  const expectedFirstCount = mode === "first_frame" ? 1 : 0;
+  const expectedReferenceCount = mode === "reference_conditioned"
+    ? referenceImages.length
+    : 0;
+  const generationPath = {
+    first_frame: "i2v_first_frame",
+    reference_conditioned: "reference_images",
+    text_to_video: "t2v",
+  }[mode];
   if (
     !prompt
-    || !source?.keyframe?.image_asset_id
     || item.state !== "reserved"
-    || inputContract.mode !== "first_frame"
-    || firstFrame.role !== "first_frame"
-    || firstFrame.image_asset_id !== source.keyframe.image_asset_id
-    || referenceImages.length !== 0
-    || Number(cardinality.first_frame) !== 1
+    || !generationPath
+    || (mode === "first_frame" && (
+      firstFrame.role !== "first_frame"
+      || firstFrame.image_asset_id !== source?.keyframe?.image_asset_id
+    ))
+    || (mode !== "first_frame" && inputContract.first_frame !== null)
+    || (mode === "reference_conditioned" && referenceImages.length < 1)
+    || (mode !== "reference_conditioned" && referenceImages.length !== 0)
+    || referenceImages.some((item) => item?.role !== "reference_image" || !item?.image_asset_id)
+    || Number(cardinality.first_frame) !== expectedFirstCount
     || Number(cardinality.last_frame) !== 0
-    || Number(cardinality.reference_image) !== 0
+    || Number(cardinality.reference_image) !== expectedReferenceCount
   ) {
-    throw new Error("视频生成确认缺少已批准关键帧或单次额度");
+    throw new Error("视频生成确认与所选生成方式不一致");
   }
   return {
     node_id: source.shot.shot_id,
+    generation_path: generationPath,
     prompt_text: prompt,
     provider_service_id: "seedance_i2v",
-    first_frame_image_asset_id: source.keyframe.image_asset_id,
-    reference_image_asset_ids: [],
+    first_frame_image_asset_id: mode === "first_frame"
+      ? source.keyframe.image_asset_id
+      : null,
+    reference_image_asset_ids: referenceImages.map((item) => item.image_asset_id),
     duration_sec: Number(contract.duration_sec || 6),
     resolution: String(contract.resolution || "720p"),
     aspect_ratio: source.keyframe.aspect_ratio || "16:9",

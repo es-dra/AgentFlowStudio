@@ -9,6 +9,7 @@ DEFAULT_VIDEO_GENERATION_PATH = "i2v_first_frame"
 
 GenerationPathId = Literal[
     "t2v",
+    "reference_images",
     "i2v_first_frame",
     "i2v_first_last",
     "reference_video",
@@ -103,6 +104,32 @@ GENERATION_PATH_CONTRACTS: dict[str, GenerationPathContract] = {
             "provider_gate_before_submit",
         ),
         notes="Current legacy-compatible video path.",
+    ),
+    "reference_images": GenerationPathContract(
+        path_id="reference_images",
+        label="Reference-conditioned video",
+        required_inputs=("prompt_text", "reference_image_asset_ids"),
+        optional_inputs=(
+            "optimized_prompt",
+            "input_source",
+            "duration_sec",
+            "resolution",
+            "aspect_ratio",
+            "motion",
+            "context_subgraph",
+        ),
+        input_media_families=("text", "image"),
+        output_media_family="video",
+        provider_capability="video.reference_images",
+        adoption_state="supported",
+        safety_preflight=(
+            "prompt_text_present",
+            "reference_image_asset_ids_present",
+            "duration_contract",
+            "provider_descriptor_capability",
+            "provider_gate_before_submit",
+        ),
+        notes="Approved images constrain identity and continuity without becoming first or last frames.",
     ),
     "i2v_first_last": GenerationPathContract(
         path_id="i2v_first_last",
@@ -332,6 +359,8 @@ def _has_input(request: Any, field: str) -> bool:
         return value is not None
     if isinstance(value, str):
         return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
     return value is not None
 
 

@@ -245,6 +245,7 @@ function approvedMediaProjection(value, projectId) {
       codec: String(media?.codec || ""),
       model: String(media?.model || ""),
       resolution: String(media?.resolution || ""),
+      generationMode: String(media?.generation_mode || ""),
       approvalGraphVersion: Number(media?.approval_graph_version || 0),
       targetNodeIds: array(media?.target_node_ids).map((item) => String(item || "")).filter(Boolean),
       lineage: media?.lineage && typeof media.lineage === "object"
@@ -348,6 +349,7 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         source_node_ids: media.targetNodeIds,
         model: media.model,
         resolution: media.resolution,
+        generation_mode: media.generationMode,
         duration_sec: media.durationSeconds,
         mime_type: media.mimeType,
         container: media.container,

@@ -130,4 +130,6 @@ def test_agent_chat_conversation_uses_server_codex_structured_llm_and_preserves_
     assert "'video_reference_count': 3" in request.prompt
     assert "'video_model': 'doubao-seedance-2-0'" in request.prompt
     assert "不要声称参考图缺失" in request.prompt
+    assert "不要因为关键帧存在就声称会使用首帧图生视频" in request.prompt
+    assert "资产参考默认只约束身份与连续性" in request.prompt
     assert "准备镜头视频" in request.prompt

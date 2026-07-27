@@ -39,6 +39,8 @@ def video_input_mode(request: Any) -> str:
     path_id = video_generation_path_id(request)
     if path_id == "t2v":
         return "text_only"
+    if path_id == "reference_images":
+        return "reference_images"
     if path_id == "reference_video":
         return "reference_video"
     if path_id in {"director_to_keyframe", "director_to_video"}:
@@ -57,6 +59,14 @@ def _default_input_source_payload(request: Any) -> dict[str, Any]:
             "source_mode": "text_prompt",
             "source_node_id": getattr(request, "node_id", None),
             "role": "prompt_only",
+        }
+    if path_id == "reference_images":
+        reference_ids = list(getattr(request, "reference_image_asset_ids", None) or [])
+        return {
+            "source_mode": "visual_asset_reference",
+            "source_asset_id": reference_ids[0] if reference_ids else "",
+            "source_node_id": getattr(request, "node_id", None),
+            "role": "reference_image",
         }
     if path_id == "reference_video":
         return {
@@ -83,6 +93,8 @@ def _default_input_role(request: Any) -> str:
     path_id = video_generation_path_id(request)
     if path_id == "t2v":
         return "prompt_only"
+    if path_id == "reference_images":
+        return "reference_image"
     if path_id == "reference_video":
         return "reference_video"
     if path_id in {"director_to_keyframe", "director_to_video"}:
