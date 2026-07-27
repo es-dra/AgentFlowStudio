@@ -675,6 +675,7 @@ def _owner_import_body(graph: dict) -> dict:
                     "stable_id": "M-CHAR-01",
                     "asset_type": "character",
                     "display_name": "叶安安",
+                    "demographics": "modern East Asian young woman",
                     "visual_identity": "清秀倔强，杏眼，黑色长发，纤细，同脸连续",
                     "variants": ["泳池湿身", "白浴巾伪装"],
                     "negative_locks": ["禁止族裔模仿式黑脸"],
@@ -744,6 +745,8 @@ def test_owner_asset_draft_import_previews_and_confirms_into_canonical_graph(tmp
     assert bible["candidate_set"]["import"]["draft_id"] == "owner-asset-bible-20260728-v1"
     assert len(bible["candidate_set"]["style_domains"]) == 2
     assert len(bible["candidate_set"]["shot_reference_map"]) == 4
+    imported_character = next(item for item in bible["assets"] if item["stable_id"] == "M-CHAR-01")
+    assert imported_character["demographics"] == "modern East Asian young woman"
 
     confirmed = confirm_asset_bible_command_result(
         PROJECT_ID,
@@ -761,6 +764,7 @@ def test_owner_asset_draft_import_previews_and_confirms_into_canonical_graph(tmp
     updated = graph_store.load(PROJECT_ID)
     assert updated["nodes"]["asset-bible-codex-clawed-fighter-smoke-20260624-h"]["metadata"]["kind"] == "asset_bible"
     assert updated["nodes"]["M-CHAR-01"]["metadata"]["owner_supplied"] is True
+    assert updated["nodes"]["M-CHAR-01"]["metadata"]["demographics"] == "modern East Asian young woman"
     assert updated["nodes"]["GFX-01"]["metadata"]["asset_subtype"] == "graphic"
     assert any(
         relation == {
@@ -795,6 +799,8 @@ def test_owner_asset_draft_import_previews_and_confirms_into_canonical_graph(tmp
         "M-ENV-01",
         "M-STY-01",
     ]
+    restored_character = next(item for item in restored_bible["assets"] if item["stable_id"] == "M-CHAR-01")
+    assert restored_character["demographics"] == "modern East Asian young woman"
 
 
 def test_owner_asset_draft_import_rejects_bad_id_collision_and_cross_domain(tmp_path) -> None:
