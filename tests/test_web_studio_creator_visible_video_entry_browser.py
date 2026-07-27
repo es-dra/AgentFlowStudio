@@ -154,6 +154,9 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                 page.wait_for_function("window.__videoEntryReady === true")
 
                 approved = page.locator(".approved-shot-video").first
+                assert page.locator(".studio-storyboard .approved-shot-video").count() == 1
+                assert page.locator(".studio-storyboard video").count() == 1
+                assert page.locator(".studio-storyboard .video-admission-panel").count() == 0
                 assert approved.get_by_text("视频已保存到项目", exact=True).is_visible()
                 assert approved.get_by_text("doubao-seedance-2-0", exact=True).is_visible()
                 assert approved.get_by_text("720p · 6.04 秒", exact=True).is_visible()
@@ -191,6 +194,8 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
 
                 page.evaluate("window.__setVideoSection('asset_bible')")
                 assert page.get_by_text("1 条已确认", exact=True).is_visible()
+                assert page.locator(".studio-asset-bible video").count() == 0
+                assert page.locator(".studio-asset-bible .video-admission-panel").count() == 0
                 assert page.get_by_role(
                     "button",
                     name="在故事板播放",
@@ -227,6 +232,108 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                 assert page.evaluate("window.__calls.videoDispatch") == 0
                 assert page.evaluate("window.__sideEffects.generateVideo") == 0
                 assert not console_errors
+            finally:
+                browser.close()
+
+
+def test_resize_observer_notification_is_not_reported_as_an_afs_error() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type == "error"
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+                result = page.evaluate(
+                    """async () => {
+                      const module = await import(
+                        "/apps/studio/src/client-error-reporter.js"
+                      );
+                      const events = [];
+                      module.installClientErrorReporter({
+                        getRuntime: () => ({
+                          projectId: "browser-video-entry",
+                          recordClientEvent: async (event) => events.push(event),
+                        }),
+                        getProjectId: () => "browser-video-entry",
+                      });
+                      const notification = new ErrorEvent("error", {
+                        message: "ResizeObserver loop completed with undelivered notifications.",
+                        cancelable: true,
+                      });
+                      const notificationAccepted = window.dispatchEvent(notification);
+                      await new Promise((resolve) => setTimeout(resolve, 0));
+                      const notificationEventCount = events.length;
+                      window.dispatchEvent(new ErrorEvent("error", {
+                        message: "TypeError: actual product failure",
+                        cancelable: true,
+                      }));
+                      await new Promise((resolve) => setTimeout(resolve, 0));
+                      const sameMessageError = new Error(
+                        "ResizeObserver loop completed with undelivered notifications."
+                      );
+                      window.dispatchEvent(new ErrorEvent("error", {
+                        message: sameMessageError.message,
+                        error: sameMessageError,
+                        filename: "/apps/studio/src/product-shell.js",
+                        lineno: 42,
+                        colno: 7,
+                        cancelable: true,
+                      }));
+                      await new Promise((resolve) => setTimeout(resolve, 0));
+                      return {
+                        notificationAccepted,
+                        defaultPrevented: notification.defaultPrevented,
+                        notificationEventCount,
+                        finalEventCount: events.length,
+                        finalEventMessage: events[0]?.message || "",
+                        sameMessageEvent: events[1]?.message || "",
+                        exactClassifier: module.isNonActionableBrowserNotification(
+                          "ResizeObserver loop limit exceeded"
+                        ),
+                        sameMessageErrorClassifier:
+                          module.isNonActionableBrowserNotification({
+                            message: sameMessageError.message,
+                            error: sameMessageError,
+                            lineno: 42,
+                            colno: 7,
+                          }),
+                        realErrorClassifier: module.isNonActionableBrowserNotification(
+                          "TypeError: actual product failure"
+                        ),
+                      };
+                    }"""
+                )
+                assert result == {
+                    "notificationAccepted": False,
+                    "defaultPrevented": True,
+                    "notificationEventCount": 0,
+                    "finalEventCount": 2,
+                    "finalEventMessage": "TypeError: actual product failure",
+                    "sameMessageEvent": (
+                        "ResizeObserver loop completed with undelivered notifications."
+                    ),
+                    "exactClassifier": True,
+                    "sameMessageErrorClassifier": False,
+                    "realErrorClassifier": False,
+                }
+                assert len(console_errors) == 2
+                assert all(item.startswith("studio_client_error ") for item in console_errors)
+                assert "actual product failure" in console_errors[0]
+                assert "ResizeObserver loop completed" in console_errors[1]
             finally:
                 browser.close()
 

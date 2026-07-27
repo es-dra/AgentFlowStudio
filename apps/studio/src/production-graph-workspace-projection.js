@@ -314,8 +314,8 @@ function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY,
 
 function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
   const aspectRatio = media.width > 0 && media.height > 0
-    ? `${media.width} / ${media.height}`
-    : "16 / 9";
+    ? `${media.width}:${media.height}`
+    : "16:9";
   return {
     id,
     type: media.mediaKind,
@@ -347,6 +347,8 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         mime_type: media.mimeType,
         container: media.container,
         codec: media.codec,
+        width: media.width,
+        height: media.height,
         approval_graph_version: media.approvalGraphVersion,
       },
       previewAspectRatio: aspectRatio,

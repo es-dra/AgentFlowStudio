@@ -49,14 +49,24 @@ export function positionBar(bar, state, node) {
 
 export function bindBarResizePositioning(bar, store, nodeId) {
   if (!window.ResizeObserver) return;
+  let pendingFrame = 0;
   const observer = new ResizeObserver(() => {
     if (!bar.isConnected) {
+      if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
       observer.disconnect();
       return;
     }
-    const state = store.get();
-    const fresh = state.nodes[nodeId];
-    if (fresh) positionBar(bar, state, fresh);
+    if (pendingFrame) return;
+    pendingFrame = window.requestAnimationFrame(() => {
+      pendingFrame = 0;
+      if (!bar.isConnected) {
+        observer.disconnect();
+        return;
+      }
+      const state = store.get();
+      const fresh = state.nodes[nodeId];
+      if (fresh) positionBar(bar, state, fresh);
+    });
   });
   observer.observe(bar);
 }
