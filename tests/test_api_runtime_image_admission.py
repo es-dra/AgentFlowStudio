@@ -20,6 +20,10 @@ from apps.api.runtime_store import RuntimeStore
 
 PROJECT_ID = "m6-9-image-admission-test"
 REQUESTED_AT = "2026-07-24T06:00:00Z"
+CURRENT_PROJECT_ID = "studio-1785154250742-86s0uf"
+OLD_CURRENT_PROJECT_MANIFEST_HASH = (
+    "7089c1827eebf5a993a4f0e95dec6537fb599fb6a7ca5143d69caf5013120cb1"
+)
 
 
 @pytest.mark.parametrize(
@@ -291,6 +295,229 @@ def compact_source_contract(*, shot_count: int = 3) -> dict:
     return source
 
 
+def current_project_locked_source_contract() -> dict:
+    scene_specs = [
+        ("01", "重生甜虐短剧切片", 12),
+        ("02", "重生甜虐后台追逃", 7),
+        ("03", "古言棋局推广", 12),
+        ("04", "古言图形落版", 4),
+    ]
+    scenes: list[dict] = []
+    shots: list[dict] = []
+    shot_lookup: dict[int, tuple[str, str]] = {}
+    ordinal = 1
+    for scene_order, (scene_suffix, scene_name, shot_total) in enumerate(scene_specs, start=1):
+        scene_id = f"scene-embedded-f0879c54f044ebb3-{scene_suffix}"
+        scenes.append(
+            {
+                "scene_id": scene_id,
+                "name": scene_name,
+                "number": scene_order,
+                "description": f"{scene_name} 的已应用分镜场景。",
+            }
+        )
+        for shot_order in range(1, shot_total + 1):
+            shot_id = f"shot-embedded-f0879c54f044ebb3-{scene_suffix}-{shot_order:02d}"
+            shot_lookup[ordinal] = (shot_id, scene_id)
+            shots.append(
+                {
+                    "shot_id": shot_id,
+                    "scene_id": scene_id,
+                    "title": "深海坠落" if ordinal == 1 else f"镜头 {ordinal:02d}",
+                    "number": ordinal,
+                    "purpose": "保持当前真实项目镜头结构的准入回归。",
+                    "shot_size": "中景",
+                    "composition": "主体清楚，保留动作与环境关系。",
+                    "camera_angle": "平视或轻微运动机位",
+                    "movement": "按镜头节奏推进",
+                    "action": "按已应用分镜完成叙事动作。",
+                    "dialogue": "",
+                    "emotion": "清楚可读",
+                    "continuity_cues": ["延续已确认角色、场景、道具和风格资产。"],
+                }
+            )
+            ordinal += 1
+    asset_defs = {
+        "M-CHAR-01": (
+            "character",
+            "叶安安",
+            "清秀倔强、杏眼、黑色长发、纤细；同脸连续表现恐惧/警觉/奶凶/决绝。",
+            ["泳池湿身（非情色）", "白浴巾伪装", "灰黑防水脏污妆+粗框眼镜+乱发+低饱和碎花裙"],
+            ["禁止族裔模仿式黑脸"],
+        ),
+        "M-CHAR-02": ("character", "傅凉川", "高挑、短黑发、锐利眉眼、克制冷感。", ["深炭黑修身西装"], []),
+        "M-CHAR-03": ("character", "孟欣", "温暖明快、棕黑中长卷发。", ["香槟/珊瑚派对裙"], []),
+        "M-CHAR-04": ("character", "主持人", "成熟专业，不抢主角视觉。", ["黑色正式礼服或西装"], []),
+        "M-ENV-01": ("scene", "象征性深海", "深蓝黑水体、上方弱冷白光、气泡颗粒。", ["非血腥写实"], []),
+        "M-ENV-02": ("scene", "前世创伤空间", "冷暗宅邸走廊/封闭房间/离开车辆。", ["灰蓝压迫光"], []),
+        "M-ENV-03": ("scene", "豪宅泳池派对", "夜间泳池、暖金庭院灯、蓝绿水面。", ["克制宾客背景"], []),
+        "M-ENV-04": ("scene", "后台化妆区", "镜前灯、衣架、化妆台。", ["支持扮丑蒙太奇"], []),
+        "M-ENV-05": ("scene", "华丽演播厅", "黑金舞台、观众暗区。", ["主持/嘉宾区关系明确"], []),
+        "M-ENV-06": ("scene", "演播厅后台走廊", "冷白顶灯、黑幕、设备箱与转角。", ["支持追逃拦截"], []),
+        "M-PROP-01": ("prop", "白色浴巾", "厚棉质无品牌，湿度/折叠连续。", ["非情色伪装用途"], []),
+        "M-PROP-02": ("prop", "厚四眼眼镜", "黑色粗框、尺寸固定。", ["不做真正畸变"], []),
+        "M-PROP-03": ("prop", "主持手麦", "哑光黑无品牌。", ["舞台主持用途"], []),
+        "A-CHAR-01": ("character", "容华", "修长清贵、深眉眼、黑发高束。", ["墨黑暗金棋纹锦袍/黑玉冠"], []),
+        "A-CHAR-02": ("character", "白筱", "明净不柔弱、黑长发半挽。", ["月白浅青叠穿/细金发簪"], []),
+        "A-CHAR-03": ("character", "古越", "忠犬将军，玄铁轻甲、深蓝披风。", ["沉稳克制"], []),
+        "A-CHAR-04": ("character", "风荻", "俊美锋锐，朱红锦袍、黑银束发。", ["少量银饰，动作开放"], []),
+        "A-ENV-01": ("scene", "棋剑虚空", "墨黑空间、微尘、局部暗金光。", ["服务抽象意象"], []),
+        "A-ENV-02": ("scene", "黑檀棋室", "黑檀棋盘、深木格栅。", ["暖烛冷月并置"], []),
+        "A-ENV-03": ("scene", "灯火长街", "石板街、木构店面、暖灯笼、夜雾。", ["无现代招牌/乱码"], []),
+        "A-ENV-04": ("scene", "风雪祭天坛", "高台石阶、青铜礼器、强风雪旗幡。", ["人物清楚"], []),
+        "A-PROP-01": ("prop", "金色棋子", "温润旧金、扁圆、细棋纹。", ["尺寸统一"], []),
+        "A-PROP-02": ("prop", "古剑", "冷锻钢直刃、黑革柄、暗金护手。", ["不发光"], []),
+        "A-PROP-03": ("prop", "黑檀棋盘", "深色木纹、浅金格线。", ["比例固定"], []),
+        "A-PROP-04": ("prop", "相思锁", "旧铜鎏金、双鱼/缠枝暗纹。", ["无模型乱码"], []),
+        "A-PROP-05": ("prop", "龙纹密旨", "暗黄丝帛、朱红封印、压纹龙纹。", ["正文后期"], []),
+        "GFX-01": ("prop", "《请夫入瓮》无字封面母版", "容华、白筱、棋子、古剑，不含模型字。", ["无字母版"], []),
+        "GFX-02": ("prop", "读者好评卡模板", "统一边框/头像占位/星级/短评区。", ["文字后期"], []),
+        "GFX-03": ("prop", "书名作者落版", "准确书名作者由后期图形完成。", ["视频模型不得仿制文字"], []),
+        "GFX-04": ("prop", "起点阅读引导", "经核准准确LOGO/阅读原文CTA后期完成。", ["视频模型不得仿制"], []),
+    }
+    shot_refs = {
+        1: ["M-CHAR-01", "M-ENV-01", "M-STY-01"],
+        2: ["M-CHAR-01", "M-CHAR-02", "M-ENV-02", "M-STY-01"],
+        3: ["M-CHAR-01", "M-CHAR-02", "M-ENV-02", "M-STY-01"],
+        4: ["M-CHAR-01", "M-CHAR-03", "M-ENV-03", "M-STY-01"],
+        5: ["M-CHAR-01", "M-CHAR-02", "M-ENV-03", "M-STY-01"],
+        6: ["M-CHAR-01", "M-CHAR-02", "M-ENV-03", "M-STY-01"],
+        7: ["M-CHAR-01", "M-PROP-01", "M-ENV-03", "M-STY-01"],
+        8: ["M-CHAR-01", "M-CHAR-02", "M-ENV-03", "M-STY-01"],
+        9: ["M-CHAR-01", "M-PROP-02", "M-ENV-04", "M-STY-01"],
+        10: ["M-CHAR-02", "M-CHAR-04", "M-PROP-03", "M-ENV-05"],
+        11: ["M-CHAR-02", "M-CHAR-04", "M-PROP-03", "M-ENV-05"],
+        12: ["M-CHAR-01", "M-PROP-02", "M-ENV-06", "M-STY-01"],
+        13: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        14: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        15: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        16: ["M-CHAR-01", "M-PROP-02", "M-ENV-06", "M-STY-01"],
+        17: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        18: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        19: ["M-CHAR-01", "M-CHAR-02", "M-ENV-06", "M-STY-01"],
+        20: ["A-PROP-01", "A-PROP-02", "A-ENV-01", "A-STY-01"],
+        21: ["A-CHAR-01", "A-CHAR-02", "A-PROP-01", "A-PROP-02"],
+        22: ["A-CHAR-01", "A-PROP-01", "A-PROP-03", "A-ENV-02"],
+        23: ["A-CHAR-02", "A-PROP-01", "A-ENV-03", "A-STY-01"],
+        24: ["A-CHAR-03", "A-CHAR-04", "A-CHAR-02", "A-ENV-03"],
+        25: ["A-CHAR-01", "A-CHAR-02", "A-PROP-03", "A-ENV-02"],
+        26: ["A-CHAR-03", "A-CHAR-02", "A-ENV-03", "A-STY-01"],
+        27: ["A-CHAR-02", "A-CHAR-01", "A-PROP-04", "A-ENV-02"],
+        28: ["A-PROP-04", "A-PROP-05", "A-PROP-02", "A-ENV-04"],
+        29: ["A-CHAR-02", "A-CHAR-01", "A-ENV-02", "A-STY-01"],
+        30: ["A-CHAR-01", "A-CHAR-02", "A-PROP-02", "A-ENV-04"],
+        31: ["GFX-01", "GFX-02", "A-PROP-01", "A-STY-01"],
+        32: ["A-CHAR-01", "A-CHAR-02", "A-PROP-03", "A-ENV-02"],
+        33: ["GFX-01", "GFX-03", "A-STY-01"],
+        34: ["GFX-03", "GFX-04", "GFX-01", "A-STY-01"],
+        35: ["A-PROP-01", "A-PROP-02", "A-ENV-01", "A-STY-01"],
+    }
+    occurrences = {asset_id: {"scene_ids": set(), "shot_ids": set()} for asset_id in asset_defs}
+    for ordinal, refs in shot_refs.items():
+        shot_id, scene_id = shot_lookup[ordinal]
+        for ref_id in refs:
+            if ref_id in occurrences:
+                occurrences[ref_id]["shot_ids"].add(shot_id)
+                occurrences[ref_id]["scene_ids"].add(scene_id)
+    assets = []
+    for stable_id, (asset_type, display_name, visual_identity, traits, negative_locks) in sorted(asset_defs.items()):
+        scene_ids = sorted(occurrences[stable_id]["scene_ids"])
+        shot_ids = sorted(occurrences[stable_id]["shot_ids"])
+        assets.append(
+            {
+                "stable_id": stable_id,
+                "asset_type": asset_type,
+                "asset_subtype": "graphic" if stable_id.startswith("GFX-") else "",
+                "display_name": display_name,
+                "aliases": [display_name],
+                "review_state": "approved",
+                "needs_confirmation": False,
+                "owner_supplied": True,
+                "owner_draft_id": "owner-asset-bible-20260728-v1",
+                "style_domain_id": "M-STY-01" if stable_id.startswith("M-") else "A-STY-01",
+                "visual_identity": visual_identity,
+                "positive_traits": traits,
+                "negative_locks": negative_locks,
+                "pending_fields": [],
+                "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
+                "continuity_states": [
+                    {
+                        "state_id": f"continuity-{stable_id}",
+                        "label": f"{display_name} 由 Owner 底稿确认，跨引用镜头保持同一视觉身份。",
+                        "status": "confirmed",
+                        "scene_ids": scene_ids,
+                        "shot_ids": shot_ids,
+                    }
+                ],
+                "source_evidence": [
+                    {
+                        "source_type": "shot_reference_map",
+                        "source_id": stable_id,
+                        "excerpt": "Owner 确认的镜头引用范围。",
+                        "scene_ids": scene_ids,
+                        "shot_ids": shot_ids,
+                    }
+                ],
+            }
+        )
+    bible = {
+        "schema_version": "afs.asset_bible.v0.1",
+        "version": 5,
+        "status": "locked",
+        "current_revision_id": "asset-bible-r2-4c9bb9b5cf",
+        "locked_revision_id": "asset-bible-r2-4c9bb9b5cf",
+        "candidate_set": {
+            "candidate_set_id": "asset-candidates-owner-20260728-v1",
+            "script_revision_id": "script-revision-current-project",
+            "shot_candidate_id": "shot-candidate-current-project",
+            "scene_index": scenes,
+            "shot_index": shots,
+            "scene_count": 4,
+            "shot_count": 35,
+        },
+        "assets": assets,
+        "art_direction": {
+            "visual_style": "双域商业短剧资产参考；现代都市甜虐与古言棋局分别保持命名空间。",
+            "medium": "电影摄影级写实资产设定，清楚表演与可复用材质。",
+            "palette": "现代冷青黑/香槟金/泳池蓝绿；古言墨黑暗金朱红月白。",
+            "lighting": "人物脸部与资产轮廓清楚，避免廉价滤镜和文字生成。",
+            "status": "confirmed",
+            "source": "human_review",
+            "confirmed_at": REQUESTED_AT,
+        },
+        "coverage": {
+            "coverage_pass": True,
+            "quality_pass": True,
+            "scene_total": 4,
+            "scene_covered": 4,
+            "shot_total": 35,
+            "shot_covered": 35,
+            "asset_shot_covered": 35,
+            "missing_source_evidence_shot_count": 0,
+            "required_occurrence_total": sum(len(row) for row in shot_refs.values()),
+            "resolved_required": sum(len(row) for row in shot_refs.values()),
+            "unresolved_required": 0,
+        },
+        "recognition_quality": {
+            "status": "pass",
+            "issues": [],
+            "missing_anchor_count": 0,
+            "orphan_scene_coverage_count": 0,
+            "alias_collision_count": 0,
+            "recognition_ambiguity_count": 0,
+        },
+    }
+    return {
+        "authority_mode": "canonical_production_graph",
+        "production_graph_version": 5,
+        "production_graph_digest": "28885fbc833635c9edac94e0a0f5412eb29bce2a169b884ee56cceb6d145f34b",
+        "studio_state_version": "studio-state-current",
+        "art_direction": bible["art_direction"],
+        "shot_grounding": {"scenes": scenes, "shots": shots},
+        "asset_bible": bible,
+    }
+
+
 def _command(client: TestClient, command: dict, source: dict, *, confirm: bool = True) -> dict:
     body = {"command": command, "source": source, "requested_at": REQUESTED_AT}
     preview = client.post(f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview", json=body)
@@ -348,6 +575,101 @@ def test_manifest_compiler_produces_dynamic_unique_lineage_items_without_name_ru
     assert keyframe["reference_asset_grounding"]
     assert "【镜头依据】" in keyframe["prompt_contract"]["provider_prompt"]
     assert "【引用资产】" in keyframe["prompt_contract"]["provider_prompt"]
+
+
+def test_character_design_prompt_is_identity_first_and_preserves_owner_metadata() -> None:
+    source = source_contract()
+    character = source["asset_bible"]["assets"][0]
+    character["demographics"] = "modern East Asian young woman"
+    character["visual_identity"] = "modern East Asian young woman, clear oval face, compact athletic build"
+    character["positive_traits"] = [
+        "clean canonical costume silhouette for base identity",
+        "wet pool plot-state variant must stay nonsexual",
+        "theatrical messy waterproof disguise variant, never ethnic blackface",
+    ]
+    character["negative_locks"] = ["never ethnic blackface"]
+
+    manifest = compile_image_admission_manifest(PROJECT_ID, source, created_at=REQUESTED_AT)
+    item = next(entry for entry in manifest["items"] if entry["target_asset_ids"] == ["asset-character-a"])
+    prompt = item["prompt_contract"]["provider_prompt"]
+
+    assert "【基准身份参考】" in prompt
+    assert "制作命名空间：asset-character-a" in prompt
+    assert "人口与身份锚点：modern East Asian young woman" in prompt
+    assert "production reference sheet framing" in prompt
+    assert "全身或四分之三" in prompt
+    assert "中性站姿、无遮挡" in prompt
+    assert "稳定同一张脸、同一身份、同一体型" in prompt
+    assert "【变体连续性】" in prompt
+    assert "基准 canonical identity 优先" in prompt
+    assert "保留同一张脸和同一身体身份" in prompt
+    assert "wet pool plot-state variant must stay nonsexual" in prompt
+    assert "剧情驱动、非情色化" in prompt
+    assert "不得呈现为族裔模仿式黑脸" in prompt
+    assert "禁止添加任何文字、字幕、标题、Logo、水印、界面、联系表标签、误生成文字或边框" in prompt
+    assert "叶安安" not in prompt
+    assert "M-CHAR-01" not in prompt
+
+
+def test_character_design_prompt_does_not_invent_demographics_or_inflate_other_assets() -> None:
+    manifest = compile_image_admission_manifest(PROJECT_ID, source_contract(), created_at=REQUESTED_AT)
+    character = next(entry for entry in manifest["items"] if entry["target_asset_ids"] == ["asset-character-a"])
+    scene = next(entry for entry in manifest["items"] if entry["item_type"] == "scene_plate")
+    prop = next(entry for entry in manifest["items"] if entry["item_type"] == "prop_design")
+
+    character_prompt = character["prompt_contract"]["provider_prompt"]
+    scene_prompt = scene["prompt_contract"]["provider_prompt"]
+    prop_prompt = prop["prompt_contract"]["provider_prompt"]
+
+    assert "人口与身份锚点" not in character_prompt
+    assert "East Asian" not in character_prompt
+    assert "【基准身份参考】" in character_prompt
+    assert "production reference sheet framing" in character_prompt
+    assert "【基准身份参考】" not in scene_prompt
+    assert "production reference sheet framing" not in scene_prompt
+    assert "【变体连续性】" not in prop_prompt
+    assert "同一张脸" not in prop_prompt
+
+
+def test_current_project_mchar01_prompt_regression_changes_manifest_hash_deterministically() -> None:
+    source = current_project_locked_source_contract()
+    first = compile_image_admission_manifest(CURRENT_PROJECT_ID, source, created_at=REQUESTED_AT)
+    second = compile_image_admission_manifest(CURRENT_PROJECT_ID, source, created_at=REQUESTED_AT)
+
+    assert first["manifest_id"] == second["manifest_id"]
+    assert first["manifest_hash"] == second["manifest_hash"]
+    assert first["manifest_hash"] != OLD_CURRENT_PROJECT_MANIFEST_HASH
+    assert len(first["items"]) == 33
+    assert first["selection_summary"] == {
+        "canonical_character_count": 8,
+        "canonical_scene_count": 10,
+        "canonical_prop_count": 12,
+        "applied_shot_count": 35,
+        "representative_shot_count": 3,
+        "item_count": 33,
+    }
+    item = next(entry for entry in first["items"] if entry["target_asset_ids"] == ["M-CHAR-01"])
+    prompt = item["prompt_contract"]["provider_prompt"]
+
+    assert item["item_id"] == "admit-character_design-a14c33cdb7"
+    assert item["item_type"] == "character_design"
+    assert item["aspect_ratio"] == "3:4"
+    assert "叶安安" in prompt
+    assert "制作命名空间：M-CHAR-01" in prompt
+    assert "production reference sheet framing" in prompt
+    assert "全身或四分之三" in prompt
+    assert "单一角色、中性站姿、无遮挡" in prompt
+    assert "基准 canonical identity 优先" in prompt
+    assert "泳池湿身（非情色）" in prompt
+    assert "白浴巾伪装" in prompt
+    assert "灰黑防水脏污妆+粗框眼镜+乱发+低饱和碎花裙" in prompt
+    assert "同一张脸和同一身体身份" in prompt
+    assert "剧情驱动、非情色化" in prompt
+    assert "不得呈现为族裔模仿式黑脸" in prompt
+    assert "禁止添加任何文字、字幕、标题、Logo、水印、界面、联系表标签、误生成文字或边框" in prompt
+    assert "人口与身份锚点" not in prompt
+    assert "East Asian" not in prompt
+    assert item["prompt_contract"]["provider_prompt_digest"] == canonical_digest(prompt)
 
 
 def test_manifest_compile_fails_closed_for_visual_pending_or_missing_art_direction() -> None:

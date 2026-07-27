@@ -1618,6 +1618,7 @@ def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
             }
         ),
         "asset_type": asset_type,
+        "demographics": str(value.get("demographics") or "").strip()[:240],
         "importance": str(value.get("importance") or ""),
         "visual_identity": str(value.get("visual_identity") or "").strip()[:600],
         "positive_traits": [
@@ -1874,7 +1875,7 @@ def _shot_item_grounding(shot: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _asset_grounding(asset: Mapping[str, Any]) -> dict[str, Any]:
-    return {
+    grounding = {
         "stable_id": asset["stable_id"],
         "display_name": asset["display_name"],
         "asset_type": asset["asset_type"],
@@ -1887,6 +1888,9 @@ def _asset_grounding(asset: Mapping[str, Any]) -> dict[str, Any]:
         "source_evidence": deepcopy(asset["source_evidence"]),
         "occurrences": deepcopy(asset["occurrences"]),
     }
+    if asset.get("demographics"):
+        grounding["demographics"] = asset["demographics"]
+    return grounding
 
 
 def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any]) -> dict[str, Any]:
@@ -1922,8 +1926,14 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
                     "资产身份",
                     "；".join(
                         [
+                            f"制作命名空间：{grounding['stable_id']}（仅供制作连续性，不得作为画面文字）",
                             f"名称：{grounding['display_name']}",
                             f"别名：{'、'.join(grounding['aliases']) or '无'}",
+                            *(
+                                [f"人口与身份锚点：{grounding['demographics']}"]
+                                if grounding.get("demographics")
+                                else []
+                            ),
                             f"视觉身份：{grounding['visual_identity']}",
                             f"正向特征：{'、'.join(grounding['positive_traits'])}",
                         ]
@@ -1939,6 +1949,8 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
                 ),
             ]
         )
+        if item.get("item_type") == "character_design":
+            sections.extend(_character_reference_sections(grounding))
     if shot:
         sections.append(
             (
@@ -1973,7 +1985,7 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
     sections.append(
         (
             "禁止项",
-            "；".join(_localized_negative_lock(value) for value in item.get("negative_locks", []))
+            "；".join(_prompt_negative_locks(item))
             or "无额外禁止项",
         )
     )
@@ -1985,6 +1997,66 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
         "provider_prompt": provider_prompt,
         "provider_prompt_digest": canonical_digest(provider_prompt),
     }
+
+
+def _character_reference_sections(grounding: Mapping[str, Any]) -> list[tuple[str, str]]:
+    sections = [
+        (
+            "基准身份参考",
+            "；".join(
+                [
+                    "先生成基准身份，不从剧情湿身、伪装、受伤、脏污或特殊服装状态开始",
+                    "干净的全身或四分之三 production reference sheet framing",
+                    "单一角色、中性站姿、无遮挡，脸部、体态、身体比例、发型轮廓和主服装剪影清晰可复用",
+                    "稳定同一张脸、同一身份、同一体型与可识别服装轮廓，适合后续镜头持续引用",
+                ]
+            ),
+        ),
+        (
+            "变体连续性",
+            "；".join(
+                [
+                    "基准 canonical identity 优先，剧情状态和服装变体只作为后续延展约束",
+                    "所有湿身、伪装、脏污、换装或特殊剧情状态都必须保留同一张脸和同一身体身份",
+                    f"已批准变体/状态：{'、'.join(grounding.get('positive_traits') or [])}",
+                ]
+            ),
+        ),
+    ]
+    safety_constraints = _character_context_safety_constraints(grounding)
+    if safety_constraints:
+        sections.append(("角色安全语境", "；".join(safety_constraints)))
+    return sections
+
+
+def _character_context_safety_constraints(grounding: Mapping[str, Any]) -> list[str]:
+    raw = " ".join(
+        [
+            str(grounding.get("visual_identity") or ""),
+            " ".join(str(item) for item in grounding.get("positive_traits") or []),
+            " ".join(str(item) for item in grounding.get("negative_locks") or []),
+        ]
+    ).lower()
+    constraints: list[str] = []
+    if any(token in raw for token in ("湿", "wet", "浴巾", "towel", "情色", "sexual")):
+        constraints.append("湿身、浴巾或脆弱状态必须是剧情驱动、非情色化，不用身体暴露制造卖点")
+    if any(token in raw for token in ("伪装", "disguise", "脏", "污", "dirty", "防水", "妆", "makeup", "黑脸", "blackface")):
+        constraints.append("灰黑、脏污或防水妆必须读作舞台化、剧情化凌乱伪装，不得呈现为族裔模仿式黑脸")
+    return constraints
+
+
+def _prompt_negative_locks(item: Mapping[str, Any]) -> list[str]:
+    locks = [_localized_negative_lock(value) for value in item.get("negative_locks", [])]
+    if item.get("item_type") == "character_design":
+        locks.append("禁止添加任何文字、字幕、标题、Logo、水印、界面、联系表标签、误生成文字或边框")
+    result: list[str] = []
+    seen: set[str] = set()
+    for lock in locks:
+        normalized = str(lock or "").strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            result.append(normalized)
+    return result
 
 
 def _localized_negative_lock(value: Any) -> str:

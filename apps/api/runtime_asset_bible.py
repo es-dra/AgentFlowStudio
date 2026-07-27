@@ -1072,56 +1072,58 @@ def _owner_import_assets(
         if not positive_traits and description:
             positive_traits = [description[:160]]
         negative_locks = _owner_texts(raw.get("negative_locks"), 24, 160)
+        demographics = _owner_text(raw.get("demographics"), 240)
         continuity_label = _owner_text(
             raw.get("continuity") or f"{display_name} 由 Owner 底稿确认，跨引用镜头保持同一视觉身份。",
             160,
         )
-        imported.append(
-            {
-                "stable_id": stable_id,
-                "asset_type": asset_type,
-                "asset_subtype": subtype,
-                "display_name": display_name,
-                "aliases": sorted({display_name, *_owner_texts(raw.get("aliases"), 20, 120)}),
-                "visual_identity": description,
-                "review_state": "approved",
-                "confidence": 1.0,
-                "needs_confirmation": False,
-                "owner_supplied": True,
-                "owner_draft_id": draft_id,
-                "style_domain_id": style_id,
-                "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
-                "continuity_states": [
-                    {
-                        "state_id": f"continuity-{stable_id}",
-                        "label": continuity_label,
-                        "status": "confirmed",
-                        "scene_ids": scene_ids,
-                        "shot_ids": shot_ids,
-                    }
-                ],
-                "positive_traits": positive_traits,
-                "negative_locks": negative_locks,
-                "pending_fields": [],
-                "source_evidence": [
-                    {
-                        "source_type": "owner_asset_draft",
-                        "source_id": draft_id,
-                        "excerpt": description[:240] or f"{display_name} 由 Owner 底稿定义。",
-                        "scene_ids": scene_ids,
-                        "shot_ids": shot_ids,
-                    },
-                    {
-                        "source_type": "shot_reference_map",
-                        "source_id": stable_id,
-                        "excerpt": "Owner 确认的镜头引用范围。",
-                        "scene_ids": scene_ids,
-                        "shot_ids": shot_ids,
-                    },
-                ],
-                "lineage": {"parent_ids": [], "merged_from_ids": []},
-            }
-        )
+        asset = {
+            "stable_id": stable_id,
+            "asset_type": asset_type,
+            "asset_subtype": subtype,
+            "display_name": display_name,
+            "aliases": sorted({display_name, *_owner_texts(raw.get("aliases"), 20, 120)}),
+            "visual_identity": description,
+            "review_state": "approved",
+            "confidence": 1.0,
+            "needs_confirmation": False,
+            "owner_supplied": True,
+            "owner_draft_id": draft_id,
+            "style_domain_id": style_id,
+            "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
+            "continuity_states": [
+                {
+                    "state_id": f"continuity-{stable_id}",
+                    "label": continuity_label,
+                    "status": "confirmed",
+                    "scene_ids": scene_ids,
+                    "shot_ids": shot_ids,
+                }
+            ],
+            "positive_traits": positive_traits,
+            "negative_locks": negative_locks,
+            "pending_fields": [],
+            "source_evidence": [
+                {
+                    "source_type": "owner_asset_draft",
+                    "source_id": draft_id,
+                    "excerpt": description[:240] or f"{display_name} 由 Owner 底稿定义。",
+                    "scene_ids": scene_ids,
+                    "shot_ids": shot_ids,
+                },
+                {
+                    "source_type": "shot_reference_map",
+                    "source_id": stable_id,
+                    "excerpt": "Owner 确认的镜头引用范围。",
+                    "scene_ids": scene_ids,
+                    "shot_ids": shot_ids,
+                },
+            ],
+            "lineage": {"parent_ids": [], "merged_from_ids": []},
+        }
+        if demographics:
+            asset["demographics"] = demographics
+        imported.append(asset)
     _assert_owner_domain_name_uniqueness(imported)
     return imported
 
@@ -2525,6 +2527,8 @@ def _graph_events(
             "source_evidence": asset["source_evidence"],
             "asset_bible_revision_id": state.get("current_revision_id", ""),
         }
+        if asset.get("demographics"):
+            asset_metadata["demographics"] = asset["demographics"]
         if asset_id in source_graph_asset_ids:
             events.append(
                 {

@@ -240,7 +240,7 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
     if review_state not in ASSET_STATES:
         review_state = "candidate"
     occurrences = data.get("occurrences") if isinstance(data.get("occurrences"), dict) else {}
-    return {
+    result = {
         "stable_id": stable_id,
         "asset_type": asset_type,
         "asset_subtype": text(data.get("asset_subtype"), "", 80),
@@ -288,6 +288,10 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
         },
         "superseded_by_ids": _ids(data.get("superseded_by_ids"), 16),
     }
+    demographics = text(data.get("demographics"), "", 240)
+    if demographics:
+        result["demographics"] = demographics
+    return result
 
 
 def _art_direction(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
