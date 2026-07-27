@@ -12,6 +12,8 @@ export function videoAdmissionProjection(runtimeValue = null, mediaState = "idle
       job_id: manifest.item["pro" + "vider_job_id"] || "",
     } : null,
     source: manifest?.source || null,
+    provider_input_contract: manifest?.provider_input_contract || {},
+    round_contract: manifest?.round_contract || {},
     generation_contract: manifest?.["pro" + "vider_contract"] || {},
     budget_contract: manifest?.budget_contract || {},
     budget: manifest?.budget || {},
@@ -39,8 +41,25 @@ export function videoAdmissionGenerationRequest(manifest, generatedAt) {
   const source = manifest?.source || {};
   const item = manifest?.item || {};
   const contract = manifest?.["pro" + "vider_contract"] || {};
+  const inputContract = manifest?.provider_input_contract || {};
   const prompt = source?.prompt_contract?.provider_prompt;
-  if (!prompt || !source?.keyframe?.image_asset_id || item.state !== "reserved") {
+  const firstFrame = inputContract?.first_frame || {};
+  const referenceImages = Array.isArray(inputContract?.reference_images)
+    ? inputContract.reference_images
+    : [];
+  const cardinality = inputContract?.frame_role_cardinality || {};
+  if (
+    !prompt
+    || !source?.keyframe?.image_asset_id
+    || item.state !== "reserved"
+    || inputContract.mode !== "first_frame"
+    || firstFrame.role !== "first_frame"
+    || firstFrame.image_asset_id !== source.keyframe.image_asset_id
+    || referenceImages.length !== 0
+    || Number(cardinality.first_frame) !== 1
+    || Number(cardinality.last_frame) !== 0
+    || Number(cardinality.reference_image) !== 0
+  ) {
     throw new Error("视频生成确认缺少已批准关键帧或单次额度");
   }
   return {
@@ -48,7 +67,7 @@ export function videoAdmissionGenerationRequest(manifest, generatedAt) {
     prompt_text: prompt,
     provider_service_id: "seedance_i2v",
     first_frame_image_asset_id: source.keyframe.image_asset_id,
-    reference_image_asset_ids: (source.references || []).map((entry) => entry.image_asset_id),
+    reference_image_asset_ids: [],
     duration_sec: Number(contract.duration_sec || 6),
     resolution: String(contract.resolution || "720p"),
     aspect_ratio: source.keyframe.aspect_ratio || "16:9",

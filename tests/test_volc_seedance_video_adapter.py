@@ -60,6 +60,8 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
 
     def fake_urlopen(request, timeout):
         url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/v1/files/uploads/base64":
+            return _upload_response()
         if url == "https://relay.test/volc/v1/contents/generations/tasks":
             captured["create_auth"] = request.get_header("Authorization")
             captured["create_payload"] = json.loads(request.data.decode("utf-8"))
@@ -121,7 +123,9 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert payload["content"][0] == {"type": "text", "text": "A controlled cinematic move from first to last frame."}
     assert payload["content"][1]["role"] == "first_frame"
     assert payload["content"][2]["role"] == "last_frame"
-    assert payload["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert payload["content"][1]["image_url"]["url"].startswith(
+        "https://media.seedance.test/task-artifacts/tmp-inputs/"
+    )
     assert result["status"] == "succeeded"
     assert result["usage"]["output_tokens"] == 4321
     assert result["billing"] == {
@@ -312,6 +316,8 @@ def test_seedance_readiness_payload_uses_six_seconds_and_reference_group(tmp_pat
     (tmp_path / "providers.local.json").write_text(json.dumps(config), encoding="utf-8")
 
     def fake_urlopen(request, timeout):
+        if request.full_url == "https://relay.test/v1/files/uploads/base64":
+            return _upload_response()
         captured["url"] = request.full_url
         captured["payload"] = json.loads(request.data.decode("utf-8"))
         return _JsonResponse({"id": "seedance-readiness-task", "status": "queued"})
@@ -345,12 +351,91 @@ def test_seedance_readiness_payload_uses_six_seconds_and_reference_group(tmp_pat
     assert payload["duration"] == 6
     assert payload["resolution"] == "720p"
     assert [item["role"] for item in payload["content"][1:]] == [
-        "first_frame",
+        "reference_image",
         "reference_image",
         "reference_image",
         "reference_image",
     ]
+    assert result["task"]["input_upload_count"] == 4
     assert result["task"]["status"] == "submitted"
+
+
+def test_seedance_first_frame_mode_rejects_mixed_image_cardinality_before_network(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    first = tmp_path / "first.png"
+    other = tmp_path / "other.png"
+    first.write_bytes(PNG_BYTES)
+    other.write_bytes(PNG_BYTES)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    called = 0
+
+    def forbidden(*_args, **_kwargs):
+        nonlocal called
+        called += 1
+        raise AssertionError("mixed first-frame request must fail before upload or submit")
+
+    monkeypatch.setattr(volc_seedance_video.urllib.request, "urlopen", forbidden)
+    registry = ProviderRegistry.from_store(
+        load_company_provider_secrets(_seedance_provider_config(tmp_path))
+    )
+
+    with pytest.raises(ModelGatewayError, match="requires exactly one image"):
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="Animate only the approved first frame.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first, other),
+                duration_sec=5,
+                resolution="720p",
+                input_mode="first_frame",
+            ),
+        )
+    assert called == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("mime_type", "", "MIME type"),
+        ("size", len(PNG_BYTES) - 1, "byte count"),
+        ("expires_at", "2026-07-27T00:00:00Z", "expiry"),
+    ],
+)
+def test_seedance_input_upload_receipt_fails_closed_on_invalid_metadata(
+    field,
+    value,
+    message,
+) -> None:
+    response = dict(_upload_response().payload)
+    response[field] = value
+    with pytest.raises(ModelGatewayError, match=message):
+        volc_seedance_video._validated_input_url(
+            response,
+            ("media.seedance.test",),
+            expected_mime_type="image/png",
+            expected_byte_count=len(PNG_BYTES),
+        )
+
+
+def test_seedance_input_upload_receipt_rejects_similar_host() -> None:
+    response = dict(_upload_response().payload)
+    response["url"] = (
+        "https://media.seedance.test.attacker.invalid/"
+        "task-artifacts/tmp-inputs/2026/07/27/test/reference.png"
+    )
+    with pytest.raises(ModelGatewayError, match="unapproved URL"):
+        volc_seedance_video._validated_input_url(
+            response,
+            ("media.seedance.test",),
+            expected_mime_type="image/png",
+            expected_byte_count=len(PNG_BYTES),
+        )
 
 
 def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
@@ -359,6 +444,8 @@ def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> Non
 
     def fake_urlopen(request, timeout):
         url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/v1/files/uploads/base64":
+            return _upload_response()
         if url == "https://relay.test/volc/v1/contents/generations/tasks":
             return _JsonResponse({"id": "cgt-seedance-not-start", "status": "queued"})
         if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-not-start":
@@ -403,6 +490,8 @@ def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_p
 
     def fake_urlopen(request, timeout):
         url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/v1/files/uploads/base64":
+            return _upload_response()
         if url == "https://relay.test/volc/v1/contents/generations/tasks":
             captured["create_auth"] = request.get_header("Authorization")
             return _JsonResponse({"id": "cgt-seedance-safe-task", "status": "queued"})
@@ -464,6 +553,8 @@ def test_seedance_poll_reports_policy_failure_safely(tmp_path, monkeypatch) -> N
 
     def fake_urlopen(request, timeout):
         url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/v1/files/uploads/base64":
+            return _upload_response()
         if url == "https://relay.test/volc/v1/contents/generations/tasks":
             return _JsonResponse({"id": "cgt-seedance-policy-task", "status": "queued"})
         if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-policy-task":
@@ -981,6 +1072,21 @@ class _JsonResponse:
 
     def geturl(self) -> str:
         return ""
+
+
+def _upload_response() -> _JsonResponse:
+    return _JsonResponse(
+        {
+            "id": "file_test_input",
+            "url": (
+                "https://media.seedance.test/task-artifacts/tmp-inputs/"
+                "2026/07/27/test/reference.png"
+            ),
+            "mime_type": "image/png",
+            "size": len(PNG_BYTES),
+            "expires_at": "2026-07-29T00:00:00Z",
+        }
+    )
 
 
 class _BytesResponse:

@@ -45,6 +45,21 @@ const manifest = {
     classification: "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
     actual_charge_usd: null,
   },
+  provider_input_contract: {
+    mode: "first_frame",
+    first_frame: {
+      image_asset_id: "keyframe-approved",
+      label: "已批准关键帧",
+      role: "first_frame",
+    },
+    last_frame: null,
+    reference_images: [],
+    frame_role_cardinality: {
+      first_frame: 1,
+      last_frame: 0,
+      reference_image: 0,
+    },
+  },
   source: {
     shot: { shot_id: "shot-01", label: "镜头 01" },
     keyframe: {
@@ -89,11 +104,7 @@ process.stdout.write(JSON.stringify({ projection, request }));
         "prompt_text": "Canonical shot action and continuity.",
         "provider_service_id": "seedance_i2v",
         "first_frame_image_asset_id": "keyframe-approved",
-        "reference_image_asset_ids": [
-            "character-approved",
-            "scene-approved",
-            "prop-approved",
-        ],
+        "reference_image_asset_ids": [],
         "duration_sec": 6,
         "resolution": "720p",
         "aspect_ratio": "16:9",
@@ -149,10 +160,11 @@ def test_product_shell_discloses_video_contract_and_keeps_generation_gated() -> 
         "6 秒",
         "已批准关键帧",
         "参考图",
-        "参考组：",
-        "$2.00 项目停止线（非供应商强制限额、预计或实际费用）",
+        "项目参考组",
+        "$2.00 项目停止线（当前新轮次",
         "1 次发送",
         "自动重试 0",
+        "建立新的单次视频清单",
         "批准并写入项目",
         "不会自动重试",
     ):

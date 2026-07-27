@@ -11,6 +11,7 @@ import socket
 import ssl
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_CREATE_ENDPOINT = "/volc/v1/contents/generations/tasks"
 DEFAULT_QUERY_ENDPOINT = f"{DEFAULT_CREATE_ENDPOINT}/{{id}}"
+DEFAULT_INPUT_UPLOAD_ENDPOINT = "/v1/files/uploads/base64"
 EXACT_MODEL_ID = "doubao-seedance-2-0"
 MAX_ERROR_BODY_BYTES = 8192
 SAFE_TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
@@ -61,6 +63,8 @@ class VolcSeedanceVideoAdapter:
         input_mode = request.input_mode or ("first_last_frame" if len(request.reference_image_paths) > 1 else "first_frame")
         if self.descriptor.frame_modes and input_mode not in self.descriptor.frame_modes:
             raise ModelConfigError(f"unsupported input mode for {self.service_id}: {input_mode}")
+        if request.reference_image_paths:
+            _frame_roles(input_mode, len(request.reference_image_paths))
         duration = request.duration_sec or (self.descriptor.supported_durations_sec[0] if self.descriptor.supported_durations_sec else 5)
         if self.descriptor.supported_durations_sec and duration not in self.descriptor.supported_durations_sec:
             raise ModelConfigError(f"unsupported duration for {self.service_id}: {duration}")
@@ -111,16 +115,21 @@ class VolcSeedanceVideoAdapter:
             "timeout_sec": float(service.get("submit_timeout_sec") or self.descriptor.async_timeout_sec or request.timeout_sec or 120.0),
             "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
             "allowed_url_hosts": allowed_url_hosts,
+            "allowed_input_hosts": _allowed_input_hosts(service, allowed_url_hosts),
+            "input_upload_endpoint": str(
+                service.get("input_upload_endpoint") or DEFAULT_INPUT_UPLOAD_ENDPOINT
+            ),
             "pricing_exposure": exposure,
             "output_dir": request.output_dir,
             "payload": _seedance_payload(service=service, model=str(model), request=request),
         }
 
     def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
+        payload, upload_count = _upload_payload_images(plan)
         response = _request_json(
             _join_url(str(plan["base_url"]), str(plan["endpoint"])),
             method="POST",
-            payload=plan["payload"],
+            payload=payload,
             credential_value=plan.get("credential_value"),
             credential_env=plan.get("credential_env"),
             auth_header=str(plan.get("auth_header") or "Authorization"),
@@ -131,9 +140,11 @@ class VolcSeedanceVideoAdapter:
         return {
             "status": "submitted",
             "task_id": task_id,
-            "model": str((plan.get("payload") or {}).get("model") or ""),
-            "duration_sec": int((plan.get("payload") or {}).get("duration") or 0),
-            "resolution": str((plan.get("payload") or {}).get("resolution") or ""),
+            "model": str(payload.get("model") or ""),
+            "duration_sec": int(payload.get("duration") or 0),
+            "resolution": str(payload.get("resolution") or ""),
+            "input_upload_count": upload_count,
+            "input_urls_persisted": False,
             "query_url_template": _join_url(str(plan["base_url"]), str(plan["query_endpoint"])),
             "timeout_sec": float(plan.get("timeout_sec") or 120.0),
             "download_timeout_sec": float(plan.get("download_timeout_sec") or 180.0),
@@ -203,12 +214,13 @@ class VolcSeedanceVideoAdapter:
 
 def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderDispatchRequest) -> dict[str, Any]:
     content: list[dict[str, Any]] = [{"type": "text", "text": request.prompt}]
-    roles = service.get("reference_roles") if isinstance(service.get("reference_roles"), list) else []
-    for index, path in enumerate(request.reference_image_paths, start=1):
-        role = str(roles[index - 1]) if index <= len(roles) else ("first_frame" if index == 1 else "last_frame")
+    input_mode = request.input_mode or (
+        "first_last_frame" if len(request.reference_image_paths) > 1 else "first_frame"
+    )
+    roles = _frame_roles(input_mode, len(request.reference_image_paths))
+    for path, role in zip(request.reference_image_paths, roles, strict=True):
         item = {"type": "image_url", "image_url": {"url": _image_data_url(path)}}
-        if role:
-            item["role"] = role
+        item["role"] = role
         content.append(item)
     payload: dict[str, Any] = {
         "model": model,
@@ -239,6 +251,111 @@ def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderD
                 continue
             payload[key] = value
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
+
+
+def _frame_roles(input_mode: str, count: int) -> tuple[str, ...]:
+    if input_mode == "first_frame":
+        if count != 1:
+            raise ModelConfigError("Seedance first_frame mode requires exactly one image")
+        return ("first_frame",)
+    if input_mode == "first_last_frame":
+        if count != 2:
+            raise ModelConfigError("Seedance first_last_frame mode requires exactly two images")
+        return ("first_frame", "last_frame")
+    if input_mode == "reference_images":
+        if count < 1:
+            raise ModelConfigError("Seedance reference_images mode requires at least one image")
+        return tuple("reference_image" for _ in range(count))
+    raise ModelConfigError(f"unsupported Seedance image input mode: {input_mode}")
+
+
+def _upload_payload_images(plan: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    payload = json.loads(json.dumps(plan.get("payload") or {}, ensure_ascii=False))
+    content = payload.get("content")
+    if not isinstance(content, list):
+        raise ModelConfigError("Seedance content contract is invalid")
+    upload_count = 0
+    for index, item in enumerate(content):
+        if not isinstance(item, dict) or item.get("type") != "image_url":
+            continue
+        image_url = item.get("image_url")
+        data_url = image_url.get("url") if isinstance(image_url, dict) else ""
+        if not isinstance(data_url, str) or not data_url.startswith("data:image/"):
+            raise ModelConfigError("Seedance local image input is invalid")
+        mime_type = data_url[5:].split(";", 1)[0]
+        extension = ".png" if mime_type == "image/png" else ".jpg" if mime_type == "image/jpeg" else ""
+        if not extension:
+            raise ModelConfigError("Seedance local image input must be PNG or JPEG")
+        uploaded = _request_json(
+            _join_url(
+                str(plan["base_url"]),
+                str(plan.get("input_upload_endpoint") or DEFAULT_INPUT_UPLOAD_ENDPOINT),
+            ),
+            method="POST",
+            payload={
+                "data": data_url,
+                "filename": f"seedance-input-{index:02d}{extension}",
+                "purpose": "model_input",
+            },
+            credential_value=plan.get("credential_value"),
+            credential_env=plan.get("credential_env"),
+            auth_header=str(plan.get("auth_header") or "Authorization"),
+            auth_scheme=str(plan.get("auth_scheme") or "Bearer"),
+            timeout_sec=float(plan.get("timeout_sec") or 120.0),
+        )
+        public_url = _validated_input_url(
+            uploaded,
+            tuple(plan.get("allowed_input_hosts") or ()),
+            expected_mime_type=mime_type,
+            expected_byte_count=len(base64.b64decode(data_url.split(",", 1)[1], validate=True)),
+        )
+        item["image_url"] = {"url": public_url}
+        upload_count += 1
+    return payload, upload_count
+
+
+def _validated_input_url(
+    response: dict[str, Any],
+    allowed_hosts: tuple[str, ...],
+    *,
+    expected_mime_type: str,
+    expected_byte_count: int,
+) -> str:
+    url = str(response.get("url") or "")
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    normalized = {
+        str(item).lower().strip().rstrip(".")
+        for item in allowed_hosts
+        if str(item).strip()
+    }
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ModelGatewayError("Seedance input upload returned an unapproved URL") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or not host
+        or host not in normalized
+        or parsed.username
+        or parsed.password
+        or port not in {None, 443}
+        or not parsed.path.startswith("/task-artifacts/tmp-inputs/")
+    ):
+        raise ModelGatewayError("Seedance input upload returned an unapproved URL")
+    mime_type = str(response.get("mime_type") or "").split(";", 1)[0].lower()
+    if mime_type != expected_mime_type:
+        raise ModelGatewayError("Seedance input upload MIME type does not match")
+    if int(response.get("size") or 0) != expected_byte_count:
+        raise ModelGatewayError("Seedance input upload returned an invalid byte count")
+    expires_at = str(response.get("expires_at") or "").strip()
+    try:
+        expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ModelGatewayError("Seedance input upload expiry is invalid") from exc
+    if expires.tzinfo is None or expires.astimezone(UTC) <= datetime.now(UTC) + timedelta(minutes=5):
+        raise ModelGatewayError("Seedance input upload expiry is missing")
+    return url
 
 
 def _request_json(
@@ -640,6 +757,16 @@ def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item).lower().strip() for item in value if str(item).strip())
+
+
+def _allowed_input_hosts(
+    service: dict[str, Any],
+    artifact_hosts: tuple[str, ...],
+) -> tuple[str, ...]:
+    value = service.get("allowed_input_hosts")
+    if isinstance(value, list):
+        return tuple(str(item).lower().strip() for item in value if str(item).strip())
+    return artifact_hosts
 
 
 def _verified_exposure_contract(service: dict[str, Any]) -> dict[str, Any]:

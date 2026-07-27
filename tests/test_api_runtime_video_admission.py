@@ -55,7 +55,7 @@ def _exact_seedance_capability(monkeypatch) -> None:
                 "model": MODEL_ID,
                 "endpoint": CREATE_ENDPOINT,
                 "query_endpoint": QUERY_ENDPOINT,
-                "allowed_artifact_hosts": ["media.example.invalid"],
+                "allowed_artifact_hosts": ["media.crazyrouter.com"],
                 "pricing_exposure_contract": {
                     "verification_state": "verified",
                     "billing_mode": "provider_output_tokens",
@@ -159,6 +159,51 @@ def test_video_admission_capability_blocks_unverified_pricing_exposure(monkeypat
     assert capability["exact_query_endpoint"] is True
     assert capability["pricing_verified"] is False
     assert capability["provider_enforced_cost_cap"] is False
+    assert capability["configured"] is False
+
+
+def test_video_admission_capability_fails_closed_on_input_upload_config_drift(
+    monkeypatch,
+) -> None:
+    registry = SimpleNamespace(
+        store=SimpleNamespace(
+            service=lambda service_id: {
+                "model": MODEL_ID,
+                "endpoint": CREATE_ENDPOINT,
+                "query_endpoint": QUERY_ENDPOINT,
+                "input_upload_endpoint": "/v1/files/uploads/url",
+                "allowed_artifact_hosts": ["media.crazyrouter.com"],
+                "allowed_input_hosts": [
+                    "media.crazyrouter.com",
+                    "similar.crazyrouter.com",
+                ],
+                "pricing_exposure_contract": {
+                    "verification_state": "verified",
+                    "billing_mode": "provider_output_tokens",
+                    "output_token_usd": "0.01",
+                    "worst_case_output_tokens": 100,
+                    "worst_case_cost_usd": "1.00",
+                    "source_checked_at": REQUESTED_AT,
+                    "provider_enforced_cost_cap": False,
+                },
+            }
+        ),
+        descriptor=lambda service_id: SimpleNamespace(
+            reference_image_slots=4,
+            supported_durations_sec=[6],
+            supported_resolutions=["720p"],
+            frame_modes=["first_frame", "reference_images"],
+        ),
+    )
+    monkeypatch.setattr(
+        "apps.api.runtime_video_admission.load_provider_registry",
+        lambda: registry,
+    )
+
+    capability = video_admission_capability()
+
+    assert capability["exact_input_upload_endpoint"] is False
+    assert capability["input_host_configured"] is False
     assert capability["configured"] is False
 
 
@@ -1135,7 +1180,7 @@ def test_video_admission_fails_closed_on_reference_and_graph_drift(tmp_path) -> 
     _command(client, project_id, {"type": "compile", "idempotency_key": "compile"})
     manifest = load_video_admission_manifest(store, project_id)
     request_payload = video_admission_generation_request(manifest, generated_at=REQUESTED_AT)
-    request_payload["reference_image_asset_ids"] = []
+    request_payload["reference_image_asset_ids"] = ["unapproved-reference"]
     with pytest.raises(ValueError, match="reference_image_asset_ids"):
         enforce_video_admission_request(
             store,
@@ -1173,6 +1218,134 @@ def test_video_admission_fails_closed_on_reference_and_graph_drift(tmp_path) -> 
     )
     assert response.status_code == 422
     assert "ProductionGraph source is stale" in response.text
+
+
+def test_rejected_video_round_creates_one_independent_first_frame_round_without_provider(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-old"})
+    _command(client, project_id, {"type": "reserve_dispatch", "idempotency_key": "reserve-old"})
+    old_request = VideoGenerationRequest(
+        **video_admission_generation_request(
+            load_video_admission_manifest(store, project_id),
+            generated_at=REQUESTED_AT,
+        )
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        old_request,
+        job_id="provider-job-rejected",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="provider-job-rejected",
+    )
+    old_manifest = deepcopy(load_video_admission_manifest(store, project_id))
+    safe_path = (
+        store.run_dir(project_id, "provider-job-rejected")
+        / "video_generation_safe_manifest.json"
+    )
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "provider_http_status": 400,
+                    "provider_error_code": "fail_to_fetch_task",
+                    "provider_error_message": "InvalidParameter",
+                    "provider_error_stage": "submit_http_error",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission").json()
+    assert readiness["readiness"]["new_round_allowed"] is True
+    assert readiness["manifest"] == old_manifest
+
+    body = {
+        "command": {
+            "type": "create_new_round",
+            "idempotency_key": "new-independent-round",
+        },
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["version"] == old_manifest["version"] + 1
+    assert candidate["round_contract"]["kind"] == "independent_after_provider_rejection"
+    assert candidate["round_contract"]["prior_round_preserved"] is True
+    assert candidate["round_contract"]["prior_round_replay_allowed"] is False
+    assert candidate["provider_input_contract"]["mode"] == "first_frame"
+    assert candidate["provider_input_contract"]["first_frame"]["image_asset_id"] == media["keyframe"]
+    assert candidate["provider_input_contract"]["last_frame"] is None
+    assert candidate["provider_input_contract"]["reference_images"] == []
+    assert candidate["provider_input_contract"]["excluded_grounding_reference_count"] == 3
+    assert candidate["budget"]["remaining_dispatches"] == 1
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_manifest
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["item"]["state"] == "planned"
+    assert active["provider_dispatch_count"] == 0
+    request = video_admission_generation_request(
+        {
+            **active,
+            "item": {**active["item"], "state": "reserved"},
+        },
+        generated_at=REQUESTED_AT,
+    )
+    assert request["reference_image_asset_ids"] == []
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_manifest['manifest_id']}.json"
+    )
+    assert archived == old_manifest
+    assert read_json(safe_path)["provider_calls_started"] is True
+
+    replay = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    assert load_video_admission_manifest(store, project_id) == active
+
+    duplicate = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": {
+                "type": "create_new_round",
+                "idempotency_key": "different-new-round",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert duplicate.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == active
 
 
 def test_video_readiness_requires_literal_shot_one_and_exact_reference_pack(tmp_path) -> None:
