@@ -2748,10 +2748,17 @@ export function createProductShell(options = {}) {
       return panel;
     }
     const metrics = node("div", "image-admission-metrics");
+    const inputContract = view["pro" + "vider_input_contract"] || {};
+    const excludedGroundingCount = Number(
+      inputContract.excluded_grounding_reference_count || 0
+    );
     for (const [label, value] of [
       ["模型", `${view.generation_contract.model} · 非 fast`],
       ["输出", `${view.generation_contract.resolution} · ${view.generation_contract.duration_sec} 秒`],
-      ["参考", `已批准关键帧 + ${view.source?.references?.length || 0} 张参考图`],
+      ["首帧", inputContract.first_frame?.label || view.source?.keyframe?.label || "尚未完成"],
+      ["尾帧", inputContract.last_frame ? "1 张" : "不发送"],
+      ["实际发送参考图", `${inputContract.reference_images?.length || 0} 张`],
+      ["项目创作依据", `${excludedGroundingCount} 张已批准参考图（仅用于提示与连续性，不作为首尾帧发送）`],
       ["费用停止线", `$${view.budget_contract.hard_ceiling_usd} 项目停止线 · 非供应商限额/估算/实际账单`],
       ["发送规则", "最多 1 次 · 自动重试 0"],
     ]) {
@@ -2789,6 +2796,16 @@ export function createProductShell(options = {}) {
       }
     } else if (item.state === "reserved") {
       panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
+    } else if (item.state === "reconcile_required" && view.readiness?.new_round_allowed) {
+      const nextRound = node("button", "studio-primary-button", "建立新的单次视频清单");
+      nextRound.type = "button";
+      nextRound.disabled = videoAdmissionPending;
+      nextRound.dataset.videoAdmissionCommand = "create_new_round";
+      panel.append(
+        node("strong", "", "上一次发送被上游拒绝"),
+        node("p", "", "旧发送记录与费用核对状态会永久保留，不能重放。可按当前首帧合同建立一个全新的单次清单；这一步不会调用外部能力。"),
+        nextRound,
+      );
     } else if (["processing", "reconcile_required"].includes(item.state)) {
       const recover = node("button", "studio-secondary-button", "检查视频进度");
       recover.type = "button";
@@ -2846,6 +2863,8 @@ export function createProductShell(options = {}) {
     review.append(
       node("strong", "", commandType === "reserve_dispatch"
         ? "确认发送镜头 01 视频"
+        : commandType === "create_new_round"
+          ? "确认建立新的单次视频清单"
         : commandType === "recompile_current"
           ? "确认按当前版本重新准备"
         : commandType === "approve"
@@ -2854,21 +2873,23 @@ export function createProductShell(options = {}) {
             ? "拒绝视频候选"
             : "确认视频准备"),
       node("p", "", commandType === "reserve_dispatch"
-        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
+        ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 唯一首帧 ${reviewView["pro" + "vider_input_contract"]?.first_frame?.label || "已批准关键帧"} · 无尾帧 · 实际发送参考图 0 张 · 1 次发送 · 自动重试 0 · $2.00 项目停止线（当前新轮次；非供应商强制限额、预计或实际费用）。`
+        : commandType === "create_new_round"
+          ? "旧失败清单和唯一一次发送记录保持不变且不能重放；确认只建立新的独立单次清单，不发送视频。"
         : commandType === "recompile_current"
           ? `旧视频准备将保留在历史记录；新清单基于 v${Number(preview.impact?.current_graph_version || 0)}，确认只保存准备清单，不发送视频。`
         : commandType === "compile"
           ? `使用 ${manifest.source?.keyframe?.label || "已批准关键帧"} 与 ${manifest.source?.references?.length || 0} 张已批准参考图；确认只保存准备清单。`
           : "批准才会写入当前项目；拒绝不会替换现有制作事实。"),
     );
-    if (["compile", "recompile_current", "reserve_dispatch"].includes(commandType)) {
+    if (["compile", "recompile_current", "create_new_round", "reserve_dispatch"].includes(commandType)) {
       const referenceLabels = (manifest.source?.references || [])
         .map((item) => item?.label)
         .filter(Boolean);
       review.appendChild(node(
         "p",
         "",
-        `参考组：${referenceLabels.join("、") || "尚未完成"}；关键帧：${manifest.source?.keyframe?.label || "尚未完成"}。`,
+        `首帧：${manifest["pro" + "vider_input_contract"]?.first_frame?.label || manifest.source?.keyframe?.label || "尚未完成"}；尾帧：不发送；实际发送参考图：0 张。项目参考组 ${referenceLabels.join("、") || "无"} 仅用于提示与连续性依据，不冒充首尾帧。`,
       ));
     }
     const actions = node("div", "image-admission-actions");
@@ -2950,7 +2971,9 @@ export function createProductShell(options = {}) {
               status: "blocked",
               next_action: "正在核对当前制作图。",
             }
-          : snapshot.videoAdmission?.readiness || { status: "ready" },
+          : preview.command?.type === "create_new_round"
+            ? { status: "ready", next_action: "预览并确认生成。" }
+            : snapshot.videoAdmission?.readiness || { status: "ready" },
         lineage: preview.command?.type === "recompile_current"
           ? {
               status: "unknown",
@@ -2967,7 +2990,7 @@ export function createProductShell(options = {}) {
       const commandType = preview.command?.type;
       videoAdmissionPreview = null;
       videoAdmissionError = "";
-      if (commandType === "recompile_current") {
+      if (["recompile_current", "create_new_round"].includes(commandType)) {
         try {
           await refreshGraphBoundRuntimeState();
         } catch {
@@ -3923,7 +3946,7 @@ export function createProductShell(options = {}) {
       const root = document.getElementById("product-shell-root");
       if (!action || !root?.contains(action) || action.disabled) return;
       const command = String(action.dataset.videoAdmissionCommand || "");
-      if (!["reserve_dispatch", "recompile_current"].includes(command)) return;
+      if (!["reserve_dispatch", "recompile_current", "create_new_round"].includes(command)) return;
       event.preventDefault();
       void stageVideoAdmissionCommand({ type: command });
     });

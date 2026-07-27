@@ -103,6 +103,48 @@ def test_desktop_storyboard_and_agent_use_the_same_zero_provider_video_entry() -
                 browser.close()
 
 
+def test_rejected_round_builds_a_new_first_frame_manifest_without_dispatch() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type == "error"
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html#rejected",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+                panel = page.locator(".video-admission-panel")
+                assert panel.get_by_text("上一次发送被上游拒绝", exact=True).is_visible()
+                page.get_by_role(
+                    "button",
+                    name="建立新的单次视频清单",
+                    exact=True,
+                ).click()
+                page.get_by_text("确认建立新的单次视频清单", exact=True).wait_for()
+                review = page.locator(".image-admission-review")
+                assert review.get_by_text("旧失败清单和唯一一次发送记录保持不变", exact=False).is_visible()
+                assert review.get_by_text("实际发送参考图：0 张", exact=False).is_visible()
+                page.get_by_role("button", name="确认", exact=True).click()
+                page.get_by_role("button", name="预览并确认生成", exact=True).wait_for()
+                assert panel.get_by_text("实际发送参考图").is_visible()
+                assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert page.evaluate("window.__sideEffects.generateVideo") == 0
+                assert not console_errors
+            finally:
+                browser.close()
+
+
 def test_refreshed_planned_manifest_reopens_final_confirmation_without_reserving() -> None:
     with _server() as base_url:
         with sync_playwright() as playwright:
@@ -524,16 +566,60 @@ def _contract_html() -> str:
         hard_ceiling_usd: "2.00",
         classification: "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
       };
+      const providerInputContract = {
+        mode: "first_frame",
+        first_frame: {
+          image_asset_id: "keyframe-approved",
+          label: "已批准关键帧",
+          role: "first_frame",
+          mime_type: "image/png",
+          width: 1280,
+          height: 720,
+          byte_count: 1024,
+        },
+        last_frame: null,
+        reference_images: [],
+        frame_role_cardinality: {
+          first_frame: 1,
+          last_frame: 0,
+          reference_image: 0,
+        },
+        excluded_grounding_reference_count: 3,
+      };
       const compiledManifest = {
         status: "locked",
         manifest_id: "video-manifest",
         manifest_hash: "a".repeat(64),
         source,
+        provider_input_contract: providerInputContract,
         provider_contract: providerContract,
         budget_contract: budgetContract,
         budget: { dispatches_reserved: 0, remaining_dispatches: 1 },
         item: { item_id: "video-shot-01", state: "planned" },
         provider_dispatch_count: 0,
+      };
+      const newRoundManifest = {
+        ...compiledManifest,
+        version: 3,
+        manifest_id: "video-manifest-new-round",
+        manifest_hash: "c".repeat(64),
+        round_contract: {
+          kind: "independent_after_provider_rejection",
+          prior_round_preserved: true,
+          prior_round_replay_allowed: false,
+        },
+      };
+      const rejectedManifest = {
+        ...compiledManifest,
+        version: 2,
+        item: {
+          ...compiledManifest.item,
+          state: "reconcile_required",
+          provider_job_id: "old-rejected-job",
+          network_disposition: "may_have_dispatched",
+        },
+        budget: { dispatches_reserved: 1, remaining_dispatches: 0 },
+        provider_dispatch_count: 1,
       };
       const recompiledManifest = {
         ...compiledManifest,
@@ -551,6 +637,8 @@ def _contract_html() -> str:
         result: {
           manifest: command.type === "compile"
             ? { ...compiledManifest, status: "draft" }
+            : command.type === "create_new_round"
+              ? newRoundManifest
             : command.type === "recompile_current"
               ? recompiledManifest
             : {
@@ -598,6 +686,9 @@ def _contract_html() -> str:
           if (request.command.type === "reserve_dispatch") window.__calls.reservePreview += 1;
           if (request.command.type === "recompile_current") {
             window.__rebuildEffects.recompilePreview += 1;
+          }
+          if (request.command.type === "create_new_round") {
+            return Promise.resolve(preview(request.command));
           }
           if (request.command.type === "compile" && window.__deferCompilePreview) {
             return new Promise((resolve) => {
@@ -663,6 +754,30 @@ def _contract_html() -> str:
               provider_dispatch_count: 0,
             });
           }
+          if (request.command.type === "create_new_round") {
+            persistedVideoAdmission = {
+              status: "locked",
+              manifest: newRoundManifest,
+              readiness: {
+                status: "ready",
+                shot_id: "shot-01",
+                shot_label: "镜头 01",
+                first_frame_label: "已批准关键帧",
+                reference_count: 3,
+              },
+              lineage: {
+                status: "current",
+                prepared_graph_version: 14,
+                current_graph_version: 14,
+              },
+              capability: { configured: true },
+              provider_dispatch_count: 0,
+            };
+            return Promise.resolve({
+              result: { manifest: newRoundManifest },
+              provider_dispatch_count: 0,
+            });
+          }
           if (request.command.type === "compile") {
             window.__sideEffects.persistedWrites += 1;
             persistedVideoAdmission = {
@@ -723,18 +838,23 @@ def _contract_html() -> str:
           items: [{ item_id: "approved-keyframe", state: "approved" }],
         },
       };
-      const startPlanned = ["#planned", "#stale"].includes(window.location.hash);
+      const startPlanned = ["#planned", "#stale", "#rejected"].includes(window.location.hash);
       const startStale = window.location.hash === "#stale";
+      const startRejected = window.location.hash === "#rejected";
       const videoAdmission = {
         status: startPlanned ? "locked" : "empty",
-        manifest: startPlanned ? compiledManifest : null,
+        manifest: startRejected ? rejectedManifest : startPlanned ? compiledManifest : null,
         readiness: {
-          status: startStale ? "stale" : "ready",
+          status: startStale ? "stale" : startRejected ? "new_round_ready" : "ready",
           shot_id: "shot-01",
           shot_label: "镜头 01",
           first_frame_label: "已批准关键帧",
           reference_count: 3,
           next_action: "预览视频生成确认卡。",
+          ...(startRejected ? {
+            new_round_allowed: true,
+            next_action: "建立新的单次视频清单；旧失败记录保持不变。",
+          } : {}),
         },
         lineage: startStale
           ? {

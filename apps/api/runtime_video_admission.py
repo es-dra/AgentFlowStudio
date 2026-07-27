@@ -50,6 +50,7 @@ HARD_BUDGET_USD = Decimal("2.00")
 COMMANDS = {
     "compile",
     "recompile_current",
+    "create_new_round",
     "reserve_dispatch",
     "record_job",
     "record_candidate",
@@ -161,7 +162,7 @@ def register_runtime_video_admission_routes(
                 result["updated_at"] = _now()
                 path.parent.mkdir(parents=True, exist_ok=True)
                 reject_unsafe_payload(result)
-                if command["type"] == "recompile_current":
+                if command["type"] in {"recompile_current", "create_new_round"}:
                     with _verified_graph_snapshot_lock(store, project_id, result):
                         _archive_manifest_once(store, project_id, existing)
                         write_json(path, result)
@@ -221,7 +222,7 @@ def video_admission_readiness(
             ),
             "provider_dispatch_count": 0,
         }
-    return {
+    readiness = {
         "status": "ready",
         "shot_id": source["shot"]["shot_id"],
         "shot_label": source["shot"]["label"],
@@ -230,6 +231,20 @@ def video_admission_readiness(
         "next_action": "预览视频生成确认卡。",
         "provider_dispatch_count": 0,
     }
+    active = load_video_admission_manifest(store, project_id)
+    try:
+        _assert_new_round_eligible(store, project_id, active)
+    except (KeyError, ValueError, ProductionGraphError):
+        pass
+    else:
+        readiness.update(
+            {
+                "status": "new_round_ready",
+                "new_round_allowed": True,
+                "next_action": "建立新的单次视频清单；旧失败记录保持不变。",
+            }
+        )
+    return readiness
 
 
 def video_admission_capability() -> dict[str, Any]:
@@ -239,7 +254,10 @@ def video_admission_capability() -> dict[str, Any]:
     reference_slots = 0
     duration_supported = False
     resolution_supported = False
+    first_frame_mode_supported = False
     reference_mode_supported = False
+    exact_input_upload_endpoint = False
+    input_host_configured = False
     artifact_hosts_configured = False
     pricing_verified = False
     worst_case_output_tokens = 0
@@ -251,7 +269,25 @@ def video_admission_capability() -> dict[str, Any]:
         configured_model = str(service.get("model") or "")
         configured_endpoint = str(service.get("endpoint") or "")
         configured_query_endpoint = str(service.get("query_endpoint") or "")
-        artifact_hosts_configured = bool(service.get("allowed_artifact_hosts"))
+        exact_input_upload_endpoint = (
+            str(service.get("input_upload_endpoint") or "/v1/files/uploads/base64")
+            == "/v1/files/uploads/base64"
+        )
+        artifact_hosts_configured = "media.crazyrouter.com" in {
+            str(item).lower().strip()
+            for item in service.get("allowed_artifact_hosts", [])
+            if str(item).strip()
+        }
+        configured_input_hosts = (
+            service.get("allowed_input_hosts")
+            if isinstance(service.get("allowed_input_hosts"), list)
+            else service.get("allowed_artifact_hosts", [])
+        )
+        input_host_configured = {
+            str(item).lower().strip()
+            for item in configured_input_hosts
+            if str(item).strip()
+        } == {"media.crazyrouter.com"}
         pricing = _pricing_exposure_contract(service)
         pricing_verified = pricing["verified"]
         worst_case_output_tokens = pricing["worst_case_output_tokens"]
@@ -259,6 +295,7 @@ def video_admission_capability() -> dict[str, Any]:
         reference_slots = int(descriptor.reference_image_slots or 0)
         duration_supported = DURATION_SEC in descriptor.supported_durations_sec
         resolution_supported = RESOLUTION in descriptor.supported_resolutions
+        first_frame_mode_supported = "first_frame" in descriptor.frame_modes
         reference_mode_supported = "reference_images" in descriptor.frame_modes
     except (ModelGatewayError, KeyError, OSError, ValueError, InvalidOperation):
         pass
@@ -266,11 +303,13 @@ def video_admission_capability() -> dict[str, Any]:
     exact_endpoint = configured_endpoint == CREATE_ENDPOINT
     exact_query_endpoint = configured_query_endpoint == QUERY_ENDPOINT
     exact_request_shape = (
-        reference_slots >= 4
+        reference_slots >= 1
         and duration_supported
         and resolution_supported
-        and reference_mode_supported
+        and first_frame_mode_supported
         and artifact_hosts_configured
+        and exact_input_upload_endpoint
+        and input_host_configured
         and pricing_verified
     )
     return {
@@ -292,8 +331,11 @@ def video_admission_capability() -> dict[str, Any]:
         "reference_image_slots": reference_slots,
         "duration_supported": duration_supported,
         "resolution_supported": resolution_supported,
+        "first_frame_mode_supported": first_frame_mode_supported,
         "reference_mode_supported": reference_mode_supported,
         "artifact_hosts_configured": artifact_hosts_configured,
+        "exact_input_upload_endpoint": exact_input_upload_endpoint,
+        "input_host_configured": input_host_configured,
         "pricing_verified": pricing_verified,
         "worst_case_output_tokens": worst_case_output_tokens,
         "worst_case_cost_usd": worst_case_cost_usd,
@@ -329,6 +371,23 @@ def preview_video_admission_command(
             version=int(before.get("version") or 0) + 1,
         )
         _append_receipt(manifest, "manifest_recompiled", command, requested_at)
+    elif command["type"] == "create_new_round":
+        before = load_video_admission_manifest(store, project_id)
+        _assert_new_round_eligible(store, project_id, before)
+        manifest = compile_video_admission_manifest(
+            store,
+            project_id,
+            created_at=requested_at,
+            version=int(before.get("version") or 0) + 1,
+            round_contract={
+                "kind": "independent_after_provider_rejection",
+                "prior_manifest_id": str(before.get("manifest_id") or ""),
+                "prior_manifest_hash": str(before.get("manifest_hash") or ""),
+                "prior_round_preserved": True,
+                "prior_round_replay_allowed": False,
+            },
+        )
+        _append_receipt(manifest, "independent_round_created", command, requested_at)
     else:
         before = load_video_admission_manifest(store, project_id)
         if not before:
@@ -368,6 +427,18 @@ def preview_video_admission_command(
         payload["preview_digest"] = canonical_digest(
             {key: value for key, value in payload.items() if key != "preview_digest"}
         )
+    elif command["type"] == "create_new_round":
+        payload["impact"].update(
+            {
+                "source_manifest_archived": True,
+                "new_independent_round": True,
+                "prior_round_replay_allowed": False,
+                "provider_dispatch_count": 0,
+            }
+        )
+        payload["preview_digest"] = canonical_digest(
+            {key: value for key, value in payload.items() if key != "preview_digest"}
+        )
     return payload
 
 
@@ -396,6 +467,7 @@ def compile_video_admission_manifest(
     *,
     created_at: str | None = None,
     version: int = 1,
+    round_contract: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     timestamp = created_at or _now()
     if not video_admission_capability()["configured"]:
@@ -403,11 +475,18 @@ def compile_video_admission_manifest(
             "exact non-fast Seedance 2.0 720p/6s reference capability is not configured"
         )
     source = _source_contract(store, project_id)
+    provider_input_contract = _provider_input_contract(source)
     contract = {
         "schema_version": SCHEMA_VERSION,
         "project_id": project_id,
         "version": int(version),
         "source": source,
+        "provider_input_contract": provider_input_contract,
+        "round_contract": dict(round_contract or {
+            "kind": "initial",
+            "prior_round_preserved": False,
+            "prior_round_replay_allowed": False,
+        }),
         "provider_contract": {
             "service_id": SERVICE_ID,
             "model": MODEL_ID,
@@ -491,7 +570,11 @@ def enforce_video_admission_request(
     _assert_manifest_current(store, project_id, manifest)
     item = manifest["item"]
     source = manifest["source"]
-    expected_refs = [entry["image_asset_id"] for entry in source["references"]]
+    input_contract = _validated_provider_input_contract(manifest)
+    expected_refs = [
+        entry["image_asset_id"]
+        for entry in input_contract["reference_images"]
+    ]
     checks = {
         "video_admission_manifest_id": (request.video_admission_manifest_id, manifest["manifest_id"]),
         "video_admission_manifest_hash": (request.video_admission_manifest_hash, manifest["manifest_hash"]),
@@ -618,12 +701,16 @@ def mark_video_admission_task_recorded(
 def video_admission_generation_request(manifest: Mapping[str, Any], *, generated_at: str) -> dict[str, Any]:
     item = manifest["item"]
     source = manifest["source"]
+    input_contract = _validated_provider_input_contract(manifest)
     return {
         "node_id": source["shot"]["shot_id"],
         "prompt_text": source["prompt_contract"]["provider_prompt"],
         "provider_service_id": SERVICE_ID,
         "first_frame_image_asset_id": source["keyframe"]["image_asset_id"],
-        "reference_image_asset_ids": [entry["image_asset_id"] for entry in source["references"]],
+        "reference_image_asset_ids": [
+            entry["image_asset_id"]
+            for entry in input_contract["reference_images"]
+        ],
         "duration_sec": DURATION_SEC,
         "resolution": RESOLUTION,
         "aspect_ratio": source["keyframe"].get("aspect_ratio") or "16:9",
@@ -1416,6 +1503,134 @@ def _safe_command(value: Any) -> dict[str, Any]:
     if command_type == "record_candidate":
         safe["candidate"] = _safe_candidate(command.get("candidate"))
     return safe
+
+
+def _provider_input_contract(source: Mapping[str, Any]) -> dict[str, Any]:
+    keyframe = source.get("keyframe") or {}
+    references = [
+        item for item in source.get("references", [])
+        if isinstance(item, Mapping)
+    ]
+    return {
+        "mode": "first_frame",
+        "first_frame": {
+            "image_asset_id": str(keyframe.get("image_asset_id") or ""),
+            "label": str(keyframe.get("label") or "已批准关键帧"),
+            "role": "first_frame",
+            "mime_type": str(keyframe.get("mime_type") or ""),
+            "width": int(keyframe.get("width") or 0),
+            "height": int(keyframe.get("height") or 0),
+            "byte_count": int(keyframe.get("byte_count") or 0),
+        },
+        "last_frame": None,
+        "reference_images": [],
+        "frame_role_cardinality": {
+            "first_frame": 1,
+            "last_frame": 0,
+            "reference_image": 0,
+        },
+        "upload_contract": {
+            "transport": "temporary_https_model_input",
+            "provider_url_persisted": False,
+            "required_host": "media.crazyrouter.com",
+            "require_upload_receipt_validation_before_task_submit": True,
+        },
+        "excluded_grounding_references": [
+            {
+                "label": str(item.get("label") or ""),
+                "role": "creative_grounding_only",
+                "reason": "first_frame_entry_excludes_all_purpose_reference_images",
+            }
+            for item in references
+        ],
+        "excluded_grounding_reference_count": len(references),
+    }
+
+
+def _validated_provider_input_contract(
+    manifest: Mapping[str, Any],
+) -> dict[str, Any]:
+    contract = manifest.get("provider_input_contract")
+    if not isinstance(contract, Mapping):
+        raise ValueError("video admission provider input contract is missing")
+    first = contract.get("first_frame")
+    references = contract.get("reference_images")
+    cardinality = contract.get("frame_role_cardinality")
+    upload = contract.get("upload_contract")
+    if (
+        contract.get("mode") != "first_frame"
+        or not isinstance(first, Mapping)
+        or str(first.get("role") or "") != "first_frame"
+        or str(first.get("image_asset_id") or "")
+        != str((manifest.get("source") or {}).get("keyframe", {}).get("image_asset_id") or "")
+        or str(first.get("mime_type") or "") not in {"image/png", "image/jpeg"}
+        or int(first.get("width") or 0) <= 0
+        or int(first.get("height") or 0) <= 0
+        or int(first.get("byte_count") or 0) <= 0
+        or contract.get("last_frame") is not None
+        or references != []
+        or cardinality != {"first_frame": 1, "last_frame": 0, "reference_image": 0}
+        or not isinstance(upload, Mapping)
+        or upload.get("transport") != "temporary_https_model_input"
+        or upload.get("required_host") != "media.crazyrouter.com"
+        or upload.get("provider_url_persisted") is not False
+        or upload.get("require_upload_receipt_validation_before_task_submit") is not True
+    ):
+        raise ValueError("video admission provider input contract is invalid")
+    return deepcopy(dict(contract))
+
+
+def _assert_new_round_eligible(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    if not manifest:
+        raise ValueError("a prior video round is required")
+    _assert_manifest_current(store, project_id, manifest)
+    item = manifest.get("item") or {}
+    budget = manifest.get("budget") or {}
+    if (
+        item.get("state") != "reconcile_required"
+        or not str(item.get("provider_job_id") or "")
+        or str(item.get("provider_task_fingerprint") or "")
+        or item.get("candidate") is not None
+        or int(manifest.get("provider_dispatch_count") or 0) != 1
+        or int(budget.get("dispatches_reserved") or 0) != 1
+        or int(budget.get("remaining_dispatches") or 0) != 0
+    ):
+        raise ValueError("the prior video round is not a terminal rejected submission")
+    safe_path = (
+        store.run_dir(project_id, str(item["provider_job_id"]))
+        / "video_generation_safe_manifest.json"
+    )
+    if not safe_path.is_file():
+        raise ValueError("the prior video rejection evidence is unavailable")
+    safe_manifest = read_json(safe_path)
+    reject_unsafe_payload(safe_manifest)
+    blocks = [
+        block for block in safe_manifest.get("blocks", [])
+        if isinstance(block, Mapping)
+    ]
+    rejected = any(
+        int(block.get("provider_http_status") or 0) == 400
+        and (
+            str(block.get("provider_error_code") or "") == "InvalidParameter"
+            or "invalidparameter" in "".join(
+                character
+                for character in str(block.get("provider_error_message") or "").lower()
+                if character.isalnum()
+            )
+        )
+        for block in blocks
+    )
+    if (
+        safe_manifest.get("status") != "reconcile_required"
+        or safe_manifest.get("provider_calls_started") is not True
+        or safe_manifest.get("outputs") not in (None, [])
+        or not rejected
+    ):
+        raise ValueError("the prior video round is not safely classified as a rejected input")
 
 
 def _safe_candidate(value: Any, *, project_id: str = "") -> dict[str, Any]:
