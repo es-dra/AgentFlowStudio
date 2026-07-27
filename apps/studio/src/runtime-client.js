@@ -113,14 +113,15 @@ async function requestJson(route, { method = "GET", payload = null, meta = null,
   }
   const body = await response.text();
   if (!response.ok) {
-    const parsed = parseRuntimeErrorPayload(response, body);
-    const error = new Error(staleRuntimeRouteMessage(response, route, body, parsed) || runtimeErrorMessage(response, body, parsed));
+    const parsed = parseRuntimeErrorPayload(response, body, requestMeta);
+    const error = new Error(staleRuntimeRouteMessage(response, route, body, parsed) || runtimeErrorMessage(response, body, parsed, requestMeta));
     error.status = response.status;
     error.route = route;
     error.payload = parsed?.payload || null;
     error.errorCode = parsed?.error || "";
     error.requestId = parsed?.request_id || response.headers.get("X-Request-ID") || "";
     error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
+    error.generationKind = requestMeta.generation_kind || "";
     dispatchAuthBoundaryRequired(error, route);
     dispatchProjectAccessDenied(error, parsed);
     dispatchProjectIdentityInvalid(error, parsed);
@@ -200,7 +201,10 @@ function staleRuntimeRouteMessage(response, route, body, parsed = null) {
   return "当前功能暂时不可用，请刷新页面后重试。";
 }
 
-function runtimeErrorMessage(response, body, parsed = null) {
+function runtimeErrorMessage(response, body, parsed = null, requestMeta = null) {
+  if (response.status === 422 && parsed?.field?.startsWith("创作内容")) {
+    return "请先输入创作想法或剧本文本。";
+  }
   let detail = "";
   if (parsed?.message || parsed?.error) {
     detail = [
@@ -211,20 +215,22 @@ function runtimeErrorMessage(response, body, parsed = null) {
       .filter(Boolean)
       .join(" ");
   } else {
-    detail = cleanTextResponseError(body, response);
+    detail = cleanTextResponseError(body, response, requestMeta);
   }
   const safeDetail = cleanRuntimeErrorText(detail, 220);
   return safeDetail || "请求暂时失败，请稍后重试。";
 }
 
-function parseRuntimeErrorPayload(response, body) {
+function parseRuntimeErrorPayload(response, body, requestMeta = null) {
   try {
     const payload = body ? JSON.parse(body) : {};
     const detail = payload?.detail && typeof payload.detail === "object" ? payload.detail : payload;
     if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      const validation = Array.isArray(detail) ? validationErrorSummary(detail) : { message: "", field: "" };
       return {
         payload,
-        message: Array.isArray(detail) ? validationErrorMessage(detail) : String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        message: validation.message || String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        field: validation.field,
         error: "",
       };
     }
@@ -247,15 +253,22 @@ function parseRuntimeErrorPayload(response, body) {
       details,
     };
   } catch {
-    return { payload: null, message: cleanTextResponseError(body, response), error: "" };
+    return { payload: null, message: cleanTextResponseError(body, response, requestMeta), error: "" };
   }
 }
 
 function validationErrorMessage(items) {
-  if (!Array.isArray(items) || !items.length) return "";
+  return validationErrorSummary(items).message;
+}
+
+function validationErrorSummary(items) {
+  if (!Array.isArray(items) || !items.length) return { message: "", field: "" };
   const first = items[0] || {};
   const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : first.field);
-  return [first.msg || "请求参数校验失败", field ? `字段：${field}` : ""].filter(Boolean).join(" ");
+  return {
+    message: cleanRuntimeErrorText(first.msg || "请求参数校验失败", 160),
+    field,
+  };
 }
 
 function validationFieldMessage(value) {
@@ -318,19 +331,27 @@ function safeFieldName(value) {
       reference_target: "参考目标",
       role: "绑定角色",
       node_id: "节点",
+      source_text: "创作内容",
     };
     return known[normalized] || normalized.slice(0, 80);
   }).filter(Boolean);
   return labels.join(".").slice(0, 120);
 }
 
-function cleanTextResponseError(body, response) {
+function cleanTextResponseError(body, response, requestMeta = null) {
   const raw = String(body || "").trim();
   if (!raw) return response.statusText || "";
   if (/^\s*</.test(raw) || /<html|<body|<\/\w+>/i.test(raw)) {
-    return response.status === 504
-      ? "Gateway timeout while waiting for image generation; checking saved Runtime assets may recover the result."
-      : (response.statusText || "HTTP response was not JSON");
+    if (response.status === 504) {
+      const kind = String(requestMeta?.generation_kind || "");
+      if (kind === "text") return "文本处理等待超时；原文已保留，可以恢复同一文本预览或稍后重试。";
+      if (kind === "keyframe" || kind === "image") return "图片处理等待超时；可以检查同一任务的已保存结果。";
+      if (kind === "video" || kind === "video_revision" || kind === "external_video") {
+        return "视频处理等待超时；可以检查同一任务的已保存结果。";
+      }
+      return "请求等待超时；当前项目内容未改变。";
+    }
+    return response.statusText || "服务返回了无法读取的响应";
   }
   return raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -431,6 +452,7 @@ function inferUserAction(route, method) {
 }
 
 function inferGenerationKind(route) {
+  if (route.includes("/embedded-creative-actions") || route.includes("/script-plan-asset-bible") || route.includes("/agent-chat/conversation")) return "text";
   if (route.includes("/keyframe-local-edits")) return "keyframe_local_edit";
   if (route.includes("/external-video-jobs")) return "external_video";
   if (route.includes("/video-generations")) return "video";
@@ -999,12 +1021,26 @@ export function createRuntimeClient(projectId = "") {
         signal: options?.signal || null,
       });
     },
+    newEmbeddedCreativeClientRequestId() {
+      return newClientRequestId();
+    },
     previewEmbeddedCreativeAction(payload, options = {}) {
+      const stableRequestId = String(options?.clientRequestId || newClientRequestId());
       return requestJson(`/projects/${encoded}/embedded-creative-actions/preview`, {
         method: "POST",
         payload,
+        meta: { client_request_id: stableRequestId },
         signal: options?.signal || null,
       });
+    },
+    recoverEmbeddedCreativeActionByClient(clientRequestId) {
+      return requestJson(`/projects/${encoded}/embedded-creative-actions/by-client/${encodeURIComponent(clientRequestId)}`);
+    },
+    applyEmbeddedCreativeShotPlan(clientRequestId, payload) {
+      return requestJson(
+        `/projects/${encoded}/embedded-creative-actions/by-client/${encodeURIComponent(clientRequestId)}/apply-shot-plan`,
+        { method: "POST", payload },
+      );
     },
   };
 }

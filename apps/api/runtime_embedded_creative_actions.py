@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
-from agentflow.harness.json_io import write_json
+from agentflow.harness.json_io import exclusive_file_lock, write_json
 from agentflow_studio.model_gateway.company_secrets import SERVER_CODEX_SERVICE_ID
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
@@ -17,10 +20,19 @@ from agentflow_studio.model_gateway.provider_adapter import (
     structured_output_schema_digest,
 )
 from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement import llm_provider_gate
-from apps.api.runtime_production_graph import ProductionGraphStore
-from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
+from apps.api.runtime_logging import client_request_id_from_request
+from apps.api.runtime_film_production_graph import _sequence_workspace_projection
+from apps.api.runtime_production_graph import (
+    GraphIdempotencyConflict,
+    GraphVersionConflict,
+    ProductionGraphError,
+    ProductionGraphStore,
+    canonical_digest,
+)
+from apps.api.runtime_store import RuntimeStore, public_job, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
 
@@ -92,6 +104,13 @@ class EmbeddedCreativeActionRequest(BaseModel):
     generated_at: str = Field(min_length=1, max_length=80)
 
 
+class EmbeddedCreativeActionApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_graph_version: int = Field(ge=0)
+    expected_request_digest: str = Field(min_length=64, max_length=64)
+
+
 def register_runtime_embedded_creative_action_routes(
     app: FastAPI,
     store: RuntimeStore,
@@ -113,7 +132,53 @@ def register_runtime_embedded_creative_action_routes(
     ) -> dict[str, Any]:
         require_access(request, project_id)
         store.ensure_project_manifest(project_id)
+        client_request_id = client_request_id_from_request(request)
         job_id = store.new_job_id("embedded_creative_action", project_id)
+        if client_request_id:
+            normalized = _safe_client_request_id(client_request_id)
+            if normalized != client_request_id:
+                raise HTTPException(status_code=422, detail="invalid client request id")
+            claim = _claim_embedded_creative_request(
+                store,
+                project_id,
+                normalized,
+                request_digest=_embedded_request_digest(body),
+                job_id=job_id,
+            )
+            if claim["state"] == "replay":
+                recovered = _recover_embedded_creative_action_for_job(
+                    store,
+                    project_id,
+                    normalized,
+                    str(claim["record"].get("job_id") or ""),
+                )
+                if recovered is not None:
+                    recovered["idempotent_replay"] = True
+                    reject_unsafe_payload(recovered)
+                    return recovered
+                raise HTTPException(
+                    status_code=409,
+                    detail=_embedded_idempotency_detail(
+                        project_id,
+                        normalized,
+                        code="embedded_preview_recovery_incomplete",
+                        message="同一文本预览已完成，但恢复资料尚不可用。",
+                        user_action="请刷新页面恢复同一文本预览；不要重复提交。",
+                    ),
+                )
+            if claim["state"] in {"conflict", "running"}:
+                conflict = claim["state"] == "conflict"
+                raise HTTPException(
+                    status_code=409,
+                    detail=_embedded_idempotency_detail(
+                        project_id,
+                        normalized,
+                        code="embedded_preview_idempotency_conflict" if conflict else "embedded_preview_in_progress",
+                        message="同一请求标识对应了不同的文本预览。" if conflict else "同一文本预览仍在处理中。",
+                        user_action="请使用新的操作重新预览。" if conflict else "请恢复同一文本预览；不会再次提交。",
+                        retryable=not conflict,
+                    ),
+                )
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
         graph_before = graph_store.ensure(project_id)
@@ -122,6 +187,10 @@ def register_runtime_embedded_creative_action_routes(
         result["latency_ms"] = round((time.perf_counter() - started) * 1000, 2)
         graph_after = graph_store.ensure(project_id)
         result["graph_mutation"] = _graph_mutation_summary(graph_before, graph_after)
+        if client_request_id:
+            result["safe_manifest"]["client_request_id"] = client_request_id
+            result["safe_manifest"]["request_digest"] = _embedded_request_digest(body)
+        result["safe_manifest"]["source_digest"] = _text_digest(body.source_text)
         artifacts = _write_embedded_action_artifacts(
             store,
             output_dir,
@@ -135,6 +204,9 @@ def register_runtime_embedded_creative_action_routes(
                 "preview": result.get("preview") or {},
                 "provider_lineage": result.get("provider_lineage") or {},
                 "graph_mutation": result["graph_mutation"],
+                "client_request_id": client_request_id,
+                "source_digest": _text_digest(body.source_text),
+                "latency_ms": result["latency_ms"],
             },
         )
         trace_path = write_run_trace(
@@ -154,9 +226,10 @@ def register_runtime_embedded_creative_action_routes(
         )
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         job = runtime_job(job_id, project_id, "embedded_creative_action", "succeeded", artifacts=artifacts)
+        public_job_payload = store.write_job(job)
         response = {
             "project_id": project_id,
-            "job": store.write_job(job),
+            "job": public_job_payload,
             "mode": result["mode"],
             "action_type": body.action_type,
             "target": result["target"],
@@ -171,6 +244,157 @@ def register_runtime_embedded_creative_action_routes(
             "cost_usd": 0,
             "artifacts": artifacts,
             "non_claims": EMBEDDED_CREATIVE_NON_CLAIMS,
+        }
+        reject_unsafe_payload(response)
+        if client_request_id:
+            _complete_embedded_creative_request(
+                store,
+                project_id,
+                client_request_id,
+                request_digest=_embedded_request_digest(body),
+                job_id=job_id,
+                provider_calls_started=result["provider_calls_started"] is True,
+            )
+        return response
+
+    @app.get("/projects/{project_id}/embedded-creative-actions/by-client/{client_request_id}")
+    def recover_embedded_creative_action(
+        project_id: str,
+        client_request_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        require_access(request, project_id)
+        normalized = _safe_client_request_id(client_request_id)
+        if normalized != client_request_id:
+            raise HTTPException(status_code=422, detail="invalid client request id")
+        claim = _read_embedded_creative_request(store, project_id, normalized)
+        if claim:
+            if str(claim.get("status") or "") != "completed":
+                raise HTTPException(status_code=404, detail="text preview is still processing")
+            recovered = _recover_embedded_creative_action_for_job(
+                store,
+                project_id,
+                normalized,
+                str(claim.get("job_id") or ""),
+            )
+            if recovered is None:
+                raise HTTPException(status_code=404, detail="text preview recovery is incomplete")
+            reject_unsafe_payload(recovered)
+            return recovered
+        recovered = _recover_embedded_creative_action(store, project_id, normalized)
+        if recovered is None:
+            raise HTTPException(status_code=404, detail="text preview is still processing")
+        reject_unsafe_payload(recovered)
+        return recovered
+
+    @app.post("/projects/{project_id}/embedded-creative-actions/by-client/{client_request_id}/apply-shot-plan")
+    def apply_embedded_shot_plan(
+        project_id: str,
+        client_request_id: str,
+        body: EmbeddedCreativeActionApplyRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        require_access(request, project_id)
+        normalized = _safe_client_request_id(client_request_id)
+        if normalized != client_request_id:
+            raise HTTPException(status_code=422, detail="invalid client request id")
+        claim = _read_embedded_creative_request(store, project_id, normalized)
+        if not claim or str(claim.get("status") or "") != "completed":
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_preview_not_ready",
+                    "分镜预览尚未完成，当前项目未改变。",
+                    "请恢复同一分镜预览后再应用。",
+                ),
+            )
+        if str(claim.get("request_digest") or "") != body.expected_request_digest:
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_preview_changed",
+                    "当前分镜预览与待应用版本不一致。",
+                    "请刷新并审看最新分镜预览。",
+                ),
+            )
+        recovered = _recover_embedded_creative_action_for_job(
+            store,
+            project_id,
+            normalized,
+            str(claim.get("job_id") or ""),
+        )
+        preview = dict(recovered.get("preview") or {}) if recovered else {}
+        if (
+            not recovered
+            or recovered.get("mode") != "llm"
+            or recovered.get("action_type") != "shot_breakdown"
+            or not isinstance(preview.get("shot_plan"), dict)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_shot_plan_invalid",
+                    "分镜预览未通过应用检查，当前项目未改变。",
+                    "请重新生成并审看文本分镜预览。",
+                ),
+            )
+        graph = graph_store.ensure(project_id)
+        idempotency_key = f"apply-embedded-shot-plan-{normalized}"
+        if graph.get("nodes") and idempotency_key not in graph.get("idempotency", {}):
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "production_graph_already_planned",
+                    "当前项目已有制作方案，不能用旧分镜预览覆盖。",
+                    "请从当前制作版本重新预览影响。",
+                ),
+            )
+        semantic_digest = canonical_digest(
+            {
+                "request_digest": body.expected_request_digest,
+                "source_digest": str(recovered.get("safe_manifest", {}).get("source_digest") or ""),
+                "shot_plan": preview["shot_plan"],
+            },
+        )
+        try:
+            updated = graph_store.append(
+                project_id,
+                expected_version=body.expected_graph_version,
+                idempotency_key=idempotency_key,
+                semantic_digest=semantic_digest,
+                events=_compile_embedded_shot_plan_events(
+                    normalized,
+                    body.expected_request_digest,
+                    str(recovered.get("safe_manifest", {}).get("source_digest") or ""),
+                    preview["shot_plan"],
+                ),
+            )
+        except (GraphIdempotencyConflict, GraphVersionConflict, ProductionGraphError, TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_shot_plan_apply_conflict",
+                    "当前制作版本已变化，分镜未应用。",
+                    "请刷新并按当前版本重新预览。",
+                ),
+            ) from exc
+        workspace = _sequence_workspace_projection(updated, project_id=project_id, store=store)
+        response = {
+            "project_id": project_id,
+            "status": "applied",
+            "graph_version": int(updated.get("version") or 0),
+            "graph_digest": str(updated.get("graph_digest") or ""),
+            "idempotent_replay": updated.get("idempotent_replay") is True,
+            "workspace": workspace,
+            "provider_dispatch_count": 0,
+            "image_dispatch_count": 0,
+            "video_dispatch_count": 0,
+            "cost_usd": 0,
         }
         reject_unsafe_payload(response)
         return response
@@ -1073,6 +1297,382 @@ def _write_embedded_action_artifacts(
             role="embedded_creative_action_preview",
         ),
     }
+
+
+def _safe_client_request_id(value: str) -> str:
+    normalized = safe_id(str(value or "").strip())
+    return normalized[:120] if normalized.startswith("cli_") else ""
+
+
+def _embedded_request_digest(request: EmbeddedCreativeActionRequest) -> str:
+    payload = request.model_dump(mode="json")
+    payload.pop("generated_at", None)
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _text_digest(value: str) -> str:
+    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
+
+
+def _embedded_request_record_path(store: RuntimeStore, project_id: str, client_request_id: str) -> Path:
+    return (
+        store.projects_dir
+        / safe_id(project_id)
+        / "embedded_creative_action_requests"
+        / f"{safe_id(client_request_id)}.json"
+    )
+
+
+def _claim_embedded_creative_request(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+    *,
+    request_digest: str,
+    job_id: str,
+) -> dict[str, Any]:
+    path = _embedded_request_record_path(store, project_id, client_request_id)
+    with exclusive_file_lock(path.with_suffix(".transaction.lock")):
+        if path.is_file():
+            record = read_json(path)
+            if (
+                str(record.get("project_id") or "") != project_id
+                or str(record.get("client_request_id") or "") != client_request_id
+            ):
+                return {"state": "conflict", "record": record}
+            if str(record.get("request_digest") or "") != request_digest:
+                return {"state": "conflict", "record": record}
+            if str(record.get("status") or "") == "completed":
+                return {"state": "replay", "record": record}
+            return {"state": "running", "record": record}
+        now = datetime.now(timezone.utc).isoformat()
+        record = {
+            "schema_version": "afs.embedded_creative_action_request.v0.1",
+            "project_id": project_id,
+            "client_request_id": client_request_id,
+            "request_digest": request_digest,
+            "status": "running",
+            "job_id": job_id,
+            "provider_calls_started": False,
+            "created_at": now,
+            "updated_at": now,
+            "contains_request_payload": False,
+            "contains_provider_output": False,
+            "contains_secret": False,
+        }
+        write_json(path, record)
+        return {"state": "claimed", "record": record}
+
+
+def _complete_embedded_creative_request(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+    *,
+    request_digest: str,
+    job_id: str,
+    provider_calls_started: bool,
+) -> None:
+    path = _embedded_request_record_path(store, project_id, client_request_id)
+    with exclusive_file_lock(path.with_suffix(".transaction.lock")):
+        if not path.is_file():
+            raise RuntimeError("embedded creative request claim is missing")
+        record = read_json(path)
+        if (
+            str(record.get("project_id") or "") != project_id
+            or str(record.get("client_request_id") or "") != client_request_id
+            or str(record.get("request_digest") or "") != request_digest
+            or str(record.get("job_id") or "") != job_id
+            or str(record.get("status") or "") != "running"
+        ):
+            raise RuntimeError("embedded creative request claim changed before completion")
+        write_json(
+            path,
+            {
+                **record,
+                "status": "completed",
+                "provider_calls_started": bool(provider_calls_started),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+
+def _read_embedded_creative_request(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+) -> dict[str, Any] | None:
+    path = _embedded_request_record_path(store, project_id, client_request_id)
+    if not path.is_file():
+        return None
+    record = read_json(path)
+    if (
+        str(record.get("project_id") or "") != project_id
+        or str(record.get("client_request_id") or "") != client_request_id
+    ):
+        return None
+    return record
+
+
+def _embedded_idempotency_detail(
+    project_id: str,
+    client_request_id: str,
+    *,
+    code: str,
+    message: str,
+    user_action: str,
+    retryable: bool = False,
+) -> dict[str, Any]:
+    detail = safe_error_detail(
+        code,
+        detail_code=code,
+        message=message,
+        user_action=user_action,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        action="embedded_creative_action_preview",
+        stage="idempotency",
+        status="blocked",
+        retryable=retryable,
+        details={"provider_calls_started": False},
+    )
+    detail["provider_calls_started"] = False
+    return detail
+
+
+def _embedded_apply_error(
+    project_id: str,
+    code: str,
+    message: str,
+    user_action: str,
+) -> dict[str, Any]:
+    return safe_error_detail(
+        code,
+        detail_code=code,
+        message=message,
+        user_action=user_action,
+        project_id=project_id,
+        action="apply_embedded_shot_plan",
+        stage="confirm",
+        status="blocked",
+        retryable=True,
+        details={
+            "provider_calls_started": False,
+            "image_dispatch_count": 0,
+            "video_dispatch_count": 0,
+        },
+    )
+
+
+def _compile_embedded_shot_plan_events(
+    client_request_id: str,
+    request_digest: str,
+    source_digest: str,
+    shot_plan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    prefix = request_digest[:16]
+    revision_id = f"revision-embedded-{prefix}"
+    sequence_id = f"sequence-embedded-{prefix}"
+    events: list[dict[str, Any]] = [
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": revision_id,
+                "category": "revision",
+                "metadata": {
+                    "title": "已确认剧本",
+                    "source_digest": source_digest,
+                    "source_kind": "embedded_text_preview",
+                    "client_request_ref": client_request_id,
+                },
+            },
+        },
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": sequence_id,
+                "category": "collection",
+                "metadata": {
+                    "name": "制作序列",
+                    "target_duration_seconds": float(shot_plan.get("estimated_duration_sec") or 0),
+                },
+            },
+        },
+        {
+            "type": "relation_upserted",
+            "from_id": revision_id,
+            "to_id": sequence_id,
+            "relation_type": "derived_from",
+        },
+    ]
+    total_shots = 0
+    for scene_index, scene in enumerate(shot_plan.get("scenes") or [], start=1):
+        if not isinstance(scene, dict):
+            continue
+        scene_id = f"scene-embedded-{prefix}-{scene_index:02d}"
+        events.extend(
+            [
+                {
+                    "type": "node_upserted",
+                    "node": {
+                        "node_id": scene_id,
+                        "category": "location",
+                        "metadata": {
+                            "name": _safe_text(scene.get("title"), 120),
+                            "purpose": _safe_text(scene.get("purpose"), 180),
+                            "order": scene_index,
+                            "source_digest": source_digest,
+                        },
+                    },
+                },
+                {
+                    "type": "relation_upserted",
+                    "from_id": sequence_id,
+                    "to_id": scene_id,
+                    "relation_type": "contains",
+                },
+            ],
+        )
+        for shot_index, shot in enumerate(scene.get("shots") or [], start=1):
+            if not isinstance(shot, dict):
+                continue
+            total_shots += 1
+            shot_id = f"shot-embedded-{prefix}-{scene_index:02d}-{shot_index:02d}"
+            metadata = {
+                "title": _safe_text(shot.get("title"), 120),
+                "intent": _safe_text(shot.get("narrative_purpose"), 180),
+                "duration_seconds": float(shot.get("duration_sec") or 0),
+                "order": total_shots,
+                "scene_order": scene_index,
+                "shot_order": shot_index,
+                "shot_size": _safe_text(shot.get("shot_size"), 80),
+                "camera_angle": _safe_text(shot.get("camera_angle"), 80),
+                "movement": _safe_text(shot.get("movement"), 120),
+                "blocking": _safe_text(shot.get("blocking"), 180),
+                "sound": _safe_text(shot.get("sound"), 120),
+                "transition": _safe_text(shot.get("transition"), 80),
+                "source_digest": source_digest,
+            }
+            events.extend(
+                [
+                    {
+                        "type": "node_upserted",
+                        "node": {
+                            "node_id": shot_id,
+                            "category": "unit",
+                            "metadata": metadata,
+                        },
+                    },
+                    {
+                        "type": "relation_upserted",
+                        "from_id": scene_id,
+                        "to_id": shot_id,
+                        "relation_type": "contains",
+                    },
+                    {
+                        "type": "work_created",
+                        "work_id": f"work-{shot_id}",
+                        "semantic_digest": canonical_digest(metadata),
+                        "depends_on": [shot_id, scene_id],
+                    },
+                ],
+            )
+    if total_shots < 1:
+        raise ValueError("shot plan has no shots")
+    return events
+
+
+def _recover_embedded_creative_action_for_job(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+    job_id: str,
+) -> dict[str, Any] | None:
+    if not job_id:
+        return None
+    run_dir = store.run_dir(project_id, job_id)
+    recovered = _recover_embedded_creative_action_from_run(
+        store,
+        project_id,
+        client_request_id,
+        run_dir,
+    )
+    if recovered is None:
+        return None
+    try:
+        job = store.load_job(job_id)
+    except KeyError:
+        return None
+    if str(job.get("project_id") or "") != project_id or str(job.get("job_id") or "") != job_id:
+        return None
+    recovered["job"] = public_job(job)
+    recovered["artifacts"] = dict(job.get("artifacts") or {})
+    return recovered
+
+
+def _recover_embedded_creative_action(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+) -> dict[str, Any] | None:
+    project_runs = store.runs_dir / safe_id(project_id)
+    if not project_runs.is_dir():
+        return None
+    run_dirs = sorted(
+        (path for path in project_runs.iterdir() if path.is_dir()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for run_dir in run_dirs:
+        recovered = _recover_embedded_creative_action_from_run(
+            store,
+            project_id,
+            client_request_id,
+            run_dir,
+        )
+        if recovered is not None:
+            return recovered
+    return None
+
+
+def _recover_embedded_creative_action_from_run(
+    store: RuntimeStore,
+    project_id: str,
+    client_request_id: str,
+    run_dir: Path,
+) -> dict[str, Any] | None:
+    manifest_path = run_dir / "embedded_creative_action_safe_manifest.json"
+    preview_path = run_dir / "embedded_creative_action_preview.json"
+    if not manifest_path.is_file() or not preview_path.is_file():
+        return None
+    manifest = read_json(manifest_path)
+    if str(manifest.get("project_id") or "") != project_id:
+        return None
+    if str(manifest.get("client_request_id") or "") != client_request_id:
+        return None
+    preview_payload = read_json(preview_path)
+    if str(preview_payload.get("project_id") or "") != project_id:
+        return None
+    response = {
+        "project_id": project_id,
+        "mode": str(preview_payload.get("mode") or manifest.get("mode") or ""),
+        "action_type": str(preview_payload.get("action_type") or ""),
+        "target": dict(preview_payload.get("target") or manifest.get("target") or {}),
+        "creative_task": dict(preview_payload.get("creative_task") or {}),
+        "preview": dict(preview_payload.get("preview") or {}),
+        "provider_gate": dict(manifest.get("provider_gate") or {}),
+        "provider_calls_started": manifest.get("provider_calls_started") is True,
+        "provider_lineage": dict(preview_payload.get("provider_lineage") or manifest.get("provider_lineage") or {}),
+        "safe_manifest": manifest,
+        "graph_mutation": dict(preview_payload.get("graph_mutation") or {}),
+        "latency_ms": float(preview_payload.get("latency_ms") or 0),
+        "cost_usd": 0,
+        "recovered": True,
+        "non_claims": EMBEDDED_CREATIVE_NON_CLAIMS,
+    }
+    reject_unsafe_payload(response)
+    return response
 
 
 def _graph_mutation_summary(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:

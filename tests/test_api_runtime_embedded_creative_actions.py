@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 from fastapi.testclient import TestClient
 
+from agentflow.harness.json_io import write_json
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -133,6 +137,7 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     response = client.post(
         f"/projects/{project_id}/embedded-creative-actions/preview",
         json=_creative_action_request(),
+        headers={"X-Client-Request-ID": "cli_embedded_recovery_contract"},
     )
 
     assert response.status_code == 200, response.text
@@ -163,6 +168,38 @@ def test_embedded_script_revision_uses_server_codex_schema_and_preserves_graph(t
     assert "孙悟空大战猪八戒" in request.prompt
     assert "固定4x15/10x6" in request.prompt
     assert "screenplay_candidate" in request.prompt
+    recovered = client.get(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_embedded_recovery_contract",
+    )
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["recovered"] is True
+    assert recovered.json()["preview"] == payload["preview"]
+    assert recovered.json()["graph_mutation"] == payload["graph_mutation"]
+    assert recovered.json()["safe_manifest"]["image_video_generation_enabled"] is False
+    assert len(calls) == 1
+    replay = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(generated_at="2026-07-22T12:01:00Z"),
+        headers={"X-Client-Request-ID": "cli_embedded_recovery_contract"},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["idempotent_replay"] is True
+    assert replay.json()["job"]["job_id"] == payload["job"]["job_id"]
+    assert replay.json()["preview"] == payload["preview"]
+    assert len(calls) == 1
+    conflict = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=_creative_action_request(source_text="完全不同的任意剧本文本。"),
+        headers={"X-Client-Request-ID": "cli_embedded_recovery_contract"},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["error"] == "embedded_preview_idempotency_conflict"
+    assert len(calls) == 1
+    cross_project = client.get(
+        "/projects/another-project/embedded-creative-actions/by-client/cli_embedded_recovery_contract",
+    )
+    assert cross_project.status_code == 404
+    assert len(calls) == 1
 
 
 def test_embedded_script_revision_rejects_prose_without_screenplay_candidate(tmp_path, monkeypatch) -> None:
@@ -427,8 +464,11 @@ def test_embedded_script_revision_repairs_invalid_structured_output_with_provide
 
 
 def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(tmp_path, monkeypatch) -> None:
+    calls = []
+
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id, request))
             return {
                 "provider_calls_started": True,
                 "structured_output": {
@@ -493,6 +533,7 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
             node_type="script",
             source_text="悟空和八戒因为供果争执，最后发现妖怪踪迹。",
         ),
+        headers={"X-Client-Request-ID": "cli_dynamic_storyboard_once"},
     )
 
     assert response.status_code == 200, response.text
@@ -504,3 +545,90 @@ def test_embedded_shot_breakdown_returns_dynamic_preview_without_creating_shots(
     after = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert after["version"] == before["version"]
     assert after["graph_digest"] == before["graph_digest"]
+    assert len(calls) == 1
+
+    apply_body = {
+        "expected_graph_version": 0,
+        "expected_request_digest": payload["safe_manifest"]["request_digest"],
+    }
+    applied = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_dynamic_storyboard_once/apply-shot-plan",
+        json=apply_body,
+    )
+    assert applied.status_code == 200, applied.text
+    applied_payload = applied.json()
+    assert applied_payload["graph_version"] == 1
+    assert applied_payload["idempotent_replay"] is False
+    assert applied_payload["provider_dispatch_count"] == 0
+    assert applied_payload["image_dispatch_count"] == 0
+    assert applied_payload["video_dispatch_count"] == 0
+    assert len(applied_payload["workspace"]["sequence"]["scenes"]) == 1
+    assert len(applied_payload["workspace"]["sequence"]["shots"]) == 2
+    assert len(calls) == 1
+
+    replay = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/by-client/cli_dynamic_storyboard_once/apply-shot-plan",
+        json=apply_body,
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["graph_version"] == 1
+    assert replay.json()["idempotent_replay"] is True
+    assert len(calls) == 1
+
+
+def test_embedded_preview_running_claim_never_redispatches(tmp_path, monkeypatch) -> None:
+    calls = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            calls.append((capability, service_id, request))
+            raise AssertionError("a running claim must not dispatch")
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_embedded_creative_actions.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "embedded-action-running"
+    client_request_id = "cli_embedded_running_claim"
+    _create_project(client, project_id)
+    request_payload = _creative_action_request()
+    stable_payload = dict(request_payload)
+    stable_payload.pop("generated_at")
+    request_digest = hashlib.sha256(
+        json.dumps(stable_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+    ).hexdigest()
+    record_path = (
+        tmp_path
+        / "projects"
+        / project_id
+        / "embedded_creative_action_requests"
+        / f"{client_request_id}.json"
+    )
+    write_json(
+        record_path,
+        {
+            "schema_version": "afs.embedded_creative_action_request.v0.1",
+            "project_id": project_id,
+            "client_request_id": client_request_id,
+            "request_digest": request_digest,
+            "status": "running",
+            "job_id": "job-in-progress",
+            "provider_calls_started": False,
+            "created_at": "2026-07-27T00:00:00+00:00",
+            "updated_at": "2026-07-27T00:00:00+00:00",
+            "contains_request_payload": False,
+            "contains_provider_output": False,
+            "contains_secret": False,
+        },
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/embedded-creative-actions/preview",
+        json=request_payload,
+        headers={"X-Client-Request-ID": client_request_id},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "embedded_preview_in_progress"
+    assert calls == []
+    stored = json.loads(record_path.read_text(encoding="utf-8"))
+    assert stored["status"] == "running"
+    assert "source_text" not in stored

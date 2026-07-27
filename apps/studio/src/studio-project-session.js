@@ -4,8 +4,9 @@ const SESSION_PROJECT_KEY = "afs_studio_session_project_id";
 
 export function initialProjectId() {
   const params = new URLSearchParams(window.location.search || "");
-  const fromQuery = safeProjectId(params.get("project"));
-  if (fromQuery) return fromQuery;
+  if (params.has("project")) {
+    return strictProjectId(params.get("project")) || "studio-invalid-project";
+  }
   const stored = safeProjectId(localStorage.getItem(ACTIVE_PROJECT_KEY));
   return stored || "studio-empty";
 }
@@ -19,6 +20,11 @@ export function persistActiveProject(projectId) {
 export function safeProjectId(value) {
   const text = String(value || "").trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
   return text || "";
+}
+
+export function strictProjectId(value) {
+  const text = String(value || "").trim();
+  return /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,119}$/.test(text) ? text : "";
 }
 
 export function rememberProject(projectId) {

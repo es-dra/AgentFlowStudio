@@ -174,8 +174,8 @@ export function creativeActionFailureInfo(action = {}) {
   const detail = safePublicText(action.error_detail || task.error_detail || action.error || action.message || "", 420);
   const preserved = safePublicText(action.preserved_state, 360)
     || (action.action_type === "shot_breakdown"
-      ? "当前节点和已应用剧本已保留；ProductionGraph 未改变。"
-      : "当前节点内容已保留；ProductionGraph 未改变。");
+      ? "当前节点和已应用剧本已保留；制作内容没有改变。"
+      : "原文已保留并可继续编辑；制作内容没有改变。");
   const nextAction = safePublicText(action.next_action, 360) || failureNextAction(category, action.action_type);
   return {
     category,
@@ -198,7 +198,6 @@ export function failureCategoryLabel(category) {
     shot_plan_missing: "分镜结构缺失",
     shot_plan_empty: "分镜为空",
     timeout: "任务超时",
-    media_error_isolated: "媒体能力错误已隔离",
     client_runtime_state: "本地任务状态异常",
     task_failed: "任务失败",
   }[safeToken(category, 120)] || "任务失败";
@@ -232,7 +231,7 @@ function failureNextAction(category, actionType) {
       ? "保留已扩写剧本，重新预览分镜；若再次失败，先检查剧本是否有清晰场次。"
       : "保留原节点，重新预览剧本化修订。";
   }
-  if (category === "timeout") return "稍后重新预览；不要重复点击以免创建并发任务。";
+  if (category === "timeout") return "可以重新运行文本优化；这次只处理文字内容。";
   return "使用 AI 创作搭档中的重新预览继续；确认前不会改动画布。";
 }
 

@@ -116,7 +116,8 @@ def test_m6_7_1_visual_correction_contract() -> None:
     assert "notice = \"当前节点任务已开始" not in shell
 
     assert "taskStatePhaseSummary" in panel
-    assert "ordered.includes(phase)" in panel
+    assert 'line.appendChild(el("li", "current", taskPhaseLabel(current)))' in panel
+    assert "ordered.includes(phase)" not in panel
 
     assert "embeddedTaskPerimeterSweep" in node_css
     assert "embeddedTaskPerimeterRotate" not in node_css
@@ -146,7 +147,7 @@ def test_m6_7_3_embedded_creative_failure_recovery_contract() -> None:
 
     unavailable_panel = body.split('if (action.status === "unavailable")', 1)[1].split('if (action.status === "preview")', 1)[0]
     assert "creativeActionFailureInfo(action)" in unavailable_panel
-    assert "请在 AI 创作搭档中重新预览。" in unavailable_panel
+    assert "详细原因和文本重试在右侧。" in unavailable_panel
     assert "retry: true" not in unavailable_panel
 
     assert "selected_screenplay_summary" in lifecycle
@@ -185,9 +186,50 @@ def test_m6_7_3_creative_task_failure_info_is_safe_and_actionable() -> None:
       assert.equal(failed.error_owner, "provider_output_validation");
       assert.match(failed.error_detail, /<local-path-redacted>/);
       assert.equal(info.label, "AI 输出结构未通过校验");
-      assert.match(info.preserved_state, /ProductionGraph 未改变/);
+      assert.match(info.preserved_state, /制作内容没有改变/);
       assert.match(info.next_action, /重新预览分镜/);
     """
+    subprocess.run(["node", "--input-type=module", "-e", script], cwd=ROOT, check=True)
+
+
+def test_text_only_runtime_timeout_is_creator_safe_and_never_claims_media() -> None:
+    script = r'''
+      import assert from "node:assert/strict";
+      import { createRuntimeClient } from "./apps/studio/src/runtime-client.js";
+      import { beginProjectIdentityLoad, commitProjectIdentity } from "./apps/studio/src/project-identity-gate.js";
+
+      globalThis.window = {
+        location: { protocol: "https:", href: "https://afstudio.art/studio/?project=unicode-project", search: "?project=unicode-project" },
+        localStorage: { getItem: () => "", setItem: () => {}, removeItem: () => {} },
+        dispatchEvent: () => {},
+      };
+      globalThis.fetch = async () => new Response("<html><body>Gateway Time-out</body></html>", {
+        status: 504,
+        statusText: "Gateway Time-out",
+        headers: { "Content-Type": "text/html" },
+      });
+      beginProjectIdentityLoad("unicode-project");
+      commitProjectIdentity({ projectId: "unicode-project" });
+
+      const runtime = createRuntimeClient("unicode-project");
+      let failure = null;
+      try {
+        await runtime.previewEmbeddedCreativeAction({
+          action_type: "script_revision",
+          node_id: "story",
+          node_type: "text",
+          source_text: "雨落在钟楼。",
+          mode: "professional_expansion",
+          generated_at: "2026-07-27T00:00:00Z",
+        }, { clientRequestId: "cli_timeout_contract" });
+      } catch (error) {
+        failure = error;
+      }
+      assert.equal(failure.status, 504);
+      assert.equal(failure.generationKind, "text");
+      assert.match(failure.message, /文本处理等待超时/);
+      assert.doesNotMatch(failure.message, /image|video|Runtime assets|ProductionGraph/i);
+    '''
     subprocess.run(["node", "--input-type=module", "-e", script], cwd=ROOT, check=True)
 
 

@@ -436,7 +436,7 @@ function currentTaskReview({ store, runtime, onRender }) {
   );
   wrap.appendChild(header);
   wrap.appendChild(taskPhaseList(task, action));
-  if (action.status === "running") {
+  if (["running", "recovering"].includes(action.status)) {
     wrap.appendChild(el("p", "agent-current-task-copy", action.message || "正在生成可审看预览；确认前画布不会改变。"));
   } else if (action.status === "preview") {
     wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action.preview?.shot_plan) : screenplayReview(action, store, node));
@@ -456,8 +456,7 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
   const row = el("div", "agent-current-task-actions");
   if (action.status === "preview") {
     row.appendChild(taskButton("应用", "studio-primary-button", () => {
-      applyEmbeddedCreativeAction(store, node.id);
-      onRender?.();
+      void applyEmbeddedCreativeAction(store, node.id, runtime).finally(() => onRender?.());
     }));
     row.appendChild(taskButton("取消", "studio-secondary-button", () => {
       cancelEmbeddedCreativeAction(store, node.id);
@@ -471,7 +470,7 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
       onRender?.();
     }));
   }
-  if (["running"].includes(action.status)) {
+  if (["running", "recovering"].includes(action.status)) {
     row.appendChild(taskButton("取消任务", "studio-secondary-button", () => {
       cancelEmbeddedCreativeAction(store, node.id);
       onRender?.();
@@ -489,19 +488,26 @@ function currentTaskActions({ store, runtime, node, action, onRender }) {
 function failureReview(action) {
   const failure = creativeActionFailureInfo(action);
   const wrap = el("section", "agent-current-task-failure");
-  wrap.appendChild(el("p", "agent-current-task-error", `${failure.label}：${failure.detail || action.message || "这一步需要处理。"}`));
-  wrap.appendChild(simpleList("恢复状态", [
-    failure.preserved_state,
-    failure.next_action,
-  ]));
+  wrap.appendChild(el("p", "agent-current-task-error", `${failure.label}。${failure.preserved_state}`));
+  wrap.appendChild(el("p", "agent-current-task-copy", failure.next_action));
+  if (failure.detail && failure.detail !== action.message) {
+    const details = el("details", "agent-current-task-diagnostics");
+    details.appendChild(el("summary", "", "技术详情"));
+    details.appendChild(el("p", "", failure.detail));
+    wrap.appendChild(details);
+  }
   return wrap;
 }
 
 function screenplayReview(action, store, node) {
   const preview = action.preview || {};
   const wrap = el("div", "agent-screenplay-review");
-  const summary = screenplayCandidateSummary(preview.screenplay_candidate);
-  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.title} · ${summary.scene_count} 场 · ${summary.character_count} 名角色 · ${summary.dialogue_blocks} 段对白。`));
+  if (preview.screenplay_candidate) {
+    const summary = screenplayCandidateSummary(preview.screenplay_candidate);
+    wrap.appendChild(el("p", "agent-current-task-copy", `${summary.title} · ${summary.scene_count} 场 · ${summary.character_count} 名角色 · ${summary.dialogue_blocks} 段对白。`));
+  } else {
+    wrap.appendChild(el("p", "agent-current-task-copy", "故事扩写预览，可编辑后应用或取消。"));
+  }
   const diff = el("div", "agent-current-diff");
   const before = el("section", "");
   before.append(el("strong", "", "原文"), el("p", "", excerpt(action.source_text, 360)));
@@ -588,21 +594,18 @@ function appliedSubgraphSummary(subgraph) {
 }
 
 function taskPhaseList(task, action) {
-  const phases = Array.isArray(task?.completed_phases) ? task.completed_phases : [];
   const current = task?.phase || action?.status || "";
   const line = el("ol", "agent-task-phases");
-  const ordered = [];
-  for (const phase of [...phases, current].filter(Boolean)) {
-    if (!ordered.includes(phase)) ordered.push(phase);
+  if (current === "failed" || action?.status === "unavailable") {
+    line.appendChild(el("li", "current", "文本处理未完成"));
+    return line;
   }
-  for (const phase of ordered.slice(-5)) {
-    const item = el("li", phase === current ? "current" : "", taskPhaseLabel(phase));
-    line.appendChild(item);
-  }
+  line.appendChild(el("li", "current", taskPhaseLabel(current)));
   return line;
 }
 
 function taskStatePhaseSummary(task, action) {
+  if (task?.phase === "failed" || action?.status === "unavailable") return "文本处理未完成";
   const stateLabel = taskStateLabel(task);
   const phaseLabel = taskPhaseLabel(task?.phase || action?.status || "queued");
   return stateLabel === phaseLabel ? stateLabel : `${stateLabel} · ${phaseLabel}`;

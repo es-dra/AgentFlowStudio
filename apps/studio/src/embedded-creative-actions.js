@@ -11,6 +11,7 @@ import {
 import { visibleCanvasFrame } from "./canvas-safe-area.js";
 import { clampScale, nodesBounds } from "./geometry.js";
 import { defaultParams } from "./nodes.js";
+import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 
 const ACTION_MODES = {
   script_revision: "professional_expansion",
@@ -27,6 +28,9 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
   if (!canUseEmbeddedCreativeAction(node, actionType)) return null;
   const sourceText = sourceTextForNode(node);
   const actionId = `embedded_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const clientRequestId = options.clientRequestId
+    || runtime?.newEmbeddedCreativeClientRequestId?.()
+    || `cli_embedded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const mode = options.mode || ACTION_MODES[actionType] || "professional_expansion";
   const localTask = createLocalCreativeTask(node, actionId, actionType, mode, sourceText);
   store.set((state) => {
@@ -42,6 +46,7 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
         ? "AI 正在为当前节点生成可审查预览；确认前不会改动画布。"
         : "请先在当前节点输入想法、剧本或制作说明。",
       requested_at: new Date().toISOString(),
+      client_request_id: clientRequestId,
       source_node_version: nodeVersion(target, sourceText),
       creative_task: localTask,
       preview: null,
@@ -78,43 +83,113 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       constraints: embeddedConstraints(actionType),
       provider_service_id: "server_codex",
       generated_at: new Date().toISOString(),
-    });
-    store.set((state) => {
-      const target = state.nodes[node.id];
-      const current = target?.params?.embeddedCreativeAction;
-      if (!target || current?.action_id !== actionId || current?.status === "cancelled") return;
-      const unavailable = response?.mode !== "llm" || response?.provider_calls_started !== true;
-      const failure = unavailable ? failureFromPreviewResponse(response, actionType) : null;
-      target.params.embeddedCreativeAction = {
-        ...target.params.embeddedCreativeAction,
-        status: unavailable ? "unavailable" : "preview",
-        message: unavailable ? failure.message : resultReadyMessage(actionType, response?.preview),
-        error: unavailable ? failure.message : "",
-        error_category: unavailable ? failure.category : "",
-        error_owner: unavailable ? failure.error_owner : "",
-        error_detail: unavailable ? failure.detail : "",
-        preserved_state: unavailable ? failure.preserved_state : "",
-        next_action: unavailable ? failure.next_action : "",
-        creative_task: unavailable
-          ? failCreativeTask(normalizeCreativeTask(response?.creative_task, localTask), failure.category, {
-            error_owner: failure.error_owner,
-            error_detail: failure.detail,
-          })
-          : normalizeCreativeTask(response?.creative_task, completeCreativeTask(localTask)),
-        preview: response?.preview || null,
-        provider_lineage: safeProviderLineage(response?.provider_lineage || { provider_calls_started: response?.provider_calls_started === true }),
-        graph_mutation: response?.graph_mutation || { mutated: false, scope: "preview_only", reason: unavailable ? "preview_unavailable" : "preview_ready" },
-        latency_ms: response?.latency_ms || 0,
-        cost_usd: Number(response?.cost_usd || 0),
-        completed_at: new Date().toISOString(),
-      };
-    }, { history: false });
+    }, { clientRequestId });
+    applyEmbeddedCreativeResponse(store, node.id, actionId, actionType, response, localTask);
     await store.flushRuntimeSave?.();
     return response;
   } catch (error) {
+    const recoverableConflict = Number(error?.status || 0) === 409
+      && error?.errorCode === "embedded_preview_in_progress";
+    if (
+      ([0, 504].includes(Number(error?.status || 0)) || recoverableConflict)
+      && runtime?.recoverEmbeddedCreativeActionByClient
+    ) {
+      markEmbeddedCreativeRecovering(store, node.id, actionId, localTask);
+      const recovered = await recoverEmbeddedCreativeResponse(runtime, clientRequestId);
+      if (recovered) {
+        applyEmbeddedCreativeResponse(store, node.id, actionId, actionType, recovered, localTask);
+        await store.flushRuntimeSave?.();
+        return recovered;
+      }
+    }
     markEmbeddedCreativeUnavailable(store, node.id, actionId, safeEmbeddedActionError(error, actionType), localTask);
     return null;
   }
+}
+
+export async function recoverPendingEmbeddedCreativeActions(store, runtime) {
+  const pending = Object.values(store?.get?.()?.nodes || {})
+    .map((node) => ({ node, action: node?.params?.embeddedCreativeAction }))
+    .filter(({ action }) => ["running", "recovering"].includes(action?.status) && action?.client_request_id);
+  await Promise.all(pending.map(async ({ node, action }) => {
+    const recovered = await recoverEmbeddedCreativeResponse(runtime, action.client_request_id);
+    if (!recovered) return;
+    applyEmbeddedCreativeResponse(
+      store,
+      node.id,
+      action.action_id,
+      action.action_type || "script_revision",
+      recovered,
+      action.creative_task || {},
+    );
+    await store.flushRuntimeSave?.();
+  }));
+}
+
+function applyEmbeddedCreativeResponse(store, nodeId, actionId, actionType, response, localTask) {
+  store.set((state) => {
+    const target = state.nodes[nodeId];
+    const current = target?.params?.embeddedCreativeAction;
+    if (!target || current?.action_id !== actionId || current?.status === "cancelled") return;
+    const unavailable = response?.mode !== "llm" || response?.provider_calls_started !== true;
+    const failure = unavailable ? failureFromPreviewResponse(response, actionType) : null;
+    target.params.embeddedCreativeAction = {
+      ...current,
+      status: unavailable ? "unavailable" : "preview",
+      message: unavailable ? failure.message : resultReadyMessage(actionType, response?.preview),
+      error: unavailable ? failure.message : "",
+      error_category: unavailable ? failure.category : "",
+      error_owner: unavailable ? failure.error_owner : "",
+      error_detail: unavailable ? failure.detail : "",
+      preserved_state: unavailable ? failure.preserved_state : "",
+      next_action: unavailable ? failure.next_action : "",
+      creative_task: unavailable
+        ? failCreativeTask(normalizeCreativeTask(response?.creative_task, localTask), failure.category, {
+          error_owner: failure.error_owner,
+          error_detail: failure.detail,
+        })
+        : normalizeCreativeTask(response?.creative_task, completeCreativeTask(localTask)),
+      preview: response?.preview || null,
+      provider_lineage: safeProviderLineage(response?.provider_lineage || { provider_calls_started: response?.provider_calls_started === true }),
+      safe_manifest: safeEmbeddedManifest(response?.safe_manifest),
+      graph_mutation: response?.graph_mutation || { mutated: false, scope: "preview_only", reason: unavailable ? "preview_unavailable" : "preview_ready" },
+      latency_ms: response?.latency_ms || 0,
+      cost_usd: Number(response?.cost_usd || 0),
+      completed_at: new Date().toISOString(),
+    };
+  }, { history: false });
+}
+
+function markEmbeddedCreativeRecovering(store, nodeId, actionId, localTask) {
+  store.set((state) => {
+    const target = state.nodes[nodeId];
+    const current = target?.params?.embeddedCreativeAction;
+    if (!target || current?.action_id !== actionId || current?.status === "cancelled") return;
+    target.params.embeddedCreativeAction = {
+      ...current,
+      status: "recovering",
+      message: "连接已中断，正在恢复同一文本预览；不会再次提交。",
+      creative_task: {
+        ...normalizeCreativeTask(current.creative_task, localTask),
+        state: "running",
+        phase: "recovering",
+      },
+    };
+  }, { history: false });
+  void store.flushRuntimeSave?.();
+}
+
+async function recoverEmbeddedCreativeResponse(runtime, clientRequestId, attempts = 65) {
+  if (!runtime?.recoverEmbeddedCreativeActionByClient || !clientRequestId) return null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await runtime.recoverEmbeddedCreativeActionByClient(clientRequestId);
+    } catch (error) {
+      if (Number(error?.status || 0) !== 404) return null;
+      if (attempt + 1 < attempts) await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  return null;
 }
 
 export function cancelEmbeddedCreativeAction(store, nodeId) {
@@ -144,7 +219,136 @@ export function clearEmbeddedCreativeAction(store, nodeId) {
   }, { history: false });
 }
 
-export function applyEmbeddedCreativeAction(store, nodeId) {
+export async function applyEmbeddedCreativeAction(store, nodeId, runtime = null) {
+  const projected = store.get()?.nodes?.[nodeId];
+  const projectedAction = projected?.params?.embeddedCreativeAction;
+  const revisedText = String(projectedAction?.preview?.revised_text || "").trim();
+  const scriptRevisionId = String(projected?.params?.scriptRevision?.revision_id || "").trim();
+  if (
+    runtime?.applyEmbeddedCreativeShotPlan
+    && projectedAction?.status === "preview"
+    && projectedAction?.action_type === "shot_breakdown"
+    && projectedAction?.preview?.shot_plan
+    && projectedAction?.client_request_id
+    && projectedAction?.safe_manifest?.request_digest
+  ) {
+    if (projectedAction.source_node_version && projectedAction.source_node_version !== nodeVersion(projected, projectedAction.source_text)) {
+      markStaleEmbeddedCreativeAction(store, nodeId, projectedAction);
+      return false;
+    }
+    store.set((state) => {
+      const action = state.nodes[nodeId]?.params?.embeddedCreativeAction;
+      if (action?.status !== "preview") return;
+      action.status = "applying";
+      action.message = "正在把已审阅分镜保存到当前制作版本。";
+    }, { history: false });
+    try {
+      const response = await runtime.applyEmbeddedCreativeShotPlan(
+        projectedAction.client_request_id,
+        {
+          expected_graph_version: Number(
+            store.get()?.production?.production_graph_projection?.graph_version || 0,
+          ),
+          expected_request_digest: projectedAction.safe_manifest.request_digest,
+        },
+      );
+      store.set((state) => {
+        const action = state.nodes[nodeId]?.params?.embeddedCreativeAction;
+        if (!action) return;
+        action.status = "applied";
+        action.message = "分镜已保存到当前制作版本。";
+        action.creative_task = completeCreativeTask(action.creative_task, "applied", "applied");
+        action.applied_graph_version = Number(response?.graph_version || 0);
+        action.applied_graph_digest = String(response?.graph_digest || "");
+        action.applied_at = new Date().toISOString();
+      }, { history: false });
+      await store.flushRuntimeSave?.();
+      dispatchBrowserEvent("afs:production-graph-updated", {
+        detail: {
+          graph_version: Number(response?.graph_version || 0),
+          graph_digest: String(response?.graph_digest || ""),
+          workspace: response?.workspace || null,
+        },
+      });
+      dispatchBrowserEvent("afs:embedded-creative-task-finished", {
+        detail: { node_id: nodeId, status: "applied" },
+      });
+      return true;
+    } catch (error) {
+      markEmbeddedCreativeUnavailable(store, nodeId, projectedAction.action_id, {
+        category: "shot_plan_apply_failed",
+        error_owner: "runtime",
+        message: "分镜暂时无法保存；原剧本和预览都已保留。",
+        detail: safeFailureText(error?.message || ""),
+        next_action: "刷新当前项目后再次应用同一预览，不会重新调用文本模型。",
+      }, projectedAction.creative_task);
+      await store.flushRuntimeSave?.();
+      return false;
+    }
+  }
+  if (
+    runtime?.createScriptRevision
+    && scriptRevisionId
+    && projectedAction?.status === "preview"
+    && projectedAction?.action_type === "script_revision"
+    && revisedText
+  ) {
+    if (projectedAction.source_node_version && projectedAction.source_node_version !== nodeVersion(projected, projectedAction.source_text)) {
+      markStaleEmbeddedCreativeAction(store, nodeId, projectedAction);
+      return false;
+    }
+    store.set((state) => {
+      const action = state.nodes[nodeId]?.params?.embeddedCreativeAction;
+      if (action?.status !== "preview") return;
+      action.status = "applying";
+      action.message = "正在保存新的剧本版本；完成前当前内容不会改变。";
+    }, { history: false });
+    try {
+      const response = await runtime.createScriptRevision({
+        source_kind: "script",
+        source_text: revisedText,
+        parent_revision_id: scriptRevisionId,
+        provenance: {
+          source: "embedded_creative_action",
+          action_id: projectedAction.action_id,
+          mode: projectedAction.mode || "",
+        },
+        created_at: new Date().toISOString(),
+      });
+      const projection = response?.projection;
+      const revisionId = String(response?.revision?.revision_id || projection?.current_revision_id || "").trim();
+      if (!projection || !revisionId) throw new Error("新的剧本版本未返回可恢复投影");
+      store.set((state) => {
+        applyScriptCoreTruthProjection(state, projection);
+        const appliedNode = state.nodes?.[`script_truth_revision_${revisionId}`];
+        if (!appliedNode) return;
+        appliedNode.params.embeddedCreativeAction = {
+          ...projectedAction,
+          status: "applied",
+          message: "修订已保存为新的剧本版本；原始想法仍保留在版本记录中。",
+          creative_task: completeCreativeTask(projectedAction.creative_task, "applied", "applied"),
+          applied_revision_id: revisionId,
+          applied_at: new Date().toISOString(),
+        };
+        state.selection = { nodeIds: [appliedNode.id], edgeId: null };
+      });
+      await store.flushRuntimeSave?.();
+      dispatchBrowserEvent("afs:embedded-creative-task-finished", {
+        detail: { node_id: `script_truth_revision_${revisionId}`, status: "applied" },
+      });
+      return true;
+    } catch (error) {
+      markEmbeddedCreativeUnavailable(store, nodeId, projectedAction.action_id, {
+        category: "script_revision_save_failed",
+        error_owner: "runtime",
+        message: "修订暂时无法保存；原文和预览都已保留。",
+        detail: safeFailureText(error?.message || ""),
+        next_action: "检查连接后再次应用当前预览，不会重新调用文本模型。",
+      }, projectedAction.creative_task);
+      await store.flushRuntimeSave?.();
+      return false;
+    }
+  }
   let applied = false;
   store.set((state) => {
     const node = state.nodes[nodeId];
@@ -153,30 +357,7 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
     const revisedText = String(preview.revised_text || "").trim();
     if (!node || action?.status !== "preview" || !revisedText) return;
     if (action.source_node_version && action.source_node_version !== nodeVersion(node, action.source_text)) {
-      const failure = {
-        category: "stale_node_version",
-        error_owner: "client_state",
-        message: "当前节点已变化，请重新预览，避免把旧结果应用到新内容。",
-        detail: "source node revision changed before apply",
-        next_action: "保持当前节点内容，在 AI 创作搭档中重新预览。",
-        preserved_state: "当前节点内容已保留；ProductionGraph 未改变。",
-      };
-      node.params.embeddedCreativeAction = {
-        ...action,
-        status: "unavailable",
-        message: failure.message,
-        error: failure.message,
-        error_category: failure.category,
-        error_owner: failure.error_owner,
-        error_detail: failure.detail,
-        next_action: failure.next_action,
-        preserved_state: failure.preserved_state,
-        graph_mutation: { mutated: false, scope: "apply_guard", reason: "stale_node_version" },
-        creative_task: failCreativeTask(action.creative_task, failure.category, {
-          error_owner: failure.error_owner,
-          error_detail: failure.detail,
-        }),
-      };
+      markStaleEmbeddedCreativeActionInNode(node, action);
       return;
     }
     const revisions = Array.isArray(node.params.revisions) ? node.params.revisions : [];
@@ -254,6 +435,42 @@ export function applyEmbeddedCreativeAction(store, nodeId) {
     if (flush && typeof flush.finally === "function") void flush.finally(finish);
     else finish();
   }
+  return applied;
+}
+
+function markStaleEmbeddedCreativeAction(store, nodeId, action) {
+  store.set((state) => {
+    const node = state.nodes?.[nodeId];
+    if (!node || node.params?.embeddedCreativeAction?.action_id !== action.action_id) return;
+    markStaleEmbeddedCreativeActionInNode(node, action);
+  }, { history: false });
+}
+
+function markStaleEmbeddedCreativeActionInNode(node, action) {
+  const failure = {
+    category: "stale_node_version",
+    error_owner: "client_state",
+    message: "当前节点已变化，请重新预览，避免把旧结果应用到新内容。",
+    detail: "source node revision changed before apply",
+    next_action: "保持当前节点内容，在 AI 创作搭档中重新预览。",
+    preserved_state: "当前节点内容已保留；制作内容没有改变。",
+  };
+  node.params.embeddedCreativeAction = {
+    ...action,
+    status: "unavailable",
+    message: failure.message,
+    error: failure.message,
+    error_category: failure.category,
+    error_owner: failure.error_owner,
+    error_detail: failure.detail,
+    next_action: failure.next_action,
+    preserved_state: failure.preserved_state,
+    graph_mutation: { mutated: false, scope: "apply_guard", reason: "stale_node_version" },
+    creative_task: failCreativeTask(action.creative_task, failure.category, {
+      error_owner: failure.error_owner,
+      error_detail: failure.detail,
+    }),
+  };
 }
 
 export function editEmbeddedCreativePreview(store, nodeId, text) {
@@ -324,8 +541,8 @@ function normalizeFailurePayload(value, actionType) {
     detail,
     preserved_state: safeFailureText(raw.preserved_state)
       || (actionType === "shot_breakdown"
-        ? "当前节点和已应用剧本已保留；ProductionGraph 未改变。"
-        : "当前节点内容已保留；ProductionGraph 未改变。"),
+        ? "当前节点和已应用剧本已保留；制作内容没有改变。"
+        : "原文已保留并可继续编辑；制作内容没有改变。"),
     next_action: safeFailureText(raw.next_action) || defaultNextAction(category, actionType),
     provider_lineage: raw.provider_lineage ? safeProviderLineage(raw.provider_lineage) : null,
     graph_mutation: raw.graph_mutation || null,
@@ -337,8 +554,7 @@ function defaultFailureMessage(category, actionType) {
   if (category === "provider_output_validation" || category === "unsafe_or_invalid_llm_preview") {
     return actionType === "shot_breakdown" ? "AI 返回的分镜结构未通过校验。" : "AI 返回的剧本结构未通过校验。";
   }
-  if (category === "timeout") return "任务超过受控等待时间，未写入画布。";
-  if (category === "media_error_isolated") return "媒体能力错误已隔离；文本任务未写入画布。";
+  if (category === "timeout") return "文本优化等待超时；原文已保留。";
   return actionType === "shot_breakdown" ? "动态分镜任务失败；当前图未改变。" : "节点内修订任务失败；当前图未改变。";
 }
 
@@ -349,6 +565,7 @@ function defaultNextAction(category, actionType) {
       ? "保留已扩写剧本，重新预览分镜；若再次失败，先检查场次边界。"
       : "保留原节点，重新预览剧本化修订。";
   }
+  if (category === "timeout") return "可以重新运行文本优化；这次只处理文字内容。";
   return "使用 AI 创作搭档中的重新预览继续；确认前不会改动画布。";
 }
 
@@ -686,7 +903,13 @@ function compactShotText(value) {
 }
 
 function sourceTextForNode(node) {
-  return String(node?.content || node?.prompt || node?.result || "").trim();
+  return String(
+    node?.params?.scriptRevision?.source_text
+    || node?.content
+    || node?.prompt
+    || node?.result
+    || "",
+  ).trim();
 }
 
 function safeNodeContext(state, node) {
@@ -743,19 +966,17 @@ function safeProviderLineage(value) {
   };
 }
 
+function safeEmbeddedManifest(value) {
+  return {
+    request_digest: String(value?.request_digest || "").slice(0, 64),
+    source_digest: String(value?.source_digest || "").slice(0, 64),
+    provider_dispatch_count: Number(value?.provider_dispatch_count || 0),
+    image_video_generation_enabled: value?.image_video_generation_enabled === true,
+  };
+}
+
 function safeEmbeddedActionError(error, actionType) {
   const text = String(error?.message || error || "");
-  if (/image|video|keyframe|gateway timeout|生成画面|视频|图片/i.test(text)) {
-    return normalizeFailurePayload({
-      category: "media_error_isolated",
-      error_owner: "media_dependency",
-      message: actionType === "shot_breakdown"
-        ? "分镜拆解任务被媒体能力错误中断；当前节点没有改变。"
-        : "剧本化任务被媒体能力错误中断；当前节点没有改变。",
-      detail: text,
-      next_action: "确认文本能力可用后重新预览；不要触发图片或视频能力。",
-    }, actionType);
-  }
   const category = /timeout|timed out|超时/i.test(text)
     ? "timeout"
     : /studio_state_conflict|version conflict|版本冲突/i.test(text)

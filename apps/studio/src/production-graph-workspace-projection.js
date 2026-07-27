@@ -108,6 +108,11 @@ export function productionGraphWorkspaceProjection(workspace = null) {
 }
 
 export function applyProductionGraphCanvasProjection(state, workspace) {
+  const workspaceProjectId = String(workspace?.project_id || "");
+  const stateProjectId = String(state?.meta?.projectId || "");
+  if (stateProjectId && (!workspaceProjectId || workspaceProjectId !== stateProjectId)) {
+    throw new Error("production graph project does not match the active canvas");
+  }
   const projection = productionGraphWorkspaceProjection(workspace);
   removeCanvasProjection(state);
   state.production = state.production || {};

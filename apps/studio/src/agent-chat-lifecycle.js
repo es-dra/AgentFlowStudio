@@ -131,7 +131,13 @@ export function agentChatContextSnapshot({
     selected_node_type: cleanToken(activeNode?.type, 40),
     selected_node_status: cleanToken(activeNode?.status, 40),
     selected_node_title: cleanText(activeNode?.title || activeNode?.label || "", 80),
-    selected_node_text: cleanSourceText(activeNode?.content || activeNode?.prompt || "", 12000),
+    selected_node_text: cleanSourceText(
+      activeNode?.params?.scriptRevision?.source_text
+      || activeNode?.content
+      || activeNode?.prompt
+      || "",
+      12000,
+    ),
     selected_core_asset_id: cleanToken(selectedCoreAsset?.asset_id, 140),
     selected_core_asset_type: cleanToken(selectedCoreAsset?.asset_type, 60),
     selected_core_asset_status: cleanToken(selectedCoreAsset?.status, 80),
