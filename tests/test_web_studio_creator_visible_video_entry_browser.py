@@ -199,6 +199,113 @@ def test_refreshed_planned_manifest_reopens_final_confirmation_without_reserving
                 browser.close()
 
 
+def test_stale_video_manifest_rebuilds_current_version_before_final_confirmation() -> None:
+    with _server() as base_url:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
+            )
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                console_errors: list[str] = []
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(message.text)
+                    if message.type == "error"
+                    else None,
+                )
+                page.goto(
+                    f"{base_url}/__creator_video_entry.html#stale",
+                    wait_until="domcontentloaded",
+                )
+                page.wait_for_function("window.__videoEntryReady === true")
+
+                main_action = page.locator(".storyboard-heading-actions").get_by_role(
+                    "button",
+                    name="按当前版本重新准备",
+                    exact=True,
+                )
+                assert main_action.is_visible()
+                assert page.locator(".agent-primary-action").get_by_text(
+                    "按当前版本重新准备",
+                    exact=True,
+                ).is_visible()
+                panel = page.locator(".video-admission-panel")
+                assert panel.get_by_text("制作图已更新", exact=True).is_visible()
+                assert panel.get_by_text(
+                    "旧视频准备基于 v14；当前制作图为 v15",
+                    exact=False,
+                ).is_visible()
+                assert panel.get_by_text(
+                    "镜头 01 的画面语义未变化",
+                    exact=False,
+                ).is_visible()
+                page.evaluate("window.__deferRecompilePreview = true")
+                main_action.click()
+                assert page.get_by_role(
+                    "button",
+                    name="正在按当前版本准备…",
+                    exact=True,
+                ).is_disabled()
+                assert page.evaluate("window.__rebuildEffects") == {
+                    "recompilePreview": 1,
+                    "recompileConfirm": 0,
+                    "oldManifestArchived": 0,
+                }
+                page.evaluate("window.__releaseRecompilePreview()")
+                page.get_by_text("确认按当前版本重新准备", exact=True).wait_for()
+                assert page.get_by_text(
+                    "旧视频准备将保留在历史记录；新清单基于 v15",
+                    exact=False,
+                ).is_visible()
+                assert page.get_by_text("角色甲、月台甲、怀表甲").is_visible()
+                page.get_by_role("button", name="确认", exact=True).click()
+
+                page.get_by_role(
+                    "button",
+                    name="预览并确认生成",
+                    exact=True,
+                ).wait_for()
+                assert page.evaluate("window.__rebuildEffects") == {
+                    "recompilePreview": 1,
+                    "recompileConfirm": 1,
+                    "oldManifestArchived": 1,
+                }
+                page.get_by_role(
+                    "button",
+                    name="预览并确认生成",
+                    exact=True,
+                ).click()
+                page.get_by_text("确认发送镜头 01 视频", exact=True).wait_for()
+                final_card = page.locator(".image-admission-review")
+                for text in (
+                    "doubao-seedance-2-0（非 fast）",
+                    "720p",
+                    "6 秒",
+                    "1 次发送",
+                    "自动重试 0",
+                    "$2.00 项目停止线",
+                    "角色甲、月台甲、怀表甲",
+                ):
+                    assert final_card.get_by_text(text, exact=False).is_visible()
+                assert page.get_by_role(
+                    "button",
+                    name="确认并发送",
+                    exact=True,
+                ).is_visible()
+                assert page.evaluate("window.__calls.videoDispatch") == 0
+                assert page.evaluate("window.__sideEffects") == {
+                    "reserveConfirm": 0,
+                    "persistedWrites": 0,
+                    "preflightVideo": 0,
+                    "generateVideo": 0,
+                }
+                assert not console_errors
+            finally:
+                browser.close()
+
+
 def _assert_storyboard_entry(page: Page) -> None:
     main_entry = page.locator("#product-main").get_by_role(
         "button",
@@ -290,6 +397,11 @@ def _contract_html() -> str:
         preflightVideo: 0,
         generateVideo: 0,
       };
+      window.__rebuildEffects = {
+        recompilePreview: 0,
+        recompileConfirm: 0,
+        oldManifestArchived: 0,
+      };
       const projectId = "browser-video-entry";
       const bible = {
         schema_version: "afs.asset_bible.v0.1",
@@ -379,6 +491,7 @@ def _contract_html() -> str:
         },
       };
       const source = {
+        production_graph: { version: 14, graph_digest: "graph-v14" },
         shot: { shot_id: "shot-01", label: "镜头 01" },
         keyframe: {
           image_asset_id: "keyframe-approved",
@@ -422,12 +535,24 @@ def _contract_html() -> str:
         item: { item_id: "video-shot-01", state: "planned" },
         provider_dispatch_count: 0,
       };
+      const recompiledManifest = {
+        ...compiledManifest,
+        version: 2,
+        manifest_id: "video-manifest-v15",
+        manifest_hash: "b".repeat(64),
+        source: {
+          ...source,
+          production_graph: { version: 15, graph_digest: "graph-v15" },
+        },
+      };
       const preview = (command) => ({
         preview_digest: `${command.type}-digest`,
         command,
         result: {
           manifest: command.type === "compile"
             ? { ...compiledManifest, status: "draft" }
+            : command.type === "recompile_current"
+              ? recompiledManifest
             : {
                 ...compiledManifest,
                 item: { ...compiledManifest.item, state: "reserved", reservation_token: "reservation" },
@@ -471,6 +596,9 @@ def _contract_html() -> str:
         previewVideoAdmissionCommand(request) {
           if (request.command.type === "compile") window.__calls.compilePreview += 1;
           if (request.command.type === "reserve_dispatch") window.__calls.reservePreview += 1;
+          if (request.command.type === "recompile_current") {
+            window.__rebuildEffects.recompilePreview += 1;
+          }
           if (request.command.type === "compile" && window.__deferCompilePreview) {
             return new Promise((resolve) => {
               window.__releaseCompilePreview = () => {
@@ -487,11 +615,54 @@ def _contract_html() -> str:
               };
             });
           }
+          if (request.command.type === "recompile_current" && window.__deferRecompilePreview) {
+            return new Promise((resolve) => {
+              window.__releaseRecompilePreview = () => {
+                window.__deferRecompilePreview = false;
+                resolve({
+                  ...preview(request.command),
+                  impact: {
+                    current_graph_version: 15,
+                    prepared_graph_version: 14,
+                    source_manifest_archived: true,
+                    keyframe_reuse: "verified_current",
+                    affected_objects: ["镜头 01 视频来源未受此次更新影响"],
+                  },
+                });
+              };
+            });
+          }
           return Promise.resolve(preview(request.command));
         },
         confirmVideoAdmissionCommand(request) {
           if (request.command.type === "compile") window.__calls.compileConfirm += 1;
           if (request.command.type === "reserve_dispatch") window.__sideEffects.reserveConfirm += 1;
+          if (request.command.type === "recompile_current") {
+            window.__rebuildEffects.recompileConfirm += 1;
+            window.__rebuildEffects.oldManifestArchived += 1;
+            persistedVideoAdmission = {
+              status: "locked",
+              manifest: recompiledManifest,
+              readiness: {
+                status: "ready",
+                shot_id: "shot-01",
+                shot_label: "镜头 01",
+                first_frame_label: "已批准关键帧",
+                reference_count: 3,
+              },
+              lineage: {
+                status: "current",
+                prepared_graph_version: 15,
+                current_graph_version: 15,
+              },
+              capability: { configured: true },
+              provider_dispatch_count: 0,
+            };
+            return Promise.resolve({
+              result: { manifest: recompiledManifest },
+              provider_dispatch_count: 0,
+            });
+          }
           if (request.command.type === "compile") {
             window.__sideEffects.persistedWrites += 1;
             persistedVideoAdmission = {
@@ -552,18 +723,34 @@ def _contract_html() -> str:
           items: [{ item_id: "approved-keyframe", state: "approved" }],
         },
       };
-      const startPlanned = window.location.hash === "#planned";
+      const startPlanned = ["#planned", "#stale"].includes(window.location.hash);
+      const startStale = window.location.hash === "#stale";
       const videoAdmission = {
         status: startPlanned ? "locked" : "empty",
         manifest: startPlanned ? compiledManifest : null,
         readiness: {
-          status: "ready",
+          status: startStale ? "stale" : "ready",
           shot_id: "shot-01",
           shot_label: "镜头 01",
           first_frame_label: "已批准关键帧",
           reference_count: 3,
           next_action: "预览视频生成确认卡。",
         },
+        lineage: startStale
+          ? {
+              status: "stale",
+              prepared_graph_version: 14,
+              current_graph_version: 15,
+              keyframe_reuse: "verified_current",
+              affected_objects: ["镜头 01 视频来源未受此次更新影响"],
+              rebuild_allowed: true,
+            }
+          : {
+              status: startPlanned ? "current" : "empty",
+              prepared_graph_version: startPlanned ? 14 : 0,
+              current_graph_version: 14,
+              rebuild_allowed: false,
+            },
         capability: { configured: true },
         provider_dispatch_count: 0,
       };

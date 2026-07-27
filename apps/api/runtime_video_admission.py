@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -14,15 +15,21 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from agentflow_studio.slicing_sop.video_metadata import probe_video_metadata
 from apps.api.runtime_auth import RuntimeAuthStore
-from apps.api.runtime_image_admission import load_image_admission_manifest
+from apps.api.runtime_image_admission import (
+    SCHEMA_VERSION as IMAGE_ADMISSION_SCHEMA_VERSION,
+    load_image_admission_manifest,
+)
 from apps.api.runtime_image_assets import image_asset_metadata
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_production_graph import (
     GraphIdempotencyConflict,
     GraphVersionConflict,
+    GRAPH_SCHEMA_VERSION,
     ProductionGraphError,
     ProductionGraphStore,
     canonical_digest,
+    graph_lock_path,
+    graph_path,
     graph_has_authority,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
@@ -42,6 +49,7 @@ AUTO_RETRY = 0
 HARD_BUDGET_USD = Decimal("2.00")
 COMMANDS = {
     "compile",
+    "recompile_current",
     "reserve_dispatch",
     "record_job",
     "record_candidate",
@@ -69,12 +77,18 @@ def register_runtime_video_admission_routes(
     def get_video_admission(project_id: str, request: Request) -> dict[str, Any]:
         require_access(request, project_id)
         manifest = load_video_admission_manifest(store, project_id)
-        readiness = video_admission_readiness(store, project_id)
+        lineage = video_admission_lineage(store, project_id, manifest)
+        readiness = video_admission_readiness(
+            store,
+            project_id,
+            lineage=lineage,
+        )
         return {
             "schema_version": SCHEMA_VERSION,
             "status": manifest.get("status", "empty") if manifest else "empty",
             "manifest": manifest,
             "readiness": readiness,
+            "lineage": lineage,
             "capability": video_admission_capability(),
             "provider_dispatch_count": int((manifest or {}).get("provider_dispatch_count") or 0),
             "external_cost_usd": None,
@@ -147,7 +161,12 @@ def register_runtime_video_admission_routes(
                 result["updated_at"] = _now()
                 path.parent.mkdir(parents=True, exist_ok=True)
                 reject_unsafe_payload(result)
-                write_json(path, result)
+                if command["type"] == "recompile_current":
+                    with _verified_graph_snapshot_lock(store, project_id, result):
+                        _archive_manifest_once(store, project_id, existing)
+                        write_json(path, result)
+                else:
+                    write_json(path, result)
             return {
                 **preview,
                 "status": "confirmed",
@@ -160,7 +179,12 @@ def register_runtime_video_admission_routes(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def video_admission_readiness(store: RuntimeStore, project_id: str) -> dict[str, Any]:
+def video_admission_readiness(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    lineage: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     capability = video_admission_capability()
     if not capability["configured"]:
         return {
@@ -176,6 +200,25 @@ def video_admission_readiness(store: RuntimeStore, project_id: str) -> dict[str,
             "status": "blocked",
             "reason": str(exc),
             "next_action": "请先批准镜头 01 关键帧与所需参考图片。",
+            "provider_dispatch_count": 0,
+        }
+    if lineage and lineage.get("status") == "stale":
+        return {
+            "status": "stale",
+            "reason": "production_graph_updated",
+            "shot_id": source["shot"]["shot_id"],
+            "shot_label": source["shot"]["label"],
+            "first_frame_label": source["keyframe"]["label"],
+            "reference_count": len(source["references"]),
+            "prepared_graph_version": int(lineage.get("prepared_graph_version") or 0),
+            "current_graph_version": int(lineage.get("current_graph_version") or 0),
+            "keyframe_reuse": str(lineage.get("keyframe_reuse") or ""),
+            "affected_objects": list(lineage.get("affected_objects") or []),
+            "rebuild_allowed": lineage.get("rebuild_allowed") is True,
+            "next_action": str(
+                lineage.get("next_action")
+                or "按当前制作图重新准备视频。"
+            ),
             "provider_dispatch_count": 0,
         }
     return {
@@ -267,9 +310,25 @@ def preview_video_admission_command(
     command = _safe_command(body.get("command"))
     requested_at = _requested_at(body)
     if command["type"] == "compile":
-        before: dict[str, Any] = {}
+        before = load_video_admission_manifest(store, project_id)
+        if before:
+            raise ValueError(
+                "video admission already exists; rebuild it from the current ProductionGraph"
+            )
         manifest = compile_video_admission_manifest(store, project_id, created_at=requested_at)
         _append_receipt(manifest, "manifest_compiled", command, requested_at)
+    elif command["type"] == "recompile_current":
+        before = load_video_admission_manifest(store, project_id)
+        lineage = video_admission_lineage(store, project_id, before)
+        if lineage.get("status") != "stale" or lineage.get("rebuild_allowed") is not True:
+            raise ValueError("video admission cannot be rebuilt from the current ProductionGraph")
+        manifest = compile_video_admission_manifest(
+            store,
+            project_id,
+            created_at=requested_at,
+            version=int(before.get("version") or 0) + 1,
+        )
+        _append_receipt(manifest, "manifest_recompiled", command, requested_at)
     else:
         before = load_video_admission_manifest(store, project_id)
         if not before:
@@ -290,7 +349,26 @@ def preview_video_admission_command(
                 store=store,
                 project_id=project_id,
             )
-    return _preview_payload(before, manifest, command)
+    payload = _preview_payload(before, manifest, command)
+    if command["type"] == "recompile_current":
+        lineage = video_admission_lineage(store, project_id, before)
+        payload["impact"].update(
+            {
+                "source_manifest_archived": True,
+                "prepared_graph_version": int(
+                    lineage.get("prepared_graph_version") or 0
+                ),
+                "current_graph_version": int(
+                    lineage.get("current_graph_version") or 0
+                ),
+                "keyframe_reuse": str(lineage.get("keyframe_reuse") or ""),
+                "affected_objects": list(lineage.get("affected_objects") or []),
+            }
+        )
+        payload["preview_digest"] = canonical_digest(
+            {key: value for key, value in payload.items() if key != "preview_digest"}
+        )
+    return payload
 
 
 def _preview_payload(
@@ -317,6 +395,7 @@ def compile_video_admission_manifest(
     project_id: str,
     *,
     created_at: str | None = None,
+    version: int = 1,
 ) -> dict[str, Any]:
     timestamp = created_at or _now()
     if not video_admission_capability()["configured"]:
@@ -327,7 +406,7 @@ def compile_video_admission_manifest(
     contract = {
         "schema_version": SCHEMA_VERSION,
         "project_id": project_id,
-        "version": 1,
+        "version": int(version),
         "source": source,
         "provider_contract": {
             "service_id": SERVICE_ID,
@@ -558,44 +637,281 @@ def video_admission_generation_request(manifest: Mapping[str, Any], *, generated
     }
 
 
+def video_admission_lineage(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    active = dict(manifest or load_video_admission_manifest(store, project_id))
+    if not active:
+        return {
+            "status": "empty",
+            "provider_dispatch_count": 0,
+        }
+    graph = ProductionGraphStore(store).load(project_id)
+    prepared = active.get("source", {}).get("production_graph") or {}
+    prepared_version = int(prepared.get("version") or 0)
+    current_version = int(graph.get("version") or 0)
+    prepared_digest = str(prepared.get("graph_digest") or "")
+    current_digest = str(graph.get("graph_digest") or "")
+    if (
+        prepared_version == current_version
+        and prepared_digest == current_digest
+    ):
+        return {
+            "status": "current",
+            "prepared_graph_version": prepared_version,
+            "current_graph_version": current_version,
+            "keyframe_reuse": "current",
+            "affected_objects": [],
+            "rebuild_allowed": False,
+            "provider_dispatch_count": 0,
+        }
+    try:
+        current_source = _source_contract(store, project_id)
+    except (KeyError, ValueError, ProductionGraphError):
+        return {
+            "status": "stale",
+            "prepared_graph_version": prepared_version,
+            "current_graph_version": current_version,
+            "keyframe_reuse": "requires_new_keyframe",
+            "affected_objects": ["镜头 01 画面来源"],
+            "rebuild_allowed": False,
+            "next_action": "当前镜头画面来源已变化；请先批准新的镜头 01 关键帧。",
+            "reason_code": "keyframe_lineage_not_current",
+            "provider_dispatch_count": 0,
+        }
+    affected = _video_source_affected_objects(
+        active.get("source") or {},
+        current_source,
+    )
+    old_visual = _video_visual_source(active.get("source") or {})
+    current_visual = _video_visual_source(current_source)
+    keyframe_reuse = (
+        "verified_current"
+        if canonical_digest(old_visual) == canonical_digest(current_visual)
+        else "updated_approved_source"
+    )
+    item = active.get("item") or {}
+    budget = active.get("budget") or {}
+    rebuild_allowed = (
+        item.get("state") == "planned"
+        and not item.get("provider_job_id")
+        and int(active.get("provider_dispatch_count") or 0) == 0
+        and int(budget.get("dispatches_reserved") or 0) == 0
+    )
+    return {
+        "status": "stale",
+        "prepared_graph_version": prepared_version,
+        "current_graph_version": current_version,
+        "keyframe_reuse": keyframe_reuse,
+        "affected_objects": affected or ["镜头 01 视频来源未受此次更新影响"],
+        "rebuild_allowed": rebuild_allowed,
+        "next_action": (
+            "按当前版本重新准备"
+            if rebuild_allowed
+            else "旧视频准备已有发送状态，不能自动重建。"
+        ),
+        "provider_dispatch_count": 0,
+    }
+
+
+def _video_visual_source(source: Mapping[str, Any]) -> dict[str, Any]:
+    prompt = source.get("prompt_contract") or {}
+    return {
+        "shot": source.get("shot") or {},
+        "canonical_entities": source.get("canonical_entities") or {},
+        "keyframe": {
+            key: (source.get("keyframe") or {}).get(key)
+            for key in ("image_asset_id", "sha256", "width", "height", "aspect_ratio")
+        },
+        "references": [
+            {
+                key: item.get(key)
+                for key in ("target_asset_id", "image_asset_id", "sha256")
+            }
+            for item in source.get("references", [])
+            if isinstance(item, Mapping)
+        ],
+        "prompt_contract": {
+            key: prompt.get(key)
+            for key in (
+                "shot_action",
+                "composition",
+                "camera_angle",
+                "camera_movement",
+                "emotion",
+                "continuity_cues",
+                "canonical_entities",
+                "keyword_rewrite",
+                "sample_fallback",
+            )
+        },
+    }
+
+
+def _video_source_affected_objects(
+    before: Mapping[str, Any],
+    after: Mapping[str, Any],
+) -> list[str]:
+    affected: list[str] = []
+    before_visual = _video_visual_source(before)
+    after_visual = _video_visual_source(after)
+    if (
+        before_visual["shot"] != after_visual["shot"]
+        or before_visual["prompt_contract"] != after_visual["prompt_contract"]
+        or before_visual["canonical_entities"] != after_visual["canonical_entities"]
+    ):
+        affected.append(str((after.get("shot") or {}).get("label") or "镜头 01"))
+    if before_visual["keyframe"] != after_visual["keyframe"]:
+        affected.append("镜头 01 已批准关键帧")
+    if before_visual["references"] != after_visual["references"]:
+        labels = [
+            str(item.get("label") or "")
+            for item in after.get("references", [])
+            if isinstance(item, Mapping) and item.get("label")
+        ]
+        affected.extend(labels or ["镜头 01 参考组"])
+    return list(dict.fromkeys(affected))
+
+
+def _image_admission_manifests(
+    store: RuntimeStore,
+    project_id: str,
+) -> list[dict[str, Any]]:
+    active = load_image_admission_manifest(store, project_id)
+    if not active:
+        return []
+    manifests = [active]
+    history_dir = (
+        store.projects_dir
+        / safe_id(project_id)
+        / "image_admission"
+        / "history"
+    )
+    if history_dir.is_dir():
+        for path in sorted(history_dir.glob("*.json")):
+            archived = read_json(path)
+            reject_unsafe_payload(archived)
+            if (
+                archived.get("schema_version") != IMAGE_ADMISSION_SCHEMA_VERSION
+                or archived.get("project_id") != project_id
+                or safe_id(str(archived.get("manifest_id") or "")) != path.stem
+            ):
+                raise ValueError("archived image manifest storage scope is invalid")
+            manifests.append(archived)
+    return manifests
+
+
+def _shot_one_grounding(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    rows = [
+        dict(item)
+        for item in (
+            manifest.get("source", {})
+            .get("shot_grounding", {})
+            .get("shots", [])
+        )
+        if isinstance(item, Mapping) and int(item.get("number") or 0) == 1
+    ]
+    if len(rows) != 1:
+        raise ValueError("video readiness requires exactly one applied shot numbered 1")
+    return rows[0]
+
+
+def _keyframe_visual_contract(
+    manifest: Mapping[str, Any],
+    shot: Mapping[str, Any],
+) -> dict[str, Any]:
+    art_direction = manifest.get("art_direction") or {}
+    return {
+        "asset_bible_revision_id": str(
+            manifest.get("source", {}).get("asset_bible_revision_id") or ""
+        ),
+        "art_direction": {
+            key: art_direction.get(key)
+            for key in (
+                "status",
+                "visual_style",
+                "medium",
+                "palette",
+                "lighting",
+            )
+        },
+        "shot": {
+            key: shot.get(key)
+            for key in (
+                "shot_id",
+                "action",
+                "composition",
+                "shot_size",
+                "camera_angle",
+                "movement",
+                "emotion",
+                "purpose",
+                "continuity_cues",
+            )
+        },
+    }
+
+
+def _approved_shot_one_keyframe(
+    manifests: list[Mapping[str, Any]],
+    graph: Mapping[str, Any],
+    shot_id: str,
+    current_manifest: Mapping[str, Any],
+    current_shot: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    approved_for_shot = _approved_media_by_target(graph).get(shot_id, set())
+    candidates: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+    for manifest in manifests:
+        for item in manifest.get("items", []):
+            if (
+                not isinstance(item, Mapping)
+                or item.get("item_type") != "shot_keyframe"
+                or item.get("state") != "approved"
+                or str(item.get("target_shot_id") or "") != shot_id
+                or not isinstance(item.get("candidate"), Mapping)
+            ):
+                continue
+            image_asset_id = str(item["candidate"].get("image_asset_id") or "")
+            if image_asset_id and image_asset_id in approved_for_shot:
+                candidates[image_asset_id] = (dict(item), dict(manifest))
+    if len(candidates) != 1:
+        raise ValueError(
+            "video readiness requires one approved keyframe bound exactly to shot 01"
+        )
+    keyframe, source_manifest = next(iter(candidates.values()))
+    source_shot = _shot_one_grounding(source_manifest)
+    if canonical_digest(
+        _keyframe_visual_contract(current_manifest, current_shot)
+    ) != canonical_digest(
+        _keyframe_visual_contract(source_manifest, source_shot)
+    ):
+        raise ValueError(
+            "approved shot 01 keyframe is stale after shot visual semantics changed"
+        )
+    return keyframe, source_manifest
+
+
 def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     if not graph_has_authority(store, project_id):
         raise ValueError("video readiness requires an authoritative ProductionGraph")
     graph = ProductionGraphStore(store).load(project_id)
-    image_manifest = load_image_admission_manifest(store, project_id)
-    if not image_manifest:
+    image_manifests = _image_admission_manifests(store, project_id)
+    if not image_manifests:
         raise ValueError("video readiness requires an approved shot keyframe")
+    image_manifest = image_manifests[0]
     if image_manifest.get("status") != "locked":
         raise ValueError("video readiness requires a locked image admission manifest")
-    keyframes = [
-        item
-        for item in image_manifest.get("items", [])
-        if item.get("item_type") == "shot_keyframe"
-        and item.get("state") == "approved"
-        and isinstance(item.get("candidate"), Mapping)
-    ]
-    if not keyframes:
-        raise ValueError("video readiness requires an approved shot keyframe")
-    shot_rows = {
-        str(item.get("shot_id") or ""): item
-        for item in (image_manifest.get("source", {}).get("shot_grounding", {}).get("shots") or [])
-        if isinstance(item, Mapping)
-    }
-    shot_one_rows = [
-        row for row in shot_rows.values()
-        if int(row.get("number") or 0) == 1
-    ]
-    if len(shot_one_rows) != 1:
-        raise ValueError("video readiness requires exactly one applied shot numbered 1")
-    shot = shot_one_rows[0]
+    shot = _shot_one_grounding(image_manifest)
     shot_id = str(shot.get("shot_id") or "")
-    matching_keyframes = [
-        item for item in keyframes
-        if str(item.get("target_shot_id") or "") == shot_id
-    ]
-    if len(matching_keyframes) != 1:
-        raise ValueError("video readiness requires one approved keyframe bound exactly to shot 01")
-    keyframe = matching_keyframes[0]
+    keyframe, _ = _approved_shot_one_keyframe(
+        image_manifests,
+        graph,
+        shot_id,
+        image_manifest,
+        shot,
+    )
     candidate = keyframe["candidate"]
     first_frame = _validated_approved_image(
         store,
@@ -1284,6 +1600,64 @@ def _manifest_path(store: RuntimeStore, project_id: str) -> Path:
     return store.projects_dir / safe_id(project_id) / "video_admission" / "manifest.json"
 
 
+def _archive_manifest_once(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    manifest_id = safe_id(str(manifest.get("manifest_id") or ""))
+    if not manifest_id:
+        raise ValueError("video admission manifest identity is missing")
+    path = (
+        store.projects_dir
+        / safe_id(project_id)
+        / "video_admission"
+        / "history"
+        / f"{manifest_id}.json"
+    )
+    if path.is_file():
+        archived = read_json(path)
+        reject_unsafe_payload(archived)
+        if canonical_digest(archived) != canonical_digest(manifest):
+            raise ValueError(
+                "archived video manifest conflicts with the immutable source ledger"
+            )
+        return
+    reject_unsafe_payload(manifest)
+    write_json(path, deepcopy(dict(manifest)))
+
+
+@contextmanager
+def _verified_graph_snapshot_lock(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+):
+    expected = manifest.get("source", {}).get("production_graph") or {}
+    path = graph_path(store, project_id)
+    with exclusive_file_lock(graph_lock_path(store, project_id)):
+        graph = read_json(path)
+        if (
+            graph.get("schema_version") != GRAPH_SCHEMA_VERSION
+            or graph.get("project_id") != project_id
+        ):
+            raise ProductionGraphError("canonical production graph scope/schema mismatch")
+        stored_digest = str(graph.get("graph_digest") or "")
+        computed_digest = canonical_digest(
+            {key: value for key, value in graph.items() if key != "graph_digest"}
+        )
+        if not stored_digest or stored_digest != computed_digest:
+            raise ProductionGraphError("canonical production graph digest mismatch")
+        if (
+            int(graph.get("version") or 0) != int(expected.get("version") or 0)
+            or stored_digest != str(expected.get("graph_digest") or "")
+        ):
+            raise GraphVersionConflict(
+                "ProductionGraph changed while video preparation was being confirmed"
+            )
+        yield
+
+
 def _money(value: Decimal) -> str:
     return f"{value.quantize(Decimal('0.01')):.2f}"
 
@@ -1310,5 +1684,6 @@ __all__ = (
     "register_runtime_video_admission_routes",
     "video_admission_capability",
     "video_admission_generation_request",
+    "video_admission_lineage",
     "video_admission_readiness",
 )
