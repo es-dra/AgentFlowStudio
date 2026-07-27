@@ -572,6 +572,7 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
             "codec": "h264",
             "model": "model-alpha",
             "resolution": "720p",
+            "generationMode": "",
             "approvalGraphVersion": 16,
             "targetNodeIds": ["shot-alpha"],
             "lineage": {
