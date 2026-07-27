@@ -16,6 +16,7 @@ export function videoAdmissionProjection(runtimeValue = null, mediaState = "idle
     budget_contract: manifest?.budget_contract || {},
     budget: manifest?.budget || {},
     readiness: runtimeValue?.readiness || { status: "blocked" },
+    lineage: runtimeValue?.lineage || { status: manifest ? "unknown" : "empty" },
     capability: runtimeValue?.capability || {},
     media_state: mediaState,
     provider_dispatch_count: Number(manifest?.provider_dispatch_count || 0),

@@ -416,6 +416,9 @@ export function deriveProductionCopilotState({
   const videoReady = capabilityGates.video === true
     && videoAdmission?.readiness?.status === "ready"
     && videoAdmission?.selected_shot_ready === true;
+  const videoRebuildReady = capabilityGates.video === true
+    && videoAdmission?.lineage?.status === "stale"
+    && videoAdmission?.lineage?.rebuild_allowed === true;
   const videoStatus = String(videoAdmission?.status || "empty");
   const videoItemState = String(videoAdmission?.item?.state || "");
   const qualityIssues = bible.recognition_quality.issues;
@@ -520,6 +523,13 @@ export function deriveProductionCopilotState({
       action: "review_image_admission",
       label: "审阅已停止批次",
       reason: "未发送项目已停止；已完成和已拒绝记录仍保留。",
+      enabled: true,
+    };
+  } else if (contentReady && videoRebuildReady) {
+    next = {
+      action: "rebuild_video_admission",
+      label: "按当前版本重新准备",
+      reason: `制作图已从 v${Number(videoAdmission?.lineage?.prepared_graph_version || 0)} 更新到 v${Number(videoAdmission?.lineage?.current_graph_version || 0)}；旧视频准备保留但不能发送。`,
       enabled: true,
     };
   } else if (contentReady && videoReady && videoItemState === "planned") {

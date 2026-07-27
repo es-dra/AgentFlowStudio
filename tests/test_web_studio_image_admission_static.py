@@ -52,6 +52,22 @@ def test_image_admission_uses_preview_confirm_runtime_command_path() -> None:
     assert "gpt-image" not in shell
 
 
+def test_approved_image_refreshes_graph_bound_video_lineage_in_same_session() -> None:
+    shell = PRODUCT_SHELL.read_text(encoding="utf-8")
+    refresh_body = shell.split(
+        "async function refreshGraphBoundRuntimeState", 1
+    )[1].split("async function previewGraphMutation", 1)[0]
+    confirm_body = shell.split(
+        "async function confirmImageAdmissionCommand", 1
+    )[1].split("async function commitImageAdmissionCommand", 1)[0]
+
+    assert "runtime.sequenceWorkspace?.()" in refresh_body
+    assert "runtime.loadVideoAdmission?.()" in refresh_body
+    assert "snapshot.videoAdmission = videoAdmission" in refresh_body
+    assert 'confirmedCommand.type === "approve"' in confirm_body
+    assert "await refreshGraphBoundRuntimeState();" in confirm_body
+
+
 def test_next_image_batch_is_creator_selected_and_separate_from_generation() -> None:
     shell = PRODUCT_SHELL.read_text(encoding="utf-8")
     copilot = (ROOT / "apps/studio/src/asset-bible-workspace.js").read_text(encoding="utf-8")

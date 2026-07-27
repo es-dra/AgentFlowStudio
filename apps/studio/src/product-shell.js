@@ -955,6 +955,25 @@ export function createProductShell(options = {}) {
     }, { history: false, persist: false });
   }
 
+  async function refreshGraphBoundRuntimeState(runtime = options.getRuntime?.()) {
+    if (!runtime) return null;
+    const [workspace, videoAdmission] = await Promise.all([
+      runtime.sequenceWorkspace?.(),
+      runtime.loadVideoAdmission?.(),
+    ]);
+    if (workspace) {
+      snapshot.sequenceWorkspace = workspace;
+      applyGraphWorkspace(workspace);
+      snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+    }
+    if (videoAdmission) {
+      snapshot.videoAdmission = videoAdmission;
+      videoAdmissionPreview = null;
+      videoAdmissionError = "";
+    }
+    return workspace;
+  }
+
   async function previewGraphMutation(nodeId, patch, title) {
     try {
       pendingGraphImpact = await options.getRuntime?.().previewSequenceImpact({ changed_node_ids: [nodeId] });
@@ -974,12 +993,11 @@ export function createProductShell(options = {}) {
     }
     if (graphRefreshPending) return;
     graphRefreshPending = true;
-    options.getRuntime?.().sequenceWorkspace?.().then((workspace) => {
-      snapshot.sequenceWorkspace = workspace;
-      applyGraphWorkspace(workspace);
-      snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+    refreshGraphBoundRuntimeState().then((workspace) => {
       pendingGraphImpact = null;
-      notice = `制作图已更新到版本 ${Number(workspace.graph_version || 0)}。`;
+      notice = workspace
+        ? `制作图已更新到版本 ${Number(workspace.graph_version || 0)}。`
+        : "制作图已更新；相关制作状态将在重新载入后同步。";
     }).catch(() => {
       notice = "制作图已变更但刷新失败，请重新载入后继续；不会重复执行命令。";
     }).finally(() => {
@@ -1140,7 +1158,7 @@ export function createProductShell(options = {}) {
           render();
         });
         headerActions.appendChild(admission);
-        if (videoAdmissionView().readiness?.status === "ready") {
+        if (["ready", "stale"].includes(videoAdmissionView().readiness?.status)) {
           const video = node("button", "studio-secondary-button", "准备视频");
           video.type = "button";
           video.addEventListener("click", () => {
@@ -1201,7 +1219,9 @@ export function createProductShell(options = {}) {
         ? "1 条已确认"
         : videoAdmissionView().item?.state === "candidate"
           ? "1 条待审看"
-          : videoAdmissionView().readiness?.status === "ready"
+          : videoAdmissionView().readiness?.status === "stale"
+            ? "需按当前版本更新"
+            : videoAdmissionView().readiness?.status === "ready"
             ? "可准备"
             : "等待关键帧"],
     ];
@@ -2515,6 +2535,9 @@ export function createProductShell(options = {}) {
         : confirmedCommand.type === "approve"
           ? "图片候选已确认并保存到当前项目；可以继续查看已确认图片。"
         : "图片准入清单已更新；未调用外部能力。";
+      if (confirmedCommand.type === "approve") {
+        await refreshGraphBoundRuntimeState();
+      }
       render();
       if (confirmedCommand.type === "reserve_dispatch") {
         const item = response?.result?.manifest?.items?.find(
@@ -2661,6 +2684,45 @@ export function createProductShell(options = {}) {
       panel.appendChild(buildVideoAdmissionReview());
       return panel;
     }
+    if (view.lineage?.status === "stale") {
+      const stale = node("div", "image-admission-empty video-admission-stale");
+      const preparedVersion = Number(view.lineage.prepared_graph_version || 0);
+      const currentVersion = Number(view.lineage.current_graph_version || 0);
+      stale.append(
+        node("strong", "", "制作图已更新"),
+        node(
+          "p",
+          "",
+          `旧视频准备基于 v${preparedVersion}；当前制作图为 v${currentVersion}。旧准备已保留，但不能发送。`,
+        ),
+      );
+      const affected = (view.lineage.affected_objects || []).filter(Boolean);
+      if (affected.length) {
+        stale.appendChild(node("p", "", `本次视频来源核对：${affected.join("、")}。`));
+      }
+      stale.appendChild(node(
+        "p",
+        "",
+        view.lineage.keyframe_reuse === "verified_current"
+          ? `镜头 01 的画面语义未变化；已批准关键帧与 ${view.source?.references?.length || 0} 张参考图可复用。`
+          : view.readiness?.next_action || "当前镜头画面来源需要重新确认。",
+      ));
+      if (view.lineage.rebuild_allowed) {
+        const rebuilding = videoAdmissionPending
+          && videoAdmissionPendingCommand === "recompile_current";
+        const rebuild = node(
+          "button",
+          "studio-primary-button",
+          rebuilding ? "正在按当前版本准备…" : "按当前版本重新准备",
+        );
+        rebuild.type = "button";
+        rebuild.disabled = rebuilding;
+        rebuild.dataset.videoAdmissionCommand = "recompile_current";
+        stale.appendChild(rebuild);
+      }
+      panel.appendChild(stale);
+      return panel;
+    }
     if (view.readiness?.status !== "ready" && view.status === "empty") {
       const blocked = node("div", "image-admission-empty");
       blocked.append(
@@ -2784,6 +2846,8 @@ export function createProductShell(options = {}) {
     review.append(
       node("strong", "", commandType === "reserve_dispatch"
         ? "确认发送镜头 01 视频"
+        : commandType === "recompile_current"
+          ? "确认按当前版本重新准备"
         : commandType === "approve"
           ? "批准视频候选并写入项目"
           : commandType === "reject"
@@ -2791,11 +2855,13 @@ export function createProductShell(options = {}) {
             : "确认视频准备"),
       node("p", "", commandType === "reserve_dispatch"
         ? `${reviewView.generation_contract.model}（非 fast） · 720p · 6 秒 · 1 次发送 · 自动重试 0 · $2.00 项目停止线（非供应商强制限额、预计或实际费用）。`
+        : commandType === "recompile_current"
+          ? `旧视频准备将保留在历史记录；新清单基于 v${Number(preview.impact?.current_graph_version || 0)}，确认只保存准备清单，不发送视频。`
         : commandType === "compile"
           ? `使用 ${manifest.source?.keyframe?.label || "已批准关键帧"} 与 ${manifest.source?.references?.length || 0} 张已批准参考图；确认只保存准备清单。`
           : "批准才会写入当前项目；拒绝不会替换现有制作事实。"),
     );
-    if (commandType === "compile" || commandType === "reserve_dispatch") {
+    if (["compile", "recompile_current", "reserve_dispatch"].includes(commandType)) {
       const referenceLabels = (manifest.source?.references || [])
         .map((item) => item?.label)
         .filter(Boolean);
@@ -2878,11 +2944,36 @@ export function createProductShell(options = {}) {
         ...(snapshot.videoAdmission || {}),
         status: response?.result?.manifest?.status || "locked",
         manifest: response?.result?.manifest || null,
-        readiness: snapshot.videoAdmission?.readiness || { status: "ready" },
+        readiness: preview.command?.type === "recompile_current"
+          ? {
+              ...(snapshot.videoAdmission?.readiness || {}),
+              status: "blocked",
+              next_action: "正在核对当前制作图。",
+            }
+          : snapshot.videoAdmission?.readiness || { status: "ready" },
+        lineage: preview.command?.type === "recompile_current"
+          ? {
+              status: "unknown",
+              prepared_graph_version: Number(
+                response?.result?.manifest?.source?.production_graph?.version || 0
+              ),
+              current_graph_version: 0,
+              keyframe_reuse: "",
+              affected_objects: [],
+              rebuild_allowed: false,
+            }
+          : snapshot.videoAdmission?.lineage,
       };
       const commandType = preview.command?.type;
       videoAdmissionPreview = null;
       videoAdmissionError = "";
+      if (commandType === "recompile_current") {
+        try {
+          await refreshGraphBoundRuntimeState();
+        } catch {
+          videoAdmissionError = "新视频准备已保存，但当前制作图核对失败；请重新载入后继续。不会发送视频。";
+        }
+      }
       render();
       if (commandType === "reserve_dispatch") {
         await dispatchVideoAdmissionItem();
@@ -3144,16 +3235,28 @@ export function createProductShell(options = {}) {
     const videoActionState = videoView.status === "empty"
       ? "empty"
       : String(videoView.item?.state || "");
-    if (currentShotVideoAdmissionReady() && ["empty", "planned"].includes(videoActionState)) {
+    const rebuildVideo = currentShotVideoAdmissionRebuildable();
+    if (
+      (currentShotVideoAdmissionReady() || rebuildVideo)
+      && ["empty", "planned"].includes(videoActionState)
+    ) {
       const videoActionLabel = videoAdmissionPending
         ? "正在准备…"
+        : rebuildVideo
+          ? "按当前版本重新准备"
         : videoView.item?.state === "planned"
           ? "确认镜头视频"
           : "准备镜头视频";
       const prepareVideo = node("button", "studio-primary-button", videoActionLabel);
       prepareVideo.type = "button";
       prepareVideo.disabled = videoAdmissionPending;
-      prepareVideo.addEventListener("click", () => void openCurrentShotVideoPreparation());
+      prepareVideo.addEventListener("click", () => {
+        if (rebuildVideo) {
+          void stageVideoAdmissionCommand({ type: "recompile_current" });
+        } else {
+          void openCurrentShotVideoPreparation();
+        }
+      });
       headingActions.appendChild(prepareVideo);
     }
     heading.appendChild(headingActions);
@@ -3649,6 +3752,11 @@ export function createProductShell(options = {}) {
       void openCurrentShotVideoPreparation();
       return;
     }
+    if (action.action === "rebuild_video_admission") {
+      showStoryboard();
+      void stageVideoAdmissionCommand({ type: "recompile_current" });
+      return;
+    }
     if ([
       "review_video_admission",
       "resume_video_admission",
@@ -3815,7 +3923,7 @@ export function createProductShell(options = {}) {
       const root = document.getElementById("product-shell-root");
       if (!action || !root?.contains(action) || action.disabled) return;
       const command = String(action.dataset.videoAdmissionCommand || "");
-      if (command !== "reserve_dispatch") return;
+      if (!["reserve_dispatch", "recompile_current"].includes(command)) return;
       event.preventDefault();
       void stageVideoAdmissionCommand({ type: command });
     });
@@ -4571,6 +4679,15 @@ export function createProductShell(options = {}) {
     const shot = currentShot();
     return readiness.status === "ready"
       && Boolean(readiness.shot_id)
+      && readiness.shot_id === shot.graphNodeId
+      && Boolean(shot.preview);
+  }
+  function currentShotVideoAdmissionRebuildable() {
+    const view = videoAdmissionView();
+    const readiness = view.readiness || {};
+    const shot = currentShot();
+    return view.lineage?.status === "stale"
+      && view.lineage?.rebuild_allowed === true
       && readiness.shot_id === shot.graphNodeId
       && Boolean(shot.preview);
   }

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from contextlib import contextmanager
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -460,6 +462,254 @@ def _command(
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def _rotate_image_manifest_after_graph_update(
+    store: RuntimeStore,
+    project_id: str,
+) -> tuple[dict, dict]:
+    image_path = store.projects_dir / project_id / "image_admission" / "manifest.json"
+    historical = read_json(image_path)
+    history_path = (
+        image_path.parent
+        / "history"
+        / f"{historical['manifest_id']}.json"
+    )
+    write_json(history_path, historical)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph = graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="approve-other-shot-keyframe",
+        semantic_digest=canonical_digest({"other_shot_keyframe": "approved"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "approved-other-shot-keyframe",
+                    "category": "artifact",
+                    "metadata": {
+                        "kind": "approved_image",
+                        "image_asset_id": "other-shot-image",
+                    },
+                },
+            }
+        ],
+    )
+    current = deepcopy(historical)
+    current["manifest_id"] = "image-manifest-current-batch"
+    current["manifest_hash"] = "b" * 64
+    current["items"] = [
+        {
+            "item_id": "other-shot-processing",
+            "item_type": "shot_keyframe",
+            "target_shot_id": "shot-03",
+            "state": "processing",
+        }
+    ]
+    current["accepted_graph_snapshots"] = [
+        {"version": graph["version"], "graph_digest": graph["graph_digest"]}
+    ]
+    write_json(image_path, current)
+    return historical, graph
+
+
+def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without_dispatch(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-v1"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    _, graph = _rotate_image_manifest_after_graph_update(store, project_id)
+    image_path = store.projects_dir / project_id / "image_admission" / "manifest.json"
+    image_before = read_json(image_path)
+
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "stale"
+    assert state["readiness"]["prepared_graph_version"] == old_video["source"]["production_graph"]["version"]
+    assert state["readiness"]["current_graph_version"] == graph["version"]
+    assert state["lineage"]["keyframe_reuse"] == "verified_current"
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["lineage"]["affected_objects"] == ["镜头 01 视频来源未受此次更新影响"]
+    assert state["provider_dispatch_count"] == 0
+
+    body = {
+        "command": {
+            "type": "recompile_current",
+            "idempotency_key": "recompile-current-v2",
+        },
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["version"] == old_video["version"] + 1
+    assert candidate["source"]["production_graph"] == {
+        "version": graph["version"],
+        "graph_digest": graph["graph_digest"],
+    }
+    assert candidate["source"]["keyframe"]["image_asset_id"] == media["keyframe"]
+    assert [item["image_asset_id"] for item in candidate["source"]["references"]] == [
+        media["character"],
+        media["prop"],
+        media["scene"],
+    ]
+    assert candidate["item"]["state"] == "planned"
+    assert candidate["budget"]["dispatches_reserved"] == 0
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_video
+    assert read_json(image_path) == image_before
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+
+    assert confirmed.status_code == 200, confirmed.text
+    rebuilt = load_video_admission_manifest(store, project_id)
+    assert rebuilt == confirmed.json()["result"]["manifest"]
+    assert rebuilt["source"]["production_graph"]["version"] == graph["version"]
+    assert rebuilt["item"]["state"] == "planned"
+    assert rebuilt["budget"] == {
+        "dispatches_reserved": 0,
+        "remaining_dispatches": 1,
+        "hard_ceiling_usd": "2.00",
+        "actual_charge_usd": None,
+        "actual_charge_verification": "unverified",
+    }
+    assert rebuilt["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_video['manifest_id']}.json"
+    )
+    assert archived == old_video
+    assert read_json(image_path) == image_before
+
+    replay = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    assert load_video_admission_manifest(store, project_id) == rebuilt
+    assert read_json(image_path) == image_before
+
+
+def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-v1"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    _rotate_image_manifest_after_graph_update(store, project_id)
+    body = {
+        "command": {
+            "type": "recompile_current",
+            "idempotency_key": "recompile-racing-graph",
+        },
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+
+    from apps.api import runtime_video_admission as module
+
+    original_lock = module._verified_graph_snapshot_lock
+
+    @contextmanager
+    def advance_graph_before_snapshot_lock(*args, **kwargs):
+        graph_store = ProductionGraphStore(store)
+        graph = graph_store.load(project_id)
+        graph_store.append(
+            project_id,
+            expected_version=graph["version"],
+            idempotency_key="concurrent-shot-03-approval",
+            semantic_digest=canonical_digest({"shot_03": "approved"}),
+            events=[
+                {
+                    "type": "node_upserted",
+                    "node": {
+                        "node_id": "concurrent-shot-03-artifact",
+                        "category": "artifact",
+                        "metadata": {
+                            "kind": "approved_image",
+                            "image_asset_id": "shot-03-approved-image",
+                        },
+                    },
+                }
+            ],
+        )
+        with original_lock(*args, **kwargs):
+            yield
+
+    monkeypatch.setattr(
+        module,
+        "_verified_graph_snapshot_lock",
+        advance_graph_before_snapshot_lock,
+    )
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+
+    assert confirmed.status_code == 409
+    assert "ProductionGraph changed" in confirmed.text
+    assert load_video_admission_manifest(store, project_id) == old_video
+    assert not (
+        store.projects_dir / project_id / "video_admission" / "history"
+    ).exists()
+    assert old_video["provider_dispatch_count"] == 0
+
+
+def test_stale_video_manifest_requires_new_keyframe_when_shot_visual_semantics_change(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-before-change"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    _, _ = _rotate_image_manifest_after_graph_update(store, project_id)
+    image_path = store.projects_dir / project_id / "image_admission" / "manifest.json"
+    current_image = read_json(image_path)
+    current_image["source"]["shot_grounding"]["shots"][0]["action"] = (
+        "巡夜人甲离开操作台并走向站台另一端"
+    )
+    write_json(image_path, current_image)
+
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "blocked"
+    assert state["lineage"]["status"] == "stale"
+    assert state["lineage"]["keyframe_reuse"] == "requires_new_keyframe"
+    assert state["lineage"]["rebuild_allowed"] is False
+    assert "新的镜头 01 关键帧" in state["lineage"]["next_action"]
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": {
+                "type": "recompile_current",
+                "idempotency_key": "unsafe-recompile",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == old_video
+    assert not (
+        store.projects_dir / project_id / "video_admission" / "history"
+    ).exists()
 
 
 def _claim_for_test(
