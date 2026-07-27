@@ -39,6 +39,17 @@ from apps.api.runtime_production_graph import (
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_video_candidates import candidate_file
 from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID
+from apps.api.runtime_video_staging import (
+    FIRST_FRAME,
+    REFERENCE_CONDITIONED,
+    TEXT_TO_VIDEO,
+    build_temporal_prompt,
+    default_mode,
+    mode_options,
+    temporal_staging_template,
+    validate_generation_mode,
+    validate_temporal_staging,
+)
 
 
 SCHEMA_VERSION = "afs.video_admission_manifest.v0.1"
@@ -55,6 +66,7 @@ COMMANDS = {
     "compile",
     "recompile_current",
     "create_new_round",
+    "create_comparison_round",
     "reserve_dispatch",
     "record_job",
     "record_candidate",
@@ -166,7 +178,11 @@ def register_runtime_video_admission_routes(
                 result["updated_at"] = _now()
                 path.parent.mkdir(parents=True, exist_ok=True)
                 reject_unsafe_payload(result)
-                if command["type"] in {"recompile_current", "create_new_round"}:
+                if command["type"] in {
+                    "recompile_current",
+                    "create_new_round",
+                    "create_comparison_round",
+                }:
                     with _verified_graph_snapshot_lock(store, project_id, result):
                         _archive_manifest_once(store, project_id, existing)
                         write_json(path, result)
@@ -208,6 +224,8 @@ def video_admission_readiness(
             "provider_dispatch_count": 0,
         }
     if lineage and lineage.get("status") == "stale":
+        generation_modes = mode_options(capability)
+        suggested_mode = default_mode(capability, len(source["references"]))
         return {
             "status": "stale",
             "reason": "production_graph_updated",
@@ -215,6 +233,19 @@ def video_admission_readiness(
             "shot_label": source["shot"]["label"],
             "first_frame_label": source["keyframe"]["label"],
             "reference_count": len(source["references"]),
+            "generation_modes": generation_modes,
+            "suggested_generation_mode": suggested_mode,
+            "suggested_mode_reason": next(
+                (
+                    str(item["reason"])
+                    for item in generation_modes
+                    if item["mode"] == suggested_mode
+                ),
+                "",
+            ),
+            "temporal_staging_template": temporal_staging_template(
+                source["shot_semantics"]
+            ),
             "prepared_graph_version": int(lineage.get("prepared_graph_version") or 0),
             "current_graph_version": int(lineage.get("current_graph_version") or 0),
             "keyframe_reuse": str(lineage.get("keyframe_reuse") or ""),
@@ -226,16 +257,43 @@ def video_admission_readiness(
             ),
             "provider_dispatch_count": 0,
         }
+    generation_modes = mode_options(capability)
+    suggested_mode = default_mode(capability, len(source["references"]))
     readiness = {
         "status": "ready",
         "shot_id": source["shot"]["shot_id"],
         "shot_label": source["shot"]["label"],
         "first_frame_label": source["keyframe"]["label"],
         "reference_count": len(source["references"]),
-        "next_action": "预览视频生成确认卡。",
+        "generation_modes": generation_modes,
+        "suggested_generation_mode": suggested_mode,
+        "suggested_mode_reason": next(
+            (
+                str(item["reason"])
+                for item in generation_modes
+                if item["mode"] == suggested_mode
+            ),
+            "",
+        ),
+        "temporal_staging_template": temporal_staging_template(
+            source["shot_semantics"]
+        ),
+        "next_action": "选择生成方式并补全镜头叙事。",
         "provider_dispatch_count": 0,
     }
     active = load_video_admission_manifest(store, project_id)
+    try:
+        _assert_comparison_round_eligible(store, project_id, active)
+    except (KeyError, ValueError, ProductionGraphError):
+        pass
+    else:
+        readiness.update(
+            {
+                "status": "comparison_ready",
+                "comparison_round_allowed": True,
+                "next_action": "准备一个不覆盖旧结果的叙事镜头对照。",
+            }
+        )
     try:
         _assert_new_round_eligible(store, project_id, active)
     except (KeyError, ValueError, ProductionGraphError):
@@ -260,6 +318,7 @@ def video_admission_capability() -> dict[str, Any]:
     resolution_supported = False
     first_frame_mode_supported = False
     reference_mode_supported = False
+    text_mode_supported = False
     exact_input_upload_endpoint = False
     input_host_configured = False
     artifact_hosts_configured = False
@@ -302,6 +361,7 @@ def video_admission_capability() -> dict[str, Any]:
         resolution_supported = RESOLUTION in descriptor.supported_resolutions
         first_frame_mode_supported = "first_frame" in descriptor.frame_modes
         reference_mode_supported = "reference_images" in descriptor.frame_modes
+        text_mode_supported = "text_only" in descriptor.frame_modes
     except (ModelGatewayError, KeyError, OSError, ValueError, InvalidOperation):
         pass
     exact_model = configured_model == MODEL_ID
@@ -312,6 +372,7 @@ def video_admission_capability() -> dict[str, Any]:
         and duration_supported
         and resolution_supported
         and first_frame_mode_supported
+        and reference_mode_supported
         and artifact_hosts_configured
         and exact_input_upload_endpoint
         and input_host_configured
@@ -338,6 +399,7 @@ def video_admission_capability() -> dict[str, Any]:
         "resolution_supported": resolution_supported,
         "first_frame_mode_supported": first_frame_mode_supported,
         "reference_mode_supported": reference_mode_supported,
+        "text_mode_supported": text_mode_supported,
         "artifact_hosts_configured": artifact_hosts_configured,
         "exact_input_upload_endpoint": exact_input_upload_endpoint,
         "input_host_configured": input_host_configured,
@@ -362,7 +424,14 @@ def preview_video_admission_command(
             raise ValueError(
                 "video admission already exists; rebuild it from the current ProductionGraph"
             )
-        manifest = compile_video_admission_manifest(store, project_id, created_at=requested_at)
+        manifest = compile_video_admission_manifest(
+            store,
+            project_id,
+            created_at=requested_at,
+            generation_mode=command.get("generation_mode"),
+            selection_reason=command.get("selection_reason"),
+            temporal_staging=command.get("temporal_staging"),
+        )
         _append_receipt(manifest, "manifest_compiled", command, requested_at)
     elif command["type"] == "recompile_current":
         before = load_video_admission_manifest(store, project_id)
@@ -374,6 +443,9 @@ def preview_video_admission_command(
             project_id,
             created_at=requested_at,
             version=int(before.get("version") or 0) + 1,
+            generation_mode=command.get("generation_mode"),
+            selection_reason=command.get("selection_reason"),
+            temporal_staging=command.get("temporal_staging"),
         )
         _append_receipt(manifest, "manifest_recompiled", command, requested_at)
     elif command["type"] == "create_new_round":
@@ -384,6 +456,9 @@ def preview_video_admission_command(
             project_id,
             created_at=requested_at,
             version=int(before.get("version") or 0) + 1,
+            generation_mode=command.get("generation_mode"),
+            selection_reason=command.get("selection_reason"),
+            temporal_staging=command.get("temporal_staging"),
             round_contract={
                 "kind": "independent_after_provider_rejection",
                 "prior_manifest_id": str(before.get("manifest_id") or ""),
@@ -393,6 +468,27 @@ def preview_video_admission_command(
             },
         )
         _append_receipt(manifest, "independent_round_created", command, requested_at)
+    elif command["type"] == "create_comparison_round":
+        before = load_video_admission_manifest(store, project_id)
+        _assert_comparison_round_eligible(store, project_id, before)
+        manifest = compile_video_admission_manifest(
+            store,
+            project_id,
+            created_at=requested_at,
+            version=int(before.get("version") or 0) + 1,
+            generation_mode=command.get("generation_mode"),
+            selection_reason=command.get("selection_reason"),
+            temporal_staging=command.get("temporal_staging"),
+            round_contract={
+                "kind": "independent_comparison",
+                "prior_manifest_id": str(before.get("manifest_id") or ""),
+                "prior_manifest_hash": str(before.get("manifest_hash") or ""),
+                "prior_round_preserved": True,
+                "prior_round_replay_allowed": False,
+                "prior_approved_result_immutable": True,
+            },
+        )
+        _append_receipt(manifest, "comparison_round_created", command, requested_at)
     else:
         before = load_video_admission_manifest(store, project_id)
         if not before:
@@ -432,13 +528,16 @@ def preview_video_admission_command(
         payload["preview_digest"] = canonical_digest(
             {key: value for key, value in payload.items() if key != "preview_digest"}
         )
-    elif command["type"] == "create_new_round":
+    elif command["type"] in {"create_new_round", "create_comparison_round"}:
         payload["impact"].update(
             {
                 "source_manifest_archived": True,
                 "new_independent_round": True,
                 "prior_round_replay_allowed": False,
                 "provider_dispatch_count": 0,
+                "prior_approved_result_immutable": (
+                    command["type"] == "create_comparison_round"
+                ),
             }
         )
         payload["preview_digest"] = canonical_digest(
@@ -473,6 +572,9 @@ def compile_video_admission_manifest(
     created_at: str | None = None,
     version: int = 1,
     round_contract: Mapping[str, Any] | None = None,
+    generation_mode: Any = None,
+    selection_reason: Any = None,
+    temporal_staging: Any = None,
 ) -> dict[str, Any]:
     timestamp = created_at or _now()
     if not video_admission_capability()["configured"]:
@@ -480,7 +582,32 @@ def compile_video_admission_manifest(
             "exact non-fast Seedance 2.0 720p/6s reference capability is not configured"
         )
     source = _source_contract(store, project_id)
-    provider_input_contract = _provider_input_contract(source)
+    capability = video_admission_capability()
+    mode = validate_generation_mode(
+        generation_mode,
+        capability=capability,
+        source=source,
+    )
+    staging = validate_temporal_staging(temporal_staging)
+    reason = str(selection_reason or mode["reason"]).strip()
+    if not reason:
+        raise ValueError("视频生成方式需要显示选择原因")
+    source["prompt_contract"] = build_temporal_prompt(
+        mode=mode["mode"],
+        selection_reason=reason,
+        staging=staging,
+        shot=source["shot_semantics"],
+        canonical_entities=source["canonical_entities"],
+    )
+    source["generation_mode"] = {
+        **mode,
+        "selection_reason": reason[:600],
+    }
+    source["temporal_staging"] = staging
+    provider_input_contract = _provider_input_contract(
+        source,
+        generation_mode=mode["mode"],
+    )
     contract = {
         "schema_version": SCHEMA_VERSION,
         "project_id": project_id,
@@ -580,6 +707,15 @@ def enforce_video_admission_request(
         entry["image_asset_id"]
         for entry in input_contract["reference_images"]
     ]
+    expected_first_frame = (
+        str((input_contract.get("first_frame") or {}).get("image_asset_id") or "")
+        or None
+    )
+    expected_generation_path = {
+        FIRST_FRAME: "i2v_first_frame",
+        REFERENCE_CONDITIONED: "reference_images",
+        TEXT_TO_VIDEO: "t2v",
+    }[str(input_contract["mode"])]
     checks = {
         "video_admission_manifest_id": (request.video_admission_manifest_id, manifest["manifest_id"]),
         "video_admission_manifest_hash": (request.video_admission_manifest_hash, manifest["manifest_hash"]),
@@ -590,9 +726,10 @@ def enforce_video_admission_request(
         ),
         "first_frame_image_asset_id": (
             request.first_frame_image_asset_id,
-            source["keyframe"]["image_asset_id"],
+            expected_first_frame,
         ),
         "reference_image_asset_ids": (list(request.reference_image_asset_ids), expected_refs),
+        "generation_path": (request.generation_path, expected_generation_path),
         "duration_sec": (request.duration_sec, DURATION_SEC),
         "resolution": (request.resolution.lower(), RESOLUTION),
         "candidate_count": (request.candidate_count, 1),
@@ -707,11 +844,21 @@ def video_admission_generation_request(manifest: Mapping[str, Any], *, generated
     item = manifest["item"]
     source = manifest["source"]
     input_contract = _validated_provider_input_contract(manifest)
+    mode = str(input_contract["mode"])
+    first_frame = input_contract.get("first_frame") or {}
+    generation_path = {
+        FIRST_FRAME: "i2v_first_frame",
+        REFERENCE_CONDITIONED: "reference_images",
+        TEXT_TO_VIDEO: "t2v",
+    }[mode]
     return {
         "node_id": source["shot"]["shot_id"],
+        "generation_path": generation_path,
         "prompt_text": source["prompt_contract"]["provider_prompt"],
         "provider_service_id": SERVICE_ID,
-        "first_frame_image_asset_id": source["keyframe"]["image_asset_id"],
+        "first_frame_image_asset_id": (
+            str(first_frame.get("image_asset_id") or "") or None
+        ),
         "reference_image_asset_ids": [
             entry["image_asset_id"]
             for entry in input_contract["reference_images"]
@@ -746,6 +893,23 @@ def video_admission_lineage(
     current_version = int(graph.get("version") or 0)
     prepared_digest = str(prepared.get("graph_digest") or "")
     current_digest = str(graph.get("graph_digest") or "")
+    item = active.get("item") or {}
+    promotion = item.get("promotion") or {}
+    if (
+        item.get("state") == "approved"
+        and int(promotion.get("graph_version") or 0) == current_version
+        and str(promotion.get("graph_digest") or "") == current_digest
+    ):
+        return {
+            "status": "current",
+            "prepared_graph_version": prepared_version,
+            "current_graph_version": current_version,
+            "keyframe_reuse": "verified_current",
+            "affected_objects": [],
+            "rebuild_allowed": False,
+            "approved_result_current": True,
+            "provider_dispatch_count": 0,
+        }
     if (
         prepared_version == current_version
         and prepared_digest == current_digest
@@ -784,7 +948,6 @@ def video_admission_lineage(
         if canonical_digest(old_visual) == canonical_digest(current_visual)
         else "updated_approved_source"
     )
-    item = active.get("item") or {}
     budget = active.get("budget") or {}
     rebuild_allowed = (
         item.get("state") == "planned"
@@ -810,6 +973,18 @@ def video_admission_lineage(
 
 def _video_visual_source(source: Mapping[str, Any]) -> dict[str, Any]:
     prompt = source.get("prompt_contract") or {}
+    source_semantics = source.get("shot_semantics") or {}
+    shot_semantics = {
+        "action": source_semantics.get("action", prompt.get("shot_action")),
+        "composition": source_semantics.get("composition", prompt.get("composition")),
+        "camera_angle": source_semantics.get("camera_angle", prompt.get("camera_angle")),
+        "movement": source_semantics.get("movement", prompt.get("camera_movement")),
+        "emotion": source_semantics.get("emotion", prompt.get("emotion")),
+        "continuity_cues": source_semantics.get(
+            "continuity_cues",
+            prompt.get("continuity_cues"),
+        ),
+    }
     return {
         "shot": source.get("shot") or {},
         "canonical_entities": source.get("canonical_entities") or {},
@@ -825,20 +1000,7 @@ def _video_visual_source(source: Mapping[str, Any]) -> dict[str, Any]:
             for item in source.get("references", [])
             if isinstance(item, Mapping)
         ],
-        "prompt_contract": {
-            key: prompt.get(key)
-            for key in (
-                "shot_action",
-                "composition",
-                "camera_angle",
-                "camera_movement",
-                "emotion",
-                "continuity_cues",
-                "canonical_entities",
-                "keyword_rewrite",
-                "sample_fallback",
-            )
-        },
+        "shot_semantics": shot_semantics,
     }
 
 
@@ -851,7 +1013,7 @@ def _video_source_affected_objects(
     after_visual = _video_visual_source(after)
     if (
         before_visual["shot"] != after_visual["shot"]
-        or before_visual["prompt_contract"] != after_visual["prompt_contract"]
+        or before_visual["shot_semantics"] != after_visual["shot_semantics"]
         or before_visual["canonical_entities"] != after_visual["canonical_entities"]
     ):
         affected.append(str((after.get("shot") or {}).get("label") or "镜头 01"))
@@ -1052,13 +1214,20 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         for item in image_manifest.get("accepted_graph_snapshots", [])
         if isinstance(item, Mapping)
     }
-    if (current_snapshot["version"], current_snapshot["graph_digest"]) not in accepted:
+    approved_video_exists = any(
+        node.get("state") == "active"
+        and (node.get("metadata") or {}).get("kind") == "approved_video"
+        for node in (graph.get("nodes") or {}).values()
+    )
+    if (
+        (current_snapshot["version"], current_snapshot["graph_digest"])
+        not in accepted
+        and not approved_video_exists
+    ):
         raise ValueError("approved keyframe lineage is stale against the current ProductionGraph")
     labels = _canonical_labels_for_shot(graph, shot_id)
-    prompt_contract = _prompt_contract(
-        _normalized_video_shot_semantics(graph, shot_id, shot),
-        labels,
-    )
+    shot_semantics = _normalized_video_shot_semantics(graph, shot_id, shot)
+    prompt_contract = _prompt_contract(shot_semantics, labels)
     return {
         "production_graph": current_snapshot,
         "asset_bible_revision_id": str(image_manifest.get("source", {}).get("asset_bible_revision_id") or ""),
@@ -1075,6 +1244,7 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         },
         "references": references,
         "canonical_entities": labels,
+        "shot_semantics": shot_semantics,
         "prompt_contract": prompt_contract,
     }
 
@@ -1199,6 +1369,11 @@ def _normalized_video_shot_semantics(
             metadata.get("emotion"),
             shot_grounding.get("purpose"),
             metadata.get("narrative_purpose"),
+        ),
+        "narrative_purpose": first_text(
+            shot_grounding.get("purpose"),
+            metadata.get("narrative_purpose"),
+            metadata.get("intent"),
         ),
         "continuity_cues": continuity,
     }
@@ -1387,6 +1562,30 @@ def _approve_to_graph(
                     "model": MODEL_ID,
                     "resolution": RESOLUTION,
                     "duration_sec": DURATION_SEC,
+                    "generation_mode": str(
+                        (manifest.get("provider_input_contract") or {}).get("mode")
+                        or FIRST_FRAME
+                    ),
+                    "first_frame_count": int(
+                        (
+                            (manifest.get("provider_input_contract") or {})
+                            .get("frame_role_cardinality", {})
+                            .get("first_frame")
+                            or 0
+                        )
+                    ),
+                    "reference_image_count": int(
+                        (
+                            (manifest.get("provider_input_contract") or {})
+                            .get("frame_role_cardinality", {})
+                            .get("reference_image")
+                            or 0
+                        )
+                    ),
+                    "temporal_staging": deepcopy(
+                        (manifest.get("source") or {}).get("temporal_staging")
+                        or {}
+                    ),
                     "mime_type": str(technical_qa.get("container") or ""),
                     "width": int(technical_qa.get("width") or 0),
                     "height": int(technical_qa.get("height") or 0),
@@ -1462,6 +1661,11 @@ def _reconcile_existing_approval(
         or metadata.get("model") != MODEL_ID
         or metadata.get("resolution") != RESOLUTION
         or int(metadata.get("duration_sec") or 0) != DURATION_SEC
+        or str(metadata.get("generation_mode") or FIRST_FRAME)
+        != str(
+            (manifest.get("provider_input_contract") or {}).get("mode")
+            or FIRST_FRAME
+        )
     ):
         raise ValueError("existing video graph promotion conflicts with the approval ledger")
     relation_matches = [
@@ -1508,6 +1712,17 @@ def _safe_command(value: Any) -> dict[str, Any]:
     if not key:
         raise ValueError("video admission command requires idempotency_key")
     safe = {"type": command_type, "idempotency_key": key[:180]}
+    if command_type in {
+        "compile",
+        "recompile_current",
+        "create_new_round",
+        "create_comparison_round",
+    }:
+        safe["generation_mode"] = str(command.get("generation_mode") or "")[:80]
+        safe["selection_reason"] = str(command.get("selection_reason") or "")[:600]
+        safe["temporal_staging"] = validate_temporal_staging(
+            command.get("temporal_staging")
+        )
     for field in ("provider_job_id", "error_category"):
         if command.get(field):
             safe[field] = str(command[field])[:180]
@@ -1516,15 +1731,17 @@ def _safe_command(value: Any) -> dict[str, Any]:
     return safe
 
 
-def _provider_input_contract(source: Mapping[str, Any]) -> dict[str, Any]:
+def _provider_input_contract(
+    source: Mapping[str, Any],
+    *,
+    generation_mode: str,
+) -> dict[str, Any]:
     keyframe = source.get("keyframe") or {}
     references = [
         item for item in source.get("references", [])
         if isinstance(item, Mapping)
     ]
-    return {
-        "mode": "first_frame",
-        "first_frame": {
+    first_frame = {
             "image_asset_id": str(keyframe.get("image_asset_id") or ""),
             "label": str(keyframe.get("label") or "已批准关键帧"),
             "role": "first_frame",
@@ -1532,13 +1749,53 @@ def _provider_input_contract(source: Mapping[str, Any]) -> dict[str, Any]:
             "width": int(keyframe.get("width") or 0),
             "height": int(keyframe.get("height") or 0),
             "byte_count": int(keyframe.get("byte_count") or 0),
-        },
+        }
+    reference_images = [
+        {
+            "image_asset_id": str(item.get("image_asset_id") or ""),
+            "label": str(item.get("label") or "已批准资产参考"),
+            "role": "reference_image",
+            "mime_type": str(item.get("mime_type") or ""),
+            "width": int(item.get("width") or 0),
+            "height": int(item.get("height") or 0),
+            "byte_count": int(item.get("byte_count") or 0),
+            "target_asset_id": str(item.get("target_asset_id") or ""),
+        }
+        for item in references
+    ]
+    selected_first = first_frame if generation_mode == FIRST_FRAME else None
+    selected_references = (
+        reference_images
+        if generation_mode == REFERENCE_CONDITIONED
+        else []
+    )
+    excluded = []
+    if generation_mode != FIRST_FRAME:
+        excluded.append(
+            {
+                "label": str(keyframe.get("label") or "已批准关键帧"),
+                "role": "approved_keyframe_not_sent",
+                "reason": "generation_mode_does_not_lock_first_frame",
+            }
+        )
+    if generation_mode != REFERENCE_CONDITIONED:
+        excluded.extend(
+            {
+                "label": str(item.get("label") or ""),
+                "role": "approved_reference_not_sent",
+                "reason": "generation_mode_does_not_send_identity_references",
+            }
+            for item in references
+        )
+    return {
+        "mode": generation_mode,
+        "first_frame": selected_first,
         "last_frame": None,
-        "reference_images": [],
+        "reference_images": selected_references,
         "frame_role_cardinality": {
-            "first_frame": 1,
+            "first_frame": 1 if selected_first else 0,
             "last_frame": 0,
-            "reference_image": 0,
+            "reference_image": len(selected_references),
         },
         "upload_contract": {
             "transport": "temporary_https_model_input",
@@ -1546,15 +1803,8 @@ def _provider_input_contract(source: Mapping[str, Any]) -> dict[str, Any]:
             "required_host": "media.crazyrouter.com",
             "require_upload_receipt_validation_before_task_submit": True,
         },
-        "excluded_grounding_references": [
-            {
-                "label": str(item.get("label") or ""),
-                "role": "creative_grounding_only",
-                "reason": "first_frame_entry_excludes_all_purpose_reference_images",
-            }
-            for item in references
-        ],
-        "excluded_grounding_reference_count": len(references),
+        "excluded_grounding_references": excluded,
+        "excluded_grounding_reference_count": len(excluded),
     }
 
 
@@ -1568,19 +1818,57 @@ def _validated_provider_input_contract(
     references = contract.get("reference_images")
     cardinality = contract.get("frame_role_cardinality")
     upload = contract.get("upload_contract")
+    mode = str(contract.get("mode") or "")
+    source = manifest.get("source") or {}
+    source_references = [
+        item for item in source.get("references", [])
+        if isinstance(item, Mapping)
+    ]
+    expected_first = (
+        str((source.get("keyframe") or {}).get("image_asset_id") or "")
+        if mode == FIRST_FRAME
+        else ""
+    )
+    expected_references = (
+        [str(item.get("image_asset_id") or "") for item in source_references]
+        if mode == REFERENCE_CONDITIONED
+        else []
+    )
+    actual_references = [
+        str(item.get("image_asset_id") or "")
+        for item in references
+        if isinstance(item, Mapping)
+    ] if isinstance(references, list) else []
+    media_rows = (
+        ([first] if isinstance(first, Mapping) else [])
+        + ([item for item in references if isinstance(item, Mapping)] if isinstance(references, list) else [])
+    )
     if (
-        contract.get("mode") != "first_frame"
-        or not isinstance(first, Mapping)
-        or str(first.get("role") or "") != "first_frame"
-        or str(first.get("image_asset_id") or "")
-        != str((manifest.get("source") or {}).get("keyframe", {}).get("image_asset_id") or "")
-        or str(first.get("mime_type") or "") not in {"image/png", "image/jpeg"}
-        or int(first.get("width") or 0) <= 0
-        or int(first.get("height") or 0) <= 0
-        or int(first.get("byte_count") or 0) <= 0
+        mode not in {FIRST_FRAME, REFERENCE_CONDITIONED, TEXT_TO_VIDEO}
+        or (mode == FIRST_FRAME and not isinstance(first, Mapping))
+        or (mode != FIRST_FRAME and first is not None)
+        or (
+            isinstance(first, Mapping)
+            and (
+                str(first.get("role") or "") != "first_frame"
+                or str(first.get("image_asset_id") or "") != expected_first
+            )
+        )
+        or actual_references != expected_references
+        or any(str(item.get("role") or "") != "reference_image" for item in (references or []))
+        or any(
+            str(item.get("mime_type") or "") not in {"image/png", "image/jpeg"}
+            or int(item.get("width") or 0) <= 0
+            or int(item.get("height") or 0) <= 0
+            or int(item.get("byte_count") or 0) <= 0
+            for item in media_rows
+        )
         or contract.get("last_frame") is not None
-        or references != []
-        or cardinality != {"first_frame": 1, "last_frame": 0, "reference_image": 0}
+        or cardinality != {
+            "first_frame": 1 if mode == FIRST_FRAME else 0,
+            "last_frame": 0,
+            "reference_image": len(expected_references),
+        }
         or not isinstance(upload, Mapping)
         or upload.get("transport") != "temporary_https_model_input"
         or upload.get("required_host") != "media.crazyrouter.com"
@@ -1642,6 +1930,48 @@ def _assert_new_round_eligible(
         or not rejected
     ):
         raise ValueError("the prior video round is not safely classified as a rejected input")
+
+
+def _assert_comparison_round_eligible(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    if not manifest:
+        raise ValueError("an approved video round is required")
+    item = manifest.get("item") or {}
+    candidate = item.get("candidate") or {}
+    promotion = item.get("promotion") or {}
+    budget = manifest.get("budget") or {}
+    if (
+        item.get("state") != "approved"
+        or not str(candidate.get("sha256") or "")
+        or not str(promotion.get("production_graph_node_id") or "")
+        or int(manifest.get("provider_dispatch_count") or 0) != 1
+        or int(budget.get("dispatches_reserved") or 0) != 1
+        or int(budget.get("remaining_dispatches") or 0) != 0
+    ):
+        raise ValueError("the prior video round is not an immutable approved result")
+    graph = ProductionGraphStore(store).load(project_id)
+    node = (
+        (graph.get("nodes") or {}).get(
+            str(promotion["production_graph_node_id"])
+        )
+        or {}
+    )
+    metadata = node.get("metadata") or {}
+    if (
+        node.get("state") != "active"
+        or metadata.get("kind") != "approved_video"
+        or metadata.get("manifest_hash") != manifest.get("manifest_hash")
+        or metadata.get("sha256") != candidate.get("sha256")
+    ):
+        raise ValueError("the approved video result is not current in ProductionGraph")
+    current_source = _source_contract(store, project_id)
+    if canonical_digest(
+        _video_visual_source(manifest.get("source") or {})
+    ) != canonical_digest(_video_visual_source(current_source)):
+        raise ValueError("the shot changed after the approved video; prepare current media first")
 
 
 def _safe_candidate(value: Any, *, project_id: str = "") -> dict[str, Any]:

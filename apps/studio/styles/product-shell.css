@@ -1267,6 +1267,11 @@
 .product-state-lock { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(244, 183, 64, .32); border-radius: 6px; color: #f4b740; background: rgba(244, 183, 64, .07); }
 .product-state-preserved { color: #b7c7d0; }
 .product-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.product-project-selection { display: grid; width: min(560px, 100%); gap: 8px; margin: 4px 0; }
+.product-project-choice { display: grid; gap: 3px; min-height: 56px; border: 1px solid var(--product-border); border-radius: 6px; padding: 10px 12px; background: var(--product-surface); color: var(--product-text); text-align: left; cursor: pointer; }
+.product-project-choice:hover,
+.product-project-choice:focus-visible { border-color: var(--product-accent); background: var(--product-accent-soft); }
+.product-project-choice span { color: var(--product-muted); font-size: 12px; }
 .identity-cache-read-only { position: relative; }
 .identity-cache-read-only .canvas-workspace-stage { pointer-events: none; }
 .identity-cache-banner { position: absolute; z-index: 12; top: 8px; left: 50%; max-width: calc(100% - 24px); border: 1px solid rgba(244, 183, 64, .32); border-radius: 6px; padding: 7px 10px; background: #182016; color: #f5d68a; font-size: 12px; transform: translateX(-50%); }

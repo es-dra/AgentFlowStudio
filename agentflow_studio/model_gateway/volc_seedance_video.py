@@ -266,6 +266,10 @@ def _seedance_payload(*, service: dict[str, Any], model: str, request: ProviderD
 
 
 def _frame_roles(input_mode: str, count: int) -> tuple[str, ...]:
+    if input_mode == "text_only":
+        if count != 0:
+            raise ModelConfigError("Seedance text_only mode cannot include images")
+        return ()
     if input_mode == "first_frame":
         if count != 1:
             raise ModelConfigError("Seedance first_frame mode requires exactly one image")

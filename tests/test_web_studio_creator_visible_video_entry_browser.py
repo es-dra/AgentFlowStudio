@@ -124,6 +124,11 @@ def test_desktop_storyboard_and_agent_use_the_same_zero_provider_video_entry() -
                 page.get_by_text("当前镜头已有已批准关键帧和 3 张参考图", exact=False).wait_for()
                 assert page.evaluate("window.__calls.agentConversation") == 1
                 page.locator(".agent-primary-action").get_by_text("准备镜头视频").click()
+                page.locator(".video-generation-setup").get_by_role(
+                    "button",
+                    name="预览视频准备",
+                    exact=True,
+                ).click()
                 page.get_by_text("确认视频准备", exact=True).wait_for()
                 assert page.evaluate("window.__calls.videoDispatch") == 0
                 assert not console_errors
@@ -159,6 +164,7 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                 assert page.locator(".studio-storyboard .video-admission-panel").count() == 0
                 assert approved.get_by_text("视频已保存到项目", exact=True).is_visible()
                 assert approved.get_by_text("doubao-seedance-2-0", exact=True).is_visible()
+                assert approved.get_by_text("首帧图生视频", exact=True).is_visible()
                 assert approved.get_by_text("720p · 6.04 秒", exact=True).is_visible()
                 video = approved.locator("video")
                 page.wait_for_function(
@@ -217,6 +223,7 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                     """() => Object.values(window.__videoStudioState.nodes).some(
                       (node) => node.type === "video"
                         && node.status === "complete"
+                        && node.params?.approvedMedia?.generation_mode === "first_frame"
                         && node.previewUrl.startsWith("/projects/browser-video-entry/")
                     )"""
                 )
@@ -229,6 +236,85 @@ def test_approved_video_is_playable_and_consistent_across_refresh_and_views() ->
                     }"""
                 )
                 assert page.get_by_text("视频已保存到项目", exact=True).first.is_visible()
+                page.evaluate("window.__setVideoSection('storyboard')")
+                page.locator(".storyboard-heading-actions").get_by_role(
+                    "button",
+                    name="准备叙事镜头对照",
+                    exact=True,
+                ).click()
+                comparison_setup = page.locator(".video-generation-setup")
+                assert comparison_setup.is_visible()
+                assert comparison_setup.get_by_label(
+                    "视频生成方式"
+                ).input_value() == "reference_conditioned"
+                assert comparison_setup.get_by_text(
+                    "使用批准资产约束身份与连续性，不锁定首帧。",
+                    exact=True,
+                ).is_visible()
+                comparison_setup.get_by_role(
+                    "button",
+                    name="准备叙事镜头对照",
+                    exact=True,
+                ).click()
+                comparison_review = page.locator(".image-admission-review")
+                comparison_review.get_by_text(
+                    "确认建立叙事镜头对照",
+                    exact=True,
+                ).wait_for()
+                assert comparison_review.get_by_text(
+                    "旧批准视频保持不变",
+                    exact=False,
+                ).is_visible()
+                assert comparison_review.get_by_text(
+                    "首帧：不发送",
+                    exact=False,
+                ).is_visible()
+                assert comparison_review.get_by_text(
+                    "实际发送参考图：3 张",
+                    exact=False,
+                ).is_visible()
+                comparison_review.get_by_role(
+                    "button",
+                    name="确认",
+                    exact=True,
+                ).click()
+                reserve = page.get_by_role(
+                    "button",
+                    name="预览并确认生成",
+                    exact=True,
+                )
+                reserve.wait_for()
+                reserve.click()
+                final_review = page.locator(".image-admission-review")
+                final_review.get_by_text(
+                    "确认发送镜头 01 视频",
+                    exact=True,
+                ).wait_for()
+                assert final_review.get_by_text(
+                    "doubao-seedance-2-0（非 fast）",
+                    exact=False,
+                ).is_visible()
+                assert final_review.get_by_text(
+                    "720p · 6 秒 · 参考图约束视频",
+                    exact=False,
+                ).is_visible()
+                assert final_review.get_by_text(
+                    "1 次发送 · 自动重试 0 · $2.00 项目停止线",
+                    exact=False,
+                ).is_visible()
+                assert final_review.get_by_text(
+                    "首帧：不发送",
+                    exact=False,
+                ).is_visible()
+                assert final_review.get_by_text(
+                    "实际发送参考图：3 张",
+                    exact=False,
+                ).is_visible()
+                assert final_review.get_by_role(
+                    "button",
+                    name="确认并发送",
+                    exact=True,
+                ).is_visible()
                 assert page.evaluate("window.__calls.videoDispatch") == 0
                 assert page.evaluate("window.__sideEffects.generateVideo") == 0
                 assert not console_errors
@@ -383,7 +469,7 @@ def test_approved_ledger_without_graph_media_does_not_become_a_second_ui_truth()
                 browser.close()
 
 
-def test_rejected_round_builds_a_new_first_frame_manifest_without_dispatch() -> None:
+def test_rejected_round_builds_a_new_reference_manifest_without_dispatch() -> None:
     with _server() as base_url:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
@@ -414,7 +500,8 @@ def test_rejected_round_builds_a_new_first_frame_manifest_without_dispatch() -> 
                 page.get_by_text("确认建立新的单次视频清单", exact=True).wait_for()
                 review = page.locator(".image-admission-review")
                 assert review.get_by_text("旧失败清单和唯一一次发送记录保持不变", exact=False).is_visible()
-                assert review.get_by_text("实际发送参考图：0 张", exact=False).is_visible()
+                assert review.get_by_text("实际发送参考图：3 张", exact=False).is_visible()
+                assert review.get_by_text("参考图约束视频", exact=False).is_visible()
                 page.get_by_role("button", name="确认", exact=True).click()
                 page.get_by_role("button", name="预览并确认生成", exact=True).wait_for()
                 assert panel.get_by_text("实际发送参考图").is_visible()
@@ -565,9 +652,18 @@ def test_stale_video_manifest_rebuilds_current_version_before_final_confirmation
                 ).is_visible()
                 page.evaluate("window.__deferRecompilePreview = true")
                 main_action.click()
-                assert page.get_by_role(
+                setup = page.locator(".video-generation-setup")
+                assert setup.get_by_label(
+                    "视频生成方式"
+                ).input_value() == "reference_conditioned"
+                setup.get_by_role(
                     "button",
-                    name="正在按当前版本准备…",
+                    name="按当前版本重新准备",
+                    exact=True,
+                ).click()
+                assert panel.get_by_role(
+                    "button",
+                    name="正在准备…",
                     exact=True,
                 ).is_disabled()
                 assert page.evaluate("window.__rebuildEffects") == {
@@ -644,7 +740,23 @@ def _assert_storyboard_entry(page: Page) -> None:
     )
     page.evaluate("window.__deferCompilePreview = true")
     main_entry.click()
-    assert page.locator(".storyboard-heading-actions").get_by_role(
+    setup = page.locator(".video-generation-setup")
+    assert setup.is_visible()
+    assert setup.get_by_label("视频生成方式").input_value() == "reference_conditioned"
+    for label in (
+        "主体动作弧",
+        "空间位移",
+        "互动对象",
+        "镜头运动",
+        "环境动态",
+        "节奏",
+        "起始状态",
+        "结束状态",
+        "叙事目的",
+    ):
+        assert setup.get_by_label(label).input_value()
+    setup.get_by_role("button", name="预览视频准备", exact=True).click()
+    assert setup.get_by_role(
         "button",
         name="正在准备…",
         exact=True,
@@ -653,7 +765,7 @@ def _assert_storyboard_entry(page: Page) -> None:
     assert page.evaluate("window.__calls.compilePreview") == 1
     page.evaluate("window.__releaseCompilePreview()")
     page.get_by_text("确认视频准备", exact=True).wait_for()
-    assert page.get_by_text("已批准关键帧").last.is_visible()
+    assert page.get_by_text("参考图约束视频", exact=False).last.is_visible()
     assert page.get_by_text("角色甲、月台甲、怀表甲").is_visible()
     assert page.evaluate("window.__calls.videoDispatch") == 0
 
@@ -817,6 +929,7 @@ def _contract_html() -> str:
               codec: "vp9",
               model: "doubao-seedance-2-0",
               resolution: "720p",
+              generation_mode: "first_frame",
               approval_graph_version: 16,
               target_node_ids: ["shot-01"],
               lineage: {
@@ -860,6 +973,22 @@ def _contract_html() -> str:
           provider_prompt: "角色甲在月台甲修复怀表甲，镜头缓慢推进。",
           camera_movement: "缓慢推进",
         },
+        generation_mode: {
+          mode: "reference_conditioned",
+          label: "参考图约束视频",
+          selection_reason: "使用批准资产约束身份与连续性，不锁定首帧。",
+        },
+        temporal_staging: {
+          subject_action_arc: "角色甲拿起怀表，打开后盖并完成一次校准",
+          spatial_displacement: "角色从长椅一端起身移向月台工作灯",
+          interaction_object: "双手持续操作怀表与修表工具",
+          camera_movement: "镜头平稳侧移并在校准完成时停住",
+          environment_dynamics: "远处蒸汽掠过月台，灯光随列车震动轻晃",
+          pacing: "前段克制，中段加快，结尾停顿",
+          start_state: "角色独坐月台检查无法走动的怀表",
+          end_state: "怀表重新走动，角色抬头望向远处铁轨",
+          narrative_purpose: "完成孤独修复任务并建立继续前行的转折",
+        },
       };
       const providerContract = {
         service_id: "seedance_i2v",
@@ -878,24 +1007,23 @@ def _contract_html() -> str:
         classification: "program_stop_ceiling_not_provider_enforced_estimate_or_actual",
       };
       const providerInputContract = {
-        mode: "first_frame",
-        first_frame: {
-          image_asset_id: "keyframe-approved",
-          label: "已批准关键帧",
-          role: "first_frame",
+        mode: "reference_conditioned",
+        first_frame: null,
+        last_frame: null,
+        reference_images: source.references.map((item) => ({
+          ...item,
+          role: "reference_image",
           mime_type: "image/png",
           width: 1280,
           height: 720,
           byte_count: 1024,
-        },
-        last_frame: null,
-        reference_images: [],
+        })),
         frame_role_cardinality: {
-          first_frame: 1,
+          first_frame: 0,
           last_frame: 0,
-          reference_image: 0,
+          reference_image: 3,
         },
-        excluded_grounding_reference_count: 3,
+        excluded_grounding_reference_count: 1,
       };
       const compiledManifest = {
         status: "locked",
@@ -959,6 +1087,22 @@ def _contract_html() -> str:
           prior_round_replay_allowed: false,
         },
       };
+      const comparisonManifest = {
+        ...compiledManifest,
+        version: 4,
+        manifest_id: "video-manifest-comparison",
+        manifest_hash: "f".repeat(64),
+        source: {
+          ...source,
+          production_graph: { version: 16, graph_digest: "graph-v16" },
+        },
+        round_contract: {
+          kind: "independent_comparison",
+          prior_round_preserved: true,
+          prior_round_replay_allowed: false,
+          prior_approved_result_immutable: true,
+        },
+      };
       const rejectedManifest = {
         ...compiledManifest,
         version: 2,
@@ -989,6 +1133,8 @@ def _contract_html() -> str:
             ? { ...compiledManifest, status: "draft" }
             : command.type === "create_new_round"
               ? newRoundManifest
+            : command.type === "create_comparison_round"
+              ? comparisonManifest
             : command.type === "recompile_current"
               ? recompiledManifest
             : {
@@ -1038,6 +1184,9 @@ def _contract_html() -> str:
             window.__rebuildEffects.recompilePreview += 1;
           }
           if (request.command.type === "create_new_round") {
+            return Promise.resolve(preview(request.command));
+          }
+          if (request.command.type === "create_comparison_round") {
             return Promise.resolve(preview(request.command));
           }
           if (request.command.type === "compile" && window.__deferCompilePreview) {
@@ -1128,6 +1277,30 @@ def _contract_html() -> str:
               provider_dispatch_count: 0,
             });
           }
+          if (request.command.type === "create_comparison_round") {
+            persistedVideoAdmission = {
+              status: "locked",
+              manifest: comparisonManifest,
+              readiness: {
+                status: "ready",
+                shot_id: "shot-01",
+                shot_label: "镜头 01",
+                first_frame_label: "已批准关键帧",
+                reference_count: 3,
+              },
+              lineage: {
+                status: "current",
+                prepared_graph_version: 16,
+                current_graph_version: 16,
+              },
+              capability: { configured: true },
+              provider_dispatch_count: 0,
+            };
+            return Promise.resolve({
+              result: { manifest: comparisonManifest },
+              provider_dispatch_count: 0,
+            });
+          }
           if (request.command.type === "compile") {
             window.__sideEffects.persistedWrites += 1;
             persistedVideoAdmission = {
@@ -1211,7 +1384,7 @@ def _contract_html() -> str:
               : null,
         readiness: {
           status: approvedLedgerState
-            ? "stale"
+            ? "comparison_ready"
             : startStale
               ? "stale"
               : startRejected
@@ -1221,20 +1394,58 @@ def _contract_html() -> str:
           shot_label: "镜头 01",
           first_frame_label: "已批准关键帧",
           reference_count: 3,
-          next_action: "预览视频生成确认卡。",
+          generation_modes: [
+            {
+              mode: "reference_conditioned",
+              label: "参考图约束视频",
+              supported: true,
+              reason: "使用批准资产约束身份与连续性，不锁定首帧。",
+            },
+            {
+              mode: "first_frame",
+              label: "首帧图生视频",
+              supported: true,
+              reason: "仅在明确要求从关键帧开始时使用。",
+            },
+            {
+              mode: "text_to_video",
+              label: "文生视频（仅文字叙事）",
+              supported: false,
+              reason: "当前服务未开放。",
+            },
+          ],
+          suggested_generation_mode: "reference_conditioned",
+          suggested_mode_reason: "使用批准资产约束身份与连续性，不锁定首帧。",
+          temporal_staging_template: {
+            subject_action_arc: "角色甲拿起怀表，打开后盖并完成一次校准",
+            spatial_displacement: "角色从长椅一端起身移向月台工作灯",
+            interaction_object: "双手持续操作怀表与修表工具",
+            camera_movement: "镜头平稳侧移并在校准完成时停住",
+            environment_dynamics: "远处蒸汽掠过月台，灯光随列车震动轻晃",
+            pacing: "前段克制，中段加快，结尾停顿",
+            start_state: "角色独坐月台检查无法走动的怀表",
+            end_state: "怀表重新走动，角色抬头望向远处铁轨",
+            narrative_purpose: "完成孤独修复任务并建立继续前行的转折",
+          },
+          next_action: "选择生成方式并补全镜头叙事。",
           ...(startRejected ? {
             new_round_allowed: true,
             next_action: "建立新的单次视频清单；旧失败记录保持不变。",
           } : {}),
+          ...(approvedLedgerState ? {
+            comparison_round_allowed: true,
+            next_action: "准备一个不覆盖旧结果的叙事镜头对照。",
+          } : {}),
         },
         lineage: approvedLedgerState
           ? {
-              status: "stale",
+              status: "current",
               prepared_graph_version: 15,
               current_graph_version: 16,
               keyframe_reuse: "verified_current",
               affected_objects: [],
               rebuild_allowed: false,
+              approved_result_current: true,
             }
           : startStale
           ? {

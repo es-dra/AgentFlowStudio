@@ -11,7 +11,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
-from agentflow_studio.model_gateway.errors import ModelGatewayError, ModelProviderError
+from agentflow_studio.model_gateway.errors import (
+    ModelConfigError,
+    ModelGatewayError,
+    ModelProviderError,
+)
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from agentflow_studio.model_gateway import volc_seedance_video
 from apps.api import runtime_video_routes
@@ -397,6 +401,15 @@ def test_seedance_first_frame_mode_rejects_mixed_image_cardinality_before_networ
             ),
         )
     assert called == 0
+
+
+def test_seedance_text_only_role_contract_has_zero_images() -> None:
+    assert volc_seedance_video._frame_roles("text_only", 0) == ()
+    with pytest.raises(
+        ModelConfigError,
+        match="text_only mode cannot include images",
+    ):
+        volc_seedance_video._frame_roles("text_only", 1)
 
 
 @pytest.mark.parametrize(

@@ -438,6 +438,11 @@ def _approved_media_projection(
             "codec": receipt["codec"],
             "model": str(metadata.get("model") or ""),
             "resolution": str(metadata.get("resolution") or ""),
+            "generation_mode": str(
+                metadata.get("generation_mode")
+                or receipt.get("generation_mode")
+                or "first_frame"
+            ),
             "approval_graph_version": receipt["approval_graph_version"],
             "lineage": {
                 "source_kind": "approved_video_receipt",
@@ -535,6 +540,17 @@ def _approved_video_receipts(
             "height": int(technical_qa.get("height") or 0),
             "duration_sec": float(technical_qa.get("duration_sec") or 0),
             "codec": str(technical_qa.get("codec") or ""),
+            "generation_mode": str(
+                (
+                    manifest.get("provider_input_contract")
+                    if isinstance(
+                        manifest.get("provider_input_contract"),
+                        Mapping,
+                    )
+                    else {}
+                ).get("mode")
+                or "first_frame"
+            ),
             "approval_graph_version": _positive_int(promotion.get("graph_version")),
             "_media_path": media_path,
         }

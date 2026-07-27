@@ -199,7 +199,8 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     open_flow = shell.split("async function openCurrentShotVideoPreparation()", 1)[1].split(
         "function handleAgentVideoPreparation()", 1
     )[0]
-    assert 'stageVideoAdmissionCommand({ type: "compile" })' in open_flow
+    assert "focusVideoAdmissionPanel()" in open_flow
+    assert 'stageVideoAdmissionCommand({ type: "compile" })' not in open_flow
     assert 'section = "storyboard"' in open_flow
 
     assert 'action.action === "prepare_shot_video"' in shell

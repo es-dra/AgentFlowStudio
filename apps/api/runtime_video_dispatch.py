@@ -133,29 +133,43 @@ def submit_video_generation(
             user_action="Choose a supported generation path before submitting to a video provider.",
             details=path_error["details"],
         )
-    try:
-        first_frame_path = image_asset_file_path(store, project_id, request.first_frame_image_asset_id)
-        frame_metadata = [image_asset_metadata(store, project_id, request.first_frame_image_asset_id)]
-    except (KeyError, ValueError) as exc:
-        raise RuntimeApiError(
-            "first_frame_asset_not_found",
-            "首帧图片不存在或已失效。",
-            stage="first_frame_resolve",
-            user_action="请重新上传图片，并在节点菜单中设为首帧后再生成视频。",
-            details={"asset_id": request.first_frame_image_asset_id},
-        ) from exc
-    runtime_file_event(
-        "video",
-        "first_frame_resolved",
-        request_id=request_id,
-        client_request_id=client_request_id,
-        project_id=project_id,
-        node_id=request.node_id,
-        job_id=job_id,
-        provider_service_id=request.provider_service_id,
-        first_frame_asset_id=request.first_frame_image_asset_id,
-        elapsed_ms=_elapsed_ms(started),
-    )
+    input_mode = video_input_mode(request)
+    first_frame_path = None
+    frame_metadata: list[dict[str, Any]] = []
+    if request.first_frame_image_asset_id:
+        try:
+            first_frame_path = image_asset_file_path(
+                store,
+                project_id,
+                request.first_frame_image_asset_id,
+            )
+            frame_metadata.append(
+                image_asset_metadata(
+                    store,
+                    project_id,
+                    request.first_frame_image_asset_id,
+                )
+            )
+        except (KeyError, ValueError) as exc:
+            raise RuntimeApiError(
+                "first_frame_asset_not_found",
+                "首帧图片不存在或已失效。",
+                stage="first_frame_resolve",
+                user_action="请重新选择已批准首帧后再生成视频。",
+                details={"asset_id": request.first_frame_image_asset_id},
+            ) from exc
+        runtime_file_event(
+            "video",
+            "first_frame_resolved",
+            request_id=request_id,
+            client_request_id=client_request_id,
+            project_id=project_id,
+            node_id=request.node_id,
+            job_id=job_id,
+            provider_service_id=request.provider_service_id,
+            first_frame_asset_id=request.first_frame_image_asset_id,
+            elapsed_ms=_elapsed_ms(started),
+        )
     approved_reference_paths: list[Path] = []
     for reference_asset_id in request.reference_image_asset_ids:
         try:
@@ -322,7 +336,11 @@ def submit_video_generation(
                 "requires": "quota_override_confirmed",
             },
         )
-    reference_paths = [first_frame_path, *approved_reference_paths]
+    reference_paths = []
+    if input_mode in {"first_frame", "first_last_frame"} and first_frame_path:
+        reference_paths.append(first_frame_path)
+    if input_mode == "reference_images":
+        reference_paths.extend(approved_reference_paths)
     if last_frame_path:
         reference_paths.append(last_frame_path)
     if request.provider_service_id == SEEDANCE_SERVICE_ID:
@@ -354,7 +372,7 @@ def submit_video_generation(
         duration_sec=request.duration_sec,
         resolution=request.resolution,
         motion=request.motion,
-        input_mode=video_input_mode(request),
+        input_mode=input_mode,
         input_source=video_input_source_contract(request),
         duration_contract=video_duration_contract(request.duration_sec),
         model_name_override=SEEDANCE_MODEL_ID if request.provider_service_id == SEEDANCE_SERVICE_ID else None,
@@ -671,7 +689,7 @@ def _model_call_context(project_id: str, request: VideoGenerationRequest, contex
             "aspect_ratio": request.aspect_ratio,
             "input_mode": video_input_mode(request),
             "reference_image_slots": (
-                1
+                int(bool(request.first_frame_image_asset_id))
                 + len(request.reference_image_asset_ids)
                 + int(bool(request.last_frame_image_asset_id))
             ),
@@ -714,9 +732,9 @@ def _validate_provider_request(request: VideoGenerationRequest, descriptor: Any)
     if supported_input_modes and input_mode not in supported_input_modes:
         raise RuntimeApiError(
             "unsupported_input_mode",
-            "褰撳墠瑙嗛妯″瀷涓嶆敮鎸佽棣栧抚/棣栧熬甯ц緭鍏ユā寮忋€?",
+            "当前视频模型不支持所选生成方式。",
             stage="provider_capability_check",
-            user_action=f"璇锋敼涓烘ā鍨嬫敮鎸佺殑杈撳叆妯″紡锛?{', '.join(supported_input_modes)}銆?",
+            user_action="请返回确认卡选择当前服务支持的视频生成方式。",
             details={
                 "input_mode": input_mode,
                 "allowed": supported_input_modes,

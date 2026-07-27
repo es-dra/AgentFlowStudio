@@ -12,6 +12,7 @@ from apps.api.runtime_service import create_runtime_app
 
 INITIAL_GENERATION_PATHS = {
     "t2v",
+    "reference_images",
     "i2v_first_frame",
     "i2v_first_last",
     "reference_video",
@@ -37,6 +38,11 @@ def test_generation_path_contract_v1_defines_initial_paths() -> None:
     assert contracts["t2v"]["required_inputs"] == ["prompt_text"]
     assert "first_frame_image_asset_id" not in contracts["t2v"]["required_inputs"]
     assert contracts["i2v_first_frame"]["required_inputs"] == ["prompt_text", "first_frame_image_asset_id"]
+    assert contracts["reference_images"]["required_inputs"] == [
+        "prompt_text",
+        "reference_image_asset_ids",
+    ]
+    assert contracts["reference_images"]["adoption_state"] == "supported"
     assert contracts["i2v_first_last"]["required_inputs"] == [
         "prompt_text",
         "first_frame_image_asset_id",
@@ -77,6 +83,22 @@ def test_video_generation_request_keeps_legacy_i2v_required_inputs() -> None:
 
     assert video_generation_path_id(legacy) == "i2v_first_frame"
     assert video_generation_path_id(first_last) == "i2v_first_last"
+
+    reference_conditioned = VideoGenerationRequest(
+        generation_path="reference_images",
+        prompt_text="Use approved references for identity continuity.",
+        reference_image_asset_ids=["character-ref", "scene-ref"],
+        generated_at="2026-07-27T00:00:00+00:00",
+    )
+    assert reference_conditioned.first_frame_image_asset_id is None
+    assert video_generation_path_id(reference_conditioned) == "reference_images"
+    with pytest.raises(ValidationError) as missing_references:
+        VideoGenerationRequest(
+            generation_path="reference_images",
+            prompt_text="No references supplied.",
+            generated_at="2026-07-27T00:00:00+00:00",
+        )
+    assert "reference_image_asset_ids" in str(missing_references.value)
 
 
 def test_t2v_preflight_does_not_require_first_frame_and_blocks_provider_submit(tmp_path, monkeypatch) -> None:
