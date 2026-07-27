@@ -670,20 +670,15 @@ export function createProductShell(options = {}) {
     const textarea = document.createElement("textarea");
     textarea.rows = 4;
     textarea.value = m6SourceText;
-    textarea.placeholder = "可粘贴想法、已有剧本、场景、镜头、角色、参考图用途或制作目标";
-    textarea.setAttribute("aria-label", "输入想法或已有剧本");
-    textarea.addEventListener("input", () => {
-      m6SourceText = textarea.value;
-      m6SourceDraftDirty = true;
-      writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
-      writeM6SourceDraft(currentM6SourceRevisionKey(), currentScriptTruthRevisionBinding());
-    });
+    textarea.placeholder = "先保存并应用剧本，再准备制作方案";
+    textarea.setAttribute("aria-label", "当前已应用剧本");
+    textarea.readOnly = true;
     const preview = node("button", "studio-primary-button", "生成剧本制作方案");
     preview.type = "button";
     const previewBusy = ["queued", "running"].includes(String(m6PreviewRun?.phase || ""));
     preview.disabled = previewBusy;
     preview.textContent = previewBusy ? "制作方案处理中" : "生成剧本制作方案";
-    preview.addEventListener("click", () => previewM6ScriptPlan(textarea.value));
+    preview.addEventListener("click", () => previewM6ScriptPlan());
     planner.append(textarea, preview, ...planningImportControls());
     if (m6PreviewRun) planner.appendChild(buildM6PreviewRunStatus());
     status.append(planner, planResizeHandle());
@@ -855,13 +850,20 @@ export function createProductShell(options = {}) {
     requestCanvasSafeAreaUpdate();
   }
 
-  async function previewM6ScriptPlan(sourceText) {
+  async function previewM6ScriptPlan() {
     const runtime = options.getRuntime?.();
     if (!runtime) return;
     const expectedProjectId = currentM6ProjectId();
     if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
+    const sourceText = currentScriptTruthSourceText();
+    const sourceBinding = currentScriptTruthBinding();
+    if (!sourceText || !sourceBinding.revision_id || !sourceBinding.source_digest) {
+      notice = "请先保存并应用当前剧本，再准备制作方案。";
+      render();
+      return;
+    }
     const clientRequestId = runtime.newM6PreviewClientRequestId?.() || `m6_${Date.now()}`;
-    m6SourceText = String(sourceText || "");
+    m6SourceText = sourceText;
     writeM6SourceDraft(currentM6SourceDraftKey(), m6SourceText);
     writeM6SourceDraft(currentM6SubmittedSourceKey(), m6SourceText);
     writeM6SourceDraft(currentM6SourceRevisionKey(), currentScriptTruthRevisionBinding());
@@ -878,8 +880,10 @@ export function createProductShell(options = {}) {
     render();
     try {
       const run = await runtime.previewM6ScriptPlanAssetBible({
-        source_kind: "idea",
+        source_kind: "script",
         source_text: sourceText,
+        source_revision_id: sourceBinding.revision_id,
+        source_revision_digest: sourceBinding.source_digest,
       }, clientRequestId);
       if (!isM6RuntimeCurrent(runtime, expectedProjectId)) return;
       await observeM6PreviewRun(run, runtime, expectedProjectId);
@@ -1287,7 +1291,6 @@ export function createProductShell(options = {}) {
     const currentScriptRevisionId = String(
       source?.script_revision_id
       || snapshot.studioState?.production?.script_core_truth_projection?.current_revision_id
-      || currentReadyScriptNode()?.id
       || "",
     );
     const items = [
@@ -1425,8 +1428,7 @@ export function createProductShell(options = {}) {
   function assetBibleEmpty(source) {
     const wrap = node("section", "asset-bible-empty");
     const hasCurrentScript = Boolean(
-      snapshot.studioState?.production?.script_core_truth_projection?.current_revision_id
-      || currentReadyScriptNode(),
+      snapshot.studioState?.production?.script_core_truth_projection?.current_revision_id,
     );
     wrap.appendChild(node(
       "strong",
@@ -4436,8 +4438,20 @@ export function createProductShell(options = {}) {
   }
 
   function currentScriptTruthRevisionBinding() {
+    const binding = currentScriptTruthBinding();
+    return [binding.revision_id, binding.source_digest].filter(Boolean).join(":");
+  }
+
+  function currentScriptTruthBinding() {
     const projection = snapshot.studioState?.production?.script_core_truth_projection || {};
-    return [projection.current_revision_id || "", projection.source_digest || ""].filter(Boolean).join(":");
+    return {
+      revision_id: String(projection.current_revision_id || ""),
+      source_digest: String(
+        projection.source_digest
+        || projection.current_revision?.source_digest
+        || "",
+      ),
+    };
   }
 
   function currentScriptTruthSourceText() {

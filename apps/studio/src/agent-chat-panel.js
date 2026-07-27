@@ -30,6 +30,7 @@ import {
   taskStateLabel,
 } from "./creative-task-contract.js";
 import {
+  isValidStoryboardDuration,
   productionBriefForSource,
   productionBriefLabel,
   shotPlanDurationAssessment,
@@ -596,7 +597,7 @@ function shotPlanReview(action) {
   wrap.appendChild(el(
     "p",
     `agent-current-task-copy ${assessment.apply_allowed ? "duration-pass" : "duration-blocked"}`,
-    `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 目标 ${Math.round(assessment.target_duration_seconds)} 秒 · 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒。`,
+    `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 目标 ${Math.round(assessment.target_duration_seconds)} 秒（允许偏差 ${Math.round(assessment.tolerance_seconds)} 秒）· 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒。`,
   ));
   wrap.appendChild(el(
     "p",
@@ -639,7 +640,10 @@ function storyboardBriefReview({ store, runtime, node, action, onRender }) {
   label.appendChild(input);
   wrap.appendChild(label);
   wrap.appendChild(el("small", "", `允许偏差 ${Math.round(brief.tolerance_seconds)} 秒。`));
-  wrap.appendChild(taskButton("确认目标并预览分镜", "studio-primary-button", () => {
+  const validation = el("small", "storyboard-duration-error", "");
+  validation.setAttribute("aria-live", "polite");
+  const confirm = taskButton("确认目标并预览分镜", "studio-primary-button", () => {
+    if (!isValidStoryboardDuration(input.value)) return;
     const productionBrief = updateEmbeddedStoryboardBrief(store, node.id, input.value);
     if (!productionBrief) return;
     void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], "shot_breakdown", {
@@ -647,7 +651,15 @@ function storyboardBriefReview({ store, runtime, node, action, onRender }) {
       productionBrief,
     }).finally(() => onRender?.());
     onRender?.();
-  }));
+  });
+  const syncValidity = () => {
+    const valid = isValidStoryboardDuration(input.value);
+    confirm.disabled = !valid;
+    validation.textContent = valid ? "" : "请输入 5 到 3600 秒之间的目标时长。";
+  };
+  input.addEventListener("input", syncValidity);
+  syncValidity();
+  wrap.append(validation, confirm);
   wrap.appendChild(taskButton("稍后", "studio-secondary-button", () => {
     clearEmbeddedCreativeAction(store, node.id);
     onRender?.();

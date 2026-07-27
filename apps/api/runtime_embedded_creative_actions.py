@@ -132,6 +132,11 @@ class EmbeddedCreativeActionRequest(BaseModel):
     @model_validator(mode="after")
     def validate_source_binding(self) -> "EmbeddedCreativeActionRequest":
         actual_digest = _text_digest(self.source_text)
+        if self.action_type == "shot_breakdown":
+            if not self.source_revision_id or not self.source_digest:
+                raise ValueError("shot breakdown requires the current script revision binding")
+            if self.production_brief is None:
+                raise ValueError("shot breakdown requires a confirmed production brief")
         if self.source_digest and self.source_digest != actual_digest:
             raise ValueError("source digest does not match source text")
         if self.source_revision_id and not self.source_digest:
@@ -145,6 +150,11 @@ class EmbeddedCreativeActionRequest(BaseModel):
                 and self.production_brief.source_revision_id != self.source_revision_id
             ):
                 raise ValueError("production brief source revision does not match request")
+            if self.action_type == "shot_breakdown" and (
+                self.production_brief.source_revision_id != self.source_revision_id
+                or self.production_brief.source_digest != self.source_digest
+            ):
+                raise ValueError("production brief must bind the current script revision")
         return self
 
 
@@ -154,6 +164,15 @@ class EmbeddedCreativeActionApplyRequest(BaseModel):
     expected_graph_version: int = Field(ge=0)
     expected_request_digest: str = Field(min_length=64, max_length=64)
     expected_production_brief: EmbeddedProductionBrief
+
+    @model_validator(mode="after")
+    def validate_script_binding(self) -> "EmbeddedCreativeActionApplyRequest":
+        if (
+            not self.expected_production_brief.source_revision_id
+            or not self.expected_production_brief.source_digest
+        ):
+            raise ValueError("shot plan apply requires the current script revision binding")
+        return self
 
 
 def register_runtime_embedded_creative_action_routes(
@@ -177,13 +196,14 @@ def register_runtime_embedded_creative_action_routes(
     ) -> dict[str, Any]:
         require_access(request, project_id)
         store.ensure_project_manifest(project_id)
-        _require_current_script_binding(
-            store,
-            project_id,
-            revision_id=body.source_revision_id,
-            source_digest=body.source_digest,
-            stage="preview",
-        )
+        if body.action_type == "shot_breakdown":
+            _require_current_script_binding(
+                store,
+                project_id,
+                revision_id=body.source_revision_id,
+                source_digest=body.source_digest,
+                stage="preview",
+            )
         client_request_id = client_request_id_from_request(request)
         job_id = store.new_job_id("embedded_creative_action", project_id)
         if client_request_id:
@@ -1659,8 +1679,26 @@ def _require_current_script_binding(
     source_digest: str,
     stage: str,
 ) -> None:
-    if not revision_id and not source_digest:
-        return
+    if not revision_id or not source_digest:
+        raise HTTPException(
+            status_code=409,
+            detail=safe_error_detail(
+                "embedded_source_revision_required",
+                detail_code="embedded_source_revision_required",
+                message="当前剧本版本尚未可靠绑定，分镜操作已停止。",
+                user_action="请刷新项目并从当前已应用剧本重新规划分镜。",
+                project_id=project_id,
+                action="embedded_creative_action_preview" if stage == "preview" else "apply_embedded_shot_plan",
+                stage=stage,
+                status="blocked",
+                retryable=False,
+                details={
+                    "provider_calls_started": False,
+                    "image_dispatch_count": 0,
+                    "video_dispatch_count": 0,
+                },
+            ),
+        )
     current = current_script_revision_binding(store, project_id)
     if (
         str(current.get("revision_id") or "") == revision_id

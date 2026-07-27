@@ -291,7 +291,7 @@ function compactCreativeTaskResult(action) {
     );
     wrap.appendChild(textBlock(
       `embedded-creative-compact-line ${assessment.apply_allowed ? "duration-pass" : "duration-blocked"}`,
-      `目标 ${Math.round(assessment.target_duration_seconds)} 秒 · 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒`,
+      `目标 ${Math.round(assessment.target_duration_seconds)} 秒（允许偏差 ${Math.round(assessment.tolerance_seconds)} 秒）· 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒`,
     ));
     if (!assessment.apply_allowed) {
       wrap.appendChild(textBlock("embedded-creative-compact-line duration-blocked", "候选已保留，但时长不合格，不能直接应用。"));

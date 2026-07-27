@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from difflib import SequenceMatcher
 from typing import Any, Literal, Mapping
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_error_detail
@@ -26,6 +27,7 @@ from apps.api.runtime_production_graph import (
     canonical_digest,
     graph_path,
 )
+from apps.api.runtime_script_core_truth import current_script_revision_binding
 from apps.api.runtime_store import RuntimeStore
 
 
@@ -51,6 +53,8 @@ class M6ScriptPlanPreviewRequest(BaseModel):
 
     source_kind: Literal["idea", "script", "uploaded_text"] = "idea"
     source_text: str = Field(min_length=1, max_length=200_000)
+    source_revision_id: str = Field(min_length=1, max_length=140)
+    source_revision_digest: str = Field(min_length=64, max_length=64)
     revision_instruction: str | None = Field(default=None, max_length=2000)
     parent_candidate_digest: str | None = Field(default=None, max_length=64)
     requested_language: str = Field(default="zh-CN", max_length=24)
@@ -63,6 +67,15 @@ class M6ScriptPlanPreviewRequest(BaseModel):
         if not _clean_source_text(value):
             raise ValueError("creator input is required")
         return value
+
+    @model_validator(mode="after")
+    def validate_applied_script_binding(self) -> "M6ScriptPlanPreviewRequest":
+        if self.source_kind != "script":
+            raise ValueError("production planning requires the current applied script")
+        digest = hashlib.sha256(_clean_source_text(self.source_text).encode("utf-8")).hexdigest()
+        if self.source_revision_digest != digest:
+            raise ValueError("source revision digest does not match source text")
+        return self
 
 
 class M6ScriptPlanConfirmRequest(BaseModel):
@@ -91,6 +104,7 @@ def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: Runt
     def preview_script_plan_asset_bible(project_id: str, body: M6ScriptPlanPreviewRequest, request: Request) -> dict[str, Any]:
         owner_id = require_access(request, project_id)
         store.ensure_project_manifest(project_id)
+        _require_current_m6_script_binding(store, project_id, body)
         client_request_id = client_request_id_from_request(request)
         if not client_request_id:
             raise _contract_error(
@@ -181,6 +195,7 @@ def register_runtime_m6_script_plan_asset_bible_routes(app: FastAPI, store: Runt
                 candidate = preview.get("candidate")
                 if not isinstance(candidate, dict):
                     raise M6PreviewRunError("preview_candidate_missing", "stored preview candidate is unavailable")
+                _require_current_m6_candidate_binding(store, project_id, candidate)
                 validation = validate_m6_candidate(candidate)
                 events = compile_film_candidate(project_id, candidate)
                 graph = graph_store.append(
@@ -234,6 +249,46 @@ def _preview_planner(remote_llm_enabled: bool):
 
         return build_m6_server_codex_script_plan_asset_bible
     return build_m6_script_plan_asset_bible
+
+
+def _require_current_m6_script_binding(
+    store: RuntimeStore,
+    project_id: str,
+    body: M6ScriptPlanPreviewRequest,
+) -> None:
+    current = current_script_revision_binding(store, project_id)
+    if (
+        str(current.get("revision_id") or "") == body.source_revision_id
+        and str(current.get("source_digest") or "") == body.source_revision_digest
+    ):
+        return
+    raise _contract_error(
+        "m6_source_revision_changed",
+        "当前已应用剧本版本已变化，请从当前剧本重新准备制作方案。",
+        project_id=project_id,
+        stage="m6_preview_create",
+        status_code=409,
+    )
+
+
+def _require_current_m6_candidate_binding(
+    store: RuntimeStore,
+    project_id: str,
+    candidate: Mapping[str, Any],
+) -> None:
+    lineage = candidate.get("brief", {}).get("lineage", {})
+    current = current_script_revision_binding(store, project_id)
+    if (
+        isinstance(lineage, Mapping)
+        and str(lineage.get("source_revision_id") or "") == str(current.get("revision_id") or "")
+        and str(lineage.get("source_revision_digest") or "") == str(current.get("source_digest") or "")
+        and str(current.get("revision_id") or "")
+    ):
+        return
+    raise M6PreviewRunError(
+        "preview_source_revision_changed",
+        "当前已应用剧本版本已变化；旧制作方案不能确认。",
+    )
 
 
 def _preview_run_http_error(exc: M6PreviewRunError, *, project_id: str, stage: str) -> HTTPException:
@@ -305,6 +360,8 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
             },
             "lineage": {
                 "source_digest": source_digest,
+                "source_revision_id": _safe_token(body.get("source_revision_id")),
+                "source_revision_digest": str(body.get("source_revision_digest") or ""),
                 "parent_candidate_digest": body.get("parent_candidate_digest") or "",
                 "revision_instruction": _clean_text(body.get("revision_instruction")),
             },

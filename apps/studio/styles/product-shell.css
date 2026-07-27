@@ -1190,6 +1190,11 @@
   color: var(--product-text);
 }
 
+.agent-storyboard-brief .storyboard-duration-error {
+  min-height: 1.25rem;
+  color: #ffb4a8;
+}
+
 .agent-current-task-copy.duration-blocked {
   color: #ffb4a8;
 }

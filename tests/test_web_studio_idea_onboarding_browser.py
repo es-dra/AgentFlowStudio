@@ -84,9 +84,10 @@ def test_short_idea_routes_to_text_expansion_then_refreshes_durable_revision() -
         page.get_by_text("剧本文本：月光下，纸船逆流而上", exact=False).wait_for()
         assert page.get_by_role("button", name="准备制作方案", exact=True).is_visible()
         page.get_by_role("button", name="准备制作方案", exact=True).click()
-        assert page.get_by_label("输入想法或已有剧本").input_value() == (
+        assert page.get_by_label("当前已应用剧本").input_value() == (
             "月光下，纸船逆流而上，送回一封迟到多年的信。"
         )
+        assert page.get_by_label("当前已应用剧本").is_editable() is False
         page.reload(wait_until="domcontentloaded")
         page.wait_for_function("window.__contractReady === true")
         page.get_by_text("剧本文本：月光下，纸船逆流而上", exact=False).wait_for()
@@ -136,7 +137,12 @@ def test_complete_script_recovers_same_preview_then_applies_one_graph_update() -
         ).is_visible()
         assert task_panel.get_by_label("分镜目标总时长（秒）").input_value() == "120"
         assert page.evaluate("window.__calls.textPreview") == 0
+        task_panel.get_by_label("分镜目标总时长（秒）").fill("4")
+        assert task_panel.get_by_text("请输入 5 到 3600 秒之间的目标时长。", exact=True).is_visible()
+        assert task_panel.get_by_role("button", name="确认目标并预览分镜", exact=True).is_disabled()
+        assert page.evaluate("window.__calls.textPreview") == 0
         task_panel.get_by_label("分镜目标总时长（秒）").fill("12")
+        assert task_panel.get_by_role("button", name="确认目标并预览分镜", exact=True).is_enabled()
         task_panel.get_by_role("button", name="确认目标并预览分镜", exact=True).click()
 
         page.get_by_text("分镜候选已准备好。", exact=True).wait_for()
@@ -421,6 +427,25 @@ def _contract_html() -> str:
         });
       }
       if (!stored && !isIdea) {
+        const fullScriptDigest = "b2b1c1dc40e2f7c061dd5375ff483a0f235d8494959f33677deca6b7c401bc2f";
+        studioState.production.script_core_truth_projection = {
+          schema_version: "afs.script_core_truth.v0.1",
+          project_id: projectId,
+          current_revision_id: "revision-script-1",
+          source_digest: fullScriptDigest,
+          source_text: fullScript,
+          current_revision: {
+            project_id: projectId,
+            revision_id: "revision-script-1",
+            source_kind: "script",
+            source_text: fullScript,
+            source_digest: fullScriptDigest,
+            source_length: fullScript.length,
+            analysis_state: "ready",
+          },
+          revision_history: [],
+          analysis_state: "ready",
+        };
         studioState.nodes["script-complete"] = {
           id: "script-complete",
           type: "script",
@@ -432,7 +457,13 @@ def _contract_html() -> str:
           content: fullScript,
           prompt: fullScript,
           status: "complete",
-          params: {},
+          params: {
+            scriptRevision: {
+              revision_id: "revision-script-1",
+              source_digest: fullScriptDigest,
+              source_text: fullScript,
+            },
+          },
         };
         studioState.order = ["script-complete"];
         studioState.selection = { nodeIds: ["script-complete"], edgeId: null };

@@ -20,7 +20,11 @@ from apps.api.runtime_m6_preview_runs import (
 )
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
-from tests.test_runtime_m6_script_plan_asset_bible import IDEA_TEXT, SCRIPT_TEXT
+from tests.test_runtime_m6_script_plan_asset_bible import (
+    IDEA_TEXT,
+    SCRIPT_TEXT,
+    _bind_script_revision,
+)
 
 
 @pytest.mark.parametrize("source_text", ["灯亮", "第一行。\n第二行？", "🌧️ 雨夜，纸船逆流。"])
@@ -32,11 +36,12 @@ def test_short_unicode_ideas_enter_durable_planning_without_schema_rejection_or_
     monkeypatch.setattr(m6_routes, "_server_codex_m6_enabled", lambda: False)
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    binding = _bind_script_revision(client, "short-unicode", source_text)
 
     response = client.post(
         "/projects/short-unicode/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": f"short-{len(source_text)}"},
-        json={"source_kind": "idea", "source_text": source_text},
+        json={"source_kind": "script", "source_text": source_text, **binding},
     )
     assert response.status_code == 200, response.text
     run = _wait_for_phase(
@@ -85,7 +90,8 @@ def test_disconnect_recovery_reuses_one_dispatch_and_confirm_is_exactly_once(tmp
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
     headers = {"X-Client-Request-ID": "disconnect-one"}
-    payload = {"source_kind": "idea", "source_text": IDEA_TEXT}
+    binding = _bind_script_revision(client, "recover", IDEA_TEXT)
+    payload = {"source_kind": "script", "source_text": IDEA_TEXT, **binding}
 
     created = client.post("/projects/recover/m6/script-plan-asset-bible/preview", headers=headers, json=payload)
     assert created.status_code == 200, created.text
@@ -212,10 +218,12 @@ def test_failed_or_cancelled_run_never_writes_graph_or_blindly_retries(tmp_path,
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
     headers = {"X-Client-Request-ID": "failed-once"}
+    binding = _bind_script_revision(client, "failed", SCRIPT_TEXT)
+    payload = {"source_kind": "script", "source_text": SCRIPT_TEXT, **binding}
     created = client.post(
         "/projects/failed/m6/script-plan-asset-bible/preview",
         headers=headers,
-        json={"source_kind": "script", "source_text": SCRIPT_TEXT},
+        json=payload,
     )
     run = _wait_for_phase(client, "failed", created.json()["run_id"], "failed")
     assert run["dispatch_count"] == 1
@@ -224,7 +232,7 @@ def test_failed_or_cancelled_run_never_writes_graph_or_blindly_retries(tmp_path,
     replay = client.post(
         "/projects/failed/m6/script-plan-asset-bible/preview",
         headers=headers,
-        json={"source_kind": "script", "source_text": SCRIPT_TEXT},
+        json=payload,
     )
     assert replay.json()["phase"] == "failed"
     assert calls == 1
@@ -252,7 +260,6 @@ def test_failed_or_cancelled_run_never_writes_graph_or_blindly_retries(tmp_path,
 def test_stale_graph_and_candidate_digest_fail_closed(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     first = _start_and_wait(client, "stale", IDEA_TEXT, "stale-first")
-    second = _start_and_wait(client, "stale", SCRIPT_TEXT, "stale-second")
     confirmed = client.post(
         "/projects/stale/m6/script-plan-asset-bible/confirm",
         json={
@@ -262,6 +269,7 @@ def test_stale_graph_and_candidate_digest_fail_closed(tmp_path) -> None:
         },
     )
     assert confirmed.status_code == 200
+    second = _start_and_wait(client, "stale", SCRIPT_TEXT, "stale-second")
     stale = client.post(
         "/projects/stale/m6/script-plan-asset-bible/confirm",
         json={
@@ -467,10 +475,16 @@ def test_pruned_confirmed_run_replays_minimal_canonical_receipt(tmp_path) -> Non
     assert replay.json()["status"] == "confirmed"
     assert replay.json()["graph"] == first_graph
     assert replay.json()["candidate_digest"] == run["candidate_digest"]
+    projection = client.get("/projects/confirmed-retention/script-truth").json()["projection"]
     preview_replay = client.post(
         "/projects/confirmed-retention/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": "confirmed-retention"},
-        json={"source_kind": "idea", "source_text": IDEA_TEXT},
+        json={
+            "source_kind": "script",
+            "source_text": IDEA_TEXT,
+            "source_revision_id": projection["current_revision_id"],
+            "source_revision_digest": projection["current_revision"]["source_digest"],
+        },
     )
     assert preview_replay.status_code == 410
     assert "preview_run_expired" in preview_replay.text
@@ -510,22 +524,23 @@ def test_orphaned_ledger_never_blindly_redispatches_after_service_recovery(tmp_p
 def test_execution_contract_is_immutable_across_gate_changes(tmp_path, monkeypatch) -> None:
     runtime_root = tmp_path / "runtime"
     store = M6PreviewRunStore(RuntimeStore(runtime_root))
-    body = {"source_kind": "idea", "source_text": IDEA_TEXT}
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    deterministic_binding = _bind_script_revision(client, "deterministic-contract", IDEA_TEXT)
+    deterministic_body = {"source_kind": "script", "source_text": IDEA_TEXT, **deterministic_binding}
 
     deterministic, _ = store.create_or_load(
         "deterministic-contract",
         owner_id="local-runtime-owner",
         client_request_id="deterministic-gate-flip",
-        source_digest=preview_source_digest(body),
+        source_digest=preview_source_digest(deterministic_body),
         expected_graph_version=0,
         remote_llm_enabled=False,
     )
     monkeypatch.setattr(m6_routes, "_server_codex_m6_enabled", lambda: True)
-    client = TestClient(create_runtime_app(runtime_root=runtime_root))
     response = client.post(
         "/projects/deterministic-contract/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": "deterministic-gate-flip"},
-        json=body,
+        json=deterministic_body,
     )
     assert response.status_code == 200
     completed = _wait_for_phase(
@@ -537,11 +552,13 @@ def test_execution_contract_is_immutable_across_gate_changes(tmp_path, monkeypat
     assert completed["provider"]["service"] == "local_deterministic"
     assert completed["dispatch_count"] == 0
 
+    remote_binding = _bind_script_revision(client, "remote-contract", IDEA_TEXT)
+    remote_body = {"source_kind": "script", "source_text": IDEA_TEXT, **remote_binding}
     remote, _ = store.create_or_load(
         "remote-contract",
         owner_id="local-runtime-owner",
         client_request_id="remote-gate-flip",
-        source_digest=preview_source_digest(body),
+        source_digest=preview_source_digest(remote_body),
         expected_graph_version=0,
         remote_llm_enabled=True,
     )
@@ -549,7 +566,7 @@ def test_execution_contract_is_immutable_across_gate_changes(tmp_path, monkeypat
     blocked = client.post(
         "/projects/remote-contract/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": "remote-gate-flip"},
-        json=body,
+        json=remote_body,
     )
     assert blocked.status_code == 200
     assert blocked.json()["phase"] == "failed"
@@ -616,10 +633,11 @@ def _start_and_wait(
     headers: dict[str, str] | None = None,
 ) -> dict:
     request_headers = {**(headers or {}), "X-Client-Request-ID": client_request_id}
+    binding = _bind_script_revision(client, project_id, source_text, headers=headers)
     response = client.post(
         f"/projects/{project_id}/m6/script-plan-asset-bible/preview",
         headers=request_headers,
-        json={"source_kind": "idea", "source_text": source_text},
+        json={"source_kind": "script", "source_text": source_text, **binding},
     )
     assert response.status_code == 200, response.text
     return _wait_for_phase(client, project_id, response.json()["run_id"], "succeeded", headers=request_headers)

@@ -421,9 +421,9 @@ export function deriveProductionCopilotState({
     scriptReady
     && readyScriptNode
     && !graphReady
-    && (
-      !studioState?.production?.script_core_truth_projection?.current_revision_id
-      || readyScriptNode.params?.embeddedCreativeAction?.action_type === "shot_breakdown"
+    && !(
+      readyScriptNode.params?.embeddedCreativeAction?.action_type === "script_revision"
+      && readyScriptNode.params?.embeddedCreativeAction?.status === "applied"
     )
   ) {
     const action = readyScriptNode.params?.embeddedCreativeAction || {};

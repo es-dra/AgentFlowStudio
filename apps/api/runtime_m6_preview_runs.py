@@ -668,6 +668,8 @@ def preview_source_digest(body: Mapping[str, Any]) -> str:
         "schema_version": RUN_SCHEMA_VERSION,
         "source_kind": body.get("source_kind") or "idea",
         "source_text": str(body.get("source_text") or ""),
+        "source_revision_id": str(body.get("source_revision_id") or ""),
+        "source_revision_digest": str(body.get("source_revision_digest") or ""),
         "revision_instruction": str(body.get("revision_instruction") or ""),
         "parent_candidate_digest": str(body.get("parent_candidate_digest") or ""),
         "requested_language": str(body.get("requested_language") or "zh-CN"),

@@ -2,6 +2,10 @@ export const DEFAULT_SHORT_FILM_DURATION_SECONDS = 120;
 export const MIN_STORYBOARD_DURATION_SECONDS = 5;
 export const MAX_STORYBOARD_DURATION_SECONDS = 3600;
 
+export function isValidStoryboardDuration(value) {
+  return normalizedDuration(value) !== null;
+}
+
 export function productionBriefForSource(sourceText, override = null) {
   const selected = normalizedDuration(override?.target_duration_seconds);
   if (selected !== null) {

@@ -13,6 +13,7 @@ import { clampScale, nodesBounds } from "./geometry.js";
 import { defaultParams } from "./nodes.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 import {
+  isValidStoryboardDuration,
   productionBriefForSource,
   shotPlanDurationAssessment,
 } from "./storyboard-duration-contract.js";
@@ -168,6 +169,7 @@ export function prepareEmbeddedShotBreakdown(store, node, options = {}) {
 }
 
 export function updateEmbeddedStoryboardBrief(store, nodeId, targetDurationSeconds) {
+  if (!isValidStoryboardDuration(targetDurationSeconds)) return null;
   let updated = null;
   store.set((state) => {
     const action = state.nodes?.[nodeId]?.params?.embeddedCreativeAction;

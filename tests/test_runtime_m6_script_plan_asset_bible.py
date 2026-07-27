@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
 import time
 
 from fastapi.testclient import TestClient
@@ -57,8 +58,14 @@ EXPLICIT_NAME_BRIEF = (
         ("🌧️ 雨夜", "🌧️ 雨夜"),
     ],
 )
-def test_m6_preview_request_accepts_nonempty_creator_ideas_of_any_length(raw: str, expected: str) -> None:
-    request = M6ScriptPlanPreviewRequest(source_kind="idea", source_text=raw)
+def test_m6_preview_request_accepts_bound_applied_scripts_of_any_length(raw: str, expected: str) -> None:
+    clean = _clean_source_text_for_assertion(raw)
+    request = M6ScriptPlanPreviewRequest(
+        source_kind="script",
+        source_text=raw,
+        source_revision_id="revision-test",
+        source_revision_digest=hashlib.sha256(clean.encode("utf-8")).hexdigest(),
+    )
     assert _clean_source_text_for_assertion(request.source_text) == expected
     assert request.source_text == raw
     assert request.provider_dispatch_count == 0
@@ -67,7 +74,25 @@ def test_m6_preview_request_accepts_nonempty_creator_ideas_of_any_length(raw: st
 @pytest.mark.parametrize("raw", ["", " ", "\n\t"])
 def test_m6_preview_request_rejects_empty_creator_input(raw: str) -> None:
     with pytest.raises(ValueError):
-        M6ScriptPlanPreviewRequest(source_kind="idea", source_text=raw)
+        M6ScriptPlanPreviewRequest(
+            source_kind="script",
+            source_text=raw,
+            source_revision_id="revision-test",
+            source_revision_digest="0" * 64,
+        )
+
+
+def test_m6_preview_request_rejects_unbound_or_non_script_sources() -> None:
+    digest = hashlib.sha256(b"bound script").hexdigest()
+    with pytest.raises(ValueError):
+        M6ScriptPlanPreviewRequest(source_kind="script", source_text="bound script")
+    with pytest.raises(ValueError):
+        M6ScriptPlanPreviewRequest(
+            source_kind="idea",
+            source_text="bound script",
+            source_revision_id="revision-test",
+            source_revision_digest=digest,
+        )
 
 
 def _clean_source_text_for_assertion(value: str) -> str:
@@ -573,10 +598,11 @@ def test_m6_server_codex_scope_drift_fails_closed_before_candidate_or_graph_writ
     monkeypatch.setattr(runtime_m6_server_codex_planner, "_dispatch_server_codex_structured_plan", fake_dispatch)
     runtime_root = tmp_path / "runtime"
     client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    binding = _bind_script_revision(client, "m6-drift", SCRIPT_TEXT)
     response = client.post(
         "/projects/m6-drift/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": "m6-drift-preview"},
-        json={"source_kind": "script", "source_text": SCRIPT_TEXT},
+        json={"source_kind": "script", "source_text": SCRIPT_TEXT, **binding},
     )
     assert response.status_code == 200, response.text
     run = response.json()
@@ -683,13 +709,15 @@ def _start_and_wait(
     source_text: str,
     client_request_id: str,
     *,
-    source_kind: str = "idea",
+    source_kind: str = "script",
     **extra,
 ) -> dict[str, object]:
+    assert source_kind == "script"
+    binding = _bind_script_revision(client, project_id, source_text)
     response = client.post(
         f"/projects/{project_id}/m6/script-plan-asset-bible/preview",
         headers={"X-Client-Request-ID": client_request_id},
-        json={"source_kind": source_kind, "source_text": source_text, **extra},
+        json={"source_kind": "script", "source_text": source_text, **binding, **extra},
     )
     assert response.status_code == 200, response.text
     run = response.json()
@@ -704,6 +732,26 @@ def _start_and_wait(
         run = loaded.json()
     assert run["phase"] == "succeeded", run
     return run
+
+
+def _bind_script_revision(
+    client: TestClient,
+    project_id: str,
+    source_text: str,
+    *,
+    headers: dict[str, str] | None = None,
+) -> dict[str, str]:
+    response = client.post(
+        f"/projects/{project_id}/script-revisions",
+        headers=headers or {},
+        json={"source_kind": "script", "source_text": source_text},
+    )
+    assert response.status_code == 200, response.text
+    revision = response.json()["revision"]
+    return {
+        "source_revision_id": revision["revision_id"],
+        "source_revision_digest": revision["source_digest"],
+    }
 
 
 def _server_codex_payload() -> dict[str, object]:

@@ -437,6 +437,8 @@ def _candidate_from_provider_payload(
             },
             "lineage": {
                 "source_digest": source_digest,
+                "source_revision_id": _safe_token(body.get("source_revision_id")),
+                "source_revision_digest": str(body.get("source_revision_digest") or ""),
                 "parent_candidate_digest": parent_candidate_digest,
                 "revision_instruction": revision_instruction,
                 "provider_dispatch_id": dispatch_id,

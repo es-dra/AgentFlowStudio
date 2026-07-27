@@ -10,6 +10,7 @@ def test_storyboard_duration_contract_is_creator_visible_and_fail_closed() -> No
 import assert from "node:assert/strict";
 import {
   DEFAULT_SHORT_FILM_DURATION_SECONDS,
+  isValidStoryboardDuration,
   productionBriefForSource,
   shotPlanDurationAssessment,
 } from "./apps/studio/src/storyboard-duration-contract.js";
@@ -21,6 +22,10 @@ import {
 } from "./apps/studio/src/embedded-creative-actions.js";
 
 assert.equal(DEFAULT_SHORT_FILM_DURATION_SECONDS, 120);
+assert.equal(isValidStoryboardDuration(5), true);
+assert.equal(isValidStoryboardDuration(3600), true);
+assert.equal(isValidStoryboardDuration(4), false);
+assert.equal(isValidStoryboardDuration(3601), false);
 assert.deepEqual(
   productionBriefForSource("这是一部总时长约 90 秒的任意故事。"),
   {
@@ -38,6 +43,24 @@ assert.equal(
   productionBriefForSource("目标时长 2 分钟。").target_duration_seconds,
   120,
 );
+const sixMinuteBrief = productionBriefForSource("这是一部目标总时长约 6 分钟的完整故事。");
+assert.equal(sixMinuteBrief.target_duration_seconds, 360);
+assert.equal(sixMinuteBrief.duration_source, "script_explicit");
+assert.equal(sixMinuteBrief.tolerance_seconds, 36);
+const sixMinuteAssessment = shotPlanDurationAssessment({
+  estimated_duration_sec: 360,
+  scenes: [{
+    title: "任意场景",
+    shots: Array.from({ length: 6 }, (_, index) => ({
+      title: `任意镜头 ${index + 1}`,
+      duration_sec: 60,
+    })),
+  }],
+}, sixMinuteBrief);
+assert.equal(sixMinuteAssessment.target_duration_seconds, 360);
+assert.equal(sixMinuteAssessment.candidate_duration_seconds, 360);
+assert.equal(sixMinuteAssessment.tolerance_seconds, 36);
+assert.equal(sixMinuteAssessment.apply_allowed, true);
 
 const longPlan = {
   estimated_duration_sec: 530,
@@ -131,6 +154,7 @@ prepareEmbeddedShotBreakdown(store, state.nodes.script);
 assert.equal(state.nodes.script.params.embeddedCreativeAction.status, "briefing");
 assert.equal(previewCalls, 0);
 const selectedBrief = updateEmbeddedStoryboardBrief(store, "script", 60);
+assert.equal(updateEmbeddedStoryboardBrief(store, "script", 4), null);
 await startEmbeddedCreativeAction(store, runtime, state.nodes.script, "shot_breakdown", {
   mode: "dynamic_shot_breakdown",
   productionBrief: selectedBrief,
@@ -165,3 +189,15 @@ def test_duration_contract_has_no_sample_specific_branch() -> None:
     source = (STUDIO_ROOT / "src" / "storyboard-duration-contract.js").read_text(encoding="utf-8")
     for sample in ("唐僧", "白骨精", "白骨成亲", "776", "5 场", "30 镜头"):
         assert sample not in source
+
+
+def test_plan_entry_uses_only_the_current_script_revision_binding() -> None:
+    source = (STUDIO_ROOT / "src" / "product-shell.js").read_text(encoding="utf-8")
+    assert 'textarea.setAttribute("aria-label", "当前已应用剧本")' in source
+    assert "textarea.readOnly = true" in source
+    assert 'source_kind: "script"' in source
+    assert "source_revision_id: sourceBinding.revision_id" in source
+    assert "source_revision_digest: sourceBinding.source_digest" in source
+    assert "previewM6ScriptPlan(textarea.value)" not in source
+    assert "|| currentReadyScriptNode()?.id" not in source
+    assert "|| currentReadyScriptNode()," not in source
