@@ -137,6 +137,53 @@ def sanitize_asset_bible(
                 candidate_set.get("source_graph_asset_ids"),
                 96,
             ),
+            "style_domains": [
+                {
+                    "domain_id": _id(item.get("domain_id")),
+                    "art_direction_id": _id(item.get("art_direction_id")),
+                    "label": text(item.get("label"), "风格域", 120),
+                    "visual_style": text(item.get("visual_style"), "", 360),
+                    "medium": text(item.get("medium"), "", 240),
+                    "palette": text(item.get("palette"), "", 240),
+                    "lighting": text(item.get("lighting"), "", 240),
+                    "camera_language": text(item.get("camera_language"), "", 360),
+                    "negative_locks": _texts(
+                        item.get("negative_locks"),
+                        text=text,
+                        limit=12,
+                        length=160,
+                    ),
+                    "scene_ids": _ids(item.get("scene_ids"), 80),
+                    "shot_ids": _ids(item.get("shot_ids"), 240),
+                    "status": text(item.get("status"), "candidate", 40),
+                    "owner_supplied": item.get("owner_supplied") is True,
+                }
+                for item in _list(candidate_set.get("style_domains"))[:16]
+                if isinstance(item, dict) and _id(item.get("domain_id"))
+            ],
+            "reference_candidates": [
+                {
+                    "reference_id": _id(item.get("reference_id")),
+                    "kind": text(item.get("kind"), "style_reference", 80),
+                    "label": text(item.get("label"), "参考", 120),
+                    "scene_ids": _ids(item.get("scene_ids"), 80),
+                    "shot_ids": _ids(item.get("shot_ids"), 240),
+                    "status": text(item.get("status"), "candidate", 40),
+                    "owner_supplied": item.get("owner_supplied") is True,
+                }
+                for item in _list(candidate_set.get("reference_candidates"))[:96]
+                if isinstance(item, dict) and _id(item.get("reference_id"))
+            ],
+            "shot_reference_map": [
+                {
+                    "shot_ordinal": max(1, int(number(item.get("shot_ordinal"), index + 1))),
+                    "shot_id": _id(item.get("shot_id")),
+                    "reference_ids": _ids(item.get("reference_ids"), 4),
+                }
+                for index, item in enumerate(_list(candidate_set.get("shot_reference_map"))[:240])
+                if isinstance(item, dict) and _id(item.get("shot_id"))
+            ],
+            "import": _import_summary(candidate_set.get("import"), text=text, number=number),
             "created_at": text(candidate_set.get("created_at"), "", 80),
         },
         "assets": assets,
@@ -196,12 +243,16 @@ def _asset(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[
     return {
         "stable_id": stable_id,
         "asset_type": asset_type,
+        "asset_subtype": text(data.get("asset_subtype"), "", 80),
         "display_name": text(data.get("display_name"), "待确认资产", 120),
         "aliases": _texts(data.get("aliases"), text=text, limit=20, length=120),
         "visual_identity": text(data.get("visual_identity"), "", 600),
         "review_state": review_state,
         "confidence": max(0.0, min(1.0, number(data.get("confidence"), 0))),
         "needs_confirmation": data.get("needs_confirmation") is not False,
+        "owner_supplied": data.get("owner_supplied") is True,
+        "owner_draft_id": _id(data.get("owner_draft_id")),
+        "style_domain_id": _id(data.get("style_domain_id")),
         "occurrences": {
             "scene_ids": _ids(occurrences.get("scene_ids"), 80),
             "shot_ids": _ids(occurrences.get("shot_ids"), 160),
@@ -253,6 +304,25 @@ def _art_direction(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
         "status": "confirmed" if complete and data.get("status") == "confirmed" else "pending",
         "source": "human_review" if data.get("source") == "human_review" else "",
         "confirmed_at": text(data.get("confirmed_at"), "", 80) if complete else "",
+    }
+
+
+def _import_summary(
+    value: Any,
+    *,
+    text: TextSanitizer,
+    number: NumberSanitizer,
+) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    if not data:
+        return {}
+    return {
+        "draft_id": _id(data.get("draft_id")),
+        "idempotency_key": _id(data.get("idempotency_key")),
+        "asset_count": max(0, int(number(data.get("asset_count"), 0))),
+        "art_direction_count": max(0, int(number(data.get("art_direction_count"), 0))),
+        "owner_supplied": data.get("owner_supplied") is True,
+        "note": text(data.get("note"), "", 240),
     }
 
 

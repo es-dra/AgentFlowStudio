@@ -31,6 +31,7 @@ SCHEMA_VERSION = "afs.asset_bible.v0.1"
 COMMANDS = {
     "generate_candidates",
     "regenerate_candidates",
+    "import_asset_draft",
     "create_asset",
     "set_art_direction",
     "approve",
@@ -44,6 +45,7 @@ COMMANDS = {
 }
 ASSET_TYPES = {"character", "scene", "prop"}
 ART_DIRECTION_FIELDS = ("visual_style", "medium", "palette", "lighting")
+OWNER_IMPORT_ID_PATTERN = re.compile(r"^(?:M|A|GFX)-[A-Z0-9]+(?:-[A-Z0-9]+)*$")
 
 
 def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
@@ -84,81 +86,92 @@ def register_runtime_asset_bible_routes(app: FastAPI, store: RuntimeStore, auth:
     def confirm_asset_bible_command(project_id: str, body: dict[str, Any], request: Request) -> dict[str, Any]:
         require_access(request, project_id)
         try:
-            supplied_command_id = _optional_token(body.get("command_id"))
-            supplied_idempotency_key = _optional_token(
-                supplied_command_id or body.get("idempotency_key")
-            )
-            supplied_digest = str(body.get("preview_digest") or "")
-            if supplied_command_id and supplied_command_id != _command_id(supplied_digest):
-                raise ValueError("asset Bible command identity does not match the reviewed preview")
-            current = _clean_state(body.get("asset_bible"))
-            authority_mode = "legacy_studio_adapter"
-            graph: dict[str, Any] | None = None
-            if graph_has_authority(store, project_id):
-                graph = graph_store.load(project_id)
-                current = _asset_bible_from_graph(graph, project_id)
-                authority_mode = "canonical_production_graph"
-            if (
-                supplied_idempotency_key
-                and supplied_idempotency_key in current.get("idempotency_keys", [])
-            ):
-                replay = {
-                    **_public_result(current, authority_mode=authority_mode),
-                    "status": "confirmed",
-                    "idempotent_replay": True,
-                    "receipt": deepcopy(current.get("last_receipt", {})),
-                }
-                if graph is not None:
-                    replay.update(
-                        {
-                            "graph_version": graph["version"],
-                            "graph_digest": graph["graph_digest"],
-                        }
-                    )
-                reject_unsafe_payload(replay)
-                return replay
-            preview = preview_asset_bible_command_result(project_id, body, graph=graph)
-            if not supplied_digest or supplied_digest != preview["preview_digest"]:
-                raise ValueError("asset Bible preview is stale; review the impact again")
-            if supplied_command_id and supplied_command_id != preview["command_id"]:
-                raise ValueError("asset Bible command identity does not match the reviewed preview")
-            idempotency_key = supplied_idempotency_key or preview["command_id"]
-            result = deepcopy(preview["result"])
-            state = result["asset_bible"]
-            if idempotency_key in state.get("idempotency_keys", []):
-                return {**result, "status": "confirmed", "idempotent_replay": True}
-            state["idempotency_keys"] = [*state.get("idempotency_keys", []), idempotency_key][-40:]
-            receipt = _receipt(state, preview["command"], preview["impact"])
-            state["last_receipt"] = receipt
-            result["asset_bible"] = state
-            if graph_has_authority(store, project_id):
-                graph = graph_store.load(project_id)
-                expected = int(body.get("expected_graph_version", graph["version"]))
-                previous_state = _clean_state(body.get("asset_bible"))
-                events = _graph_events(project_id, state, graph, previous_state=previous_state)
-                updated = graph_store.append(
-                    project_id,
-                    expected_version=expected,
-                    idempotency_key=idempotency_key,
-                    semantic_digest=canonical_digest({"asset_bible": state, "command": preview["command"]}),
-                    events=events,
-                )
-                result.update(
-                    {
-                        "authority_mode": "canonical_production_graph",
-                        "graph_version": updated["version"],
-                        "graph_digest": updated["graph_digest"],
-                        "idempotent_replay": bool(updated.get("idempotent_replay")),
-                    }
-                )
-            else:
-                result.update({"authority_mode": "legacy_studio_adapter", "idempotent_replay": False})
-            reject_unsafe_payload(result)
-            return {**result, "status": "confirmed", "receipt": receipt}
+            return confirm_asset_bible_command_result(project_id, body, graph_store=graph_store)
         except (GraphVersionConflict, GraphIdempotencyConflict) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except (ProductionGraphError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def confirm_asset_bible_command_result(
+    project_id: str,
+    body: Mapping[str, Any],
+    *,
+    graph_store: ProductionGraphStore,
+) -> dict[str, Any]:
+    store = graph_store.store
+    command = body.get("command") if isinstance(body.get("command"), Mapping) else {}
+    supplied_command_id = _optional_token(body.get("command_id"))
+    supplied_idempotency_key = _optional_token(
+        body.get("idempotency_key") or command.get("idempotency_key") or supplied_command_id
+    )
+    supplied_digest = str(body.get("preview_digest") or "")
+    if supplied_command_id and supplied_command_id != _command_id(supplied_digest):
+        raise ValueError("asset Bible command identity does not match the reviewed preview")
+    current = _clean_state(body.get("asset_bible"))
+    authority_mode = "legacy_studio_adapter"
+    graph: dict[str, Any] | None = None
+    if graph_has_authority(store, project_id):
+        graph = graph_store.load(project_id)
+        current = _asset_bible_from_graph(graph, project_id)
+        authority_mode = "canonical_production_graph"
+    if (
+        supplied_idempotency_key
+        and supplied_idempotency_key in current.get("idempotency_keys", [])
+    ):
+        replay = {
+            **_public_result(current, authority_mode=authority_mode),
+            "status": "confirmed",
+            "idempotent_replay": True,
+            "receipt": deepcopy(current.get("last_receipt", {})),
+        }
+        if graph is not None:
+            replay.update(
+                {
+                    "graph_version": graph["version"],
+                    "graph_digest": graph["graph_digest"],
+                }
+            )
+        reject_unsafe_payload(replay)
+        return replay
+    preview = preview_asset_bible_command_result(project_id, body, graph=graph)
+    if not supplied_digest or supplied_digest != preview["preview_digest"]:
+        raise ValueError("asset Bible preview is stale; review the impact again")
+    if supplied_command_id and supplied_command_id != preview["command_id"]:
+        raise ValueError("asset Bible command identity does not match the reviewed preview")
+    idempotency_key = supplied_idempotency_key or preview["command_id"]
+    result = deepcopy(preview["result"])
+    state = result["asset_bible"]
+    if idempotency_key in state.get("idempotency_keys", []):
+        return {**result, "status": "confirmed", "idempotent_replay": True}
+    state["idempotency_keys"] = [*state.get("idempotency_keys", []), idempotency_key][-40:]
+    receipt = _receipt(state, preview["command"], preview["impact"])
+    state["last_receipt"] = receipt
+    result["asset_bible"] = state
+    if graph_has_authority(store, project_id):
+        graph = graph_store.load(project_id)
+        expected = int(body.get("expected_graph_version", graph["version"]))
+        previous_state = _clean_state(body.get("asset_bible"))
+        events = _graph_events(project_id, state, graph, previous_state=previous_state)
+        updated = graph_store.append(
+            project_id,
+            expected_version=expected,
+            idempotency_key=idempotency_key,
+            semantic_digest=canonical_digest({"asset_bible": state, "command": preview["command"]}),
+            events=events,
+        )
+        result.update(
+            {
+                "authority_mode": "canonical_production_graph",
+                "graph_version": updated["version"],
+                "graph_digest": updated["graph_digest"],
+                "idempotent_replay": bool(updated.get("idempotent_replay")),
+            }
+        )
+    else:
+        result.update({"authority_mode": "legacy_studio_adapter", "idempotent_replay": False})
+    reject_unsafe_payload(result)
+    return {**result, "status": "confirmed", "receipt": receipt}
 
 
 def preview_asset_bible_command_result(
@@ -757,6 +770,509 @@ def _graph_asset_evidence(metadata: Mapping[str, Any], display_name: str) -> lis
     return values[:4] or [f"{display_name} 来自已确认制作方案"]
 
 
+def _import_asset_draft_state(
+    project_id: str,
+    current: Mapping[str, Any],
+    command: Mapping[str, Any],
+    body: Mapping[str, Any],
+    graph: Mapping[str, Any] | None,
+    *,
+    created_at: str,
+) -> dict[str, Any]:
+    if graph is None:
+        raise ValueError("owner asset draft import requires canonical ProductionGraph authority")
+    if current.get("status") == "locked":
+        raise ValueError("locked Asset Bible requires a new revision before importing assets")
+    expected_graph_version = int(
+        _number(command.get("graph_version") or body.get("graph_version"), 0)
+    )
+    expected_graph_digest = _digest_token(
+        command.get("graph_digest") or body.get("graph_digest"),
+        field="graph_digest",
+    )
+    if expected_graph_version != int(graph.get("version") or 0):
+        raise ValueError("owner asset draft import graph version is stale")
+    if expected_graph_digest != str(graph.get("graph_digest") or ""):
+        raise ValueError("owner asset draft import graph digest is stale")
+
+    draft_id = _token(command.get("draft_id") or body.get("draft_id"), "draft_id")
+    idempotency_key = _token(
+        command.get("idempotency_key") or body.get("idempotency_key"),
+        "idempotency_key",
+    )
+    assets_input = [
+        item for item in (command.get("assets") or body.get("assets") or [])
+        if isinstance(item, Mapping)
+    ]
+    art_input = [
+        item for item in (command.get("art_directions") or body.get("art_directions") or [])
+        if isinstance(item, Mapping)
+    ]
+    if not assets_input:
+        raise ValueError("owner asset draft import requires assets")
+    if not art_input:
+        raise ValueError("owner asset draft import requires art directions")
+
+    story = _graph_story_structure(graph)
+    shot_rows, scene_rows, shot_scene, shot_domains = _import_story_indexes(story)
+    art_directions = _owner_import_art_directions(art_input, shot_domains=shot_domains)
+    assets = _owner_import_assets(
+        project_id,
+        draft_id=draft_id,
+        assets_input=assets_input,
+        art_directions=art_directions,
+        story=story,
+        shot_rows=shot_rows,
+        shot_scene=shot_scene,
+        shot_reference_map=command.get("shot_reference_map", body.get("shot_reference_map")),
+        graph=graph,
+    )
+    art_direction = _combined_owner_art_direction(art_directions, confirmed_at=created_at)
+    candidate_set = {
+        "candidate_set_id": (
+            "asset-import-"
+            + canonical_digest(
+                {
+                    "project": project_id,
+                    "draft_id": draft_id,
+                    "graph_digest": graph.get("graph_digest"),
+                    "asset_ids": [item["stable_id"] for item in assets],
+                }
+            )[:16]
+        ),
+        "version": 1,
+        "source_node_id": story["revision_id"],
+        "script_revision_id": story["revision_id"],
+        "shot_candidate_id": str(graph.get("graph_digest") or ""),
+        "scene_count": len(scene_rows),
+        "shot_count": len(shot_rows),
+        "scene_index": scene_rows,
+        "shot_index": shot_rows,
+        "required_asset_anchors": [
+            {
+                "anchor_id": f"anchor-{asset['stable_id']}",
+                "asset_type": asset["asset_type"],
+                "display_name": asset["display_name"],
+                "aliases": sorted({asset["display_name"], *asset.get("aliases", [])}),
+                "scene_ids": list(asset["occurrences"]["scene_ids"]),
+                "shot_ids": list(asset["occurrences"]["shot_ids"]),
+                "ambiguity": "",
+                "source_asset_id": asset["stable_id"],
+            }
+            for asset in assets
+        ],
+        "recognition_ambiguities": [],
+        "source_digest": canonical_digest(
+            {
+                "draft_id": draft_id,
+                "graph_digest": graph.get("graph_digest"),
+                "assets": [item["stable_id"] for item in assets],
+            }
+        ),
+        "source_graph_version": int(graph.get("version") or 0),
+        "source_graph_digest": str(graph.get("graph_digest") or ""),
+        "source_graph_asset_ids": [item["stable_id"] for item in assets],
+        "style_domains": list(art_directions.values()),
+        "reference_candidates": [
+            {
+                "reference_id": f"reference-{style_id}",
+                "kind": "style_reference",
+                "label": item["label"],
+                "scene_ids": item["scene_ids"],
+                "shot_ids": item["shot_ids"],
+                "status": "approved",
+                "owner_supplied": True,
+            }
+            for style_id, item in art_directions.items()
+        ],
+        "shot_reference_map": _owner_import_shot_reference_rows(
+            command.get("shot_reference_map", body.get("shot_reference_map")),
+            shot_rows=shot_rows,
+        ),
+        "import": {
+            "draft_id": draft_id,
+            "idempotency_key": idempotency_key,
+            "asset_count": len(assets),
+            "art_direction_count": len(art_directions),
+            "owner_supplied": True,
+        },
+        "created_at": created_at,
+    }
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "authority_mode": "canonical_production_graph",
+        "status": "candidate_review",
+        "version": int(current.get("version") or 0) + 1,
+        "candidate_set": candidate_set,
+        "assets": assets,
+        "required_occurrences": _required_occurrences(assets),
+        "occurrence_resolutions": [],
+        "art_direction": art_direction,
+        "revisions": list(current.get("revisions", [])),
+        "current_revision_id": "",
+        "locked_revision_id": "",
+        "locked_at": "",
+        "last_receipt": {},
+        "idempotency_keys": list(current.get("idempotency_keys", [])),
+        "provider_dispatch_count": 0,
+        "external_cost_usd": 0,
+        "recognition_delta": {
+            "added_asset_ids": [item["stable_id"] for item in assets],
+            "merged_asset_ids": [],
+            "retained_asset_ids": [],
+            "history_asset_ids": [
+                item["stable_id"]
+                for item in current.get("assets", [])
+                if item.get("review_state") in {"rejected", "superseded"}
+            ],
+        },
+    }
+    result = _refresh_coverage(result)
+    return _append_revision(result, "import_asset_draft", created_at=created_at)
+
+
+def _import_story_indexes(story: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str], dict[str, str]]:
+    active = story["active"]
+    shots_by_scene = story["shots_by_scene"]
+    shot_scene: dict[str, str] = {}
+    shot_domains: dict[str, str] = {}
+    scene_rows = [
+        {
+            "scene_id": scene_id,
+            "name": _graph_node_label(active[scene_id], fallback=f"场景 {index}"),
+            "number": index,
+        }
+        for index, scene_id in enumerate(story["scene_ids"], start=1)
+    ]
+    shot_rows: list[dict[str, Any]] = []
+    number = 0
+    for scene_id in story["scene_ids"]:
+        scene_domain = _scene_style_domain(
+            active[scene_id].get("metadata")
+            if isinstance(active[scene_id].get("metadata"), Mapping)
+            else {},
+            scene_id=scene_id,
+        )
+        for shot_id in shots_by_scene.get(scene_id, []):
+            number += 1
+            shot_scene[shot_id] = scene_id
+            shot_domains[shot_id] = scene_domain["domain_id"]
+            shot_rows.append(
+                _graph_shot_index_row(
+                    active[shot_id],
+                    shot_id=shot_id,
+                    scene_id=scene_id,
+                    number=number,
+                )
+            )
+    return shot_rows, scene_rows, shot_scene, shot_domains
+
+
+def _owner_import_art_directions(
+    items: list[Mapping[str, Any]],
+    *,
+    shot_domains: Mapping[str, str],
+) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for raw in items:
+        style_id = _owner_import_id(raw.get("stable_id") or raw.get("style_id"), field="art_direction_id")
+        if style_id not in {"M-STY-01", "A-STY-01"}:
+            raise ValueError("owner art direction ids must use M-STY-01 or A-STY-01")
+        if style_id in result:
+            raise ValueError("owner asset draft import contains duplicate art direction ids")
+        label = _owner_text(raw.get("label") or raw.get("name") or style_id, 120)
+        result[style_id] = {
+            "domain_id": style_id,
+            "art_direction_id": style_id,
+            "label": label,
+            "visual_style": _owner_text(raw.get("visual_style") or raw.get("description"), 360),
+            "medium": _owner_text(raw.get("medium"), 240),
+            "palette": _owner_text(raw.get("palette"), 240),
+            "lighting": _owner_text(raw.get("lighting"), 240),
+            "camera_language": _owner_text(raw.get("camera_language"), 360),
+            "negative_locks": _owner_texts(raw.get("negative_locks"), 12, 160),
+            "scene_ids": [],
+            "shot_ids": [],
+            "status": "approved",
+            "owner_supplied": True,
+        }
+    if {"M-STY-01", "A-STY-01"} - set(result):
+        raise ValueError("owner asset draft import requires M-STY-01 and A-STY-01")
+    for shot_id, domain in shot_domains.items():
+        style_id = "A-STY-01" if domain == "style-ancient-romance" else "M-STY-01"
+        result[style_id]["shot_ids"].append(shot_id)
+    return result
+
+
+def _owner_import_assets(
+    project_id: str,
+    *,
+    draft_id: str,
+    assets_input: list[Mapping[str, Any]],
+    art_directions: Mapping[str, Mapping[str, Any]],
+    story: Mapping[str, Any],
+    shot_rows: list[Mapping[str, Any]],
+    shot_scene: Mapping[str, str],
+    shot_reference_map: Any,
+    graph: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    imported_ids: set[str] = set()
+    graph_node_ids = set(graph.get("nodes", {}))
+    assets_by_id: dict[str, Mapping[str, Any]] = {}
+    for item in assets_input:
+        stable_id = _owner_import_id(item.get("stable_id") or item.get("asset_id"), field="stable_id")
+        if stable_id in imported_ids:
+            raise ValueError("owner asset draft import contains duplicate stable ids")
+        if stable_id in graph_node_ids:
+            raise ValueError(f"owner asset draft import id collides with existing graph node: {stable_id}")
+        imported_ids.add(stable_id)
+        assets_by_id[stable_id] = item
+    shot_reference_rows = _owner_import_shot_reference_rows(
+        shot_reference_map,
+        shot_rows=shot_rows,
+    )
+    occurrences = {asset_id: {"shot_ids": set(), "scene_ids": set()} for asset_id in imported_ids}
+    art_scene_ids = {style_id: set() for style_id in art_directions}
+    known_reference_ids = set(imported_ids) | set(art_directions)
+    for row in shot_reference_rows:
+        shot_id = row["shot_id"]
+        scene_id = shot_scene[shot_id]
+        for ref_id in row["reference_ids"]:
+            if ref_id not in known_reference_ids:
+                raise ValueError(f"shot reference map uses unknown asset or style id: {ref_id}")
+            if ref_id in art_scene_ids:
+                art_scene_ids[ref_id].add(scene_id)
+                continue
+            occurrences[ref_id]["shot_ids"].add(shot_id)
+            occurrences[ref_id]["scene_ids"].add(scene_id)
+    for style_id, scene_ids in art_scene_ids.items():
+        art_directions[style_id]["scene_ids"] = sorted(scene_ids)
+
+    imported: list[dict[str, Any]] = []
+    for stable_id in sorted(imported_ids):
+        raw = assets_by_id[stable_id]
+        asset_type, subtype = _owner_import_asset_type(stable_id, raw)
+        style_id = _owner_import_style_id(stable_id, raw)
+        if style_id not in art_directions:
+            raise ValueError(f"owner asset {stable_id} references unknown style domain")
+        shot_ids = sorted(occurrences[stable_id]["shot_ids"])
+        scene_ids = sorted(occurrences[stable_id]["scene_ids"])
+        if not shot_ids:
+            raise ValueError(f"owner asset {stable_id} has no shot references")
+        _assert_no_cross_domain(stable_id, style_id, shot_ids, story)
+        display_name = _owner_text(raw.get("display_name") or raw.get("name"), 120)
+        if not display_name:
+            raise ValueError(f"owner asset {stable_id} requires a display name")
+        description = _owner_text(raw.get("visual_identity") or raw.get("description"), 600)
+        positive_traits = _owner_texts(
+            raw.get("positive_traits") or raw.get("traits") or raw.get("variants"),
+            24,
+            160,
+        )
+        if not positive_traits and description:
+            positive_traits = [description[:160]]
+        negative_locks = _owner_texts(raw.get("negative_locks"), 24, 160)
+        continuity_label = _owner_text(
+            raw.get("continuity") or f"{display_name} 由 Owner 底稿确认，跨引用镜头保持同一视觉身份。",
+            160,
+        )
+        imported.append(
+            {
+                "stable_id": stable_id,
+                "asset_type": asset_type,
+                "asset_subtype": subtype,
+                "display_name": display_name,
+                "aliases": sorted({display_name, *_owner_texts(raw.get("aliases"), 20, 120)}),
+                "visual_identity": description,
+                "review_state": "approved",
+                "confidence": 1.0,
+                "needs_confirmation": False,
+                "owner_supplied": True,
+                "owner_draft_id": draft_id,
+                "style_domain_id": style_id,
+                "occurrences": {"scene_ids": scene_ids, "shot_ids": shot_ids},
+                "continuity_states": [
+                    {
+                        "state_id": f"continuity-{stable_id}",
+                        "label": continuity_label,
+                        "status": "confirmed",
+                        "scene_ids": scene_ids,
+                        "shot_ids": shot_ids,
+                    }
+                ],
+                "positive_traits": positive_traits,
+                "negative_locks": negative_locks,
+                "pending_fields": [],
+                "source_evidence": [
+                    {
+                        "source_type": "owner_asset_draft",
+                        "source_id": draft_id,
+                        "excerpt": description[:240] or f"{display_name} 由 Owner 底稿定义。",
+                        "scene_ids": scene_ids,
+                        "shot_ids": shot_ids,
+                    },
+                    {
+                        "source_type": "shot_reference_map",
+                        "source_id": stable_id,
+                        "excerpt": "Owner 确认的镜头引用范围。",
+                        "scene_ids": scene_ids,
+                        "shot_ids": shot_ids,
+                    },
+                ],
+                "lineage": {"parent_ids": [], "merged_from_ids": []},
+            }
+        )
+    _assert_owner_domain_name_uniqueness(imported)
+    return imported
+
+
+def _owner_import_shot_reference_rows(
+    value: Any,
+    *,
+    shot_rows: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if not isinstance(value, Mapping):
+        raise ValueError("owner asset draft import requires shot_reference_map")
+    shot_by_ordinal = {int(item["number"]): str(item["shot_id"]) for item in shot_rows}
+    expected_ordinals = set(shot_by_ordinal)
+    supplied_ordinals: set[int] = set()
+    rows = []
+    for raw_key, raw_refs in value.items():
+        try:
+            ordinal = int(str(raw_key).strip())
+        except ValueError as exc:
+            raise ValueError("shot_reference_map keys must be shot ordinals") from exc
+        if ordinal not in shot_by_ordinal:
+            raise ValueError(f"shot_reference_map references unknown shot ordinal {ordinal}")
+        refs = [_owner_import_id(item, field="reference_id") for item in raw_refs] if isinstance(raw_refs, list) else []
+        if not refs or len(refs) > 4:
+            raise ValueError("each shot_reference_map row requires one to four references")
+        if len(set(refs)) != len(refs):
+            raise ValueError("shot_reference_map row contains duplicate references")
+        supplied_ordinals.add(ordinal)
+        rows.append({"shot_ordinal": ordinal, "shot_id": shot_by_ordinal[ordinal], "reference_ids": refs})
+    if supplied_ordinals != expected_ordinals:
+        missing = sorted(expected_ordinals - supplied_ordinals)
+        extra = sorted(supplied_ordinals - expected_ordinals)
+        raise ValueError(f"shot_reference_map must cover every shot exactly once; missing={missing}, extra={extra}")
+    return sorted(rows, key=lambda item: item["shot_ordinal"])
+
+
+def _owner_import_asset_type(stable_id: str, raw: Mapping[str, Any]) -> tuple[str, str]:
+    raw_type = str(raw.get("asset_type") or raw.get("type") or "").strip().lower()
+    if raw_type in {"environment", "env"}:
+        raw_type = "scene"
+    if raw_type in {"graphic", "prop/graphic"}:
+        raw_type = "prop"
+    inferred = (
+        "character" if "-CHAR-" in stable_id
+        else "scene" if "-ENV-" in stable_id
+        else "prop"
+    )
+    asset_type = raw_type or inferred
+    if asset_type not in ASSET_TYPES:
+        raise ValueError(f"owner asset {stable_id} has unsupported asset type")
+    if asset_type != inferred and stable_id.startswith(("M-", "A-")):
+        raise ValueError(f"owner asset {stable_id} type does not match its namespace")
+    subtype = str(raw.get("asset_subtype") or raw.get("kind") or "").strip()[:80]
+    if stable_id.startswith("GFX-"):
+        asset_type = "prop"
+        subtype = subtype or "graphic"
+    return asset_type, subtype
+
+
+def _owner_import_style_id(stable_id: str, raw: Mapping[str, Any]) -> str:
+    supplied = _optional_token(raw.get("style_domain_id") or raw.get("art_direction_id"))
+    if supplied:
+        return _owner_import_id(supplied, field="style_domain_id")
+    return "M-STY-01" if stable_id.startswith("M-") else "A-STY-01"
+
+
+def _assert_no_cross_domain(
+    stable_id: str,
+    style_id: str,
+    shot_ids: list[str],
+    story: Mapping[str, Any],
+) -> None:
+    active = story["active"]
+    shot_scene = story["shot_scene"]
+    for shot_id in shot_ids:
+        scene_id = shot_scene[shot_id]
+        metadata = active[scene_id].get("metadata") if isinstance(active[scene_id].get("metadata"), Mapping) else {}
+        scene_style = _scene_style_domain(metadata, scene_id=scene_id)["domain_id"]
+        expected = "A-STY-01" if scene_style == "style-ancient-romance" else "M-STY-01"
+        if style_id != expected:
+            raise ValueError(f"owner asset {stable_id} crosses style domains")
+
+
+def _assert_owner_domain_name_uniqueness(assets: list[Mapping[str, Any]]) -> None:
+    owner_by_name: dict[tuple[str, str, str], str] = {}
+    for asset in assets:
+        key = (
+            str(asset.get("asset_type") or ""),
+            str(asset.get("style_domain_id") or ""),
+            _normalized_name(str(asset.get("display_name") or "")),
+        )
+        existing = owner_by_name.get(key)
+        if existing and existing != asset.get("stable_id"):
+            raise ValueError("owner asset draft import contains duplicate names in one style domain")
+        owner_by_name[key] = str(asset.get("stable_id") or "")
+
+
+def _combined_owner_art_direction(
+    art_directions: Mapping[str, Mapping[str, Any]],
+    *,
+    confirmed_at: str,
+) -> dict[str, Any]:
+    modern = art_directions.get("M-STY-01", {})
+    ancient = art_directions.get("A-STY-01", {})
+    return {
+        "visual_style": " / ".join(
+            item for item in [modern.get("visual_style"), ancient.get("visual_style")] if item
+        )[:240],
+        "medium": " / ".join(
+            item for item in [modern.get("medium"), ancient.get("medium")] if item
+        )[:240],
+        "palette": " / ".join(
+            item for item in [modern.get("palette"), ancient.get("palette")] if item
+        )[:240],
+        "lighting": " / ".join(
+            item for item in [modern.get("lighting"), ancient.get("lighting")] if item
+        )[:240],
+        "status": "confirmed",
+        "source": "human_review",
+        "confirmed_at": confirmed_at,
+    }
+
+
+def _owner_import_id(value: Any, *, field: str) -> str:
+    token = _token(value, field)
+    if not OWNER_IMPORT_ID_PATTERN.fullmatch(token):
+        raise ValueError(f"{field} must use an M-*, A-*, or GFX-* owner namespace")
+    return token
+
+
+def _digest_token(value: Any, *, field: str) -> str:
+    raw = str(value or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", raw):
+        raise ValueError(f"{field} must be a canonical digest")
+    return raw
+
+
+def _owner_text(value: Any, length: int) -> str:
+    return str(value or "").strip()[:length]
+
+
+def _owner_texts(value: Any, limit: int, length: int) -> list[str]:
+    if isinstance(value, str):
+        raw_items = re.split(r"[、,\n;；]+", value)
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+    return list(dict.fromkeys(str(item or "").strip()[:length] for item in raw_items if str(item or "").strip()))[:limit]
+
+
 def _apply_command(
     project_id: str,
     current: dict[str, Any],
@@ -767,6 +1283,15 @@ def _apply_command(
 ) -> dict[str, Any]:
     command_type = str(command.get("type") or "")
     command_time = _requested_at(body)
+    if command_type == "import_asset_draft":
+        return _import_asset_draft_state(
+            project_id,
+            current,
+            command,
+            body,
+            graph,
+            created_at=command_time,
+        )
     if command_type in {"generate_candidates", "regenerate_candidates"}:
         generated = (
             build_graph_asset_candidate_set(project_id, graph)
@@ -1497,6 +2022,8 @@ def _refresh_coverage(state: dict[str, Any]) -> dict[str, Any]:
     for asset in active_assets:
         if asset.get("asset_type") != "scene":
             continue
+        if asset.get("owner_supplied") is True:
+            continue
         for scene_id in asset.get("occurrences", {}).get("scene_ids", []):
             expected_shots = shots_by_scene.get(str(scene_id), set())
             missing = sorted(expected_shots - set(asset.get("occurrences", {}).get("shot_ids", [])))
@@ -1984,9 +2511,13 @@ def _graph_events(
         asset_id = str(asset["stable_id"])
         asset_metadata = {
             "kind": asset["asset_type"],
+            "asset_subtype": asset.get("asset_subtype", ""),
             "display_name": asset["display_name"],
             "aliases": asset["aliases"],
             "review_state": asset["review_state"],
+            "owner_supplied": asset.get("owner_supplied") is True,
+            "owner_draft_id": asset.get("owner_draft_id", ""),
+            "style_domain_id": asset.get("style_domain_id", ""),
             "visual_identity": asset.get("visual_identity", ""),
             "continuity_states": asset["continuity_states"],
             "positive_traits": asset["positive_traits"],
@@ -2071,6 +2602,7 @@ def _receipt(state: Mapping[str, Any], command: Mapping[str, Any], impact: Mappi
             f"已重新识别 {len([item for item in state.get('assets', []) if item.get('review_state') not in {'rejected', 'superseded'}])} "
             "个当前资产；已批准事实保留，旧候选进入历史，未调用外部能力。"
         ),
+        "import_asset_draft": f"已导入 {len(state.get('assets', []))} 个 Owner 资产，未调用外部能力。",
         "create_asset": "人工补充资产已进入候选审核，出现范围等待确认。",
         "set_art_direction": "统一美术方向已确认并写入 Asset Bible 当前版本。",
         "approve": "资产候选已批准，引用关系保持可追溯。",
@@ -2110,6 +2642,13 @@ def _public_result(state: Mapping[str, Any], *, authority_mode: str) -> dict[str
 def _safe_command(command: Mapping[str, Any]) -> dict[str, Any]:
     allowed = {
         "type",
+        "draft_id",
+        "idempotency_key",
+        "graph_version",
+        "graph_digest",
+        "assets",
+        "art_directions",
+        "shot_reference_map",
         "target_id",
         "target_ids",
         "patch",
@@ -2176,6 +2715,7 @@ def _requested_at(body: Mapping[str, Any]) -> str:
 __all__ = (
     "SCHEMA_VERSION",
     "build_asset_candidate_set",
+    "confirm_asset_bible_command_result",
     "preview_asset_bible_command_result",
     "register_runtime_asset_bible_routes",
 )

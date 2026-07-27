@@ -9,6 +9,7 @@ SUPPORTED_SOURCE_TYPES = {
     "occurrence_ledger",
     "applied_shot_plan",
     "script_revision",
+    "shot_reference_map",
 }
 
 
@@ -87,7 +88,7 @@ def authoritative_source_evidence(
     ):
         source_type = evidence["source_type"]
         source_id = evidence["source_id"]
-        if source_type == "occurrence_ledger":
+        if source_type in {"occurrence_ledger", "shot_reference_map"}:
             if not asset_id or source_id != asset_id:
                 continue
             evidence_shot_ids = set(evidence["shot_ids"]) & occurrence_shot_ids

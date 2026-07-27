@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.runtime_asset_bible import (
     build_asset_candidate_set,
+    confirm_asset_bible_command_result,
     preview_asset_bible_command_result,
 )
 from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state
@@ -608,6 +609,237 @@ def test_nested_sequence_graph_generates_zero_provider_two_domain_candidates(tmp
     assert "古言棋局域 王府密室" in by_type["scene"]
     assert {"红绳", "手机", "照片", "竹简", "长剑", "旧军籍册"} & by_type["prop"]
     assert not any("林晚" in name and "容华" in name for name in by_type["character"])
+
+
+def _seed_owner_import_graph(graph_store, project_id: str = PROJECT_ID) -> dict:
+    from apps.api.runtime_production_graph import canonical_digest
+
+    graph_store.append(
+        project_id,
+        expected_version=0,
+        idempotency_key="seed-owner-import-story",
+        semantic_digest=canonical_digest({"seed": "owner-import-story"}),
+        events=[
+            {"type": "node_upserted", "node": {"node_id": "revision-owner", "category": "revision", "metadata": {"source_digest": "d" * 64}}},
+            {"type": "node_upserted", "node": {"node_id": "sequence-owner", "category": "collection", "metadata": {"kind": "story_sequence"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-modern-owner", "category": "location", "metadata": {"name": "现代重生甜虐 泳池夜", "space": "夜间泳池暖金灯与蓝绿水面"}}},
+            {"type": "node_upserted", "node": {"node_id": "scene-ancient-owner", "category": "location", "metadata": {"name": "古言棋局 王府密室", "space": "黑檀棋盘与冷月烛火"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-modern-owner-1", "category": "unit", "metadata": {"title": "深海坠落", "duration_seconds": 6, "blocking": "叶安安在象征性深海中下沉。"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-modern-owner-2", "category": "unit", "metadata": {"title": "泳池对峙", "duration_seconds": 6, "blocking": "叶安安警觉看向泳池边的傅凉川。"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-ancient-owner-1", "category": "unit", "metadata": {"title": "棋局开场", "duration_seconds": 6, "blocking": "容华在黑檀棋盘前落下金色棋子。"}}},
+            {"type": "node_upserted", "node": {"node_id": "shot-ancient-owner-2", "category": "unit", "metadata": {"title": "封面落版", "duration_seconds": 6, "blocking": "无字封面母版进入后期图形段落。"}}},
+            {"type": "relation_upserted", "from_id": "revision-owner", "to_id": "sequence-owner", "relation_type": "derived_from"},
+            {"type": "relation_upserted", "from_id": "sequence-owner", "to_id": "scene-modern-owner", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "sequence-owner", "to_id": "scene-ancient-owner", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-modern-owner", "to_id": "shot-modern-owner-1", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-modern-owner", "to_id": "shot-modern-owner-2", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-ancient-owner", "to_id": "shot-ancient-owner-1", "relation_type": "contains"},
+            {"type": "relation_upserted", "from_id": "scene-ancient-owner", "to_id": "shot-ancient-owner-2", "relation_type": "contains"},
+        ],
+    )
+    return graph_store.load(project_id)
+
+
+def _owner_import_body(graph: dict) -> dict:
+    return {
+        "requested_at": "2026-07-28T00:00:00Z",
+        "idempotency_key": "owner-asset-bible-20260728-v1-import",
+        "command": {
+            "type": "import_asset_draft",
+            "draft_id": "owner-asset-bible-20260728-v1",
+            "idempotency_key": "owner-asset-bible-20260728-v1-import",
+            "graph_version": graph["version"],
+            "graph_digest": graph["graph_digest"],
+            "art_directions": [
+                {
+                    "stable_id": "M-STY-01",
+                    "label": "现代重生甜虐",
+                    "visual_style": "商业级都市重生甜虐短剧；写实、表演清楚",
+                    "medium": "电影摄影，真实皮肤与织物",
+                    "palette": "冷青黑、香槟金、暖白、蓝绿水光",
+                    "lighting": "恐惧贴近移动浅景深，喜剧干净中近景",
+                    "negative_locks": ["禁止廉价网大滤镜"],
+                },
+                {
+                    "stable_id": "A-STY-01",
+                    "label": "古言作品推广",
+                    "visual_style": "高概念甜虐古言/爱情棋局/权谋寓言",
+                    "medium": "丝绸暗纹锦缎、旧铜玉石、黑檀冷锻钢",
+                    "palette": "墨黑、暗金、朱红、月白",
+                    "lighting": "对峙、遮挡、棋盘线条和距离",
+                    "negative_locks": ["拒绝仙侠光污染"],
+                },
+            ],
+            "assets": [
+                {
+                    "stable_id": "M-CHAR-01",
+                    "asset_type": "character",
+                    "display_name": "叶安安",
+                    "visual_identity": "清秀倔强，杏眼，黑色长发，纤细，同脸连续",
+                    "variants": ["泳池湿身", "白浴巾伪装"],
+                    "negative_locks": ["禁止族裔模仿式黑脸"],
+                },
+                {
+                    "stable_id": "M-ENV-01",
+                    "asset_type": "scene",
+                    "display_name": "象征性深海",
+                    "visual_identity": "深蓝黑水体，上方弱冷白光，气泡颗粒",
+                },
+                {
+                    "stable_id": "A-CHAR-01",
+                    "asset_type": "character",
+                    "display_name": "容华",
+                    "visual_identity": "修长清贵，深眉眼，黑发高束，墨黑暗金棋纹锦袍",
+                },
+                {
+                    "stable_id": "A-PROP-01",
+                    "asset_type": "prop",
+                    "display_name": "金色棋子",
+                    "visual_identity": "温润旧金，扁圆，细棋纹，尺寸统一",
+                },
+                {
+                    "stable_id": "GFX-01",
+                    "asset_type": "graphic",
+                    "display_name": "《请夫入瓮》无字封面母版",
+                    "visual_identity": "容华、白筱、棋子、古剑，不含模型字",
+                },
+            ],
+            "shot_reference_map": {
+                "1": ["M-CHAR-01", "M-ENV-01", "M-STY-01"],
+                "2": ["M-CHAR-01", "M-STY-01"],
+                "3": ["A-CHAR-01", "A-PROP-01", "A-STY-01"],
+                "4": ["GFX-01", "A-PROP-01", "A-STY-01"],
+            },
+        },
+    }
+
+
+def test_owner_asset_draft_import_previews_and_confirms_into_canonical_graph(tmp_path) -> None:
+    from apps.api.runtime_production_graph import ProductionGraphStore
+    from apps.api.runtime_store import RuntimeStore
+
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    graph_store = ProductionGraphStore(store)
+    graph = _seed_owner_import_graph(graph_store)
+    body = _owner_import_body(graph)
+
+    preview = preview_asset_bible_command_result(PROJECT_ID, body, graph=graph)
+    assert preview["provider_dispatch_count"] == 0
+    assert preview["result"]["graph_mutation"] == 0
+    assert graph_store.load(PROJECT_ID)["version"] == graph["version"]
+    bible = preview["result"]["asset_bible"]
+    assert bible["status"] == "candidate_review"
+    assert bible["locked_revision_id"] == ""
+    assert {item["stable_id"] for item in bible["assets"]} == {
+        "M-CHAR-01",
+        "M-ENV-01",
+        "A-CHAR-01",
+        "A-PROP-01",
+        "GFX-01",
+    }
+    assert all(item["review_state"] == "approved" and item["owner_supplied"] for item in bible["assets"])
+    assert bible["coverage"]["unresolved_required"] == 0
+    assert bible["coverage"]["coverage_pass"] is True
+    assert bible["candidate_set"]["import"]["draft_id"] == "owner-asset-bible-20260728-v1"
+    assert len(bible["candidate_set"]["style_domains"]) == 2
+    assert len(bible["candidate_set"]["shot_reference_map"]) == 4
+
+    confirmed = confirm_asset_bible_command_result(
+        PROJECT_ID,
+        {
+            **body,
+            "preview_digest": preview["preview_digest"],
+            "command_id": preview["command_id"],
+            "expected_graph_version": graph["version"],
+        },
+        graph_store=graph_store,
+    )
+    assert confirmed["status"] == "confirmed"
+    assert confirmed["graph_version"] == graph["version"] + 1
+    assert confirmed["asset_bible"]["status"] == "candidate_review"
+    updated = graph_store.load(PROJECT_ID)
+    assert updated["nodes"]["asset-bible-codex-clawed-fighter-smoke-20260624-h"]["metadata"]["kind"] == "asset_bible"
+    assert updated["nodes"]["M-CHAR-01"]["metadata"]["owner_supplied"] is True
+    assert updated["nodes"]["GFX-01"]["metadata"]["asset_subtype"] == "graphic"
+    assert any(
+        relation == {
+            "from_id": "M-CHAR-01",
+            "to_id": "shot-modern-owner-1",
+            "relation_type": "required_by",
+        }
+        for relation in updated["relations"]
+    )
+
+    replayed = confirm_asset_bible_command_result(
+        PROJECT_ID,
+        {
+            **body,
+            "preview_digest": preview["preview_digest"],
+            "command_id": preview["command_id"],
+            "expected_graph_version": graph["version"],
+        },
+        graph_store=graph_store,
+    )
+    assert replayed["idempotent_replay"] is True
+    assert replayed["graph_version"] == confirmed["graph_version"]
+
+    restored = TestClient(create_runtime_app(runtime_root=runtime_root)).get(
+        f"/projects/{PROJECT_ID}/m6/asset-bible"
+    )
+    assert restored.status_code == 200
+    restored_bible = restored.json()["asset_bible"]
+    assert restored_bible["candidate_set"]["style_domains"][0]["owner_supplied"] is True
+    assert restored_bible["candidate_set"]["shot_reference_map"][0]["reference_ids"] == [
+        "M-CHAR-01",
+        "M-ENV-01",
+        "M-STY-01",
+    ]
+
+
+def test_owner_asset_draft_import_rejects_bad_id_collision_and_cross_domain(tmp_path) -> None:
+    from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
+    from apps.api.runtime_store import RuntimeStore
+
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    graph_store = ProductionGraphStore(store)
+    graph = _seed_owner_import_graph(graph_store)
+    body = _owner_import_body(graph)
+
+    bad_id = deepcopy(body)
+    bad_id["command"]["assets"][0]["stable_id"] = "B-CHAR-01"
+    with pytest.raises(ValueError, match="owner namespace"):
+        preview_asset_bible_command_result(PROJECT_ID, bad_id, graph=graph)
+
+    collision_graph = graph_store.append(
+        PROJECT_ID,
+        expected_version=graph["version"],
+        idempotency_key="seed-owner-id-collision",
+        semantic_digest=canonical_digest({"collision": "M-CHAR-01"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "M-CHAR-01",
+                    "category": "resource",
+                    "metadata": {"kind": "reserved"},
+                },
+            }
+        ],
+    )
+    collision_body = _owner_import_body(collision_graph)
+    with pytest.raises(ValueError, match="collides with existing graph node"):
+        preview_asset_bible_command_result(PROJECT_ID, collision_body, graph=collision_graph)
+
+    fresh_root = tmp_path / "runtime-cross"
+    fresh_store = RuntimeStore(fresh_root)
+    fresh_graph_store = ProductionGraphStore(fresh_store)
+    fresh_graph = _seed_owner_import_graph(fresh_graph_store)
+    cross_domain = _owner_import_body(fresh_graph)
+    cross_domain["command"]["shot_reference_map"]["3"] = ["M-CHAR-01", "A-CHAR-01", "A-PROP-01", "A-STY-01"]
+    with pytest.raises(ValueError, match="crosses style domains"):
+        preview_asset_bible_command_result(PROJECT_ID, cross_domain, graph=fresh_graph)
 
 
 def test_split_rejects_duplicate_occurrence_assignment() -> None:

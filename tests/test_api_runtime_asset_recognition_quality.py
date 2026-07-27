@@ -503,6 +503,31 @@ def test_authoritative_applied_shot_evidence_requires_canonical_source_identity(
     ] == []
 
 
+def test_authoritative_owner_shot_reference_map_counts_only_matching_asset() -> None:
+    known = {"shot-a", "shot-b"}
+    asset = {
+        "stable_id": "M-CHAR-01",
+        "occurrences": {"scene_ids": ["scene-a"], "shot_ids": ["shot-a", "shot-b"]},
+        "source_evidence": [
+            {
+                "source_type": "shot_reference_map",
+                "source_id": "M-CHAR-01",
+                "shot_ids": ["shot-a", "shot-b"],
+                "excerpt": "Owner 确认的镜头引用范围。",
+            },
+            {
+                "source_type": "shot_reference_map",
+                "source_id": "M-CHAR-02",
+                "shot_ids": ["shot-a"],
+                "excerpt": "非本资产的镜头引用范围。",
+            },
+        ],
+    }
+    traceable, records = authoritative_source_evidence(asset, known)
+    assert traceable == {"shot-a", "shot-b"}
+    assert [item for item in records if item["source_id"] == "M-CHAR-02"] == []
+
+
 def test_rerecognition_confirm_is_idempotent_and_reload_preserves_quality(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
     bible = _generated_bible()
