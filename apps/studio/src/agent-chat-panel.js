@@ -17,7 +17,9 @@ import {
   cancelEmbeddedCreativeAction,
   clearEmbeddedCreativeAction,
   editEmbeddedCreativePreview,
+  prepareEmbeddedShotBreakdown,
   startEmbeddedCreativeAction,
+  updateEmbeddedStoryboardBrief,
 } from "./embedded-creative-actions.js";
 import {
   appliedCreativeActionReceiptText,
@@ -27,6 +29,11 @@ import {
   taskPhaseLabel,
   taskStateLabel,
 } from "./creative-task-contract.js";
+import {
+  productionBriefForSource,
+  productionBriefLabel,
+  shotPlanDurationAssessment,
+} from "./storyboard-duration-contract.js";
 
 export function buildAgentChatPanel({
   session,
@@ -438,8 +445,10 @@ function currentTaskReview({ store, runtime, onRender }) {
   wrap.appendChild(taskPhaseList(task, action));
   if (["running", "recovering"].includes(action.status)) {
     wrap.appendChild(el("p", "agent-current-task-copy", action.message || "正在生成可审看预览；确认前画布不会改变。"));
+  } else if (action.status === "briefing") {
+    wrap.appendChild(storyboardBriefReview({ store, runtime, node, action, onRender }));
   } else if (action.status === "preview") {
-    wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action.preview?.shot_plan) : screenplayReview(action, store, node));
+    wrap.appendChild(action.action_type === "shot_breakdown" ? shotPlanReview(action) : screenplayReview(action, store, node));
   } else if (action.status === "unavailable") {
     wrap.appendChild(failureReview(action));
   } else if (action.status === "applied") {
@@ -455,15 +464,28 @@ function currentTaskReview({ store, runtime, onRender }) {
 function currentTaskActions({ store, runtime, node, action, onRender }) {
   const row = el("div", "agent-current-task-actions");
   if (action.status === "preview") {
-    row.appendChild(taskButton("应用", "studio-primary-button", () => {
-      void applyEmbeddedCreativeAction(store, node.id, runtime).finally(() => onRender?.());
-    }));
+    const assessment = action.action_type === "shot_breakdown"
+      ? shotPlanDurationAssessment(
+          action.preview?.shot_plan,
+          action.preview?.production_brief || action.production_brief || productionBriefForSource(action.source_text),
+        )
+      : null;
+    if (!assessment || assessment.apply_allowed) {
+      row.appendChild(taskButton("应用", "studio-primary-button", () => {
+        void applyEmbeddedCreativeAction(store, node.id, runtime).finally(() => onRender?.());
+      }));
+    } else {
+      row.appendChild(taskButton("调整时长并重新规划", "studio-primary-button", () => {
+        prepareEmbeddedShotBreakdown(store, store.get().nodes[node.id], { mode: action.mode });
+        onRender?.();
+      }));
+    }
     row.appendChild(taskButton("取消", "studio-secondary-button", () => {
       cancelEmbeddedCreativeAction(store, node.id);
       onRender?.();
     }));
   }
-  if (["preview", "unavailable"].includes(action.status)) {
+  if (["preview", "unavailable"].includes(action.status) && action.action_type !== "shot_breakdown") {
     row.appendChild(taskButton("重新预览", "studio-secondary-button", () => {
       void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], action.action_type, { mode: action.mode })
         .finally(() => onRender?.());
@@ -563,10 +585,26 @@ function screenplayCandidateView(candidate) {
   return details;
 }
 
-function shotPlanReview(plan) {
+function shotPlanReview(action) {
+  const plan = action?.preview?.shot_plan || {};
   const summary = shotPlanSummary(plan);
+  const assessment = shotPlanDurationAssessment(
+    plan,
+    action?.preview?.production_brief || action?.production_brief || productionBriefForSource(action?.source_text),
+  );
   const wrap = el("div", "agent-shot-plan-review");
-  wrap.appendChild(el("p", "agent-current-task-copy", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 总时长约 ${Math.round(summary.estimated_duration_sec)} 秒。应用后会创建可见候选分镜子图，确认前不写成最终制作事实。`));
+  wrap.appendChild(el(
+    "p",
+    `agent-current-task-copy ${assessment.apply_allowed ? "duration-pass" : "duration-blocked"}`,
+    `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 目标 ${Math.round(assessment.target_duration_seconds)} 秒 · 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒。`,
+  ));
+  wrap.appendChild(el(
+    "p",
+    "agent-current-task-copy",
+    assessment.apply_allowed
+      ? "候选时长符合目标；应用前不会改变当前制作内容。"
+      : "候选已保留，但时长超出允许范围，不能直接应用。请调整目标后重新规划。",
+  ));
   const details = el("details", "agent-shot-plan-candidate");
   details.open = true;
   details.appendChild(el("summary", "", "分镜候选结构"));
@@ -585,6 +623,43 @@ function shotPlanReview(plan) {
   return wrap;
 }
 
+function storyboardBriefReview({ store, runtime, node, action, onRender }) {
+  const brief = productionBriefForSource(action.source_text, action.production_brief);
+  const wrap = el("section", "agent-storyboard-brief");
+  wrap.appendChild(el("p", "agent-current-task-copy", "先确定成片目标总时长。确认后只调用文本模型生成分镜预览。"));
+  const label = document.createElement("label");
+  label.textContent = `目标总时长（秒） · ${productionBriefLabel(brief)}`;
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "5";
+  input.max = "3600";
+  input.step = "1";
+  input.value = String(brief.target_duration_seconds);
+  input.setAttribute("aria-label", "分镜目标总时长（秒）");
+  label.appendChild(input);
+  wrap.appendChild(label);
+  wrap.appendChild(el("small", "", `允许偏差 ${Math.round(brief.tolerance_seconds)} 秒。`));
+  wrap.appendChild(taskButton("确认目标并预览分镜", "studio-primary-button", () => {
+    const productionBrief = updateEmbeddedStoryboardBrief(store, node.id, input.value);
+    if (!productionBrief) return;
+    void startEmbeddedCreativeAction(store, runtime, store.get().nodes[node.id], "shot_breakdown", {
+      mode: action.mode,
+      productionBrief,
+    }).finally(() => onRender?.());
+    onRender?.();
+  }));
+  wrap.appendChild(taskButton("稍后", "studio-secondary-button", () => {
+    clearEmbeddedCreativeAction(store, node.id);
+    onRender?.();
+  }));
+  return wrap;
+}
+
+function formatDurationDelta(value) {
+  const rounded = Math.round(Number(value || 0));
+  return rounded > 0 ? `+${rounded}` : String(rounded);
+}
+
 function appliedSubgraphSummary(subgraph) {
   const summary = shotPlanSummary(subgraph?.shot_plan || {});
   return simpleList("已创建候选子图", [
@@ -595,6 +670,11 @@ function appliedSubgraphSummary(subgraph) {
 
 function taskPhaseList(task, action) {
   const current = task?.phase || action?.status || "";
+  if (action?.status === "briefing") {
+    const line = el("ol", "agent-task-phases");
+    line.appendChild(el("li", "current", "确认目标时长"));
+    return line;
+  }
   const line = el("ol", "agent-task-phases");
   if (current === "failed" || action?.status === "unavailable") {
     line.appendChild(el("li", "current", "文本处理未完成"));
@@ -605,6 +685,7 @@ function taskPhaseList(task, action) {
 }
 
 function taskStatePhaseSummary(task, action) {
+  if (action?.status === "briefing") return "等待确认时长";
   if (task?.phase === "failed" || action?.status === "unavailable") return "文本处理未完成";
   const stateLabel = taskStateLabel(task);
   const phaseLabel = taskPhaseLabel(task?.phase || action?.status || "queued");
@@ -634,7 +715,9 @@ function selectedCanvasNode(state) {
 }
 
 function currentTaskTitle(action) {
-  if (action.action_type === "shot_breakdown") return "动态分镜候选审阅";
+  if (action.action_type === "shot_breakdown") {
+    return action.status === "briefing" ? "设置分镜目标时长" : "动态分镜候选审阅";
+  }
   return action.mode === "professional_screenplay" ? "剧本化扩写审阅" : "节点修订审阅";
 }
 

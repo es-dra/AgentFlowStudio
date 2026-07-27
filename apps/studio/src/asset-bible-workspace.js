@@ -428,13 +428,16 @@ export function deriveProductionCopilotState({
   ) {
     const action = readyScriptNode.params?.embeddedCreativeAction || {};
     const isBreakdown = action.action_type === "shot_breakdown";
+    const briefing = isBreakdown && action.status === "briefing";
     const running = isBreakdown && ["running", "recovering", "applying"].includes(action.status);
     const previewReady = isBreakdown && action.status === "preview";
     const failed = isBreakdown && action.status === "unavailable";
-    if (running || previewReady || failed || !shotTruth.status || shotTruth.status !== "ready") {
+    if (briefing || running || previewReady || failed || !shotTruth.status || shotTruth.status !== "ready") {
       return {
         stage: previewReady
           ? "storyboard_breakdown_review"
+          : briefing
+            ? "storyboard_duration_brief"
           : running
             ? "storyboard_breakdown_in_progress"
             : failed
@@ -459,6 +462,13 @@ export function deriveProductionCopilotState({
             reason: "场景、镜头顺序和时长已准备好；应用前制作内容不会改变。",
             enabled: true,
           }
+          : briefing
+            ? {
+              action: "review_storyboard_breakdown",
+              label: "确认分镜目标时长",
+              reason: "目标总时长已准备好；确认后只调用文本模型生成分镜预览。",
+              enabled: true,
+            }
           : failed
             ? {
               action: "retry_storyboard_breakdown",
@@ -476,6 +486,8 @@ export function deriveProductionCopilotState({
             },
         ready_summary: previewReady
           ? "分镜候选已准备好。"
+          : briefing
+            ? "完整剧本已保存，等待确认目标时长。"
           : running
             ? "完整剧本已保存，正在处理分镜文本。"
             : failed
@@ -483,6 +495,8 @@ export function deriveProductionCopilotState({
               : "完整剧本已保存。",
         needs_input: previewReady
           ? "审看场景、镜头顺序和时长，再决定应用或取消。"
+          : briefing
+            ? "确认或调整目标总时长，再生成分镜预览。"
           : running
             ? "等待同一文本预览完成。"
             : failed

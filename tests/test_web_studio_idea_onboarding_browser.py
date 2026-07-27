@@ -83,6 +83,10 @@ def test_short_idea_routes_to_text_expansion_then_refreshes_durable_revision() -
         page.get_by_role("button", name="应用", exact=True).click()
         page.get_by_text("剧本文本：月光下，纸船逆流而上", exact=False).wait_for()
         assert page.get_by_role("button", name="准备制作方案", exact=True).is_visible()
+        page.get_by_role("button", name="准备制作方案", exact=True).click()
+        assert page.get_by_label("输入想法或已有剧本").input_value() == (
+            "月光下，纸船逆流而上，送回一封迟到多年的信。"
+        )
         page.reload(wait_until="domcontentloaded")
         page.wait_for_function("window.__contractReady === true")
         page.get_by_text("剧本文本：月光下，纸船逆流而上", exact=False).wait_for()
@@ -124,12 +128,23 @@ def test_complete_script_recovers_same_preview_then_applies_one_graph_update() -
         assert "邮差把无人认领的信放进纸船" in script_node.locator("textarea").input_value()
         assert page.get_by_role("button", name="拆分并审阅分镜", exact=True).is_visible()
         page.get_by_role("button", name="拆分并审阅分镜", exact=True).click()
+        task_panel = page.locator(".agent-current-task-review")
+        assert page.get_by_text("完整剧本已保存，等待确认目标时长。", exact=True).is_visible()
+        assert page.locator(".agent-primary-action").get_by_text(
+            "确认分镜目标时长",
+            exact=True,
+        ).is_visible()
+        assert task_panel.get_by_label("分镜目标总时长（秒）").input_value() == "120"
+        assert page.evaluate("window.__calls.textPreview") == 0
+        task_panel.get_by_label("分镜目标总时长（秒）").fill("12")
+        task_panel.get_by_role("button", name="确认目标并预览分镜", exact=True).click()
 
         page.get_by_text("分镜候选已准备好。", exact=True).wait_for()
         assert page.get_by_text("河岸送信", exact=False).is_visible()
         assert page.get_by_text("旧邮局回响", exact=False).is_visible()
         task_panel = page.locator(".agent-current-task-review")
-        assert task_panel.get_by_text("总时长约 12 秒", exact=False).is_visible()
+        assert task_panel.get_by_text("目标 12 秒", exact=False).is_visible()
+        assert task_panel.get_by_text("候选 12 秒", exact=False).is_visible()
         assert "已排队" not in task_panel.inner_text()
         assert "整理上下文" not in task_panel.inner_text()
         assert page.evaluate("window.__calls.textPreview") == 1
@@ -137,12 +152,22 @@ def test_complete_script_recovers_same_preview_then_applies_one_graph_update() -
         assert page.evaluate("window.__calls.image") == 0
         assert page.evaluate("window.__calls.video") == 0
         _capture(page, "04-script-storyboard-recovered-review-1440x900.png")
+        page.get_by_role("tab", name="资产 Bible", exact=True).click()
+        assert page.get_by_text("剧本已选择，等待应用分镜", exact=True).is_visible()
+        status = page.locator(".asset-bible-status-bar")
+        assert status.get_by_text("已选择", exact=True).is_visible()
+        assert status.get_by_text("待安排", exact=True).is_visible()
+        _capture(page, "05-asset-bible-script-selected-storyboard-pending-1440x900.png")
+        page.get_by_role("tab", name="画布", exact=True).click()
 
         task_panel.get_by_role("button", name="取消", exact=True).click()
         assert page.get_by_role("button", name="拆分并审阅分镜", exact=True).is_visible()
         assert page.evaluate("window.__workspace.status") == "planning_required"
 
         page.get_by_role("button", name="拆分并审阅分镜", exact=True).click()
+        task_panel = page.locator(".agent-current-task-review")
+        task_panel.get_by_label("分镜目标总时长（秒）").fill("12")
+        task_panel.get_by_role("button", name="确认目标并预览分镜", exact=True).click()
         page.get_by_text("分镜候选已准备好。", exact=True).wait_for()
         page.locator(".agent-current-task-review").get_by_role(
             "button",
@@ -166,7 +191,67 @@ def test_complete_script_recovers_same_preview_then_applies_one_graph_update() -
         assert page.evaluate("window.__calls.applyShotPlan") == 1
         assert page.evaluate("window.__calls.image") == 0
         assert page.evaluate("window.__calls.video") == 0
-        _capture(page, "05-script-storyboard-applied-refresh-1440x900.png")
+        _capture(page, "06-script-storyboard-applied-refresh-1440x900.png")
+        assert not errors
+
+
+def test_historical_overlong_preview_is_preserved_and_cannot_apply() -> None:
+    with _browser_page(viewport={"width": 1440, "height": 900}) as (page, base_url, errors):
+        page.goto(
+            f"{base_url}/__idea_onboarding.html?project=script-overlong-c&flow=script",
+            wait_until="domcontentloaded",
+        )
+        page.wait_for_function("window.__contractReady === true")
+        page.evaluate(
+            """() => {
+              const shots = Array.from({ length: 30 }, (_, index) => ({
+                title: `任意镜头 ${index + 1}`,
+                duration_sec: index === 29 ? 22 : 26,
+                shot_size: "中景",
+                camera_angle: "平视",
+                movement: "缓慢移动",
+                blocking: "人物完成连续动作",
+                sound: "环境声",
+                transition: "切",
+                narrative_purpose: "推进叙事",
+              }));
+              window.__store.set((state) => {
+                state.nodes["script-complete"].params.embeddedCreativeAction = {
+                  action_id: "historical-overlong",
+                  action_type: "shot_breakdown",
+                  mode: "dynamic_shot_breakdown",
+                  status: "preview",
+                  source_text: state.nodes["script-complete"].content,
+                  message: "分镜候选已生成。",
+                  preview: {
+                    revised_text: "历史候选保留供审看。",
+                    change_summary: ["保留候选", "检查时长"],
+                    rationale: "不得静默应用超长候选。",
+                    shot_plan: {
+                      estimated_duration_sec: 530,
+                      scenes: Array.from({ length: 5 }, (_, sceneIndex) => ({
+                        title: `场景 ${sceneIndex + 1}`,
+                        purpose: "推进故事",
+                        shots: shots.slice(sceneIndex * 6, sceneIndex * 6 + 6),
+                      })),
+                    },
+                  },
+                  provider_lineage: { provider_calls_started: true, provider_dispatch_count: 1 },
+                  safe_manifest: { request_digest: "3".repeat(64), source_digest: "4".repeat(64) },
+                  creative_task: { state: "preview_ready", phase: "preview_ready" },
+                };
+              });
+            }""",
+        )
+        panel = page.locator(".agent-current-task-review")
+        assert panel.get_by_text("目标 120 秒", exact=False).is_visible()
+        assert panel.get_by_text("候选 776 秒", exact=False).is_visible()
+        assert panel.get_by_text("差异 +656 秒", exact=False).is_visible()
+        assert panel.get_by_role("button", name="应用", exact=True).count() == 0
+        assert panel.get_by_role("button", name="调整时长并重新规划", exact=True).is_visible()
+        assert page.evaluate("window.__calls.textPreview") == 0
+        assert page.evaluate("window.__workspace.status") == "planning_required"
+        _capture(page, "07-historical-overlong-duration-blocked-1440x900.png")
         assert not errors
 
 
@@ -486,11 +571,17 @@ def _contract_html() -> str:
               change_summary: ["建立两场连续结构", "明确镜头顺序与时长"],
               rationale: "只生成分镜文本预览。",
               shot_plan: shotPlan,
+              production_brief: payload.production_brief,
             },
             creative_task: {},
             provider_lineage: { provider_calls_started: true, provider_dispatch_count: 1 },
             graph_mutation: { mutated: false, scope: "preview_only" },
-            safe_manifest: { request_digest: "3".repeat(64), source_digest: "4".repeat(64), image_video_generation_enabled: false },
+            safe_manifest: {
+              request_digest: "3".repeat(64),
+              source_digest: "4".repeat(64),
+              production_brief: payload.production_brief,
+              image_video_generation_enabled: false,
+            },
             cost_usd: 0,
           };
           previewByClient.set(options.clientRequestId, response);
@@ -542,7 +633,11 @@ def _contract_html() -> str:
           return { revision: { revision_id: "revision-2" }, projection };
         },
         applyEmbeddedCreativeShotPlan: async (_clientRequestId, payload) => {
-          if (payload.expected_graph_version !== 0 || payload.expected_request_digest !== "3".repeat(64)) {
+          if (
+            payload.expected_graph_version !== 0
+            || payload.expected_request_digest !== "3".repeat(64)
+            || payload.expected_production_brief?.target_duration_seconds !== 12
+          ) {
             throw new Error("shot plan apply contract mismatch");
           }
           window.__calls.applyShotPlan += 1;
@@ -592,6 +687,8 @@ def _contract_html() -> str:
         mediaGates: { llm: true, image: false, video: false },
       });
       window.__studioState = studioState;
+      window.__store = store;
+      window.__shell = shell;
       window.__contractReady = true;
     </script>
   </body>

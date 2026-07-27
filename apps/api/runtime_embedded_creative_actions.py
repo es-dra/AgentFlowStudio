@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
 from agentflow_studio.model_gateway.company_secrets import SERVER_CODEX_SERVICE_ID
@@ -25,6 +25,7 @@ from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement import llm_provider_gate
 from apps.api.runtime_logging import client_request_id_from_request
 from apps.api.runtime_film_production_graph import _sequence_workspace_projection
+from apps.api.runtime_script_core_truth import current_script_revision_binding
 from apps.api.runtime_production_graph import (
     GraphIdempotencyConflict,
     GraphVersionConflict,
@@ -80,6 +81,28 @@ NON_SPEAKER_LABELS = {
     "旁注",
     "说明",
 }
+DEFAULT_SHORT_FILM_DURATION_SECONDS = 120.0
+MAX_STORYBOARD_DURATION_SECONDS = 3600.0
+
+
+class EmbeddedProductionBrief(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_duration_seconds: float = Field(ge=5, le=MAX_STORYBOARD_DURATION_SECONDS)
+    duration_source: Literal["script_explicit", "creator_default", "creator_selected"]
+    tolerance_seconds: float = Field(ge=0, le=MAX_STORYBOARD_DURATION_SECONDS)
+    source_revision_id: str = Field(default="", max_length=140)
+    source_digest: str = Field(default="", max_length=64)
+    requires_creator_confirmation: bool = True
+    source_duration_conflict: bool = False
+
+    @model_validator(mode="after")
+    def validate_tolerance(self) -> "EmbeddedProductionBrief":
+        if self.tolerance_seconds > self.target_duration_seconds:
+            raise ValueError("duration tolerance cannot exceed target duration")
+        if self.source_digest and not re.fullmatch(r"[a-f0-9]{64}", self.source_digest):
+            raise ValueError("source digest is invalid")
+        return self
 
 
 class EmbeddedCreativeActionRequest(BaseModel):
@@ -100,8 +123,29 @@ class EmbeddedCreativeActionRequest(BaseModel):
     ] = "professional_expansion"
     context_summary: dict[str, Any] = Field(default_factory=dict)
     constraints: list[str] = Field(default_factory=list, max_length=8)
+    production_brief: EmbeddedProductionBrief | None = None
+    source_revision_id: str = Field(default="", max_length=140)
+    source_digest: str = Field(default="", max_length=64)
     provider_service_id: str = SERVER_CODEX_SERVICE_ID
     generated_at: str = Field(min_length=1, max_length=80)
+
+    @model_validator(mode="after")
+    def validate_source_binding(self) -> "EmbeddedCreativeActionRequest":
+        actual_digest = _text_digest(self.source_text)
+        if self.source_digest and self.source_digest != actual_digest:
+            raise ValueError("source digest does not match source text")
+        if self.source_revision_id and not self.source_digest:
+            raise ValueError("source revision requires source digest")
+        if self.production_brief:
+            if self.production_brief.source_digest and self.production_brief.source_digest != actual_digest:
+                raise ValueError("production brief source digest does not match source text")
+            if (
+                self.source_revision_id
+                and self.production_brief.source_revision_id
+                and self.production_brief.source_revision_id != self.source_revision_id
+            ):
+                raise ValueError("production brief source revision does not match request")
+        return self
 
 
 class EmbeddedCreativeActionApplyRequest(BaseModel):
@@ -109,6 +153,7 @@ class EmbeddedCreativeActionApplyRequest(BaseModel):
 
     expected_graph_version: int = Field(ge=0)
     expected_request_digest: str = Field(min_length=64, max_length=64)
+    expected_production_brief: EmbeddedProductionBrief
 
 
 def register_runtime_embedded_creative_action_routes(
@@ -132,6 +177,13 @@ def register_runtime_embedded_creative_action_routes(
     ) -> dict[str, Any]:
         require_access(request, project_id)
         store.ensure_project_manifest(project_id)
+        _require_current_script_binding(
+            store,
+            project_id,
+            revision_id=body.source_revision_id,
+            source_digest=body.source_digest,
+            stage="preview",
+        )
         client_request_id = client_request_id_from_request(request)
         job_id = store.new_job_id("embedded_creative_action", project_id)
         if client_request_id:
@@ -298,6 +350,13 @@ def register_runtime_embedded_creative_action_routes(
         normalized = _safe_client_request_id(client_request_id)
         if normalized != client_request_id:
             raise HTTPException(status_code=422, detail="invalid client request id")
+        _require_current_script_binding(
+            store,
+            project_id,
+            revision_id=body.expected_production_brief.source_revision_id,
+            source_digest=body.expected_production_brief.source_digest,
+            stage="apply",
+        )
         claim = _read_embedded_creative_request(store, project_id, normalized)
         if not claim or str(claim.get("status") or "") != "completed":
             raise HTTPException(
@@ -341,6 +400,41 @@ def register_runtime_embedded_creative_action_routes(
                     "请重新生成并审看文本分镜预览。",
                 ),
             )
+        expected_brief = _safe_production_brief(body.expected_production_brief)
+        recovered_manifest = dict(recovered.get("safe_manifest") or {})
+        stored_brief = recovered_manifest.get("production_brief")
+        if isinstance(stored_brief, dict) and _safe_production_brief(stored_brief) != expected_brief:
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_production_brief_changed",
+                    "当前时长目标与生成分镜时不一致，分镜未应用。",
+                    "请按当前目标时长重新规划。",
+                ),
+            )
+        source_digest = str(recovered_manifest.get("source_digest") or "")
+        if expected_brief.get("source_digest") and expected_brief["source_digest"] != source_digest:
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_source_revision_changed",
+                    "当前剧本版本与分镜预览来源不一致，分镜未应用。",
+                    "请从当前剧本重新规划分镜。",
+                ),
+            )
+        duration_assessment = _shot_plan_duration_assessment(preview["shot_plan"], expected_brief)
+        if not duration_assessment["apply_allowed"]:
+            raise HTTPException(
+                status_code=409,
+                detail=_embedded_apply_error(
+                    project_id,
+                    "embedded_shot_plan_duration_out_of_range",
+                    "候选总时长超出当前目标，分镜未应用。",
+                    "请调整时长并重新规划；当前候选会保留。",
+                ),
+            )
         graph = graph_store.ensure(project_id)
         idempotency_key = f"apply-embedded-shot-plan-{normalized}"
         if graph.get("nodes") and idempotency_key not in graph.get("idempotency", {}):
@@ -356,8 +450,9 @@ def register_runtime_embedded_creative_action_routes(
         semantic_digest = canonical_digest(
             {
                 "request_digest": body.expected_request_digest,
-                "source_digest": str(recovered.get("safe_manifest", {}).get("source_digest") or ""),
+                "source_digest": source_digest,
                 "shot_plan": preview["shot_plan"],
+                "production_brief": expected_brief,
             },
         )
         try:
@@ -369,8 +464,9 @@ def register_runtime_embedded_creative_action_routes(
                 events=_compile_embedded_shot_plan_events(
                     normalized,
                     body.expected_request_digest,
-                    str(recovered.get("safe_manifest", {}).get("source_digest") or ""),
+                    source_digest,
                     preview["shot_plan"],
+                    expected_brief,
                 ),
             )
         except (GraphIdempotencyConflict, GraphVersionConflict, ProductionGraphError, TypeError, ValueError) as exc:
@@ -726,6 +822,14 @@ def _creative_action_prompt(
     }
     context_summary = _safe_context_summary(request.context_summary)
     constraints = [_safe_text(item, 160) for item in request.constraints if _safe_text(item, 160)]
+    production_brief = _production_brief_for_request(request)
+    duration_instruction = ""
+    if request.action_type == "shot_breakdown":
+        duration_instruction = (
+            f"本次成片目标总时长为 {production_brief['target_duration_seconds']:.2f} 秒，"
+            f"允许偏差 {production_brief['tolerance_seconds']:.2f} 秒。"
+            "逐镜头 duration_sec 合计必须落在该范围；不得让候选自行改写目标时长。"
+        )
     return "\n".join(
         [
             "你是 AFS Studio 的节点内 AI 创作动作引擎，服务专业影视创作者。",
@@ -740,6 +844,7 @@ def _creative_action_prompt(
             "如果原文已有对白，请保留并扩写为明确的 character/dialogue 块，不能省略人物说话关系。",
             "revised_text 只是 screenplay_candidate 的可读投影；镜头和摄影语言只在 shot_breakdown 里使用，不要混进文学剧本文本。",
             "如果动作是 shot_breakdown，只输出可审查分镜候选，不创建图片、不生成关键帧。",
+            duration_instruction,
             "不要输出内部路径、端口、provider raw、密钥、请求头、schema 名称或调度细节。",
             f"项目：{project_id}",
             f"节点：{request.node_id} / {request.node_type}",
@@ -800,7 +905,11 @@ def _validate_preview_payload(request: EmbeddedCreativeActionRequest, value: dic
         plan = value.get("shot_plan")
         if not isinstance(plan, dict):
             raise ValueError("shot plan is missing")
-        preview["shot_plan"] = _safe_shot_plan(plan)
+        safe_plan = _safe_shot_plan(plan)
+        production_brief = _production_brief_for_request(request)
+        preview["shot_plan"] = safe_plan
+        preview["production_brief"] = production_brief
+        preview["duration_assessment"] = _shot_plan_duration_assessment(safe_plan, production_brief)
     if request.action_type == "script_revision":
         candidate = value.get("screenplay_candidate")
         if not isinstance(candidate, dict):
@@ -1106,12 +1215,86 @@ def _safe_shot_plan(plan: dict[str, Any]) -> dict[str, Any]:
         })
     if not scenes or total < 1:
         raise ValueError("shot plan has no shots")
+    safe_scenes = scenes[:8]
+    shot_duration_sum = round(sum(
+        shot["duration_sec"] for scene in safe_scenes for shot in scene["shots"]
+    ), 2)
     return {
-        "scenes": scenes[:8],
-        "total_shots": total,
-        "estimated_duration_sec": max(1.0, min(600.0, _safe_number(plan.get("estimated_duration_sec"), sum(
-            shot["duration_sec"] for scene in scenes for shot in scene["shots"]
-        )))),
+        "scenes": safe_scenes,
+        "total_shots": sum(len(scene["shots"]) for scene in safe_scenes),
+        "estimated_duration_sec": shot_duration_sum,
+        "provider_estimated_duration_sec": max(
+            1.0,
+            min(MAX_STORYBOARD_DURATION_SECONDS, _safe_number(plan.get("estimated_duration_sec"), shot_duration_sum)),
+        ),
+        "duration_source": "per_shot_sum",
+    }
+
+
+def _production_brief_for_request(request: EmbeddedCreativeActionRequest) -> dict[str, Any]:
+    if request.production_brief:
+        return _safe_production_brief(request.production_brief)
+    return {
+        "target_duration_seconds": DEFAULT_SHORT_FILM_DURATION_SECONDS,
+        "duration_source": "creator_default",
+        "tolerance_seconds": round(DEFAULT_SHORT_FILM_DURATION_SECONDS * 0.1, 2),
+        "source_revision_id": _safe_token(request.source_revision_id, 140),
+        "source_digest": request.source_digest if re.fullmatch(r"[a-f0-9]{64}", request.source_digest or "") else "",
+    }
+
+
+def _safe_production_brief(value: EmbeddedProductionBrief | dict[str, Any]) -> dict[str, Any]:
+    raw = value.model_dump(mode="json") if isinstance(value, EmbeddedProductionBrief) else dict(value or {})
+    target = max(5.0, min(MAX_STORYBOARD_DURATION_SECONDS, _safe_number(
+        raw.get("target_duration_seconds"),
+        DEFAULT_SHORT_FILM_DURATION_SECONDS,
+    )))
+    source = _safe_token(raw.get("duration_source"), 40)
+    if source not in {"script_explicit", "creator_default", "creator_selected"}:
+        source = "creator_default"
+    tolerance = max(0.0, min(target, _safe_number(
+        raw.get("tolerance_seconds"),
+        target * 0.1 if source == "creator_default" else 1.0,
+    )))
+    digest = str(raw.get("source_digest") or "").lower()
+    return {
+        "target_duration_seconds": round(target, 2),
+        "duration_source": source,
+        "tolerance_seconds": round(tolerance, 2),
+        "source_revision_id": _safe_token(raw.get("source_revision_id"), 140),
+        "source_digest": digest if re.fullmatch(r"[a-f0-9]{64}", digest) else "",
+    }
+
+
+def _shot_plan_duration_assessment(
+    shot_plan: dict[str, Any],
+    production_brief: EmbeddedProductionBrief | dict[str, Any],
+) -> dict[str, Any]:
+    brief = _safe_production_brief(production_brief)
+    durations = [
+        float(shot.get("duration_sec") or 0)
+        for scene in shot_plan.get("scenes") or []
+        if isinstance(scene, dict)
+        for shot in scene.get("shots") or []
+        if isinstance(shot, dict)
+    ]
+    candidate = round(sum(durations), 2)
+    target = float(brief["target_duration_seconds"])
+    tolerance = float(brief["tolerance_seconds"])
+    delta = round(candidate - target, 2)
+    within_tolerance = candidate > 0 and abs(delta) <= tolerance
+    return {
+        **brief,
+        "candidate_duration_seconds": candidate,
+        "provider_estimated_duration_seconds": round(float(
+            shot_plan.get("provider_estimated_duration_sec")
+            or shot_plan.get("estimated_duration_sec")
+            or 0
+        ), 2),
+        "duration_delta_seconds": delta,
+        "within_tolerance": within_tolerance,
+        "apply_allowed": within_tolerance,
+        "status": "within_target" if within_tolerance else "outside_target",
     }
 
 
@@ -1253,7 +1436,7 @@ def _safe_manifest(
 ) -> dict[str, Any]:
     started = mode == "llm" if provider_calls_started is None else bool(provider_calls_started)
     manifest = {
-        "schema_version": "afs_embedded_creative_action_safe_manifest.v0.1",
+        "schema_version": "afs_embedded_creative_action_safe_manifest.v0.2",
         "project_id": project_id,
         "mode": mode,
         "target": target,
@@ -1271,6 +1454,9 @@ def _safe_manifest(
         "media_bytes_returned_by_api": False,
         "canvas_mutation_enabled": False,
         "image_video_generation_enabled": False,
+        "source_revision_id": _safe_token(request.source_revision_id, 140),
+        "source_digest": request.source_digest if re.fullmatch(r"[a-f0-9]{64}", request.source_digest or "") else "",
+        "production_brief": _production_brief_for_request(request) if request.action_type == "shot_breakdown" else None,
     }
     reject_unsafe_payload(manifest)
     return manifest
@@ -1465,11 +1651,49 @@ def _embedded_apply_error(
     )
 
 
+def _require_current_script_binding(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    revision_id: str,
+    source_digest: str,
+    stage: str,
+) -> None:
+    if not revision_id and not source_digest:
+        return
+    current = current_script_revision_binding(store, project_id)
+    if (
+        str(current.get("revision_id") or "") == revision_id
+        and str(current.get("source_digest") or "") == source_digest
+    ):
+        return
+    raise HTTPException(
+        status_code=409,
+        detail=safe_error_detail(
+            "embedded_source_revision_changed",
+            detail_code="embedded_source_revision_changed",
+            message="当前剧本版本已变化，旧分镜操作已停止。",
+            user_action="请从当前已应用剧本重新规划分镜。",
+            project_id=project_id,
+            action="embedded_creative_action_preview" if stage == "preview" else "apply_embedded_shot_plan",
+            stage=stage,
+            status="blocked",
+            retryable=False,
+            details={
+                "provider_calls_started": False,
+                "image_dispatch_count": 0,
+                "video_dispatch_count": 0,
+            },
+        ),
+    )
+
+
 def _compile_embedded_shot_plan_events(
     client_request_id: str,
     request_digest: str,
     source_digest: str,
     shot_plan: dict[str, Any],
+    production_brief: dict[str, Any],
 ) -> list[dict[str, Any]]:
     prefix = request_digest[:16]
     revision_id = f"revision-embedded-{prefix}"
@@ -1495,7 +1719,10 @@ def _compile_embedded_shot_plan_events(
                 "category": "collection",
                 "metadata": {
                     "name": "制作序列",
-                    "target_duration_seconds": float(shot_plan.get("estimated_duration_sec") or 0),
+                    "target_duration_seconds": float(production_brief.get("target_duration_seconds") or 0),
+                    "duration_tolerance_seconds": float(production_brief.get("tolerance_seconds") or 0),
+                    "duration_source": _safe_token(production_brief.get("duration_source"), 40),
+                    "candidate_duration_seconds": float(shot_plan.get("estimated_duration_sec") or 0),
                 },
             },
         },

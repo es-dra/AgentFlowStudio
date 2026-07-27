@@ -1168,6 +1168,31 @@
 .agent-current-list { display: grid; gap: 9px; }
 .agent-screenplay-candidate,
 .agent-shot-plan-candidate { display: grid; gap: 8px; border-top: 1px solid var(--product-line-soft); padding-top: 8px; }
+
+.agent-storyboard-brief {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-storyboard-brief label {
+  display: grid;
+  gap: 6px;
+  color: var(--product-text);
+  font-size: 12px;
+}
+
+.agent-storyboard-brief input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--product-line);
+  background: var(--product-surface-2);
+  color: var(--product-text);
+}
+
+.agent-current-task-copy.duration-blocked {
+  color: #ffb4a8;
+}
 .agent-screenplay-candidate summary,
 .agent-shot-plan-candidate summary,
 .agent-current-task-review .agent-evidence-details summary { color: var(--product-accent); cursor: pointer; font-size: 11px; font-weight: 800; }

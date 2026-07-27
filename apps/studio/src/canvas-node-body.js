@@ -9,6 +9,11 @@ import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 import { bindStableTextInputLifecycle } from "./stable-text-input.js";
 import { creativeActionFailureInfo, screenplayCandidateSummary, shotPlanSummary, taskPhaseLabel, taskStateLabel } from "./creative-task-contract.js";
+import {
+  productionBriefForSource,
+  productionBriefLabel,
+  shotPlanDurationAssessment,
+} from "./storyboard-duration-contract.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -235,11 +240,23 @@ function embeddedCreativeActionPanel(node) {
   if (["running", "recovering"].includes(action.status)) {
     panel.appendChild(progressStrip(action.status === "recovering" ? "正在恢复同一文本预览" : "正在生成可审查预览"));
   }
+  if (action.status === "briefing") panel.appendChild(storyboardBriefEditor(action));
   if (action.status === "needs_input") panel.appendChild(actionButtons(action, { clear: true }));
   if (action.status === "unavailable") panel.appendChild(actionButtons(action, { clear: true, reviewHintText: "详细原因和文本重试在右侧。" }));
   if (action.status === "preview") {
     panel.appendChild(compactCreativeTaskResult(action));
-    panel.appendChild(actionButtons(action, { cancel: true, retry: true, reviewHint: true }));
+    const assessment = action.action_type === "shot_breakdown"
+      ? shotPlanDurationAssessment(
+          action.preview?.shot_plan,
+          action.preview?.production_brief || action.production_brief || productionBriefForSource(action.source_text),
+        )
+      : null;
+    panel.appendChild(actionButtons(action, {
+      cancel: true,
+      retry: !assessment || assessment.apply_allowed,
+      adjustDuration: Boolean(assessment && !assessment.apply_allowed),
+      reviewHint: true,
+    }));
   }
   if (action.status === "applied") panel.appendChild(actionButtons(action, { clear: true, undoHint: true }));
   return panel;
@@ -268,6 +285,17 @@ function compactCreativeTaskResult(action) {
   } else if (preview.shot_plan) {
     const summary = shotPlanSummary(preview.shot_plan);
     wrap.appendChild(textBlock("embedded-creative-compact-line", `${summary.scene_count} 场 · ${summary.shot_count} 镜头 · 总时长约 ${Math.round(summary.estimated_duration_sec)} 秒`));
+    const assessment = shotPlanDurationAssessment(
+      preview.shot_plan,
+      preview.production_brief || action.production_brief || productionBriefForSource(action.source_text),
+    );
+    wrap.appendChild(textBlock(
+      `embedded-creative-compact-line ${assessment.apply_allowed ? "duration-pass" : "duration-blocked"}`,
+      `目标 ${Math.round(assessment.target_duration_seconds)} 秒 · 候选 ${Math.round(assessment.candidate_duration_seconds)} 秒 · 差异 ${formatDurationDelta(assessment.duration_delta_seconds)} 秒`,
+    ));
+    if (!assessment.apply_allowed) {
+      wrap.appendChild(textBlock("embedded-creative-compact-line duration-blocked", "候选已保留，但时长不合格，不能直接应用。"));
+    }
   }
   wrap.appendChild(textBlock("embedded-creative-compact-line", "完整预览、差异、应用和取消在右侧 AI 创作搭档中审阅。"));
   return wrap;
@@ -367,6 +395,9 @@ function actionButtons(action, flags = {}) {
     retry.dataset.creativeMode = action.mode || "";
     row.appendChild(retry);
   }
+  if (flags.adjustDuration) {
+    row.appendChild(actionButton("embedded-storyboard-adjust-duration", "调整时长并重新规划", "studio-primary-button"));
+  }
   if (flags.clear) row.appendChild(actionButton("embedded-creative-clear", "收起", "studio-text-button"));
   if (flags.reviewHint || flags.reviewHintText) {
     const hint = document.createElement("small");
@@ -379,6 +410,40 @@ function actionButtons(action, flags = {}) {
     row.appendChild(hint);
   }
   return row;
+}
+
+function storyboardBriefEditor(action) {
+  const brief = productionBriefForSource(action.source_text, action.production_brief);
+  const wrap = document.createElement("div");
+  wrap.className = "embedded-storyboard-brief";
+  const label = document.createElement("label");
+  label.textContent = `目标总时长（秒） · ${productionBriefLabel(brief)}`;
+  const input = document.createElement("input");
+  input.type = "number";
+  input.className = "embedded-storyboard-duration-input";
+  input.min = "5";
+  input.max = "3600";
+  input.step = "1";
+  input.value = String(brief.target_duration_seconds);
+  input.setAttribute("aria-label", "分镜目标总时长（秒）");
+  label.appendChild(input);
+  const hint = textBlock(
+    "embedded-creative-compact-line",
+    `允许偏差 ${Math.round(brief.tolerance_seconds)} 秒；确认后只生成文字分镜预览。`,
+  );
+  const confirm = actionButton(
+    "embedded-storyboard-brief-confirm",
+    "确认目标并预览分镜",
+    "studio-primary-button",
+  );
+  const later = actionButton("embedded-creative-clear", "稍后", "studio-secondary-button");
+  wrap.append(label, hint, confirm, later);
+  return wrap;
+}
+
+function formatDurationDelta(value) {
+  const rounded = Math.round(Number(value || 0));
+  return rounded > 0 ? `+${rounded}` : String(rounded);
 }
 
 function actionButton(action, label, className) {
