@@ -2985,7 +2985,24 @@ export function createProductShell(options = {}) {
         panel.appendChild(generate);
       }
     } else if (item.state === "reserved") {
-      panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
+      const reservePending = videoAdmissionPending
+        && videoAdmissionPendingCommand === "dispatch_reserved";
+      const send = node(
+        "button",
+        "studio-primary-button",
+        reservePending ? "正在发送…" : "发送当前视频任务",
+      );
+      send.type = "button";
+      send.disabled = !snapshot.mediaGates?.video || reservePending;
+      send.dataset.videoAdmissionCommand = "dispatch_reserved";
+      send.title = !snapshot.mediaGates?.video
+        ? "视频能力尚未启用；不会发送任务。"
+        : "只发送当前已预留的单镜头视频任务；不会重复创建清单。";
+      send.addEventListener("click", () => void dispatchReservedVideoAdmissionItem());
+      panel.append(
+        node("p", "", "单次额度已确认；可发送当前视频任务。系统会记录同一任务标识，刷新不会重复提交。"),
+        send,
+      );
     } else if (item.state === "reconcile_required" && view.readiness?.new_round_allowed) {
       panel.append(
         node("strong", "", "上一次发送被上游拒绝"),
@@ -3377,6 +3394,27 @@ export function createProductShell(options = {}) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频任务发送失败");
     }
     render();
+  }
+
+  async function dispatchReservedVideoAdmissionItem() {
+    if (videoAdmissionPending) {
+      videoAdmissionOpen = true;
+      render();
+      return;
+    }
+    videoAdmissionError = "";
+    videoAdmissionOpen = true;
+    videoAdmissionPending = true;
+    videoAdmissionPendingCommand = "dispatch_reserved";
+    render();
+    try {
+      await dispatchVideoAdmissionItem();
+    } finally {
+      videoAdmissionPending = false;
+      videoAdmissionPendingCommand = "";
+      render();
+      focusVideoAdmissionPanel();
+    }
   }
 
   async function pollVideoAdmissionItem() {
@@ -5560,8 +5598,7 @@ export function createProductShell(options = {}) {
     const shot = currentShot();
     return videoAdmissionCanPrepare(readiness)
       && Boolean(readiness.shot_id)
-      && readiness.shot_id === shot.graphNodeId
-      && Boolean(shot.preview);
+      && readiness.shot_id === shot.graphNodeId;
   }
   function currentShotVideoAdmissionRebuildable() {
     const view = videoAdmissionView();
@@ -5569,8 +5606,7 @@ export function createProductShell(options = {}) {
     const shot = currentShot();
     return view.lineage?.status === "stale"
       && view.lineage?.rebuild_allowed === true
-      && readiness.shot_id === shot.graphNodeId
-      && Boolean(shot.preview);
+      && readiness.shot_id === shot.graphNodeId;
   }
   function hasStoryFacts() { return shotModel().length > 0; }
   function projectDisplayName() {

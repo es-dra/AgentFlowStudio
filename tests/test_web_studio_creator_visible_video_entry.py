@@ -229,6 +229,7 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     assert '"准备镜头视频"' in storyboard
     assert "currentShotVideoAdmissionReady()" in storyboard
     assert "openCurrentShotVideoPreparation()" in storyboard
+    assert "&& Boolean(shot.preview)" not in shell
     assert "shot_id: view.source?.shot?.shot_id || currentShot().graphNodeId || \"\"" in shell
     assert "loadCurrentShotVideoAdmission" in shell
     assert "previewVideoAdmissionRuntimeCommand" in shell
@@ -273,3 +274,5 @@ def test_video_confirmation_remains_two_step_and_never_auto_dispatches_from_entr
     assert 'if (commandType === "reserve_dispatch")' in confirm
     assert "await dispatchVideoAdmissionItem()" in confirm
     assert 'commandType === "reserve_dispatch" ? "确认并发送" : "确认"' in shell
+    assert '"发送当前视频任务"' in shell
+    assert "dispatchReservedVideoAdmissionItem" in shell
