@@ -1039,11 +1039,10 @@ export function createProductShell(options = {}) {
   async function refreshGraphBoundRuntimeState(runtime = options.getRuntime?.()) {
     if (!runtime) return null;
     const safely = (request) => Promise.resolve(request?.()).catch(() => null);
-    const [workspace, runtimeAssetBible, imageAdmission, videoAdmission] = await Promise.all([
+    const [workspace, runtimeAssetBible, imageAdmission] = await Promise.all([
       safely(runtime.sequenceWorkspace),
       safely(runtime.loadAssetBible),
       safely(runtime.loadImageAdmission),
-      safely(runtime.loadVideoAdmission),
     ]);
     if (workspace) {
       snapshot.sequenceWorkspace = workspace;
@@ -1055,6 +1054,7 @@ export function createProductShell(options = {}) {
       snapshot.imageAdmission = imageAdmission;
       imageAdmissionPreview = null;
     }
+    const videoAdmission = await loadCurrentShotVideoAdmission(runtime);
     if (videoAdmission) {
       snapshot.videoAdmission = videoAdmission;
       videoAdmissionPreview = null;
@@ -3108,6 +3108,7 @@ export function createProductShell(options = {}) {
     prepare.disabled = setupPending || !videoAdmissionSetupComplete(setup);
     prepare.addEventListener("click", () => void stageVideoAdmissionCommand({
       type: commandType,
+      shot_id: view.source?.shot?.shot_id || currentShot().graphNodeId || "",
       generation_mode: setup.generation_mode,
       selection_reason: setup.selection_reason,
       temporal_staging: { ...setup.temporal_staging },
@@ -3246,8 +3247,9 @@ export function createProductShell(options = {}) {
         command: videoAdmissionCommand(command),
         requested_at: new Date().toISOString(),
       };
-      const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
-      videoAdmissionPreview = { ...preview, request };
+      const laneShotId = videoAdmissionCommandShotId(request.command);
+      const preview = await previewVideoAdmissionRuntimeCommand(request, laneShotId);
+      videoAdmissionPreview = { ...preview, request, lane_shot_id: laneShotId };
     } catch (error) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备预览失败");
     } finally {
@@ -3279,10 +3281,13 @@ export function createProductShell(options = {}) {
     const preview = videoAdmissionPreview;
     if (!preview) return;
     try {
-      const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
-        ...preview.request,
-        preview_digest: preview.preview_digest,
-      });
+      const response = await confirmVideoAdmissionRuntimeCommand(
+        {
+          ...preview.request,
+          preview_digest: preview.preview_digest,
+        },
+        preview.lane_shot_id || videoAdmissionCommandShotId(preview.request?.command),
+      );
       snapshot.videoAdmission = {
         ...(snapshot.videoAdmission || {}),
         status: response?.result?.manifest?.status || "locked",
@@ -3335,11 +3340,15 @@ export function createProductShell(options = {}) {
       command: videoAdmissionCommand(command),
       requested_at: new Date().toISOString(),
     };
-    const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
-    const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
-      ...request,
-      preview_digest: preview.preview_digest,
-    });
+    const laneShotId = videoAdmissionCommandShotId(request.command);
+    const preview = await previewVideoAdmissionRuntimeCommand(request, laneShotId);
+    const response = await confirmVideoAdmissionRuntimeCommand(
+      {
+        ...request,
+        preview_digest: preview.preview_digest,
+      },
+      laneShotId,
+    );
     snapshot.videoAdmission = {
       ...(snapshot.videoAdmission || {}),
       status: response?.result?.manifest?.status || "locked",
@@ -5097,7 +5106,11 @@ export function createProductShell(options = {}) {
         if (stopIfStale(activeProjectId)) return;
         try { imageAdmission = await projectRuntime?.loadImageAdmission?.(); } catch { imageAdmission = null; }
         if (stopIfStale(activeProjectId)) return;
-        try { videoAdmission = await projectRuntime?.loadVideoAdmission?.(); } catch { videoAdmission = null; }
+        if (sequenceWorkspace) {
+          snapshot.sequenceWorkspace = sequenceWorkspace;
+          snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+        }
+        try { videoAdmission = await loadCurrentShotVideoAdmission(projectRuntime); } catch { videoAdmission = null; }
         if (stopIfStale(activeProjectId)) return;
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
         if (stopIfStale(activeProjectId)) return;
@@ -5373,6 +5386,45 @@ export function createProductShell(options = {}) {
   }
   function videoAdmissionView() {
     return videoAdmissionProjection(snapshot.videoAdmission, videoAdmissionMediaState);
+  }
+  function currentVideoAdmissionShotId(command = null) {
+    return String(
+      command?.shot_id
+      || currentShot().graphNodeId
+      || videoAdmissionView().source?.shot?.shot_id
+      || "",
+    );
+  }
+  async function loadCurrentShotVideoAdmission(runtime = options.getRuntime?.()) {
+    if (!runtime) return null;
+    const shotId = currentVideoAdmissionShotId();
+    if (shotId && typeof runtime.loadVideoAdmissionLane === "function") {
+      try {
+        return await runtime.loadVideoAdmissionLane(shotId);
+      } catch {
+        return runtime.loadVideoAdmission?.() || null;
+      }
+    }
+    return runtime.loadVideoAdmission?.() || null;
+  }
+  function videoAdmissionCommandShotId(command = null) {
+    return currentVideoAdmissionShotId(command);
+  }
+  async function previewVideoAdmissionRuntimeCommand(request, laneShotId = "") {
+    const runtime = options.getRuntime?.();
+    const shotId = String(laneShotId || "");
+    if (shotId && typeof runtime?.previewVideoAdmissionLaneCommand === "function") {
+      return runtime.previewVideoAdmissionLaneCommand(shotId, request);
+    }
+    return runtime?.previewVideoAdmissionCommand(request);
+  }
+  async function confirmVideoAdmissionRuntimeCommand(request, laneShotId = "") {
+    const runtime = options.getRuntime?.();
+    const shotId = String(laneShotId || "");
+    if (shotId && typeof runtime?.confirmVideoAdmissionLaneCommand === "function") {
+      return runtime.confirmVideoAdmissionLaneCommand(shotId, request);
+    }
+    return runtime?.confirmVideoAdmissionCommand(request);
   }
   function graphApprovedShotForAdmission(view = videoAdmissionView()) {
     const sourceShotId = String(view.source?.shot?.shot_id || "");

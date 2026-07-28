@@ -625,11 +625,20 @@ export function createRuntimeClient(projectId = "") {
     loadVideoAdmission() {
       return requestJson(`/projects/${encoded}/m6/video-admission`);
     },
+    loadVideoAdmissionLane(shotId) {
+      return requestJson(`/projects/${encoded}/m6/video-admission/lanes/${encodeURIComponent(String(shotId || ""))}`);
+    },
     previewVideoAdmissionCommand(payload) {
       return requestJson(`/projects/${encoded}/m6/video-admission/commands/preview`, { method: "POST", payload });
     },
+    previewVideoAdmissionLaneCommand(shotId, payload) {
+      return requestJson(`/projects/${encoded}/m6/video-admission/lanes/${encodeURIComponent(String(shotId || ""))}/commands/preview`, { method: "POST", payload });
+    },
     confirmVideoAdmissionCommand(payload) {
       return requestJson(`/projects/${encoded}/m6/video-admission/commands/confirm`, { method: "POST", payload });
+    },
+    confirmVideoAdmissionLaneCommand(shotId, payload) {
+      return requestJson(`/projects/${encoded}/m6/video-admission/lanes/${encodeURIComponent(String(shotId || ""))}/commands/confirm`, { method: "POST", payload });
     },
     createMangaFirstProductionTruth(brief, { idempotencyKey = "", includeManifest = false } = {}) {
       return requestJson(`/projects/${encoded}/manga-first-l4b/production-truth`, {

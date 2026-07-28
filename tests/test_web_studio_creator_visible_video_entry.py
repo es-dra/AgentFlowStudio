@@ -221,6 +221,7 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     panel = (STUDIO / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
     workspace = (STUDIO / "src" / "video-admission-workspace.js").read_text(encoding="utf-8")
+    runtime = (STUDIO / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
     storyboard = shell.split("function buildStoryboardContent()", 1)[1].split(
         "function buildMediaOperationsContent()", 1
@@ -228,6 +229,13 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     assert '"准备镜头视频"' in storyboard
     assert "currentShotVideoAdmissionReady()" in storyboard
     assert "openCurrentShotVideoPreparation()" in storyboard
+    assert "shot_id: view.source?.shot?.shot_id || currentShot().graphNodeId || \"\"" in shell
+    assert "loadCurrentShotVideoAdmission" in shell
+    assert "previewVideoAdmissionRuntimeCommand" in shell
+    assert "confirmVideoAdmissionRuntimeCommand" in shell
+    assert "loadVideoAdmissionLane(shotId)" in runtime
+    assert "previewVideoAdmissionLaneCommand(shotId, payload)" in runtime
+    assert "confirmVideoAdmissionLaneCommand(shotId, payload)" in runtime
 
     open_flow = shell.split("async function openCurrentShotVideoPreparation()", 1)[1].split(
         "function handleAgentVideoPreparation()", 1
