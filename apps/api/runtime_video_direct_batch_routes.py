@@ -17,22 +17,34 @@ from apps.api.runtime_image_assets import image_asset_file_path
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_production_graph import ProductionGraphStore
 from apps.api.runtime_store import RuntimeStore, safe_id
-from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV
 from apps.api.runtime_video_admission import load_video_admission_manifest
+from apps.api.runtime_video_candidates import candidate_file
+from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV
+from apps.api.runtime_video_dispatch import poll_video_generation
 from apps.api.runtime_video_dispatch_outbox import (
     mark_network_may_have_started,
     prepare_dispatch_outbox,
     record_provider_task,
 )
 from apps.api.runtime_video_gate import provider_not_ready_block, video_gate
-from apps.api.runtime_video_manifest import safe_manifest
+from apps.api.runtime_video_manifest import safe_manifest, video_response, write_video_job
 from apps.api.runtime_video_task_state import provider_task_for_state, write_task_state
 from tools import afs_video_direct_batch_runner as direct_batch
 
 
 OPERATOR_CONFIRMATION = "AFS_DIRECT_BATCH_SERVICE_PROCESS_20260728"
-DIAGNOSTIC_PROMPT = "抽象金色棋子在深色摄影棚缓慢旋转，柔和灯光，稳定横移，6秒，无文字。"
+DIAGNOSTIC_PROMPT = "一枚温润金色棋子在深色摄影棚台面缓慢旋转，柔和暖光扫过表面纹理，稳定横向滑轨镜头，六秒，无文字。"
 DIAGNOSTIC_REF_TARGET_ID = "A-PROP-01"
+DIAGNOSTIC_TERMINAL_STATUSES = {
+    "succeeded",
+    "failed",
+    "blocked",
+    "needs_attention",
+    "reconcile_required",
+    "poll_failed",
+    "cancelled",
+    "cancelled_local_only",
+}
 
 _ACTIVE_BATCH_THREADS: dict[str, threading.Thread] = {}
 _ACTIVE_BATCH_LOCK = threading.Lock()
@@ -59,6 +71,8 @@ class VideoDirectBatchDiagnosticRequest(BaseModel):
     operator_confirmation: str = Field(min_length=1)
     run_id: str | None = None
     step: str = Field(pattern="^(text_only|single_reference)$")
+    poll_interval_sec: float = Field(default=20.0, ge=1.0, le=180.0)
+    max_poll_sec: int = Field(default=0, ge=0, le=7200)
 
 
 def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore) -> None:
@@ -212,6 +226,8 @@ def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore
             input_mode=input_mode,
             reference_image_paths=reference_image_paths,
             reference_asset_id=reference_asset_id,
+            poll_interval_sec=body.poll_interval_sec,
+            max_poll_sec=body.max_poll_sec,
         )
         ledger["status"] = (
             f"diagnostic_{body.step}_accepted"
@@ -343,6 +359,8 @@ def _run_provider_connectivity_diagnostic(
     input_mode: str,
     reference_image_paths: tuple[Path, ...],
     reference_asset_id: str,
+    poll_interval_sec: float,
+    max_poll_sec: int,
 ) -> dict[str, Any]:
     job_id = store.new_job_id("video_generation", project_id)
     output_dir = store.run_dir(project_id, job_id)
@@ -425,7 +443,7 @@ def _run_provider_connectivity_diagnostic(
         )
         write_json(output_dir / "video_generation_safe_manifest.json", manifest)
         store.write_job(runtime_job(job_id, project_id, "video_generation", "submitted"))
-        return {
+        result = {
             "status": "diagnostic_accepted",
             "connectivity_proof_passed": True,
             "step": step,
@@ -438,6 +456,15 @@ def _run_provider_connectivity_diagnostic(
             "network_disposition": str(outbox.get("network_disposition") or ""),
             "elapsed_ms": int(round((time.perf_counter() - request_started) * 1000)),
         }
+        if max_poll_sec > 0:
+            result["poll"] = _poll_diagnostic_job_to_terminal(
+                store,
+                project_id,
+                job_id=job_id,
+                poll_interval_sec=poll_interval_sec,
+                max_poll_sec=max_poll_sec,
+            )
+        return result
     except (ModelGatewayError, Exception) as exc:
         try:
             mark_network_may_have_started(output_dir)
@@ -476,6 +503,84 @@ def _run_provider_connectivity_diagnostic(
             "block": block,
             "elapsed_ms": int(round((time.perf_counter() - request_started) * 1000)),
         }
+
+
+def _poll_diagnostic_job_to_terminal(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    job_id: str,
+    poll_interval_sec: float,
+    max_poll_sec: int,
+) -> dict[str, Any]:
+    output_dir = store.run_dir(project_id, job_id)
+    deadline = time.monotonic() + max_poll_sec
+    last: dict[str, Any] = {}
+    while True:
+        result = poll_video_generation(
+            store,
+            project_id,
+            output_dir,
+            load_registry=load_provider_registry,
+            request_id=f"diagnostic-poll-{job_id}",
+            client_request_id=f"diagnostic-poll-{job_id}",
+        )
+        job = write_video_job(store, project_id, job_id, result)
+        response = video_response(store, project_id, job, result)
+        status = str((response.get("job") or {}).get("status") or response.get("status") or "")
+        candidates = response.get("candidate_previews") or []
+        last = {
+            "status": status,
+            "job_id": job_id,
+            "candidate_count": len(candidates),
+            "candidates": [
+                _diagnostic_candidate_summary(store, project_id, job_id, item)
+                for item in candidates
+                if isinstance(item, Mapping)
+            ],
+            "provider_calls_started": bool(response.get("provider_calls_started")),
+            "blocks": [
+                {
+                    "block_id": str(block.get("block_id") or ""),
+                    "reason": str(block.get("reason") or "")[:180],
+                    "provider_http_status": _safe_int(block.get("provider_http_status")),
+                    "provider_error_code": str(block.get("provider_error_code") or ""),
+                }
+                for block in ((response.get("safe_manifest") or {}).get("blocks") or [])
+                if isinstance(block, Mapping)
+            ],
+        }
+        if candidates or status in DIAGNOSTIC_TERMINAL_STATUSES:
+            last["terminal"] = True
+            return last
+        if time.monotonic() >= deadline:
+            last["terminal"] = False
+            last["timeout"] = True
+            return last
+        time.sleep(poll_interval_sec)
+
+
+def _diagnostic_candidate_summary(
+    store: RuntimeStore,
+    project_id: str,
+    job_id: str,
+    candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    candidate_id = str(candidate.get("candidate_id") or "")
+    path = candidate_file(store.run_dir(project_id, job_id), candidate_id)
+    byte_count = path.stat().st_size if path and path.is_file() else int(candidate.get("byte_count") or 0)
+    return {
+        "candidate_id": candidate_id,
+        "preview_url": str(candidate.get("preview_url") or ""),
+        "sha256": str(candidate.get("sha256") or ""),
+        "path": str(path) if path else "",
+        "byte_count": byte_count,
+        "technical_qa": {
+            "file_present": bool(path and path.is_file()),
+            "nonzero_bytes": byte_count > 0,
+            "suffix": path.suffix.lower() if path else "",
+        },
+    }
 
 
 def _safe_provider_block(exc: Exception) -> dict[str, Any]:
