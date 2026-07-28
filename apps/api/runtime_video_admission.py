@@ -67,6 +67,7 @@ COMMANDS = {
     "recompile_current",
     "create_new_round",
     "create_comparison_round",
+    "create_next_shot",
     "reserve_dispatch",
     "record_job",
     "record_candidate",
@@ -74,6 +75,7 @@ COMMANDS = {
     "approve",
     "reject",
 }
+TERMINAL_ITEM_STATES = {"approved", "failed", "rejected"}
 
 
 def register_runtime_video_admission_routes(
@@ -182,6 +184,7 @@ def register_runtime_video_admission_routes(
                     "recompile_current",
                     "create_new_round",
                     "create_comparison_round",
+                    "create_next_shot",
                 }:
                     with _verified_graph_snapshot_lock(store, project_id, result):
                         _archive_manifest_once(store, project_id, existing)
@@ -214,8 +217,24 @@ def video_admission_readiness(
             "next_action": "等待视频能力准备完成。",
             "provider_dispatch_count": 0,
         }
+    active_manifest = load_video_admission_manifest(store, project_id)
+    active_source = (
+        active_manifest.get("source")
+        if isinstance(active_manifest, Mapping)
+        else {}
+    )
+    active_shot = (
+        active_source.get("shot")
+        if isinstance(active_source, Mapping)
+        else {}
+    )
+    selected_shot_id = str((active_shot or {}).get("shot_id") or "")
     try:
-        source = _source_contract(store, project_id)
+        source = _source_contract(
+            store,
+            project_id,
+            shot_id=selected_shot_id or None,
+        )
     except (KeyError, ValueError, ProductionGraphError) as exc:
         return {
             "status": "blocked",
@@ -427,6 +446,7 @@ def preview_video_admission_command(
             store,
             project_id,
             created_at=requested_at,
+            shot_id=command.get("shot_id"),
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
@@ -442,6 +462,7 @@ def preview_video_admission_command(
             project_id,
             created_at=requested_at,
             version=int(before.get("version") or 0) + 1,
+            shot_id=str((before.get("source", {}).get("shot") or {}).get("shot_id") or ""),
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
@@ -455,6 +476,7 @@ def preview_video_admission_command(
             project_id,
             created_at=requested_at,
             version=int(before.get("version") or 0) + 1,
+            shot_id=str((before.get("source", {}).get("shot") or {}).get("shot_id") or ""),
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
@@ -475,6 +497,7 @@ def preview_video_admission_command(
             project_id,
             created_at=requested_at,
             version=int(before.get("version") or 0) + 1,
+            shot_id=str((before.get("source", {}).get("shot") or {}).get("shot_id") or ""),
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
@@ -488,6 +511,30 @@ def preview_video_admission_command(
             },
         )
         _append_receipt(manifest, "comparison_round_created", command, requested_at)
+    elif command["type"] == "create_next_shot":
+        before = load_video_admission_manifest(store, project_id)
+        _assert_next_shot_eligible(store, project_id, before, command)
+        prior_shot_id = str((before.get("source", {}).get("shot") or {}).get("shot_id") or "")
+        manifest = compile_video_admission_manifest(
+            store,
+            project_id,
+            created_at=requested_at,
+            version=int(before.get("version") or 0) + 1,
+            shot_id=str(command.get("shot_id") or ""),
+            generation_mode=command.get("generation_mode"),
+            selection_reason=command.get("selection_reason"),
+            temporal_staging=command.get("temporal_staging"),
+            round_contract={
+                "kind": "next_shot",
+                "prior_manifest_id": str(before.get("manifest_id") or ""),
+                "prior_manifest_hash": str(before.get("manifest_hash") or ""),
+                "prior_shot_id": prior_shot_id,
+                "next_shot_id": str(command.get("shot_id") or ""),
+                "prior_round_preserved": True,
+                "prior_round_replay_allowed": False,
+            },
+        )
+        _append_receipt(manifest, "next_shot_created", command, requested_at)
     else:
         before = load_video_admission_manifest(store, project_id)
         if not before:
@@ -527,7 +574,7 @@ def preview_video_admission_command(
         payload["preview_digest"] = canonical_digest(
             {key: value for key, value in payload.items() if key != "preview_digest"}
         )
-    elif command["type"] in {"create_new_round", "create_comparison_round"}:
+    elif command["type"] in {"create_new_round", "create_comparison_round", "create_next_shot"}:
         payload["impact"].update(
             {
                 "source_manifest_archived": True,
@@ -537,6 +584,7 @@ def preview_video_admission_command(
                 "prior_approved_result_immutable": (
                     command["type"] == "create_comparison_round"
                 ),
+                "next_shot_created": command["type"] == "create_next_shot",
             }
         )
         payload["preview_digest"] = canonical_digest(
@@ -570,6 +618,7 @@ def compile_video_admission_manifest(
     *,
     created_at: str | None = None,
     version: int = 1,
+    shot_id: str | None = None,
     round_contract: Mapping[str, Any] | None = None,
     generation_mode: Any = None,
     selection_reason: Any = None,
@@ -580,7 +629,7 @@ def compile_video_admission_manifest(
         raise ValueError(
             "exact non-fast Seedance 2.0 720p/6s reference capability is not configured"
         )
-    source = _source_contract(store, project_id)
+    source = _source_contract(store, project_id, shot_id=shot_id)
     capability = video_admission_capability()
     mode = validate_generation_mode(
         generation_mode,
@@ -923,7 +972,11 @@ def video_admission_lineage(
             "provider_dispatch_count": 0,
         }
     try:
-        current_source = _source_contract(store, project_id)
+        current_source = _source_contract(
+            store,
+            project_id,
+            shot_id=str((active.get("source", {}).get("shot") or {}).get("shot_id") or ""),
+        )
     except (KeyError, ValueError, ProductionGraphError):
         return {
             "status": "stale",
@@ -1056,7 +1109,7 @@ def _image_admission_manifests(
     return manifests
 
 
-def _shot_one_grounding(manifest: Mapping[str, Any]) -> dict[str, Any]:
+def _shot_grounding_for_id(manifest: Mapping[str, Any], shot_id: str) -> dict[str, Any]:
     rows = [
         dict(item)
         for item in (
@@ -1064,10 +1117,10 @@ def _shot_one_grounding(manifest: Mapping[str, Any]) -> dict[str, Any]:
             .get("shot_grounding", {})
             .get("shots", [])
         )
-        if isinstance(item, Mapping) and int(item.get("number") or 0) == 1
+        if isinstance(item, Mapping) and str(item.get("shot_id") or "") == shot_id
     ]
     if len(rows) != 1:
-        raise ValueError("video readiness requires exactly one applied shot numbered 1")
+        raise ValueError("video readiness requires exactly one applied keyframe shot grounding")
     return rows[0]
 
 
@@ -1134,23 +1187,28 @@ def _approved_shot_one_keyframe(
             "video readiness requires one approved keyframe bound exactly to shot 01"
         )
     keyframe, source_manifest = next(iter(candidates.values()))
-    source_shot = _shot_one_grounding(source_manifest)
+    source_shot = _shot_grounding_for_id(source_manifest, shot_id)
     if canonical_digest(
         _keyframe_visual_contract(current_manifest, current_shot)
     ) != canonical_digest(
         _keyframe_visual_contract(source_manifest, source_shot)
     ):
         raise ValueError(
-            "approved shot 01 keyframe is stale after shot visual semantics changed"
+            "approved shot keyframe is stale after shot visual semantics changed"
         )
     return keyframe, source_manifest
 
 
-def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
+def _source_contract(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    shot_id: str | None = None,
+) -> dict[str, Any]:
     if not graph_has_authority(store, project_id):
         raise ValueError("video readiness requires an authoritative ProductionGraph")
     graph = ProductionGraphStore(store).load(project_id)
-    shot = _canonical_video_shot_grounding(graph)
+    shot = _canonical_video_shot_grounding(graph, shot_id=shot_id)
     shot_id = str(shot.get("shot_id") or "")
     media_by_target = _approved_media_by_target(graph)
     canonical_target_ids = _canonical_target_ids_for_shot(graph, shot_id)
@@ -1202,7 +1260,7 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
         ),
         "shot": {
             "shot_id": shot_id,
-            "number": 1,
+            "number": int(shot.get("number") or 0),
             "label": str(shot.get("title") or "镜头 01"),
         },
         "keyframe": keyframe,
@@ -1214,7 +1272,14 @@ def _source_contract(store: RuntimeStore, project_id: str) -> dict[str, Any]:
     }
 
 
-def _canonical_video_shot_grounding(graph: Mapping[str, Any]) -> dict[str, Any]:
+def _canonical_video_shot_grounding(
+    graph: Mapping[str, Any],
+    *,
+    shot_id: str | None = None,
+) -> dict[str, Any]:
+    requested_shot_id = str(shot_id or "").strip()
+    if requested_shot_id and safe_id(requested_shot_id) != requested_shot_id:
+        raise ValueError("video admission shot_id must be a safe ProductionGraph node id")
     nodes = graph.get("nodes") if isinstance(graph.get("nodes"), Mapping) else {}
     active = {
         str(node_id): node
@@ -1228,23 +1293,34 @@ def _canonical_video_shot_grounding(graph: Mapping[str, Any]) -> dict[str, Any]:
         and (active.get(str(relation.get("from_id") or "")) or {}).get("category") == "location"
         and (active.get(str(relation.get("to_id") or "")) or {}).get("category") == "unit"
     }
+    shots: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for relation in graph.get("relations", []):
         if relation.get("relation_type") != "contains":
             continue
         scene_id = str(relation.get("from_id") or "")
-        shot_id = str(relation.get("to_id") or "")
-        if scene_id not in scene_ids or (active.get(shot_id) or {}).get("category") != "unit":
+        candidate_shot_id = str(relation.get("to_id") or "")
+        if (
+            candidate_shot_id in seen
+            or scene_id not in scene_ids
+            or (active.get(candidate_shot_id) or {}).get("category") != "unit"
+        ):
             continue
-        metadata = active[shot_id].get("metadata") if isinstance(active[shot_id].get("metadata"), Mapping) else {}
-        return {
-            "shot_id": shot_id,
+        metadata = (
+            active[candidate_shot_id].get("metadata")
+            if isinstance(active[candidate_shot_id].get("metadata"), Mapping)
+            else {}
+        )
+        seen.add(candidate_shot_id)
+        shots.append({
+            "shot_id": candidate_shot_id,
             "title": str(
                 metadata.get("title")
                 or metadata.get("display_name")
                 or metadata.get("intent")
-                or "镜头 01"
+                or f"镜头 {len(shots) + 1:02d}"
             ),
-            "number": 1,
+            "number": _shot_number(metadata, len(shots) + 1),
             "action": str(metadata.get("action") or metadata.get("blocking") or metadata.get("intent") or ""),
             "composition": str(metadata.get("composition") or metadata.get("shot_size") or ""),
             "camera_angle": str(metadata.get("camera_angle") or ""),
@@ -1259,8 +1335,33 @@ def _canonical_video_shot_grounding(graph: Mapping[str, Any]) -> dict[str, Any]:
             "strict_first_frame_required": metadata.get("strict_first_frame_required"),
             "first_frame_required": metadata.get("first_frame_required"),
             "exact_opening_frame": metadata.get("exact_opening_frame"),
-        }
+        })
+    if requested_shot_id:
+        for shot in shots:
+            if shot["shot_id"] == requested_shot_id:
+                return shot
+        requested = nodes.get(requested_shot_id) if isinstance(nodes, Mapping) else None
+        if not isinstance(requested, Mapping):
+            raise ValueError("video admission shot_id is not present in the current ProductionGraph")
+        if requested.get("state", "active") != "active" or requested.get("category") != "unit":
+            raise ValueError("video admission shot_id must identify an active unit shot")
+        raise ValueError("video admission shot_id must identify an applied active unit shot")
+    if len(shots) == 1:
+        return shots[0]
+    if len(shots) > 1:
+        raise ValueError("video admission compile requires explicit shot_id for multi-shot ProductionGraph")
     raise ValueError("video readiness requires at least one applied shot in ProductionGraph")
+
+
+def _shot_number(metadata: Mapping[str, Any], fallback: int) -> int:
+    for key in ("number", "shot_number", "ordinal", "index"):
+        try:
+            number = int(metadata.get(key) or 0)
+        except (TypeError, ValueError):
+            number = 0
+        if number > 0:
+            return number
+    return fallback
 
 
 def _approved_reference_ids_for_targets(
@@ -1384,11 +1485,12 @@ def _canonical_labels_for_shot(graph: Mapping[str, Any], shot_id: str) -> dict[s
         label = str(metadata.get("display_name") or metadata.get("name") or "").strip()
         if not label:
             continue
-        if node.get("category") == "entity":
+        kind = _canonical_reference_asset_kind(node)
+        if kind == "character":
             result["characters"].append(label)
-        elif node.get("category") == "location":
+        elif kind == "scene":
             result["scenes"].append(label)
-        elif node.get("category") == "resource" and metadata.get("kind") == "prop":
+        elif kind == "prop":
             result["props"].append(label)
     return result
 
@@ -1404,14 +1506,30 @@ def _canonical_target_ids_for_shot(graph: Mapping[str, Any], shot_id: str) -> se
     return {
         node_id
         for node_id in candidate_ids
-        if (
-            (nodes.get(node_id) or {}).get("category") in {"entity", "location"}
-            or (
-                (nodes.get(node_id) or {}).get("category") == "resource"
-                and (nodes.get(node_id) or {}).get("metadata", {}).get("kind") == "prop"
-            )
-        )
+        if _canonical_reference_asset_kind(nodes.get(node_id) or "")
     }
+
+
+def _canonical_reference_asset_kind(node: Mapping[str, Any] | Any) -> str:
+    if not isinstance(node, Mapping):
+        return ""
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+    category = str(node.get("category") or "")
+    kind = str(metadata.get("kind") or "").strip().lower()
+    if category == "entity" and kind in {"", "character"}:
+        return "character"
+    if category == "resource" and kind in {"scene", "prop"}:
+        return kind
+    if (
+        category == "location"
+        and kind == "scene"
+        and any(
+            str(metadata.get(key) or "").strip()
+            for key in ("asset_id", "stable_asset_id", "asset_bible_id")
+        )
+    ):
+        return "scene"
+    return ""
 
 
 def _approved_media_by_target(graph: Mapping[str, Any]) -> dict[str, set[str]]:
@@ -1843,12 +1961,18 @@ def _safe_command(value: Any) -> dict[str, Any]:
         "recompile_current",
         "create_new_round",
         "create_comparison_round",
+        "create_next_shot",
     }:
         safe["generation_mode"] = str(command.get("generation_mode") or "")[:80]
         safe["selection_reason"] = str(command.get("selection_reason") or "")[:600]
         safe["temporal_staging"] = validate_temporal_staging(
             command.get("temporal_staging")
         )
+    if command_type in {"compile", "create_next_shot"} and command.get("shot_id"):
+        shot_id = str(command.get("shot_id") or "").strip()
+        if safe_id(shot_id) != shot_id:
+            raise ValueError("video admission shot_id must be a safe ProductionGraph node id")
+        safe["shot_id"] = shot_id
     for field in ("provider_job_id", "error_category"):
         if command.get(field):
             safe[field] = str(command[field])[:180]
@@ -2033,6 +2157,7 @@ def _assert_new_round_eligible(
         raise ValueError("the prior video rejection evidence is unavailable")
     safe_manifest = read_json(safe_path)
     reject_unsafe_payload(safe_manifest)
+    outputs = safe_manifest.get("outputs")
     blocks = [
         block for block in safe_manifest.get("blocks", [])
         if isinstance(block, Mapping)
@@ -2049,13 +2174,51 @@ def _assert_new_round_eligible(
         )
         for block in blocks
     )
+    provider_not_ready = any(
+        str(block.get("failure_class") or "").strip().lower() == "provider_not_ready"
+        or str(block.get("block_id") or "").strip() == "remote_video_provider_not_ready"
+        for block in blocks
+    )
     if (
         safe_manifest.get("status") != "reconcile_required"
-        or safe_manifest.get("provider_calls_started") is not True
-        or safe_manifest.get("outputs") not in (None, [])
-        or not rejected
+        or outputs not in (None, [])
+        or not (
+            (
+                safe_manifest.get("provider_calls_started") is True
+                and rejected
+            )
+            or (
+                safe_manifest.get("provider_calls_started") is not True
+                and provider_not_ready
+            )
+        )
     ):
-        raise ValueError("the prior video round is not safely classified as a rejected input")
+        raise ValueError("the prior video round is not safely classified as recoverable")
+
+
+def _assert_next_shot_eligible(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+    command: Mapping[str, Any],
+) -> None:
+    if not manifest:
+        raise ValueError("a prior video round is required before preparing the next shot")
+    item = manifest.get("item") or {}
+    if item.get("state") not in TERMINAL_ITEM_STATES:
+        raise ValueError("the prior video round must be terminal before preparing the next shot")
+    prior_shot_id = str((manifest.get("source", {}).get("shot") or {}).get("shot_id") or "")
+    next_shot_id = str(command.get("shot_id") or "").strip()
+    if not next_shot_id:
+        raise ValueError("create_next_shot requires explicit shot_id")
+    if next_shot_id == prior_shot_id:
+        raise ValueError("create_next_shot must target a different shot_id")
+    if item.get("state") == "approved":
+        _assert_comparison_round_eligible(store, project_id, manifest)
+    else:
+        _assert_manifest_current(store, project_id, manifest)
+    graph = ProductionGraphStore(store).load(project_id)
+    _canonical_video_shot_grounding(graph, shot_id=next_shot_id)
 
 
 def _assert_comparison_round_eligible(
@@ -2093,7 +2256,11 @@ def _assert_comparison_round_eligible(
         or metadata.get("sha256") != candidate.get("sha256")
     ):
         raise ValueError("the approved video result is not current in ProductionGraph")
-    current_source = _source_contract(store, project_id)
+    current_source = _source_contract(
+        store,
+        project_id,
+        shot_id=str((manifest.get("source", {}).get("shot") or {}).get("shot_id") or ""),
+    )
     if canonical_digest(
         _video_visual_source(manifest.get("source") or {})
     ) != canonical_digest(_video_visual_source(current_source)):
