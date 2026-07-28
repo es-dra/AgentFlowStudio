@@ -277,3 +277,21 @@ def test_video_confirmation_remains_two_step_and_never_auto_dispatches_from_entr
     assert '"发送当前视频任务"' in shell
     assert '"正在发送视频任务…"' in shell
     assert "dispatchReservedVideoAdmissionItem" in shell
+
+
+def test_stale_video_panel_has_reachable_fallback_action() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    stale_branch = shell.split('if (view.lineage?.status === "stale")', 1)[1].split(
+        'if (view.readiness?.status !== "ready" && view.status === "empty")',
+        1,
+    )[0]
+
+    assert 'view.lineage.rebuild_allowed || view.readiness?.rebuild_allowed' in stale_branch
+    assert '"recompile_current"' in stale_branch
+    assert '"按当前版本重新准备"' in stale_branch
+    assert "view.readiness?.new_round_allowed" in stale_branch
+    assert '"create_new_round"' in stale_branch
+    assert '"建立新的单次视频清单"' in stale_branch
+    assert 'item.state === "reconcile_required" && item.job_id' in stale_branch
+    assert '"检查视频进度"' in stale_branch
+    assert "pollVideoAdmissionItem()" in stale_branch

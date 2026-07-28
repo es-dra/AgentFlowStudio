@@ -1868,6 +1868,179 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert read_json(image_path) == image_before
 
 
+def test_stale_reserved_video_manifest_rebuilds_current_graph_without_dispatch(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-before-reserve"})
+    _command(client, project_id, {"type": "reserve_dispatch", "idempotency_key": "reserve-before-stale"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    assert old_video["item"]["state"] == "reserved"
+    assert old_video["provider_dispatch_count"] == 0
+
+    _, graph = _rotate_image_manifest_after_graph_update(store, project_id)
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "stale"
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["readiness"]["rebuild_allowed"] is True
+    assert state["lineage"]["current_graph_version"] == graph["version"]
+
+    body = {
+        "command": _reference_video_setup_command(
+            {"type": "recompile_current", "idempotency_key": "recompile-stale-reserved"}
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    rebuilt = confirmed.json()["result"]["manifest"]
+
+    assert rebuilt["source"]["production_graph"]["version"] == graph["version"]
+    assert rebuilt["item"]["state"] == "planned"
+    assert rebuilt["budget"]["dispatches_reserved"] == 0
+    assert rebuilt["budget"]["remaining_dispatches"] == 1
+    assert rebuilt["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_video['manifest_id']}.json"
+    )
+    assert archived == old_video
+
+
+def test_stale_recoverable_reconcile_video_manifest_rebuilds_current_graph_without_dispatch(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-before-stale-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-before-stale-provider-not-ready"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        request,
+        job_id="stale-provider-not-ready-job",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="stale-provider-not-ready-job",
+    )
+    safe_path = (
+        store.run_dir(project_id, "stale-provider-not-ready-job")
+        / "video_generation_safe_manifest.json"
+    )
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": False,
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph = graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="advance-graph-with-unrelated-video-candidate",
+        semantic_digest=canonical_digest({"unrelated": "video-candidate-projection"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "unrelated-safe-artifact",
+                    "category": "artifact",
+                    "metadata": {"kind": "diagnostic"},
+                },
+            }
+        ],
+    )
+
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "stale"
+    assert state["lineage"]["keyframe_reuse"] in {"verified_current", "updated_approved_source"}
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["readiness"]["rebuild_allowed"] is True
+
+    body = {
+        "command": _reference_video_setup_command(
+            {
+                "type": "recompile_current",
+                "idempotency_key": "recompile-stale-provider-not-ready",
+            }
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    assert load_video_admission_manifest(store, project_id) == old_video
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["source"]["production_graph"]["version"] == graph["version"]
+    assert candidate["item"]["state"] == "planned"
+    assert candidate["provider_dispatch_count"] == 0
+    assert candidate["budget"]["dispatches_reserved"] == 0
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_video['manifest_id']}.json"
+    )
+    assert archived == old_video
+    assert read_json(safe_path)["outputs"] == []
+
+
 def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmation(
     tmp_path,
     monkeypatch,

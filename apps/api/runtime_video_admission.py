@@ -665,7 +665,10 @@ def preview_video_admission_command(
     elif command["type"] == "recompile_current":
         before = load_video_admission_manifest(store, project_id, shot_id=lane_shot_id)
         lineage = video_admission_lineage(store, project_id, before)
-        if lineage.get("status") != "stale" or lineage.get("rebuild_allowed") is not True:
+        if (
+            lineage.get("status") != "stale"
+            or not _stale_video_rebuild_allowed(store, project_id, before)
+        ):
             raise ValueError("video admission cannot be rebuilt from the current ProductionGraph")
         manifest = compile_video_admission_manifest(
             store,
@@ -1271,13 +1274,7 @@ def video_admission_lineage(
         if canonical_digest(old_visual) == canonical_digest(current_visual)
         else "updated_approved_source"
     )
-    budget = active.get("budget") or {}
-    rebuild_allowed = (
-        item.get("state") == "planned"
-        and not item.get("provider_job_id")
-        and int(active.get("provider_dispatch_count") or 0) == 0
-        and int(budget.get("dispatches_reserved") or 0) == 0
-    )
+    rebuild_allowed = _stale_video_rebuild_allowed(store, project_id, active)
     return {
         "status": "stale",
         "prepared_graph_version": prepared_version,
@@ -1325,6 +1322,27 @@ def _video_visual_source(source: Mapping[str, Any]) -> dict[str, Any]:
         ],
         "shot_semantics": shot_semantics,
     }
+
+
+def _stale_video_rebuild_allowed(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> bool:
+    item = manifest.get("item") or {}
+    if (
+        item.get("state") in {"planned", "reserved"}
+        and not str(item.get("provider_job_id") or "")
+        and not str(item.get("provider_task_fingerprint") or "")
+        and item.get("candidate") is None
+        and int(manifest.get("provider_dispatch_count") or 0) == 0
+    ):
+        return True
+    try:
+        _assert_recoverable_new_round_source(store, project_id, manifest)
+    except (KeyError, ValueError, ProductionGraphError):
+        return False
+    return True
 
 
 def _video_source_affected_objects(
@@ -2788,6 +2806,14 @@ def _assert_new_round_eligible(
     if not manifest:
         raise ValueError("a prior video round is required")
     _assert_manifest_current(store, project_id, manifest)
+    _assert_recoverable_new_round_source(store, project_id, manifest)
+
+
+def _assert_recoverable_new_round_source(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
     item = manifest.get("item") or {}
     budget = manifest.get("budget") or {}
     if (

@@ -2909,12 +2909,23 @@ export function createProductShell(options = {}) {
           ? `${shotLabel} 的画面语义未变化；已批准关键帧与 ${view.source?.references?.length || 0} 张参考图可复用。`
           : view.readiness?.next_action || "当前镜头画面来源需要重新确认。",
       ));
-      if (view.lineage.rebuild_allowed) {
+      if (view.lineage.rebuild_allowed || view.readiness?.rebuild_allowed) {
         stale.appendChild(buildVideoGenerationSetup(
           view,
           "recompile_current",
           "按当前版本重新准备",
         ));
+      } else if (view.readiness?.new_round_allowed) {
+        stale.appendChild(buildVideoGenerationSetup(
+          view,
+          "create_new_round",
+          "建立新的单次视频清单",
+        ));
+      } else if (item.state === "reconcile_required" && item.job_id) {
+        const recover = node("button", "studio-secondary-button", "检查视频进度");
+        recover.type = "button";
+        recover.addEventListener("click", () => void pollVideoAdmissionItem());
+        stale.appendChild(recover);
       }
       panel.appendChild(stale);
       return panel;
