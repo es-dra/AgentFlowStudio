@@ -1,0 +1,307 @@
+{
+  "fixture_version": "0.2",
+  "anchor_date": "2026-07-29",
+  "visibility": {
+    "internal_ids_visible_by_default": false,
+    "provider_details_visible_by_default": false,
+    "diagnostics_visible_by_default": false
+  },
+  "project": {
+    "project_id": "studio-1785154250742-86s0uf",
+    "display_name": "雾港来信",
+    "episode_name": "第一集·启程前",
+    "aspect_ratio": "16:9",
+    "target_duration_seconds": 77,
+    "project_version": 32,
+    "event_cursor": 418,
+    "last_checkpoint_at": "2026-07-29T14:32:00+08:00",
+    "save_state": "server_confirmed",
+    "resume_target": {
+      "surface": "review",
+      "entity_type": "video_candidate",
+      "entity_ref": "candidate-shot-03-video-v2",
+      "reason": "镜头 03 有两个视频候选等待决定"
+    }
+  },
+  "scenes": [
+    {
+      "scene_ref": "scene-01",
+      "sequence": 1,
+      "title": "雾港启程",
+      "duration_seconds": 22,
+      "script_status": "confirmed",
+      "shot_refs": [
+        "shot-01",
+        "shot-02"
+      ]
+    },
+    {
+      "scene_ref": "scene-02",
+      "sequence": 2,
+      "title": "灯塔警示",
+      "duration_seconds": 28,
+      "script_status": "confirmed",
+      "shot_refs": [
+        "shot-03",
+        "shot-04",
+        "shot-05"
+      ]
+    },
+    {
+      "scene_ref": "scene-03",
+      "sequence": 3,
+      "title": "穿过码头",
+      "duration_seconds": 27,
+      "script_status": "confirmed",
+      "shot_refs": [
+        "shot-06",
+        "shot-07"
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "shot_ref": "shot-01",
+      "sequence": 1,
+      "scene_ref": "scene-01",
+      "display_name": "雾港全景",
+      "duration_seconds": 12,
+      "shot_size": "远景",
+      "intent": "帆船穿过晨雾，港口逐渐显出轮廓",
+      "keyframe_status": "adopted",
+      "video_status": "adopted"
+    },
+    {
+      "shot_ref": "shot-02",
+      "sequence": 2,
+      "scene_ref": "scene-01",
+      "display_name": "阿岚登船",
+      "duration_seconds": 10,
+      "shot_size": "中景",
+      "intent": "阿岚回望码头，把信件藏入外套",
+      "keyframe_status": "adopted",
+      "video_status": "adopted"
+    },
+    {
+      "shot_ref": "shot-03",
+      "sequence": 3,
+      "scene_ref": "scene-02",
+      "display_name": "灯塔远景",
+      "duration_seconds": 8,
+      "shot_size": "远景",
+      "intent": "灯塔光穿过浓雾，海浪逐渐增强",
+      "keyframe_status": "adopted",
+      "video_status": "review_pending"
+    },
+    {
+      "shot_ref": "shot-04",
+      "sequence": 4,
+      "scene_ref": "scene-02",
+      "display_name": "船长转身",
+      "duration_seconds": 11,
+      "shot_size": "中景",
+      "intent": "老船长在雨中转身，视线掠过灯塔",
+      "keyframe_status": "adopted",
+      "video_status": "adopted"
+    },
+    {
+      "shot_ref": "shot-05",
+      "sequence": 5,
+      "scene_ref": "scene-02",
+      "display_name": "检查设备",
+      "duration_seconds": 9,
+      "shot_size": "近景",
+      "intent": "船员检查设备，为离港做最后准备",
+      "keyframe_status": "generating",
+      "video_status": "not_started"
+    },
+    {
+      "shot_ref": "shot-06",
+      "sequence": 6,
+      "scene_ref": "scene-03",
+      "display_name": "小船入潮",
+      "duration_seconds": 14,
+      "shot_size": "远景",
+      "intent": "小船驶入潮汐，雾港灯火逐渐远去",
+      "keyframe_status": "adopted",
+      "video_status": "adopted"
+    },
+    {
+      "shot_ref": "shot-07",
+      "sequence": 7,
+      "scene_ref": "scene-03",
+      "display_name": "巷口微光",
+      "duration_seconds": 13,
+      "shot_size": "远景",
+      "intent": "巷口最后一盏灯熄灭，留下未寄出的回音",
+      "keyframe_status": "adopted",
+      "video_status": "not_started"
+    }
+  ],
+  "assets": [
+    {
+      "asset_ref": "asset-character-alan",
+      "asset_type": "人物",
+      "display_name": "阿岚",
+      "identity_status": "confirmed",
+      "media_status": "adopted",
+      "referenced_by_shots": [
+        "shot-02"
+      ]
+    },
+    {
+      "asset_ref": "asset-character-captain",
+      "asset_type": "人物",
+      "display_name": "老船长",
+      "identity_status": "confirmed",
+      "media_status": "adopted",
+      "referenced_by_shots": [
+        "shot-04",
+        "shot-05"
+      ]
+    },
+    {
+      "asset_ref": "asset-location-harbor",
+      "asset_type": "场景",
+      "display_name": "雾港",
+      "identity_status": "confirmed",
+      "media_status": "adopted",
+      "referenced_by_shots": [
+        "shot-01",
+        "shot-02",
+        "shot-06",
+        "shot-07"
+      ]
+    },
+    {
+      "asset_ref": "asset-location-lighthouse",
+      "asset_type": "场景",
+      "display_name": "灯塔",
+      "identity_status": "confirmed",
+      "media_status": "adopted",
+      "referenced_by_shots": [
+        "shot-03",
+        "shot-04"
+      ]
+    },
+    {
+      "asset_ref": "asset-location-dock",
+      "asset_type": "场景",
+      "display_name": "码头",
+      "identity_status": "confirmed",
+      "media_status": "adopted",
+      "referenced_by_shots": [
+        "shot-01",
+        "shot-02",
+        "shot-05",
+        "shot-06",
+        "shot-07"
+      ]
+    },
+    {
+      "asset_ref": "asset-prop-letter",
+      "asset_type": "道具",
+      "display_name": "油布包裹的信件",
+      "identity_status": "confirmed",
+      "media_status": "review_pending",
+      "referenced_by_shots": [
+        "shot-02",
+        "shot-07"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_ref": "candidate-shot-03-video-v1",
+      "entity_ref": "shot-03",
+      "media_type": "视频",
+      "sequence": 1,
+      "review_state": "superseded",
+      "adoption_state": "not_adopted",
+      "duration_seconds": 8
+    },
+    {
+      "candidate_ref": "candidate-shot-03-video-v2",
+      "entity_ref": "shot-03",
+      "media_type": "视频",
+      "sequence": 2,
+      "review_state": "pending",
+      "adoption_state": "not_adopted",
+      "duration_seconds": 8,
+      "quality_issue": {
+        "range_start_seconds": 6,
+        "range_end_seconds": 8,
+        "summary": "灯塔光束在结尾有轻微跳变"
+      }
+    },
+    {
+      "candidate_ref": "candidate-asset-letter-image-v1",
+      "entity_ref": "asset-prop-letter",
+      "media_type": "图片",
+      "sequence": 1,
+      "review_state": "pending",
+      "adoption_state": "not_adopted"
+    }
+  ],
+  "tasks": [
+    {
+      "task_ref": "task-shot-05-keyframe",
+      "task_type": "关键画面制作",
+      "entity_ref": "shot-05",
+      "state": "running",
+      "progress_percent": 46,
+      "cancel_state": "cancel_allowed",
+      "recovery_state": "durable",
+      "estimated_cost_cny": 3.2
+    }
+  ],
+  "review_queue": {
+    "pending_count": 2,
+    "needs_attention_count": 1,
+    "adopted_video_count": 4,
+    "primary_decision_ref": "candidate-shot-03-video-v2"
+  },
+  "delivery": {
+    "delivery_version": 3,
+    "state": "blocked",
+    "playable_duration_seconds": 47,
+    "blockers": [
+      "镜头 03 视频候选待审核",
+      "镜头 05 关键画面正在制作",
+      "镜头 07 视频尚未制作"
+    ]
+  },
+  "team": [
+    {
+      "display_name": "陈制片",
+      "role": "制片人",
+      "capabilities": [
+        "预算确认",
+        "交付冻结"
+      ]
+    },
+    {
+      "display_name": "林导",
+      "role": "导演",
+      "capabilities": [
+        "剧本确认",
+        "候选采用",
+        "局部返工"
+      ]
+    },
+    {
+      "display_name": "阿越",
+      "role": "剪辑师",
+      "capabilities": [
+        "装配编辑",
+        "交付检查"
+      ]
+    }
+  ],
+  "budget": {
+    "currency": "CNY",
+    "monthly_limit": 500,
+    "used": 186.4,
+    "reserved": 9.5
+  }
+}
