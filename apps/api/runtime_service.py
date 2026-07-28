@@ -73,6 +73,7 @@ from apps.api.runtime_image_admission import register_runtime_image_admission_ro
 from apps.api.runtime_video_admission import register_runtime_video_admission_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
+from apps.api.runtime_studio_bff import register_runtime_studio_bff_routes
 from apps.api.runtime_sprite import register_runtime_sprite_routes
 from apps.api.runtime_visual_assets import register_runtime_visual_asset_routes
 from apps.api.runtime_video_revision_routes import register_runtime_video_revision_routes
@@ -407,6 +408,7 @@ def create_runtime_app(
     register_runtime_episode_workspace_routes(app, store, auth)
     register_runtime_creator_production_saga_routes(app, store, auth)
     register_runtime_product_read_model_routes(app, store, auth)
+    register_runtime_studio_bff_routes(app, store, auth)
     register_runtime_adaptive_canvas_v2_routes(app, store, auth)
     register_runtime_manga_first_l4a_routes(app, store, auth)
     register_runtime_script_core_truth_routes(app, store, auth)

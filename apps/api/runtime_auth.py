@@ -196,6 +196,9 @@ class RuntimeAuthStore:
             return dict(user)
 
     def require_user(self, request: Request) -> dict[str, Any]:
+        cached = getattr(request.state, "afs_user", None)
+        if isinstance(cached, dict) and cached.get("user_id"):
+            return dict(cached)
         user = self.user_from_request(request)
         if not user:
             raise HTTPException(status_code=401, detail="authentication required")
