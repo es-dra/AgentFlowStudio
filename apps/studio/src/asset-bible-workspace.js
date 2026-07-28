@@ -1,4 +1,5 @@
 import { legacyAppliedStoryboardProjection } from "./shot-truth-projection.js";
+import { videoAdmissionCanPrepare } from "./video-admission-workspace.js";
 
 export function assetBibleProjection(studioState = {}, runtimeAssetBible = null) {
   const canonical = runtimeAssetBible?.authority_mode === "canonical_production_graph"
@@ -685,7 +686,7 @@ export function deriveProductionCopilotState({
   const admissionCounts = imageAdmission?.counts || {};
   const mediaLoadFailures = Number(admissionCounts.media_load_failed || 0);
   const videoReady = capabilityGates.video === true
-    && videoAdmission?.readiness?.status === "ready"
+    && videoAdmissionCanPrepare(videoAdmission?.readiness)
     && videoAdmission?.selected_shot_ready === true;
   const videoRebuildReady = capabilityGates.video === true
     && videoAdmission?.lineage?.status === "stale"
@@ -821,6 +822,18 @@ export function deriveProductionCopilotState({
       action: "review_video_admission",
       label: "确认镜头视频",
       reason: "视频准备清单已保存；下一步审核最终模型、参考组、时长和费用停止线，再决定是否发送。",
+      enabled: true,
+    };
+  } else if (
+    contentReady
+    && videoReady
+    && videoItemState === "reconcile_required"
+    && videoAdmission?.readiness?.new_round_allowed === true
+  ) {
+    next = {
+      action: "prepare_shot_video",
+      label: "建立新视频清单",
+      reason: "上一次发送已安全归档；可建立新的单次视频清单，不会重放旧任务。",
       enabled: true,
     };
   } else if (contentReady && videoReady && ["processing", "reconcile_required"].includes(videoItemState)) {

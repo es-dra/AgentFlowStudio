@@ -1,5 +1,19 @@
 import { candidatePreviewItems } from "./node-generation-progress.js";
 
+const VIDEO_ADMISSION_PREPARATION_STATUSES = new Set([
+  "ready",
+  "new_round_ready",
+  "comparison_ready",
+]);
+
+export function videoAdmissionCanPrepare(readiness = null) {
+  return VIDEO_ADMISSION_PREPARATION_STATUSES.has(String(readiness?.status || ""));
+}
+
+export function videoAdmissionCanEnterPanel(readiness = null) {
+  return videoAdmissionCanPrepare(readiness) || String(readiness?.status || "") === "stale";
+}
+
 export function videoAdmissionProjection(runtimeValue = null, mediaState = "idle") {
   const manifest = runtimeValue?.manifest && typeof runtimeValue.manifest === "object"
     ? runtimeValue.manifest

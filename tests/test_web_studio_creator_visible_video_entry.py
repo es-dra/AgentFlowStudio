@@ -163,7 +163,21 @@ const planned = deriveProductionCopilotState({
     item: { state: "planned" },
   },
 });
-process.stdout.write(JSON.stringify({ ready, otherShot, planned }));
+const newRound = deriveProductionCopilotState({
+  ...common,
+  videoAdmission: {
+    status: "locked",
+    readiness: {
+      status: "new_round_ready",
+      shot_id: "shot-01",
+      reference_count: 3,
+      new_round_allowed: true,
+    },
+    selected_shot_ready: true,
+    item: { state: "reconcile_required" },
+  },
+});
+process.stdout.write(JSON.stringify({ ready, otherShot, planned, newRound }));
 '''
     )
 
@@ -182,6 +196,25 @@ process.stdout.write(JSON.stringify({ ready, otherShot, planned }));
         "reason": "视频准备清单已保存；下一步审核最终模型、参考组、时长和费用停止线，再决定是否发送。",
         "enabled": True,
     }
+    assert result["newRound"]["next_valid_action"] == {
+        "action": "prepare_shot_video",
+        "label": "建立新视频清单",
+        "reason": "上一次发送已安全归档；可建立新的单次视频清单，不会重放旧任务。",
+        "enabled": True,
+    }
+
+
+def test_safe_video_new_round_readiness_is_creator_visible() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    bible = (STUDIO / "src" / "asset-bible-workspace.js").read_text(encoding="utf-8")
+    workspace = (STUDIO / "src" / "video-admission-workspace.js").read_text(encoding="utf-8")
+
+    assert '"new_round_ready"' in workspace
+    assert "videoAdmissionCanEnterPanel(videoAdmissionView().readiness)" in shell
+    assert "videoAdmissionCanPrepare(videoAdmissionView().readiness)" in shell
+    assert "safeNewRoundVideo" in shell
+    assert "建立新视频清单" in shell
+    assert "videoAdmissionCanPrepare(videoAdmission?.readiness)" in bible
 
 
 def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> None:

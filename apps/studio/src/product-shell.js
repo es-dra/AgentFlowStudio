@@ -31,6 +31,8 @@ import {
 } from "./image-admission-workspace.js";
 import {
   videoAdmissionCommand,
+  videoAdmissionCanEnterPanel,
+  videoAdmissionCanPrepare,
   videoAdmissionGenerationRequest,
   videoAdmissionGenerationResult,
   videoAdmissionProjection,
@@ -1245,7 +1247,7 @@ export function createProductShell(options = {}) {
           render();
         });
         headerActions.appendChild(admission);
-        if (["ready", "stale"].includes(videoAdmissionView().readiness?.status)) {
+        if (videoAdmissionCanEnterPanel(videoAdmissionView().readiness)) {
           const videoApproved = (graphView().mediaSummary?.approvedVideos || 0) > 0;
           const video = node(
             "button",
@@ -1318,7 +1320,7 @@ export function createProductShell(options = {}) {
           ? "1 条待审看"
           : videoAdmissionView().readiness?.status === "stale"
             ? "需按当前版本更新"
-            : videoAdmissionView().readiness?.status === "ready"
+            : videoAdmissionCanPrepare(videoAdmissionView().readiness)
             ? "可准备"
             : "等待关键帧"],
     ];
@@ -3579,14 +3581,19 @@ export function createProductShell(options = {}) {
       ? "empty"
       : String(videoView.item?.state || "");
     const rebuildVideo = currentShotVideoAdmissionRebuildable();
+    const safeNewRoundVideo = currentShotVideoAdmissionReady()
+      && videoActionState === "reconcile_required"
+      && videoView.readiness?.new_round_allowed === true;
     if (
       (currentShotVideoAdmissionReady() || rebuildVideo)
-      && ["empty", "planned"].includes(videoActionState)
+      && (["empty", "planned"].includes(videoActionState) || safeNewRoundVideo)
     ) {
       const videoActionLabel = videoAdmissionPending
         ? "正在准备…"
         : rebuildVideo
           ? "按当前版本重新准备"
+        : safeNewRoundVideo
+          ? "建立新视频清单"
         : videoView.item?.state === "planned"
           ? "确认镜头视频"
           : "准备镜头视频";
@@ -5431,7 +5438,7 @@ export function createProductShell(options = {}) {
   function currentShotVideoAdmissionReady() {
     const readiness = videoAdmissionView().readiness || {};
     const shot = currentShot();
-    return readiness.status === "ready"
+    return videoAdmissionCanPrepare(readiness)
       && Boolean(readiness.shot_id)
       && readiness.shot_id === shot.graphNodeId
       && Boolean(shot.preview);
