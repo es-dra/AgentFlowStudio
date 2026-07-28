@@ -718,6 +718,112 @@ def test_pending_video_candidate_projects_into_storyboard_canvas_without_approva
     assert "视频候选待审看" in shell
 
 
+def test_pending_video_candidate_projects_from_graph_artifact_relation() -> None:
+    projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    script = f"""
+      import {{
+        applyProductionGraphCanvasProjection,
+        productionGraphWorkspaceProjection,
+      }} from {json.dumps(projection_uri)};
+      const workspace = {{
+        status: "ready",
+        project_id: "video-project",
+        graph_version: 31,
+        graph_digest: "graph-v31",
+        storyboard: {{ graph_version: 31, graph_digest: "graph-v31" }},
+        sequence: {{
+          shots: [
+            {{ node_id: "shot-20", state: "active", metadata: {{ title: "棋剑坠落", duration_seconds: 6 }} }},
+            {{ node_id: "shot-21", state: "active", metadata: {{ title: "棋室对坐", duration_seconds: 6 }} }},
+          ],
+          scenes: [{{ node_id: "scene-03", state: "active", metadata: {{ name: "场景03" }} }}],
+          video_candidates: [],
+          artifact_nodes: [
+            {{
+              node_id: "video-candidate-video-admission-shot20",
+              category: "artifact",
+              state: "active",
+              metadata: {{
+                kind: "pending_video_candidate",
+                review_state: "candidate",
+                creative_approval_state: "pending",
+                technical_qa_status: "pass",
+                source_shot_id: "shot-20",
+                manifest_id: "video-admission-shot20",
+                manifest_hash: "a".repeat(64),
+                job_id: "video-job-shot20",
+                candidate_id: "candidate_001",
+                sha256: "b".repeat(64),
+                byte_count: 4350315,
+                mime_type: "video/mp4",
+                codec: "h264",
+                width: 1280,
+                height: 720,
+                duration_sec: 6,
+                model: "doubao-seedance-2-0",
+                resolution: "720p",
+                generation_mode: "reference_conditioned",
+              }},
+            }},
+            {{
+              node_id: "video-candidate-failed",
+              category: "artifact",
+              state: "active",
+              metadata: {{
+                kind: "pending_video_candidate",
+                review_state: "candidate",
+                technical_qa_status: "failed",
+                source_shot_id: "shot-21",
+                job_id: "video-job-shot21",
+                candidate_id: "candidate_001",
+              }},
+            }},
+          ],
+          dependencies: [
+            {{ from_id: "scene-03", to_id: "shot-20", relation_type: "contains" }},
+            {{ from_id: "scene-03", to_id: "shot-21", relation_type: "contains" }},
+            {{ from_id: "shot-20", to_id: "video-candidate-video-admission-shot20", relation_type: "video_candidate" }},
+            {{ from_id: "shot-21", to_id: "video-candidate-failed", relation_type: "video_candidate" }},
+          ],
+        }},
+      }};
+      const projection = productionGraphWorkspaceProjection(workspace);
+      const state = {{ nodes: {{}}, edges: {{}}, order: [], selection: {{ nodeIds: [], edgeId: null }}, production: {{}} }};
+      applyProductionGraphCanvasProjection(state, workspace);
+      const shotNode = Object.values(state.nodes).find(
+        (node) => node.params?.productionGraphTruth?.graph_node_id === "shot-20"
+      );
+      const candidateNode = Object.values(state.nodes).find(
+        (node) => node.params?.productionGraphTruth?.graph_node_id === "video-candidate-video-admission-shot20"
+      );
+      console.log(JSON.stringify({{ projection, shotNode, candidateNode }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+    shot20, shot21 = result["projection"]["shots"]
+    assert shot20["state"] == "candidate"
+    assert shot20["videoCandidate"]["previewUrl"].endswith(
+        "/video-job-shot20/candidates/candidate_001/preview"
+    )
+    assert shot20["videoCandidate"]["lineage"] == {
+        "sourceKind": "production_graph_artifact_node",
+        "targetRelation": "video_candidate",
+    }
+    assert shot21["videoCandidate"] is None
+    assert result["projection"]["mediaSummary"]["pendingVideoCandidates"] == 1
+    assert result["shotNode"]["params"]["videoCandidate"]["manifest_id"] == "video-admission-shot20"
+    assert result["candidateNode"]["title"] == "待审看镜头视频候选"
+    assert result["candidateNode"]["previewUrl"].endswith(
+        "/video-job-shot20/candidates/candidate_001/preview"
+    )
+
+
 def test_approved_asset_media_projects_to_canvas_nodes_without_candidate_leakage() -> None:
     projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
     result_view_uri = (STUDIO / "src" / "node-result-view.js").as_uri()

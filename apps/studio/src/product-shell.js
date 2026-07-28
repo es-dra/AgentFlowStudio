@@ -2990,7 +2990,7 @@ export function createProductShell(options = {}) {
       const send = node(
         "button",
         "studio-primary-button",
-        reservePending ? "正在发送…" : "发送当前视频任务",
+        reservePending ? "正在发送视频任务…" : "发送当前视频任务",
       );
       send.type = "button";
       send.disabled = !snapshot.mediaGates?.video || reservePending;

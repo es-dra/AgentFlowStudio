@@ -275,4 +275,5 @@ def test_video_confirmation_remains_two_step_and_never_auto_dispatches_from_entr
     assert "await dispatchVideoAdmissionItem()" in confirm
     assert 'commandType === "reserve_dispatch" ? "确认并发送" : "确认"' in shell
     assert '"发送当前视频任务"' in shell
+    assert '"正在发送视频任务…"' in shell
     assert "dispatchReservedVideoAdmissionItem" in shell

@@ -343,6 +343,10 @@ def _sequence_workspace_projection(
         project_id=project_id,
         store=store,
     )
+    video_candidate_artifacts = _pending_video_candidate_artifact_nodes(
+        nodes,
+        graph["relations"],
+    )
     versions = sorted(({"version": item["version"]} for item in graph["idempotency"].values()), key=lambda item: item["version"], reverse=True)
     return {"status": "ready", "project_id": safe_id(project_id),
             "graph_version": graph["version"], "graph_digest": graph["graph_digest"],
@@ -352,11 +356,69 @@ def _sequence_workspace_projection(
             "sequences": sequences, "scenes": scenes, "shots": units, "props": props, "reference_sets": references, "production_aids": production_aids,
             "approved_media": approved_media,
             "video_candidates": video_candidates,
+            "artifact_nodes": video_candidate_artifacts,
             "dependencies": graph["relations"], "tasks": list(graph["work"].values()), "candidates": list(graph["artifacts"].values()),
             "selections": [{"selection_key": key, **value} for key, value in graph["selections"].items()],
             "reviews": list(graph["reviews"].values()), "delivery_plan": list(graph["deliveries"].values()), "version_history": versions},
             "storyboard": {"mode": "read_only", "graph_version": graph["version"], "graph_digest": graph["graph_digest"], "shots": units},
             "evidence_details_available": True, "provider_dispatch_count": 0, "cost_usd": 0}
+
+
+def _pending_video_candidate_artifact_nodes(
+    nodes: Mapping[str, Mapping[str, Any]],
+    relations: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    relation_candidate_ids = {
+        str(relation.get("to_id") or "")
+        for relation in relations
+        if relation.get("relation_type") == "video_candidate"
+    }
+    safe_metadata_keys = {
+        "kind",
+        "review_state",
+        "creative_approval_state",
+        "technical_qa_status",
+        "source_shot_id",
+        "manifest_id",
+        "manifest_hash",
+        "job_id",
+        "candidate_id",
+        "sha256",
+        "byte_count",
+        "mime_type",
+        "container",
+        "codec",
+        "width",
+        "height",
+        "duration_sec",
+        "model",
+        "resolution",
+        "generation_mode",
+    }
+    artifacts: list[dict[str, Any]] = []
+    for node_id, record in nodes.items():
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        if (
+            node_id not in relation_candidate_ids
+            or record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or metadata.get("kind") != "pending_video_candidate"
+            or metadata.get("review_state") != "candidate"
+        ):
+            continue
+        artifacts.append(
+            {
+                "node_id": node_id,
+                "category": "artifact",
+                "state": "active",
+                "metadata": {
+                    key: deepcopy(value)
+                    for key, value in metadata.items()
+                    if key in safe_metadata_keys
+                },
+            }
+        )
+    return artifacts
 
 
 def _approved_media_projection(

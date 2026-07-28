@@ -2557,6 +2557,34 @@ def test_video_candidate_projects_pending_media_before_human_approval(
             "target_node_ids": ["shot-01"],
         }
     ]
+    assert workspace["sequence"]["artifact_nodes"] == [
+        {
+            "node_id": candidate_node_id,
+            "category": "artifact",
+            "state": "active",
+            "metadata": {
+                "kind": "pending_video_candidate",
+                "manifest_id": recorded["manifest_id"],
+                "manifest_hash": recorded["manifest_hash"],
+                "job_id": "video-job-001",
+                "candidate_id": "candidate_001",
+                "source_shot_id": "shot-01",
+                "review_state": "candidate",
+                "creative_approval_state": "pending",
+                "technical_qa_status": "pass",
+                "sha256": candidate["sha256"],
+                "byte_count": len(candidate_bytes),
+                "mime_type": "video/mp4",
+                "codec": "mpeg4",
+                "width": 1280,
+                "height": 720,
+                "duration_sec": 6.0,
+                "model": MODEL_ID,
+                "resolution": RESOLUTION,
+                "generation_mode": "first_frame",
+            },
+        }
+    ]
     assert not [
         relation for relation in graph_after_candidate["relations"]
         if relation["relation_type"] == "approved_video"

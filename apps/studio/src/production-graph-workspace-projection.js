@@ -47,7 +47,7 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     workspace.project_id,
   );
   const videoCandidates = pendingVideoCandidateProjection(
-    sequence.video_candidates,
+    videoCandidateProjectionInputs(sequence, relations, workspace.project_id),
     workspace.project_id,
   );
   const approvedMediaByTarget = Object.fromEntries(approvedMedia.byTarget.entries());
@@ -377,6 +377,88 @@ function pendingVideoCandidateProjection(value, projectId) {
   return { byTarget, items };
 }
 
+function videoCandidateProjectionInputs(sequence, relations, projectId) {
+  const explicit = array(sequence.video_candidates);
+  const explicitIds = new Set(
+    explicit.map((item) => String(item?.media_node_id || "")).filter(Boolean),
+  );
+  const fromGraphRelations = pendingVideoCandidateRecordsFromArtifactNodes(
+    sequence.artifact_nodes,
+    relations,
+    projectId,
+  ).filter((item) => !explicitIds.has(String(item.media_node_id || "")));
+  return [...explicit, ...fromGraphRelations];
+}
+
+function pendingVideoCandidateRecordsFromArtifactNodes(artifactNodes, relations, projectId) {
+  const expectedProject = String(projectId || "");
+  if (!expectedProject) return [];
+  const safeId = /^[A-Za-z0-9_.-]+$/;
+  const targetsByCandidate = new Map();
+  for (const relation of array(relations)) {
+    if (relation?.relation_type !== "video_candidate") continue;
+    const mediaNodeId = String(relation.to_id || "");
+    const targetNodeId = String(relation.from_id || "");
+    if (!mediaNodeId || !targetNodeId) continue;
+    targetsByCandidate.set(mediaNodeId, [
+      ...(targetsByCandidate.get(mediaNodeId) || []),
+      targetNodeId,
+    ]);
+  }
+  const records = [];
+  for (const node of array(artifactNodes)) {
+    const mediaNodeId = String(node?.node_id || node?.id || "");
+    const metadata = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
+    const jobId = String(metadata.job_id || "");
+    const candidateId = String(metadata.candidate_id || "");
+    const sourceShotId = String(metadata.source_shot_id || "");
+    const targets = uniqueStrings(targetsByCandidate.get(mediaNodeId)).sort();
+    if (
+      !mediaNodeId
+      || node?.category !== "artifact"
+      || node?.state !== "active"
+      || metadata.kind !== "pending_video_candidate"
+      || metadata.review_state !== "candidate"
+      || metadata.technical_qa_status !== "pass"
+      || targets.length !== 1
+      || targets[0] !== sourceShotId
+      || !sourceShotId
+      || !safeId.test(jobId)
+      || !safeId.test(candidateId)
+      || candidateId.match(/^candidate_\d{3}$/) === null
+    ) {
+      continue;
+    }
+    records.push({
+      media_node_id: mediaNodeId,
+      media_kind: "video",
+      review_state: "candidate",
+      preview_url: `/projects/${expectedProject}/video-generations/${jobId}/candidates/${candidateId}/preview`,
+      mime_type: String(metadata.mime_type || "video/mp4"),
+      container: String(metadata.container || metadata.mime_type || "video/mp4"),
+      width: Number(metadata.width || 0),
+      height: Number(metadata.height || 0),
+      duration_sec: Number(metadata.duration_sec || 0),
+      codec: String(metadata.codec || ""),
+      model: String(metadata.model || ""),
+      resolution: String(metadata.resolution || ""),
+      generation_mode: String(metadata.generation_mode || ""),
+      manifest_id: String(metadata.manifest_id || ""),
+      manifest_hash: String(metadata.manifest_hash || ""),
+      job_id: jobId,
+      candidate_id: candidateId,
+      sha256: String(metadata.sha256 || ""),
+      byte_count: Number(metadata.byte_count || 0),
+      target_node_ids: [sourceShotId],
+      lineage: {
+        source_kind: "production_graph_artifact_node",
+        target_relation: "video_candidate",
+      },
+    });
+  }
+  return records;
+}
+
 function emptySummary() {
   return { scriptRevisions: 0, sequences: 0, characters: 0, locations: 0, props: 0, referenceSets: 0, tasks: 0, candidates: 0,
     productionAids: 0, selections: 0, reviews: 0, pendingReviews: 0, rejectedReviews: 0, deliveries: 0, versionHistory: [] };
@@ -436,6 +518,11 @@ function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY,
         width: videoCandidate.width,
         height: videoCandidate.height,
         duration_sec: videoCandidate.durationSeconds,
+        generation_mode: videoCandidate.generationMode,
+        manifest_id: videoCandidate.manifestId,
+        manifest_hash: videoCandidate.manifestHash,
+        job_id: videoCandidate.jobId,
+        candidate_id: videoCandidate.candidateId,
         preview_url: videoCandidate.previewUrl,
       } : null,
       previewAspectRatio: aspectRatio,
@@ -533,6 +620,10 @@ function pushOrder(state, nodeId) {
 
 function canvasNodeId(value) {
   return `production_graph_${String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 160)}`;
+}
+
+function uniqueStrings(value) {
+  return [...new Set(array(value).map((item) => String(item || "")).filter(Boolean))];
 }
 
 function array(value) {
