@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_production_graph import (
@@ -11,8 +11,9 @@ from apps.api.runtime_production_graph import (
     graph_path,
 )
 from apps.api.runtime_store import RuntimeStore
+from apps.api.runtime_store import reject_unsafe_payload
+from apps.api.runtime_studio_models import StudioSurface, StudioSurfaceEnvelope
 from apps.api.runtime_studio_projection import (
-    STUDIO_SURFACES,
     build_studio_surface_envelope,
 )
 
@@ -22,17 +23,28 @@ def register_runtime_studio_bff_routes(
     store: RuntimeStore,
     auth: RuntimeAuthStore,
 ) -> None:
-    @app.get("/api/v1/projects/{project_id}/studio", tags=["studio-v1"])
-    def studio_surface(project_id: str, request: Request, surface: str = "canvas") -> dict[str, Any]:
+    @app.get(
+        "/api/v1/projects/{project_id}/studio",
+        tags=["studio-v1"],
+        response_model=StudioSurfaceEnvelope,
+    )
+    def studio_surface(
+        project_id: str,
+        request: Request,
+        surface: StudioSurface = Query(default="canvas"),
+    ) -> StudioSurfaceEnvelope:
         _require_project_access(store, auth, request, project_id)
-        if surface not in STUDIO_SURFACES:
-            raise HTTPException(status_code=404, detail="studio surface not found")
-        return build_studio_surface_envelope(
+        payload = build_studio_surface_envelope(
             project_id=project_id,
             manifest=store.ensure_project_manifest(project_id),
             graph=_load_authoritative_graph(store, project_id),
             surface=surface,
         )
+        try:
+            reject_unsafe_payload(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail="studio projection failed safety check") from exc
+        return StudioSurfaceEnvelope.model_validate(payload)
 
 
 def _load_authoritative_graph(store: RuntimeStore, project_id: str) -> dict[str, Any] | None:

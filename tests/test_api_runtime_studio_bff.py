@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_production_graph import ProductionGraphStore
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 def _candidate() -> dict:
@@ -134,5 +136,93 @@ def test_studio_bff_rejects_unknown_surface_and_missing_project(tmp_path) -> Non
         params={"surface": "canvas"},
     )
 
-    assert unknown_surface.status_code == 404
+    assert unknown_surface.status_code == 422
     assert missing_project.status_code == 404
+
+
+def test_studio_bff_recursively_removes_private_metadata_and_refs(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "safe-projection"
+    assert client.post(
+        "/projects",
+        json={"project_id": project_id, "goal": "Safe projection"},
+    ).status_code == 200
+    graph_store = ProductionGraphStore(RuntimeStore(tmp_path))
+    graph_store.append(
+        project_id,
+        expected_version=0,
+        idempotency_key="unsafe-synthetic-input",
+        semantic_digest="b" * 64,
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "character-safe",
+                    "category": "entity",
+                    "metadata": {
+                        "display_name": "林晚",
+                        "lineage": {
+                            "source": "creator_input",
+                            "api_key": "synthetic-not-a-real-key",
+                            "nested": {
+                                "signed_url": "https://example.invalid/media?signature=synthetic",
+                                "private_path": r"C:\private\asset.png",
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": r"C:\private\unsafe-node",
+                    "category": "entity",
+                    "metadata": {"display_name": "must not project"},
+                },
+            },
+            {
+                "type": "review_recorded",
+                "review_id": "review-safe",
+                "target_id": "character-safe",
+                "state": "pending",
+                "evidence_refs": ["evidence-safe", r"C:\private\evidence.json"],
+            },
+        ],
+    )
+
+    response = client.get(
+        f"/api/v1/projects/{project_id}/studio",
+        params={"surface": "canvas"},
+    )
+    serialized = response.text.lower()
+
+    assert response.status_code == 200
+    assert "creator_input" in serialized
+    assert "api_key" not in serialized
+    assert "signed_url" not in serialized
+    assert "signature=" not in serialized
+    assert "c:\\\\" not in serialized
+    assert "unsafe-node" not in serialized
+    assert response.json()["review_queue"][0]["evidence_refs"] == ["evidence-safe"]
+
+
+def test_studio_bff_openapi_contract_is_typed(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    operation = client.get("/openapi.json").json()["paths"][
+        "/api/v1/projects/{project_id}/studio"
+    ]["get"]
+    surface = next(
+        item for item in operation["parameters"]
+        if item["name"] == "surface"
+    )
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+
+    assert surface["schema"]["enum"] == [
+        "canvas",
+        "script",
+        "storyboard",
+        "asset-bible",
+        "review",
+        "delivery",
+    ]
+    assert response_schema["$ref"].endswith("/StudioSurfaceEnvelope")

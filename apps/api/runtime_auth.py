@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -25,6 +26,7 @@ from apps.api.runtime_auth_security import (
     normalize_email,
     normalize_invite_code,
     now,
+    parse_datetime,
     password_hash,
     session_expired,
     verify_password,
@@ -37,7 +39,9 @@ AUTH_ENABLED_ENV = "AFS_AUTH_ENABLED"
 AUTH_INVITE_CODES_ENV = "AFS_INVITE_CODES"
 AUTH_OPEN_SIGNUP_ENV = "AFS_AUTH_ALLOW_OPEN_SIGNUP"
 AUTH_SESSION_TTL_HOURS_ENV = "AFS_AUTH_SESSION_TTL_HOURS"
+AUTH_SESSION_TOUCH_SECONDS_ENV = "AFS_AUTH_SESSION_TOUCH_SECONDS"
 DEFAULT_SESSION_TTL_HOURS = 168
+DEFAULT_SESSION_TOUCH_SECONDS = 300
 
 
 class AuthRegisterRequest(BaseModel):
@@ -81,6 +85,13 @@ class RuntimeAuthStore:
         except ValueError:
             value = DEFAULT_SESSION_TTL_HOURS
         return max(1, min(value, 24 * 30))
+
+    def session_touch_seconds(self) -> int:
+        try:
+            value = int(str(self.env.get(AUTH_SESSION_TOUCH_SECONDS_ENV, "")).strip())
+        except ValueError:
+            value = DEFAULT_SESSION_TOUCH_SECONDS
+        return max(30, min(value, 60 * 60))
 
     def seed_invites_from_env(self) -> None:
         with exclusive_file_lock(self.lock_path):
@@ -191,8 +202,14 @@ class RuntimeAuthStore:
             user = self._users()["users"].get(str(session.get("user_id", "")))
             if not user or user.get("status") != "active":
                 return None
-            session["last_seen_at"] = now()
-            write_json(self.sessions_path, sessions)
+            last_seen_at = parse_datetime(str(session.get("last_seen_at") or ""))
+            touch_due = (
+                last_seen_at is None
+                or (datetime.now(timezone.utc) - last_seen_at).total_seconds() >= self.session_touch_seconds()
+            )
+            if touch_due:
+                session["last_seen_at"] = now()
+                write_json(self.sessions_path, sessions)
             return dict(user)
 
     def require_user(self, request: Request) -> dict[str, Any]:

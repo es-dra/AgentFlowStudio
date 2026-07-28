@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any, Mapping
 
+from apps.api.runtime_studio_safety import (
+    OMIT,
+    safe_identifier,
+    safe_key,
+    safe_text,
+    sanitize_public_value,
+)
 
 STUDIO_BFF_SCHEMA_VERSION = "afs.studio_bff.v0.1"
 STUDIO_SURFACES = ("canvas", "script", "storyboard", "asset-bible", "review", "delivery")
@@ -44,7 +50,7 @@ def build_studio_surface_envelope(
     if graph is None:
         return {
             "schema_version": STUDIO_BFF_SCHEMA_VERSION,
-            "project_id": project_id,
+            "project_id": safe_identifier(project_id),
             "project": _project_summary(manifest),
             "authority_mode": "legacy_file",
             "project_version": 0,
@@ -63,25 +69,29 @@ def build_studio_surface_envelope(
 
     entities = _surface_entities(graph, surface)
     entity_ids = {str(item["entity_id"]) for item in entities}
-    relations = [
-        {
-            "from_id": str(item.get("from_id") or ""),
-            "to_id": str(item.get("to_id") or ""),
-            "relation_type": str(item.get("relation_type") or ""),
-        }
-        for item in graph.get("relations", [])
-        if isinstance(item, Mapping)
-        and str(item.get("from_id") or "") in entity_ids
-        and str(item.get("to_id") or "") in entity_ids
-    ]
+    relations = []
+    for item in graph.get("relations", []):
+        if not isinstance(item, Mapping):
+            continue
+        from_id = safe_identifier(item.get("from_id"))
+        to_id = safe_identifier(item.get("to_id"))
+        relation_type = safe_identifier(item.get("relation_type"), 80)
+        if from_id in entity_ids and to_id in entity_ids and relation_type:
+            relations.append(
+                {
+                    "from_id": from_id,
+                    "to_id": to_id,
+                    "relation_type": relation_type,
+                }
+            )
     task_summaries = _task_summaries(graph)
     return {
         "schema_version": STUDIO_BFF_SCHEMA_VERSION,
-        "project_id": project_id,
+        "project_id": safe_identifier(project_id),
         "project": _project_summary(manifest),
         "authority_mode": "graph_v1",
         "project_version": int(graph.get("version") or 0),
-        "graph_digest": str(graph.get("graph_digest") or ""),
+        "graph_digest": safe_text(graph.get("graph_digest"), 128),
         "surface": surface,
         "entities": entities,
         "relations": relations,
@@ -97,10 +107,10 @@ def build_studio_surface_envelope(
 
 def _project_summary(manifest: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "project_id": str(manifest.get("project_id") or ""),
-        "project_type": str(manifest.get("project_type") or ""),
-        "name": str(manifest.get("goal") or "未命名项目"),
-        "status": str(manifest.get("status") or ""),
+        "project_id": safe_identifier(manifest.get("project_id")),
+        "project_type": safe_identifier(manifest.get("project_type"), 80),
+        "name": safe_text(manifest.get("goal"), 240) or "未命名项目",
+        "status": safe_identifier(manifest.get("status"), 80),
     }
 
 
@@ -115,11 +125,14 @@ def _surface_entities(graph: Mapping[str, Any], surface: str) -> list[dict[str, 
     }
     if surface in {"storyboard", "review", "delivery"}:
         selected_ids = _expand_required_neighbors(graph, selected_ids)
-    return [
-        _public_entity(str(node_id), node)
-        for node_id, node in nodes.items()
-        if str(node_id) in selected_ids and isinstance(node, Mapping)
-    ]
+    entities = []
+    for node_id, node in nodes.items():
+        if str(node_id) not in selected_ids or not isinstance(node, Mapping):
+            continue
+        entity = _public_entity(str(node_id), node)
+        if entity is not None:
+            entities.append(entity)
+    return entities
 
 
 def _expand_required_neighbors(graph: Mapping[str, Any], selected_ids: set[str]) -> set[str]:
@@ -136,41 +149,34 @@ def _expand_required_neighbors(graph: Mapping[str, Any], selected_ids: set[str])
     return expanded
 
 
-def _public_entity(entity_id: str, node: Mapping[str, Any]) -> dict[str, Any]:
+def _public_entity(entity_id: str, node: Mapping[str, Any]) -> dict[str, Any] | None:
+    safe_entity_id = safe_identifier(entity_id)
+    if not safe_entity_id:
+        return None
     metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
-    public_metadata = {
-        str(key): deepcopy(value)
-        for key, value in metadata.items()
-        if str(key) in PUBLIC_METADATA_KEYS and _is_public_value(value)
-    }
+    public_metadata = {}
+    for key, value in metadata.items():
+        public_key = safe_key(key)
+        if public_key not in PUBLIC_METADATA_KEYS:
+            continue
+        public_value = sanitize_public_value(value)
+        if public_value is not OMIT:
+            public_metadata[public_key] = public_value
     label = next(
         (
-            str(public_metadata.get(key) or "")
+            safe_text(public_metadata.get(key), 240)
             for key in ("display_name", "name", "title", "intent")
             if public_metadata.get(key)
         ),
-        entity_id,
+        safe_entity_id,
     )
     return {
-        "entity_id": entity_id,
-        "entity_type": str(node.get("category") or "unknown"),
+        "entity_id": safe_entity_id,
+        "entity_type": safe_identifier(node.get("category"), 80) or "unknown",
         "label": label,
-        "state": str(node.get("state") or "active"),
+        "state": safe_identifier(node.get("state"), 80) or "active",
         "metadata": public_metadata,
     }
-
-
-def _is_public_value(value: Any) -> bool:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return True
-    if isinstance(value, list):
-        return len(value) <= 50 and all(_is_public_value(item) for item in value)
-    if isinstance(value, Mapping):
-        return len(value) <= 50 and all(
-            isinstance(key, str) and _is_public_value(item)
-            for key, item in value.items()
-        )
-    return False
 
 
 def _task_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -183,13 +189,20 @@ def _task_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
     for work_id, work in graph.get("work", {}).items():
         if not isinstance(work, Mapping):
             continue
+        safe_work_id = safe_identifier(work_id)
+        if not safe_work_id:
+            continue
         matching = [item for item in attempts if str(item.get("work_id") or "") == str(work_id)]
         latest = max(matching, key=lambda item: int(item.get("attempt_number") or 0), default={})
         result.append(
             {
-                "task_id": str(work_id),
-                "state": str(latest.get("state") or work.get("state") or "planned"),
-                "depends_on": [str(item) for item in work.get("depends_on", [])],
+                "task_id": safe_work_id,
+                "state": safe_identifier(latest.get("state") or work.get("state"), 80) or "planned",
+                "depends_on": [
+                    safe_ref
+                    for item in work.get("depends_on", [])
+                    if (safe_ref := safe_identifier(item))
+                ],
                 "attempt_count": len(matching),
             }
         )
@@ -197,16 +210,27 @@ def _task_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _review_queue(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
-    return [
-        {
-            "review_id": str(review_id),
-            "target_entity_id": str(review.get("target_id") or ""),
-            "state": str(review.get("state") or "pending"),
-            "evidence_refs": [str(item) for item in review.get("evidence_refs", [])],
-        }
-        for review_id, review in graph.get("reviews", {}).items()
-        if isinstance(review, Mapping)
-    ]
+    result = []
+    for review_id, review in graph.get("reviews", {}).items():
+        if not isinstance(review, Mapping):
+            continue
+        safe_review_id = safe_identifier(review_id)
+        safe_target_id = safe_identifier(review.get("target_id"))
+        if not safe_review_id or not safe_target_id:
+            continue
+        result.append(
+            {
+                "review_id": safe_review_id,
+                "target_entity_id": safe_target_id,
+                "state": safe_identifier(review.get("state"), 80) or "pending",
+                "evidence_refs": [
+                    safe_ref
+                    for item in review.get("evidence_refs", [])
+                    if (safe_ref := safe_identifier(item))
+                ],
+            }
+        )
+    return result
 
 
 def _artifact_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -215,16 +239,22 @@ def _artifact_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
         for item in graph.get("selections", {}).values()
         if isinstance(item, Mapping)
     }
-    return [
-        {
-            "artifact_id": str(artifact_id),
-            "state": str(artifact.get("state") or "candidate"),
-            "version": int(artifact.get("version") or 1),
-            "selected": str(artifact_id) in selected_ids,
-        }
-        for artifact_id, artifact in graph.get("artifacts", {}).items()
-        if isinstance(artifact, Mapping)
-    ]
+    result = []
+    for artifact_id, artifact in graph.get("artifacts", {}).items():
+        if not isinstance(artifact, Mapping):
+            continue
+        safe_artifact_id = safe_identifier(artifact_id)
+        if not safe_artifact_id:
+            continue
+        result.append(
+            {
+                "artifact_id": safe_artifact_id,
+                "state": safe_identifier(artifact.get("state"), 80) or "candidate",
+                "version": int(artifact.get("version") or 1),
+                "selected": str(artifact_id) in selected_ids,
+            }
+        )
+    return result
 
 
 def _allowed_actions(surface: str, *, has_graph: bool) -> list[dict[str, Any]]:
@@ -264,10 +294,3 @@ def _recovery_summary(tasks: list[Mapping[str, Any]]) -> dict[str, Any]:
             else "统一远端任务账本尚未迁移，不能据此重复派发。"
         ),
     }
-
-
-__all__ = (
-    "STUDIO_BFF_SCHEMA_VERSION",
-    "STUDIO_SURFACES",
-    "build_studio_surface_envelope",
-)
