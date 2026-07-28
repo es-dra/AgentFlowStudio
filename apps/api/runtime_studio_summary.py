@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from apps.api.runtime_production_graph import ProductionGraphError, impacted_descendants
 from apps.api.runtime_studio_safety import safe_identifier, safe_text
 
 
@@ -216,9 +217,22 @@ def agent_summary(
 def rework_preview(
     surface: str,
     reviews: list[Mapping[str, Any]],
+    graph: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     target_id = ""
-    if surface == "review":
+    if surface == "review" and graph is not None:
+        target_id = next(
+            (
+                safe_identifier(relation.get("from_id"))
+                for relation in graph.get("relations", [])
+                if isinstance(relation, Mapping)
+                and str(relation.get("relation_type") or "")
+                == "pending_video_candidate"
+                and _is_reworkable_unit(graph, relation.get("from_id"))
+            ),
+            "",
+        )
+    if surface == "review" and not target_id and graph is not None:
         pending_review = next(
             (
                 item
@@ -227,20 +241,53 @@ def rework_preview(
             ),
             None,
         )
-        if pending_review:
+        if pending_review and _is_reworkable_unit(
+            graph,
+            pending_review.get("target_entity_id"),
+        ):
             target_id = safe_identifier(pending_review.get("target_entity_id"))
+    impact_refs: list[str] = []
+    keep_refs: list[str] = []
+    if target_id and graph is not None:
+        try:
+            impact = impacted_descendants(graph, [target_id])
+        except ProductionGraphError:
+            target_id = ""
+        else:
+            impact_refs = [
+                safe_ref
+                for value in impact.get("invalidated_node_ids", [])
+                if (safe_ref := safe_identifier(value))
+            ]
+            keep_refs = [
+                safe_ref
+                for value in impact.get("preserved_node_ids", [])
+                if (safe_ref := safe_identifier(value))
+            ]
     return {
-        "available": False,
+        "available": bool(target_id),
         "target_entity_id": target_id,
-        "impact_refs": [],
-        "keep_refs": [],
+        "impact_refs": impact_refs,
+        "keep_refs": keep_refs,
         "cost_available": False,
         "reason": (
-            "尚未生成绑定当前项目版本的局部返工影响预览。"
+            "可以生成绑定当前项目版本的局部返工影响预览；费用尚未接入。"
             if target_id
             else "当前没有可预览局部返工的审核目标。"
         ),
     }
+
+
+def _is_reworkable_unit(
+    graph: Mapping[str, Any],
+    entity_id: Any,
+) -> bool:
+    node = graph.get("nodes", {}).get(str(entity_id or ""))
+    return bool(
+        isinstance(node, Mapping)
+        and node.get("category") == "unit"
+        and node.get("state") != "invalidated"
+    )
 
 
 def delivery_summary(

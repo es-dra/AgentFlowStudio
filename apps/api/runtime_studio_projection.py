@@ -144,7 +144,7 @@ def build_studio_surface_envelope(
         recovery=recovery,
     )
     focused_entity = _focused_entity(entities, resume)
-    rework_preview = _rework_preview(surface, reviews)
+    rework_preview = _rework_preview(surface, reviews, graph)
     return {
         "schema_version": STUDIO_BFF_SCHEMA_VERSION,
         "project_id": safe_identifier(project_id),

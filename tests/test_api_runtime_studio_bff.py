@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from apps.api.runtime_production_graph import ProductionGraphStore
+from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 
@@ -107,6 +107,56 @@ def test_studio_bff_defaults_to_canvas(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.json()["surface"] == "canvas"
+
+
+def test_studio_bff_enables_only_version_bound_rework_preview(tmp_path) -> None:
+    client, project_id = _client_with_graph(tmp_path)
+    graph_store = ProductionGraphStore(RuntimeStore(tmp_path))
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="pending-video-candidate",
+        semantic_digest=canonical_digest({"pending": "shot-001"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "video-candidate-001",
+                    "category": "artifact",
+                    "state": "active",
+                    "metadata": {"kind": "video_candidate"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "shot-001",
+                "to_id": "video-candidate-001",
+                "relation_type": "pending_video_candidate",
+            },
+        ],
+    )
+
+    response = client.get(
+        f"/api/v1/projects/{project_id}/studio",
+        params={"surface": "review"},
+    )
+
+    assert response.status_code == 200
+    preview = response.json()["rework_preview"]
+    assert preview["available"] is True
+    assert preview["target_entity_id"] == "shot-001"
+    assert set(preview["impact_refs"]) == {
+        "delivery-main",
+        "video-candidate-001",
+    }
+    action = next(
+        item
+        for item in response.json()["allowed_actions"]
+        if item["action"] == "preview_rework"
+    )
+    assert action["enabled"] is True
+    assert action["requires_preview"] is True
 
 
 def test_studio_bff_read_does_not_mutate_graph(tmp_path) -> None:
