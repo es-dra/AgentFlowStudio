@@ -20,6 +20,7 @@ from apps.api.runtime_video_admission import (
     CREATE_ENDPOINT,
     DURATION_SEC,
     HARD_BUDGET_USD,
+    MAX_ACTIVE_VIDEO_LANES,
     MAX_DISPATCHES,
     MODEL_ID,
     RESOLUTION,
@@ -487,55 +488,69 @@ def _seed_ready_project(
 
 
 def _add_second_ready_shot(store: RuntimeStore, project_id: str) -> dict:
+    return _add_ready_shot(store, project_id, "shot-02", 2)
+
+
+def _add_ready_shot(
+    store: RuntimeStore,
+    project_id: str,
+    shot_id: str,
+    number: int,
+    *,
+    metadata: dict | None = None,
+) -> dict:
     graph_store = ProductionGraphStore(store)
     graph = graph_store.load(project_id)
+    display = f"镜头 {number:02d}"
+    details = {
+        "kind": "shot",
+        "display_name": display,
+        "number": number,
+        "intent": f"完成第 {number:02d} 个动作段落",
+        "blocking": "巡夜人甲离开操作台转向检修门",
+        "shot_size": "中近景",
+        "camera_angle": "平视",
+        "camera_movement": "横移跟随",
+        "narrative_purpose": "推进检修任务进入下一空间",
+        "continuity_cues": ["延续北侧检修站照明与六角校准器位置"],
+        **(metadata or {}),
+    }
     return graph_store.append(
         project_id,
         expected_version=graph["version"],
-        idempotency_key="seed-video-shot-02",
-        semantic_digest=canonical_digest({"shot": "shot-02"}),
+        idempotency_key=f"seed-video-{shot_id}",
+        semantic_digest=canonical_digest({"shot": shot_id, "metadata": details}),
         events=[
             {
                 "type": "node_upserted",
                 "node": {
-                    "node_id": "shot-02",
+                    "node_id": shot_id,
                     "category": "unit",
-                    "metadata": {
-                        "kind": "shot",
-                        "display_name": "镜头 02",
-                        "number": 2,
-                        "intent": "完成第二个动作段落",
-                        "blocking": "巡夜人甲离开操作台转向检修门",
-                        "shot_size": "中近景",
-                        "camera_angle": "平视",
-                        "camera_movement": "横移跟随",
-                        "narrative_purpose": "推进检修任务进入下一空间",
-                        "continuity_cues": ["延续北侧检修站照明与六角校准器位置"],
-                    },
+                    "metadata": details,
                 },
             },
             {
                 "type": "relation_upserted",
                 "from_id": "character-a",
-                "to_id": "shot-02",
+                "to_id": shot_id,
                 "relation_type": "required_by",
             },
             {
                 "type": "relation_upserted",
                 "from_id": "prop-a",
-                "to_id": "shot-02",
+                "to_id": shot_id,
                 "relation_type": "required_by",
             },
             {
                 "type": "relation_upserted",
                 "from_id": "scene-a",
-                "to_id": "shot-02",
+                "to_id": shot_id,
                 "relation_type": "required_by",
             },
             {
                 "type": "relation_upserted",
                 "from_id": "scene-container-a",
-                "to_id": "shot-02",
+                "to_id": shot_id,
                 "relation_type": "contains",
             },
         ],
@@ -998,6 +1013,32 @@ def _command(
         return preview.json()
     response = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _lane_command(
+    client: TestClient,
+    project_id: str,
+    shot_id: str,
+    command: dict,
+    *,
+    confirm: bool = True,
+) -> dict:
+    if command.get("type") in {"compile", "recompile_current", "create_new_round"}:
+        command = _reference_video_setup_command(command)
+    body = {"command": command, "requested_at": REQUESTED_AT}
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/{shot_id}/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    if not confirm:
+        return preview.json()
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/{shot_id}/commands/confirm",
         json={**body, "preview_digest": preview.json()["preview_digest"]},
     )
     assert response.status_code == 200, response.text
@@ -1537,7 +1578,169 @@ def test_video_admission_reservation_is_idempotent_and_dispatch_claim_is_exactly
             project_id,
             request,
             job_id="video-job-002",
+        )
+
+
+def test_video_admission_supports_two_explicit_shot_lanes_without_overwrite(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
     )
+    _add_second_ready_shot(store, project_id)
+
+    lane_1 = _lane_command(
+        client,
+        project_id,
+        "shot-01",
+        {
+            "type": "compile",
+            "idempotency_key": "lane-shot-01",
+            "shot_id": "shot-01",
+        },
+    )["result"]["manifest"]
+    lane_2 = _lane_command(
+        client,
+        project_id,
+        "shot-02",
+        {
+            "type": "compile",
+            "idempotency_key": "lane-shot-02",
+            "shot_id": "shot-02",
+        },
+    )["result"]["manifest"]
+    assert lane_1["source"]["shot"]["shot_id"] == "shot-01"
+    assert lane_2["source"]["shot"]["shot_id"] == "shot-02"
+    assert lane_1["manifest_id"] != lane_2["manifest_id"]
+    assert load_video_admission_manifest(store, project_id) == {}
+
+    reserved_1 = _lane_command(
+        client,
+        project_id,
+        "shot-01",
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-lane-01"},
+    )["result"]["manifest"]
+    reserved_2 = _lane_command(
+        client,
+        project_id,
+        "shot-02",
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-lane-02"},
+    )["result"]["manifest"]
+    lanes = client.get(f"/projects/{project_id}/m6/video-admission/lanes").json()
+    assert lanes["capacity"] == {
+        "max_active_lanes": MAX_ACTIVE_VIDEO_LANES,
+        "active_lanes": 2,
+        "available_lanes": 0,
+    }
+    assert {
+        (lane["shot_id"], lane["item_state"], lane["lane_active"])
+        for lane in lanes["lanes"]
+    } == {
+        ("shot-01", "reserved", True),
+        ("shot-02", "reserved", True),
+    }
+
+    request_1 = VideoGenerationRequest(
+        **video_admission_generation_request(reserved_1, generated_at=REQUESTED_AT)
+    )
+    request_2 = VideoGenerationRequest(
+        **video_admission_generation_request(reserved_2, generated_at=REQUESTED_AT)
+    )
+    assert enforce_video_admission_request(store, project_id, request_1)["manifest_id"] == reserved_1["manifest_id"]
+    assert enforce_video_admission_request(store, project_id, request_2)["manifest_id"] == reserved_2["manifest_id"]
+    claim_video_admission_dispatch(store, project_id, request_1, job_id="video-job-lane-01")
+    claim_video_admission_dispatch(store, project_id, request_2, job_id="video-job-lane-02")
+    mark_video_admission_network_started(store, project_id, job_id="video-job-lane-01")
+    mark_video_admission_network_started(store, project_id, job_id="video-job-lane-02")
+
+    updated_1 = load_video_admission_manifest(store, project_id, shot_id="shot-01")
+    updated_2 = load_video_admission_manifest(store, project_id, shot_id="shot-02")
+    assert updated_1["item"]["provider_job_id"] == "video-job-lane-01"
+    assert updated_1["item"]["state"] == "reconcile_required"
+    assert updated_2["item"]["provider_job_id"] == "video-job-lane-02"
+    assert updated_2["item"]["state"] == "reconcile_required"
+
+
+def test_video_admission_blocks_third_active_lane_before_dispatch(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+    )
+    _add_second_ready_shot(store, project_id)
+    _add_ready_shot(store, project_id, "shot-03", 3)
+
+    for shot_id in ("shot-01", "shot-02"):
+        _lane_command(
+            client,
+            project_id,
+            shot_id,
+            {
+                "type": "compile",
+                "idempotency_key": f"compile-{shot_id}",
+                "shot_id": shot_id,
+            },
+        )
+        _lane_command(
+            client,
+            project_id,
+            shot_id,
+            {"type": "reserve_dispatch", "idempotency_key": f"reserve-{shot_id}"},
+        )
+
+    _lane_command(
+        client,
+        project_id,
+        "shot-03",
+        {
+            "type": "compile",
+            "idempotency_key": "compile-shot-03",
+            "shot_id": "shot-03",
+        },
+    )
+    blocked = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-03/commands/preview",
+        json={
+            "command": {
+                "type": "reserve_dispatch",
+                "idempotency_key": "reserve-shot-03",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert blocked.status_code == 422
+    assert "2-lane active dispatch limit" in blocked.json()["detail"]["details"]["raw_detail"]
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-03")[
+        "provider_dispatch_count"
+    ] == 0
+
+
+def test_video_admission_rejects_structured_post_only_shot(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+    )
+    _add_ready_shot(
+        store,
+        project_id,
+        "shot-post-only",
+        31,
+        metadata={"video_dispatch_policy": "post_only"},
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-post-only/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-post-only",
+                    "shot_id": "shot-post-only",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert "post-only" in response.json()["detail"]["details"]["raw_detail"]
 
 
 def _stub_video_probe(monkeypatch) -> None:
