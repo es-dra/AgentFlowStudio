@@ -318,8 +318,8 @@ def temporal_staging_for_target(store: RuntimeStore, project_id: str, target: Ba
         "camera_movement": str(shot.get("movement") or "稳定电影镜头，按叙事重点缓慢推进或跟随。"),
         "environment_dynamics": "环境动态服务表演和调度，不加入未确认人物、地点、道具或文字。",
         "pacing": "固定6秒单段视频，动作起承转合清楚，节奏符合当前镜头叙事。",
-        "start_state": f"{target.shot_label} 从当前剧本设定的镜头起点自然开始。",
-        "end_state": f"{target.shot_label} 在可衔接下一镜头的状态结束。",
+        "start_state": "当前镜头从剧本设定的自然起点开始，主体、空间和参考资产关系清楚。",
+        "end_state": "当前镜头在可衔接下一镜头的稳定状态结束。",
         "narrative_purpose": str(shot.get("purpose") or shot.get("emotion") or "服务当前镜头叙事和连续性。"),
     }
 
