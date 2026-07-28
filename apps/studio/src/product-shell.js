@@ -3645,6 +3645,8 @@ export function createProductShell(options = {}) {
       sectionEl.appendChild(buildApprovedShotVideo(currentShot(), {
         lineage: approvedVideoLineageForShot(currentShot()),
       }));
+    } else if (currentShot().videoCandidate) {
+      sectionEl.appendChild(buildPendingShotVideoCandidate(currentShot()));
     }
     return sectionEl;
   }
@@ -3961,7 +3963,7 @@ export function createProductShell(options = {}) {
     card.id = `storyboard-shot-${selection.sceneIndex}-${index}`;
     card.setAttribute("aria-pressed", String(index === selection.shotIndex));
     card.setAttribute("aria-label", `镜头 ${index + 1}：${shot.title}`);
-    const media = node("span", `shot-media ${shot.preview ? "has-preview" : "empty"}`);
+    const media = node("span", `shot-media ${shot.preview || shot.videoCandidate ? "has-preview" : "empty"}`);
     if (shot.preview) {
       const image = document.createElement("img");
       image.alt = `${shot.title} 镜头预览`;
@@ -3991,6 +3993,49 @@ export function createProductShell(options = {}) {
     card.append(media, copy);
     card.addEventListener("click", () => selectContext(selection.sceneIndex, index));
     return card;
+  }
+
+  function buildPendingShotVideoCandidate(shot) {
+    const candidate = shot.videoCandidate || {};
+    const sectionEl = node("section", "approved-shot-video pending-shot-video-candidate");
+    sectionEl.setAttribute("aria-label", `${shot.title || "当前镜头"}待审看视频候选`);
+    const copy = node("div", "approved-shot-video-copy");
+    copy.append(
+      node("span", "eyebrow", "待审看候选"),
+      node("h2", "", `${shot.title || "当前镜头"}视频候选`),
+      node("p", "", "这是已通过技术检查并写入当前项目的候选视频；批准前不会覆盖正式镜头关系。"),
+    );
+    const facts = node("dl", "approved-shot-video-facts");
+    for (const [label, value] of [
+      ["模型", candidate.model || "待审看模型"],
+      ["生成方式", approvedVideoGenerationModeLabel(candidate.generationMode)],
+      ["规格", [candidate.resolution, candidate.durationSeconds ? `${candidate.durationSeconds} 秒` : ""].filter(Boolean).join(" · ") || "候选已保存"],
+      ["状态", "视频候选待审看"],
+    ]) {
+      facts.append(node("dt", "", label), node("dd", "", value));
+    }
+    copy.appendChild(facts);
+    sectionEl.appendChild(copy);
+    if (candidate.previewUrl) {
+      const frame = node("div", "approved-shot-video-frame");
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", `${shot.title || "当前镜头"}视频候选播放器`);
+      video.addEventListener("loadeddata", () => {
+        frame.dataset.mediaState = "ready";
+      }, { once: true });
+      video.addEventListener("error", () => {
+        frame.dataset.mediaState = "error";
+      }, { once: true });
+      void setRuntimeMediaSource(video, candidate.previewUrl);
+      frame.appendChild(video);
+      sectionEl.appendChild(frame);
+    } else {
+      sectionEl.appendChild(node("p", "approved-shot-video-unavailable", "视频候选记录已保存，但当前媒体文件不可播放。"));
+    }
+    return sectionEl;
   }
 
   function buildApprovedShotVideo(shot, { lineage = null } = {}) {

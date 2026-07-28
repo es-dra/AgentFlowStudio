@@ -191,7 +191,10 @@ export function applyProductionGraphCanvasProjection(state, workspace) {
       slot += 1;
     });
   }
-  for (const media of projection.approvedMedia.filter((item) => item.mediaKind === "video")) {
+  for (const media of [
+    ...projection.approvedMedia.filter((item) => item.mediaKind === "video"),
+    ...projection.videoCandidates,
+  ]) {
     const graphNodeId = media.mediaNodeId;
     const id = canvasNodeId(graphNodeId);
     nodeMap.set(graphNodeId, id);
@@ -448,7 +451,9 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
   return {
     id,
     type: media.mediaKind,
-    title: media.mediaKind === "video" ? "已批准镜头视频" : "已批准镜头图片",
+    title: media.reviewState === "candidate"
+      ? "待审看镜头视频候选"
+      : media.mediaKind === "video" ? "已批准镜头视频" : "已批准镜头图片",
     x: 80 + (slot % 4) * 330,
     y: originY + Math.floor(slot / 4) * 240,
     w: 300,
@@ -456,7 +461,9 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
     content: "",
     prompt: "",
     status: "complete",
-    result: media.mediaKind === "video" ? "视频已保存到当前项目。" : "图片已保存到当前项目。",
+    result: media.reviewState === "candidate"
+      ? "视频候选已写入当前项目，等待审看批准。"
+      : media.mediaKind === "video" ? "视频已保存到当前项目。" : "图片已保存到当前项目。",
     previewUrl: media.previewUrl,
     groupId: null,
     collapsed: false,
@@ -467,7 +474,7 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         graph_version: projection.graphVersion,
         graph_digest: projection.graphDigest,
       },
-      approvedMedia: {
+      approvedMedia: media.reviewState === "candidate" ? null : {
         media_kind: media.mediaKind,
         source_node_ids: media.targetNodeIds,
         model: media.model,
@@ -481,6 +488,25 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         height: media.height,
         approval_graph_version: media.approvalGraphVersion,
       },
+      videoCandidate: media.reviewState === "candidate" ? {
+        media_node_id: media.mediaNodeId,
+        media_kind: media.mediaKind,
+        review_state: media.reviewState,
+        source_node_ids: media.targetNodeIds,
+        model: media.model,
+        resolution: media.resolution,
+        generation_mode: media.generationMode,
+        duration_sec: media.durationSeconds,
+        mime_type: media.mimeType,
+        container: media.container,
+        codec: media.codec,
+        width: media.width,
+        height: media.height,
+        manifest_id: media.manifestId,
+        job_id: media.jobId,
+        candidate_id: media.candidateId,
+        preview_url: media.previewUrl,
+      } : null,
       previewAspectRatio: aspectRatio,
       provider_dispatch_count: 0,
     },

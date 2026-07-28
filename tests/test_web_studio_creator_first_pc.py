@@ -670,7 +670,13 @@ def test_pending_video_candidate_projects_into_storyboard_canvas_without_approva
       const shotNode = Object.values(state.nodes).find(
         (node) => node.params?.productionGraphTruth?.graph_node_id === "shot-alpha"
       );
-      console.log(JSON.stringify({{ projection, shotNode }}));
+      const candidateNode = Object.values(state.nodes).find(
+        (node) => node.params?.productionGraphTruth?.graph_node_id === "video-candidate-alpha"
+      );
+      const candidateEdges = Object.values(state.edges).filter(
+        (edge) => edge.relation_type === "production_graph_video_candidate"
+      );
+      console.log(JSON.stringify({{ projection, shotNode, candidateNode, candidateEdges }}));
     """
     completed = subprocess.run(
         ["node", "--input-type=module", "-e", script],
@@ -699,6 +705,17 @@ def test_pending_video_candidate_projects_into_storyboard_canvas_without_approva
     assert result["shotNode"]["params"]["approvedMedia"] is None
     assert result["shotNode"]["params"]["videoCandidate"]["review_state"] == "candidate"
     assert result["shotNode"]["params"]["videoCandidate"]["preview_url"].endswith("/video-job-alpha/candidates/candidate_001/preview")
+    assert result["candidateNode"]["type"] == "video"
+    assert result["candidateNode"]["title"] == "待审看镜头视频候选"
+    assert result["candidateNode"]["previewUrl"].endswith("/video-job-alpha/candidates/candidate_001/preview")
+    assert result["candidateNode"]["params"]["approvedMedia"] is None
+    assert result["candidateNode"]["params"]["videoCandidate"]["review_state"] == "candidate"
+    assert len(result["candidateEdges"]) == 1
+
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    assert "buildPendingShotVideoCandidate(currentShot())" in shell
+    assert "pending-shot-video-candidate" in shell
+    assert "视频候选待审看" in shell
 
 
 def test_approved_asset_media_projects_to_canvas_nodes_without_candidate_leakage() -> None:
