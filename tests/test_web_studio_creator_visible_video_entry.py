@@ -233,6 +233,7 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     assert "loadCurrentShotVideoAdmission" in shell
     assert "previewVideoAdmissionRuntimeCommand" in shell
     assert "confirmVideoAdmissionRuntimeCommand" in shell
+    assert "selectedShotId !== (currentShot().graphNodeId || \"\")" in shell
     assert "loadVideoAdmissionLane(shotId)" in runtime
     assert "previewVideoAdmissionLaneCommand(shotId, payload)" in runtime
     assert "confirmVideoAdmissionLaneCommand(shotId, payload)" in runtime

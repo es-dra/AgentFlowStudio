@@ -4393,6 +4393,22 @@ export function createProductShell(options = {}) {
     }
     syncCanvasSelection();
     render();
+    const selectedShotId = currentShot().graphNodeId || "";
+    const selectedProjectId = currentProductProjectId();
+    if (selectedShotId) {
+      void loadCurrentShotVideoAdmission(options.getRuntime?.()).then((videoAdmission) => {
+        if (
+          !videoAdmission
+          || selectedProjectId !== currentProductProjectId()
+          || selectedShotId !== (currentShot().graphNodeId || "")
+        ) return;
+        snapshot.videoAdmission = videoAdmission;
+        videoAdmissionPreview = null;
+        videoAdmissionError = "";
+        videoAdmissionMediaState = "idle";
+        render();
+      }).catch(() => {});
+    }
     requestCanvasSafeAreaUpdate();
     requestAnimationFrame(focusCurrentContext);
   }
