@@ -1060,6 +1060,84 @@ def test_direct_batch_operator_proof_records_service_process_task_identity(
     assert manifest["provider_dispatch_count"] == 1
 
 
+def test_direct_batch_operator_diagnostic_runs_text_and_single_ref_without_graph_mutation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph = graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-diagnostic-gold-piece-ref",
+        semantic_digest=canonical_digest({"diagnostic_ref": "A-PROP-01"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "A-PROP-01",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "金色棋子"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "A-PROP-01",
+                "to_id": "approved-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    class _FakeRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            assert capability == "video"
+            assert service_id == SERVICE_ID
+            assert request.duration_sec == 6
+            assert request.resolution == "720p"
+            assert request.aspect_ratio == "16:9"
+            return {
+                "task": {
+                    "task_id": f"diag-{request.input_mode}",
+                    "status": "submitted",
+                }
+            }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _FakeRegistry(),
+    )
+
+    text = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-text-test",
+            "step": "text_only",
+        },
+    )
+    ref = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-ref-test",
+            "step": "single_reference",
+        },
+    )
+
+    assert text.status_code == 200, text.text
+    assert ref.status_code == 200, ref.text
+    assert text.json()["result"]["has_provider_task_fingerprint"] is True
+    assert text.json()["result"]["input_mode"] == "text_only"
+    assert ref.json()["result"]["has_provider_task_fingerprint"] is True
+    assert ref.json()["result"]["input_mode"] == "reference_images"
+    assert ref.json()["result"]["reference_asset_id"] == media["prop"]
+    current = graph_store.load(project_id)
+    assert current["version"] == graph["version"]
+    assert current["graph_digest"] == graph["graph_digest"]
+
+
 def test_direct_batch_safety_rewrite_staging_is_positive_and_provider_free(
     tmp_path,
     monkeypatch,
