@@ -266,6 +266,7 @@ def build_keyframe_generation(
                 edit_source_image_path=reference_images[0]["path"] if image_operation == "edit" else None,
                 edit_reference_image_paths=tuple(item["path"] for item in reference_images) if image_operation == "edit" else (),
                 image_input_fidelity=image_input_fidelity,
+                routing_key=f"{project_id}:{request.provider_service_id}:{request.node_id}:{image_operation}",
             )
             runtime_file_event(
                 "keyframe",

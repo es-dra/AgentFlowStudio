@@ -15,7 +15,7 @@ from agentflow_studio.model_gateway.company_secrets import (
 from agentflow_studio.model_gateway.errors import ModelConfigError
 from agentflow_studio.model_gateway.provider_account_pool import (
     ProviderAccountSelection,
-    select_provider_account,
+    reserve_provider_account,
 )
 
 
@@ -226,6 +226,7 @@ class ProviderDispatchRequest:
     voice: str | None = None
     response_format: Literal["wav", "mp3", "opus", "aac", "flac", "pcm"] | None = None
     instructions: str | None = None
+    routing_key: str | None = None
 
 
 def structured_output_schema_digest(schema: dict[str, Any]) -> str:
@@ -333,14 +334,15 @@ class ProviderRegistry:
         if adapter.descriptor.modality != capability:
             raise ModelConfigError(f"Provider service {service_id} does not support capability: {capability}")
         adapter.validate(request)
-        selection = select_provider_account(
+        with reserve_provider_account(
             self.store,
             service_id=service_id,
             capability=capability,
             account_pool_id=adapter.descriptor.account_pool_id,
-        )
-        plan = adapter.translate(request, selection)
-        task = adapter.submit(plan)
+            routing_key=request.routing_key,
+        ) as selection:
+            plan = adapter.translate(request, selection)
+            task = adapter.submit(plan)
         return {"service_id": service_id, "capability": capability, "task": task}
 
     def poll(self, capability: str, service_id: str, task: dict[str, Any]) -> dict[str, Any]:
