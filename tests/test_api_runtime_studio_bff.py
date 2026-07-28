@@ -59,13 +59,28 @@ def test_studio_bff_surfaces_share_one_graph_version_and_digest(tmp_path) -> Non
             f"/api/v1/projects/{project_id}/studio",
             params={"surface": surface},
         ).json()
-        for surface in ("canvas", "script", "storyboard", "asset-bible", "review", "delivery")
+        for surface in (
+            "overview",
+            "canvas",
+            "script",
+            "storyboard",
+            "asset-bible",
+            "review",
+            "delivery",
+        )
     }
 
     assert {payload["authority_mode"] for payload in payloads.values()} == {"graph_v1"}
+    assert {payload["schema_version"] for payload in payloads.values()} == {
+        "afs.studio_bff.v0.2"
+    }
     assert {payload["project_version"] for payload in payloads.values()} == {1}
     assert len({payload["graph_digest"] for payload in payloads.values()}) == 1
+    assert len({payload["event_cursor"] for payload in payloads.values()}) == 1
     assert all(payload["provider_dispatch_count"] == 0 for payload in payloads.values())
+    assert payloads["overview"]["resume_target"]["surface"] == "review"
+    assert payloads["overview"]["resume_target"]["entity_id"] == "delivery-main"
+    assert payloads["overview"]["agent_summary"]["based_on_project_version"] == 1
     assert {item["entity_type"] for item in payloads["script"]["entities"]} == {"input", "revision"}
     assert "unit" in {item["entity_type"] for item in payloads["storyboard"]["entities"]}
     assert {"entity", "location", "resource"} <= {
@@ -74,6 +89,14 @@ def test_studio_bff_surfaces_share_one_graph_version_and_digest(tmp_path) -> Non
     assert payloads["review"]["review_queue"][0]["state"] == "pending"
     assert "delivery" in {item["entity_type"] for item in payloads["delivery"]["entities"]}
     assert payloads["delivery"]["cost_summary"]["available"] is False
+    assert payloads["delivery"]["delivery_summary"]["state"] == "blocked"
+    assert payloads["delivery"]["delivery_summary"]["blocker_count"] == 2
+    assert payloads["review"]["rework_preview"]["available"] is False
+    assert next(
+        item
+        for item in payloads["review"]["allowed_actions"]
+        if item["action"] == "preview_rework"
+    )["enabled"] is False
     assert payloads["canvas"]["recovery_summary"]["safe_to_repeat_provider_dispatch"] is False
 
 
@@ -117,6 +140,10 @@ def test_studio_bff_legacy_project_is_explicit_and_does_not_create_graph(tmp_pat
     assert response.status_code == 200
     assert response.json()["authority_mode"] == "legacy_file"
     assert response.json()["entities"] == []
+    assert response.json()["event_cursor"] == 0
+    assert response.json()["surface_summary"]["state"] == "empty"
+    assert response.json()["resume_target"]["available"] is False
+    assert response.json()["delivery_summary"]["state"] == "empty"
     assert path.exists() is False
 
 
@@ -224,6 +251,7 @@ def test_studio_bff_openapi_contract_is_typed(tmp_path) -> None:
     response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
 
     assert surface["schema"]["enum"] == [
+        "overview",
         "canvas",
         "script",
         "storyboard",

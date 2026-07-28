@@ -5,7 +5,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-StudioSurface = Literal["canvas", "script", "storyboard", "asset-bible", "review", "delivery"]
+StudioSurface = Literal[
+    "overview",
+    "canvas",
+    "script",
+    "storyboard",
+    "asset-bible",
+    "review",
+    "delivery",
+]
 AuthorityMode = Literal["legacy_file", "graph_v1"]
 
 
@@ -37,6 +45,35 @@ class StudioRelation(StudioModel):
 class StudioAllowedAction(StudioModel):
     action: str
     enabled: bool
+    requires_preview: bool = False
+    target_entity_id: str = ""
+    reason: str = ""
+
+
+class StudioSurfaceSummary(StudioModel):
+    state: Literal["empty", "ready", "attention", "blocked"]
+    headline: str
+    entity_count: int = Field(ge=0)
+    attention_count: int = Field(ge=0)
+
+
+class StudioResumeTarget(StudioModel):
+    available: bool
+    surface: StudioSurface
+    entity_id: str = ""
+    reason: str
+
+
+class StudioAgentSummary(StudioModel):
+    state: Literal[
+        "collapsed",
+        "suggestion_available",
+        "attention_required",
+        "content_updated",
+    ]
+    based_on_project_version: int = Field(ge=0)
+    entity_id: str = ""
+    headline: str
 
 
 class StudioTaskSummary(StudioModel):
@@ -75,20 +112,43 @@ class StudioRecoverySummary(StudioModel):
     message: str
 
 
+class StudioReworkPreview(StudioModel):
+    available: bool
+    target_entity_id: str = ""
+    impact_refs: list[str] = Field(default_factory=list)
+    keep_refs: list[str] = Field(default_factory=list)
+    cost_available: bool = False
+    reason: str
+
+
+class StudioDeliverySummary(StudioModel):
+    state: Literal["empty", "blocked", "review_ready", "ready", "delivered"]
+    blocker_count: int = Field(ge=0)
+    delivery_version_id: str = ""
+    playable: bool = False
+
+
 class StudioSurfaceEnvelope(StudioModel):
-    schema_version: Literal["afs.studio_bff.v0.1"] = "afs.studio_bff.v0.1"
+    schema_version: Literal["afs.studio_bff.v0.2"] = "afs.studio_bff.v0.2"
     project_id: str
     project: StudioProjectSummary
     authority_mode: AuthorityMode
     project_version: int = Field(ge=0)
     graph_digest: str
+    event_cursor: int = Field(ge=0)
     surface: StudioSurface
+    surface_summary: StudioSurfaceSummary
+    focused_entity: StudioEntity | None = None
+    resume_target: StudioResumeTarget
+    agent_summary: StudioAgentSummary
     entities: list[StudioEntity] = Field(default_factory=list)
     relations: list[StudioRelation] = Field(default_factory=list)
     allowed_actions: list[StudioAllowedAction] = Field(default_factory=list)
     task_summaries: list[StudioTaskSummary] = Field(default_factory=list)
     review_queue: list[StudioReviewItem] = Field(default_factory=list)
     artifact_summaries: list[StudioArtifactSummary] = Field(default_factory=list)
+    rework_preview: StudioReworkPreview
+    delivery_summary: StudioDeliverySummary
     cost_summary: StudioCostSummary
     recovery_summary: StudioRecoverySummary
     provider_dispatch_count: Literal[0] = 0

@@ -1,0 +1,328 @@
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+from apps.api.runtime_studio_safety import safe_identifier, safe_text
+
+
+def allowed_actions(
+    surface: str,
+    *,
+    entities: list[Mapping[str, Any]],
+    reviews: list[Mapping[str, Any]],
+    artifacts: list[Mapping[str, Any]],
+    rework_preview: Mapping[str, Any],
+    delivery: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    focused_entity_id = safe_identifier(
+        entities[0].get("entity_id") if entities else ""
+    )
+    actions = [
+        _action(
+            "inspect_entity",
+            enabled=bool(focused_entity_id),
+            target_entity_id=focused_entity_id,
+            reason=(
+                "查看当前对象的安全摘要。"
+                if focused_entity_id
+                else "当前工作面没有可检查对象。"
+            ),
+        ),
+        _action(
+            "open_agent_context",
+            enabled=True,
+            target_entity_id=focused_entity_id,
+            reason="打开与当前项目版本绑定的创作助手上下文。",
+        ),
+    ]
+    if surface == "canvas":
+        actions.append(
+            _action(
+                "inspect_lineage",
+                enabled=bool(focused_entity_id),
+                target_entity_id=focused_entity_id,
+                reason=(
+                    "查看 ProductionGraph 来源与影响关系。"
+                    if focused_entity_id
+                    else "当前没有可追溯对象。"
+                ),
+            )
+        )
+    if surface == "review":
+        review_target = safe_identifier(
+            reviews[0].get("target_entity_id") if reviews else ""
+        )
+        actions.extend(
+            [
+                _action(
+                    "inspect_candidate",
+                    enabled=bool(review_target and artifacts),
+                    target_entity_id=review_target,
+                    reason=(
+                        "检查候选及其审核证据。"
+                        if review_target and artifacts
+                        else "尚无同时具备审核目标和候选证据的对象。"
+                    ),
+                ),
+                _action(
+                    "preview_rework",
+                    enabled=bool(rework_preview.get("available")),
+                    requires_preview=True,
+                    target_entity_id=safe_identifier(
+                        rework_preview.get("target_entity_id")
+                    ),
+                    reason=safe_text(rework_preview.get("reason"), 240),
+                ),
+            ]
+        )
+    if surface == "delivery":
+        delivery_version_id = safe_identifier(delivery.get("delivery_version_id"))
+        actions.append(
+            _action(
+                "inspect_delivery_version",
+                enabled=bool(delivery_version_id),
+                target_entity_id=delivery_version_id,
+                reason=(
+                    "检查当前交付事实与阻塞项。"
+                    if delivery_version_id
+                    else "尚未形成交付版本。"
+                ),
+            )
+        )
+    return actions
+
+
+def surface_summary(
+    *,
+    surface: str,
+    entities: list[Mapping[str, Any]],
+    reviews: list[Mapping[str, Any]],
+    tasks: list[Mapping[str, Any]],
+    delivery: Mapping[str, Any],
+) -> dict[str, Any]:
+    pending_reviews = [
+        item
+        for item in reviews
+        if str(item.get("state") or "") in {"pending", "rejected"}
+    ]
+    attention_tasks = [
+        item
+        for item in tasks
+        if str(item.get("state") or "")
+        in {"dispatched", "submission_unknown", "reconcile_required"}
+    ]
+    attention_count = len(pending_reviews) + len(attention_tasks)
+    if surface == "delivery" and int(delivery.get("blocker_count") or 0) > 0:
+        state = "blocked"
+        headline = f"{int(delivery.get('blocker_count') or 0)} 项阻塞待处理"
+    elif attention_tasks:
+        state = "attention"
+        headline = "存在远端任务需要安全对账"
+    elif pending_reviews:
+        state = "attention"
+        headline = f"{len(pending_reviews)} 项内容等待审核"
+    elif entities:
+        state = "ready"
+        headline = "当前工作面已从 ProductionGraph 投影"
+    else:
+        state = "empty"
+        headline = "当前工作面尚无可显示对象"
+    return {
+        "state": state,
+        "headline": headline,
+        "entity_count": len(entities),
+        "attention_count": attention_count,
+    }
+
+
+def resume_target(
+    *,
+    surface: str,
+    entities: list[Mapping[str, Any]],
+    reviews: list[Mapping[str, Any]],
+    recovery: Mapping[str, Any],
+) -> dict[str, Any]:
+    if recovery.get("attention_required"):
+        return {
+            "available": True,
+            "surface": "delivery",
+            "entity_id": "",
+            "reason": safe_text(recovery.get("message"), 240),
+        }
+    pending_review = next(
+        (
+            item
+            for item in reviews
+            if str(item.get("state") or "") in {"pending", "rejected"}
+        ),
+        None,
+    )
+    if pending_review:
+        return {
+            "available": True,
+            "surface": "review",
+            "entity_id": safe_identifier(pending_review.get("target_entity_id")),
+            "reason": "继续处理当前最优先的审核决定。",
+        }
+    if entities:
+        return {
+            "available": True,
+            "surface": surface,
+            "entity_id": safe_identifier(entities[0].get("entity_id")),
+            "reason": "继续查看当前工作面的第一个制作对象。",
+        }
+    return {
+        "available": False,
+        "surface": surface,
+        "entity_id": "",
+        "reason": "当前没有可恢复的制作位置。",
+    }
+
+
+def focused_entity(
+    entities: list[dict[str, Any]],
+    resume: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    resume_id = str(resume.get("entity_id") or "")
+    if resume_id:
+        for entity in entities:
+            if str(entity.get("entity_id") or "") == resume_id:
+                return entity
+    return entities[0] if entities else None
+
+
+def agent_summary(
+    project_version: int,
+    resume: Mapping[str, Any],
+    recovery: Mapping[str, Any],
+) -> dict[str, Any]:
+    if recovery.get("attention_required"):
+        state = "attention_required"
+        headline = "有任务需要对账；不会自动重复派发。"
+    elif resume.get("available"):
+        state = "suggestion_available"
+        headline = safe_text(resume.get("reason"), 240)
+    else:
+        state = "collapsed"
+        headline = "创作助手已收起。"
+    return {
+        "state": state,
+        "based_on_project_version": max(0, project_version),
+        "entity_id": safe_identifier(resume.get("entity_id")),
+        "headline": headline,
+    }
+
+
+def rework_preview(
+    surface: str,
+    reviews: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    target_id = ""
+    if surface == "review":
+        pending_review = next(
+            (
+                item
+                for item in reviews
+                if str(item.get("state") or "") in {"pending", "rejected"}
+            ),
+            None,
+        )
+        if pending_review:
+            target_id = safe_identifier(pending_review.get("target_entity_id"))
+    return {
+        "available": False,
+        "target_entity_id": target_id,
+        "impact_refs": [],
+        "keep_refs": [],
+        "cost_available": False,
+        "reason": (
+            "尚未生成绑定当前项目版本的局部返工影响预览。"
+            if target_id
+            else "当前没有可预览局部返工的审核目标。"
+        ),
+    }
+
+
+def delivery_summary(
+    graph: Mapping[str, Any] | None,
+    reviews: list[Mapping[str, Any]],
+    tasks: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    deliveries = (
+        graph.get("deliveries")
+        if graph is not None and isinstance(graph.get("deliveries"), Mapping)
+        else {}
+    )
+    delivery_id, delivery_record = next(iter(deliveries.items()), ("", {}))
+    delivery_state = (
+        safe_identifier(delivery_record.get("state"), 80)
+        if isinstance(delivery_record, Mapping)
+        else ""
+    )
+    blocking_reviews = [
+        item
+        for item in reviews
+        if str(item.get("state") or "") in {"pending", "rejected"}
+    ]
+    blocking_tasks = [
+        item
+        for item in tasks
+        if str(item.get("state") or "")
+        not in {"succeeded", "complete", "completed", "adopted"}
+    ]
+    blocker_count = len(blocking_reviews) + len(blocking_tasks)
+    if not delivery_id:
+        state = "empty"
+    elif blocker_count:
+        state = "blocked"
+    elif delivery_state in {"delivered", "published"}:
+        state = "delivered"
+    elif delivery_state in {"ready", "approved"}:
+        state = "ready"
+    else:
+        state = "review_ready"
+    approved_video_count = 0
+    if graph is not None:
+        approved_video_count = sum(
+            1
+            for relation in graph.get("relations", [])
+            if isinstance(relation, Mapping)
+            and str(relation.get("relation_type") or "") == "approved_video"
+        )
+    return {
+        "state": state,
+        "blocker_count": blocker_count,
+        "delivery_version_id": safe_identifier(delivery_id),
+        "playable": bool(
+            approved_video_count
+            and state in {"review_ready", "ready", "delivered"}
+        ),
+    }
+
+
+def _action(
+    action: str,
+    *,
+    enabled: bool,
+    target_entity_id: str = "",
+    reason: str,
+    requires_preview: bool = False,
+) -> dict[str, Any]:
+    return {
+        "action": action,
+        "enabled": enabled,
+        "requires_preview": requires_preview,
+        "target_entity_id": safe_identifier(target_entity_id),
+        "reason": safe_text(reason, 240),
+    }
+
+
+__all__ = (
+    "agent_summary",
+    "allowed_actions",
+    "delivery_summary",
+    "focused_entity",
+    "resume_target",
+    "rework_preview",
+    "surface_summary",
+)

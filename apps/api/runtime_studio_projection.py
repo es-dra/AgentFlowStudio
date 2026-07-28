@@ -9,10 +9,28 @@ from apps.api.runtime_studio_safety import (
     safe_text,
     sanitize_public_value,
 )
+from apps.api.runtime_studio_summary import (
+    agent_summary as _agent_summary,
+    allowed_actions as _allowed_actions,
+    delivery_summary as _delivery_summary,
+    focused_entity as _focused_entity,
+    resume_target as _resume_target,
+    rework_preview as _rework_preview,
+    surface_summary as _surface_summary,
+)
 
-STUDIO_BFF_SCHEMA_VERSION = "afs.studio_bff.v0.1"
-STUDIO_SURFACES = ("canvas", "script", "storyboard", "asset-bible", "review", "delivery")
+STUDIO_BFF_SCHEMA_VERSION = "afs.studio_bff.v0.2"
+STUDIO_SURFACES = (
+    "overview",
+    "canvas",
+    "script",
+    "storyboard",
+    "asset-bible",
+    "review",
+    "delivery",
+)
 SURFACE_CATEGORIES = {
+    "overview": {"collection", "location", "unit", "artifact", "delivery"},
     "script": {"input", "revision"},
     "storyboard": {"collection", "location", "unit"},
     "asset-bible": {"entity", "location", "resource"},
@@ -48,6 +66,16 @@ def build_studio_surface_envelope(
     if surface not in STUDIO_SURFACES:
         raise ValueError("unsupported studio surface")
     if graph is None:
+        empty_entities: list[dict[str, Any]] = []
+        empty_tasks: list[dict[str, Any]] = []
+        empty_reviews: list[dict[str, Any]] = []
+        recovery = _recovery_summary(empty_tasks)
+        resume = _resume_target(
+            surface=surface,
+            entities=empty_entities,
+            reviews=empty_reviews,
+            recovery=recovery,
+        )
         return {
             "schema_version": STUDIO_BFF_SCHEMA_VERSION,
             "project_id": safe_identifier(project_id),
@@ -55,15 +83,35 @@ def build_studio_surface_envelope(
             "authority_mode": "legacy_file",
             "project_version": 0,
             "graph_digest": "",
+            "event_cursor": 0,
             "surface": surface,
-            "entities": [],
+            "surface_summary": _surface_summary(
+                surface=surface,
+                entities=empty_entities,
+                reviews=empty_reviews,
+                tasks=empty_tasks,
+                delivery=_delivery_summary(None, empty_reviews, empty_tasks),
+            ),
+            "focused_entity": None,
+            "resume_target": resume,
+            "agent_summary": _agent_summary(0, resume, recovery),
+            "entities": empty_entities,
             "relations": [],
-            "allowed_actions": _allowed_actions(surface, has_graph=False),
-            "task_summaries": [],
-            "review_queue": [],
+            "allowed_actions": _allowed_actions(
+                surface,
+                entities=empty_entities,
+                reviews=empty_reviews,
+                artifacts=[],
+                rework_preview=_rework_preview(surface, empty_reviews),
+                delivery=_delivery_summary(None, empty_reviews, empty_tasks),
+            ),
+            "task_summaries": empty_tasks,
+            "review_queue": empty_reviews,
             "artifact_summaries": [],
+            "rework_preview": _rework_preview(surface, empty_reviews),
+            "delivery_summary": _delivery_summary(None, empty_reviews, empty_tasks),
             "cost_summary": _cost_summary(),
-            "recovery_summary": _recovery_summary([]),
+            "recovery_summary": recovery,
             "provider_dispatch_count": 0,
         }
 
@@ -85,6 +133,18 @@ def build_studio_surface_envelope(
                 }
             )
     task_summaries = _task_summaries(graph)
+    reviews = _review_queue(graph)
+    artifacts = _artifact_summaries(graph)
+    recovery = _recovery_summary(task_summaries)
+    delivery = _delivery_summary(graph, reviews, task_summaries)
+    resume = _resume_target(
+        surface=surface,
+        entities=entities,
+        reviews=reviews,
+        recovery=recovery,
+    )
+    focused_entity = _focused_entity(entities, resume)
+    rework_preview = _rework_preview(surface, reviews)
     return {
         "schema_version": STUDIO_BFF_SCHEMA_VERSION,
         "project_id": safe_identifier(project_id),
@@ -92,15 +152,39 @@ def build_studio_surface_envelope(
         "authority_mode": "graph_v1",
         "project_version": int(graph.get("version") or 0),
         "graph_digest": safe_text(graph.get("graph_digest"), 128),
+        "event_cursor": len(graph.get("events", [])),
         "surface": surface,
+        "surface_summary": _surface_summary(
+            surface=surface,
+            entities=entities,
+            reviews=reviews,
+            tasks=task_summaries,
+            delivery=delivery,
+        ),
+        "focused_entity": focused_entity,
+        "resume_target": resume,
+        "agent_summary": _agent_summary(
+            int(graph.get("version") or 0),
+            resume,
+            recovery,
+        ),
         "entities": entities,
         "relations": relations,
-        "allowed_actions": _allowed_actions(surface, has_graph=True),
+        "allowed_actions": _allowed_actions(
+            surface,
+            entities=entities,
+            reviews=reviews,
+            artifacts=artifacts,
+            rework_preview=rework_preview,
+            delivery=delivery,
+        ),
         "task_summaries": task_summaries,
-        "review_queue": _review_queue(graph),
-        "artifact_summaries": _artifact_summaries(graph),
+        "review_queue": reviews,
+        "artifact_summaries": artifacts,
+        "rework_preview": rework_preview,
+        "delivery_summary": delivery,
         "cost_summary": _cost_summary(),
-        "recovery_summary": _recovery_summary(task_summaries),
+        "recovery_summary": recovery,
         "provider_dispatch_count": 0,
     }
 
@@ -255,20 +339,6 @@ def _artifact_summaries(graph: Mapping[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return result
-
-
-def _allowed_actions(surface: str, *, has_graph: bool) -> list[dict[str, Any]]:
-    actions = [
-        {"action": "inspect_entity", "enabled": has_graph},
-        {"action": "open_agent_context", "enabled": True},
-    ]
-    if surface == "canvas":
-        actions.append({"action": "inspect_lineage", "enabled": has_graph})
-    if surface == "review":
-        actions.append({"action": "inspect_candidate", "enabled": has_graph})
-    if surface == "delivery":
-        actions.append({"action": "inspect_delivery_version", "enabled": has_graph})
-    return actions
 
 
 def _cost_summary() -> dict[str, Any]:
