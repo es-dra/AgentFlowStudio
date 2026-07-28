@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping
+from urllib.parse import parse_qsl, urlsplit
 
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 
@@ -18,14 +20,44 @@ PRIVATE_KEY_MARKERS = {
     "raw_response",
     "provider_response",
 }
+PRIVATE_KEY_TERMS = {
+    "authorization",
+    "cookie",
+    "credential",
+    "password",
+    "path",
+    "sas",
+    "secret",
+    "signature",
+    "token",
+}
+SIGNED_QUERY_KEYS = {
+    "access_token",
+    "auth",
+    "authorization",
+    "key",
+    "sig",
+    "signature",
+    "token",
+    "x-amz-credential",
+    "x-amz-signature",
+    "x-goog-credential",
+    "x-goog-signature",
+}
 PRIVATE_VALUE_MARKERS = tuple(
     fragment.lower() for fragment in AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 ) + (
     "x-amz-signature",
     "x-goog-signature",
+    "sig=",
     "signature=",
     "token=",
 )
+POSIX_PRIVATE_PATH = re.compile(
+    r"(?<![A-Za-z0-9_])/(?:etc|home|mnt|opt|private|root|srv|tmp|usr|var)(?:/[^/\s?#]+)+",
+    re.IGNORECASE,
+)
+URL_CANDIDATE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 OMIT = object()
 
 
@@ -60,7 +92,14 @@ def sanitize_public_value(value: Any, *, depth: int = 0) -> Any:
 def safe_key(value: Any) -> str:
     text = str(value or "").strip()
     lowered = text.lower()
-    if not text or any(marker in lowered for marker in PRIVATE_KEY_MARKERS):
+    normalized = re.sub(r"[^a-z0-9]+", "_", lowered).strip("_")
+    terms = {item for item in normalized.split("_") if item}
+    if (
+        not text
+        or any(marker in lowered for marker in PRIVATE_KEY_MARKERS)
+        or bool(terms & PRIVATE_KEY_TERMS)
+        or {"api", "key"} <= terms
+    ):
         return ""
     return safe_text(text, 80)
 
@@ -74,14 +113,48 @@ def safe_identifier(value: Any, limit: int = 160) -> str:
 
 def safe_text(value: Any, limit: int) -> str:
     text = " ".join(str(value or "").split())[:limit]
-    lowered = text.lower()
-    if not text or any(marker in lowered for marker in PRIVATE_VALUE_MARKERS):
+    if not text or _contains_private_value(text):
         return ""
     return text
 
 
+def assert_safe_public_payload(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if not safe_key(key):
+                raise ValueError("public payload contains a sensitive key")
+            assert_safe_public_payload(item)
+        return
+    if isinstance(value, list):
+        for item in value:
+            assert_safe_public_payload(item)
+        return
+    if isinstance(value, str) and _contains_private_value(value):
+        raise ValueError("public payload contains a private value")
+
+
+def _contains_private_value(text: str) -> bool:
+    lowered = text.lower()
+    if any(marker in lowered for marker in PRIVATE_VALUE_MARKERS):
+        return True
+    if POSIX_PRIVATE_PATH.search(text):
+        return True
+    for candidate in URL_CANDIDATE.findall(text):
+        try:
+            query_keys = {
+                key.lower()
+                for key, _value in parse_qsl(urlsplit(candidate).query, keep_blank_values=True)
+            }
+        except ValueError:
+            return True
+        if query_keys & SIGNED_QUERY_KEYS:
+            return True
+    return False
+
+
 __all__ = (
     "OMIT",
+    "assert_safe_public_payload",
     "safe_identifier",
     "safe_key",
     "safe_text",

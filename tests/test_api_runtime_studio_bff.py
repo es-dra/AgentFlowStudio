@@ -164,6 +164,9 @@ def test_studio_bff_recursively_removes_private_metadata_and_refs(tmp_path) -> N
                         "lineage": {
                             "source": "creator_input",
                             "api_key": "synthetic-not-a-real-key",
+                            "token": "synthetic-secret-token-value",
+                            "path": "/opt/afs/AgentFlowStudio/private/asset.png",
+                            "sas": "https://blob.example.invalid/a?sv=1&sig=synthetic",
                             "nested": {
                                 "signed_url": "https://example.invalid/media?signature=synthetic",
                                 "private_path": r"C:\private\asset.png",
@@ -201,6 +204,9 @@ def test_studio_bff_recursively_removes_private_metadata_and_refs(tmp_path) -> N
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
     assert "signature=" not in serialized
+    assert "synthetic-secret-token-value" not in serialized
+    assert "/opt/afs/" not in serialized
+    assert "sig=" not in serialized
     assert "c:\\\\" not in serialized
     assert "unsafe-node" not in serialized
     assert response.json()["review_queue"][0]["evidence_refs"] == ["evidence-safe"]

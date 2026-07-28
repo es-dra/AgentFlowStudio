@@ -16,6 +16,7 @@ from apps.api.runtime_studio_models import StudioSurface, StudioSurfaceEnvelope
 from apps.api.runtime_studio_projection import (
     build_studio_surface_envelope,
 )
+from apps.api.runtime_studio_safety import assert_safe_public_payload
 
 
 def register_runtime_studio_bff_routes(
@@ -41,6 +42,7 @@ def register_runtime_studio_bff_routes(
             surface=surface,
         )
         try:
+            assert_safe_public_payload(payload)
             reject_unsafe_payload(payload)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail="studio projection failed safety check") from exc
