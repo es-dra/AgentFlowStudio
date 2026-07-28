@@ -35,6 +35,7 @@ from apps.api.runtime_video_admission import (
     video_admission_capability,
     video_admission_generation_request,
 )
+from apps.api.runtime_video_direct_batch_routes import OPERATOR_CONFIRMATION
 from apps.api.runtime_video_dispatch_outbox import (
     mark_network_may_have_started,
     mark_reconcile_required,
@@ -994,6 +995,135 @@ def test_direct_batch_dry_run_keeps_shot1_safe_and_provider_free(
     assert compiled["reference_count"] == 3
     assert compiled["shot1_policy_safe"] is True
     assert load_video_admission_manifest(store, project_id, shot_id="shot-01") == {}
+
+
+def test_direct_batch_operator_proof_records_service_process_task_identity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _add_second_ready_shot(store, project_id)
+
+    def _fake_dispatch_once(
+        store: RuntimeStore,
+        project_id: str,
+        run_id: str,
+        manifest: dict,
+        *,
+        job_id: str | None = None,
+    ) -> dict:
+        request = VideoGenerationRequest(
+            **{
+                **video_admission_generation_request(
+                    manifest,
+                    generated_at=REQUESTED_AT,
+                ),
+                "quota_override_confirmed": True,
+            }
+        )
+        job_id = job_id or store.new_job_id("video_generation", project_id)
+        claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+        mark_video_admission_network_started(store, project_id, job_id=job_id)
+        mark_video_admission_task_recorded(
+            store,
+            project_id,
+            job_id=job_id,
+            provider_task_fingerprint="proof-task-fingerprint",
+        )
+        return {
+            "status": "submitted",
+            "job": {"job_id": job_id, "status": "submitted"},
+            "provider_calls_started": True,
+            "safe_manifest": {"blocks": []},
+            "candidate_previews": [],
+        }
+
+    monkeypatch.setattr(direct_batch_runner, "dispatch_once", _fake_dispatch_once)
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/proof",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-proof-test",
+            "shot_number": 2,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "proof_passed"
+    assert payload["result"]["connectivity_proof_passed"] is True
+    assert payload["result"]["has_provider_task_fingerprint"] is True
+    manifest = load_video_admission_manifest(store, project_id, shot_id="shot-02")
+    assert manifest["item"]["state"] == "processing"
+    assert manifest["item"]["network_disposition"] == "dispatched_with_task_identity"
+    assert manifest["provider_dispatch_count"] == 1
+
+
+def test_direct_batch_safety_rewrite_staging_is_positive_and_provider_free(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    for number in (10, 21, 22, 23):
+        _add_ready_shot(
+            store,
+            project_id,
+            f"shot-{number:02d}",
+            number,
+            metadata={
+                "display_name": f"敏感源镜头 {number:02d}",
+                "blocking": "旧源文本包含冲突和危险词但不应进入新轮主体动作",
+                "narrative_purpose": "旧源文本包含伤害和威胁但不应进入新轮情绪",
+            },
+        )
+    monkeypatch.setattr(
+        direct_batch_runner,
+        "provider_pool_summary",
+        lambda: {
+            "dispatch_ready": True,
+            "service_id": SERVICE_ID,
+            "model": MODEL_ID,
+            "enabled_video_accounts": 2,
+            "concurrency_capacity": 2,
+        },
+    )
+
+    summary = direct_batch_runner.dry_run(store, project_id)
+    by_number = {item["shot_number"]: item for item in summary["compiled"]}
+
+    for number in (10, 21, 22, 23):
+        assert by_number[number]["reference_count"] == 3
+        manifest = direct_batch_runner.admission_command(
+            store,
+            project_id,
+            f"shot-{number:02d}",
+            {
+                "type": "compile",
+                "shot_id": f"shot-{number:02d}",
+                "generation_mode": "reference_conditioned",
+                "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+                "temporal_staging": direct_batch_runner.temporal_staging_for_target(
+                    store,
+                    project_id,
+                    direct_batch_runner.BatchTarget(
+                        f"shot-{number:02d}",
+                        number,
+                        f"镜头 {number:02d}",
+                        "reference_conditioned",
+                        3,
+                    ),
+                ),
+                "idempotency_key": f"safety-rewrite-preview-{number}",
+            },
+            confirm=False,
+        )["result"]["manifest"]
+        prompt = manifest["source"]["prompt_contract"]["provider_prompt"]
+        assert "旧源文本" not in prompt
+        assert "伤害" not in prompt
+        assert "威胁" not in prompt
+        assert "危险" not in prompt
+    assert summary["provider_dispatch_count"] == 0
 
 
 def test_video_compile_selects_explicit_non_first_active_unit_shot(tmp_path) -> None:

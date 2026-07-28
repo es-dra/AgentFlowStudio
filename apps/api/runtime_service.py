@@ -71,6 +71,7 @@ from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_image_admission import register_runtime_image_admission_routes
 from apps.api.runtime_video_admission import register_runtime_video_admission_routes
+from apps.api.runtime_video_direct_batch_routes import register_runtime_video_direct_batch_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_sprite import register_runtime_sprite_routes
@@ -421,6 +422,7 @@ def create_runtime_app(
     register_runtime_image_asset_routes(app, store)
     register_runtime_image_admission_routes(app, store, auth)
     register_runtime_video_admission_routes(app, store, auth)
+    register_runtime_video_direct_batch_routes(app, store)
     register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
     register_runtime_feedback_candidate_routes(app, store)

@@ -261,7 +261,55 @@ def temporal_staging_for_target(store: RuntimeStore, project_id: str, target: Ba
             "pacing": "固定6秒，前半段碎片闪回，后半段归于安静的冷色空间。",
             "start_state": "画面从柔和冷光和模糊室内线条开始。",
             "end_state": "抽象光影逐渐退暗，留下安静悬念。",
-            "narrative_purpose": "用抽象光影表现前情记忆和情绪铺垫，避免具象敏感事件表达。",
+            "narrative_purpose": "用抽象光影表现前情记忆和情绪铺垫，保持含蓄、梦境化和电影感。",
+        }
+    if target.shot_number == 10:
+        return {
+            "subject_action_arc": "现代电视演播厅内，男主以克制专业的姿态走向主持区并停在访谈位置。",
+            "spatial_displacement": "他从舞台侧后方沿清晰通道进入主舞台，停在主持人与嘉宾区之间的标记点。",
+            "interaction_object": "与主持手麦、舞台灯光和观众暗区保持关系，动作只服务专业亮相和节目调度。",
+            "camera_movement": "从舞台大全景平稳推进到中景，保持人物轮廓、主持区和黑金舞台关系清楚。",
+            "environment_dynamics": "黑金演播厅灯光柔和切换，观众区保持匿名暗化，LED背景为抽象图形且无文字。",
+            "pacing": "固定6秒稳健亮相，前半段入场，后半段站定并进入专业访谈氛围。",
+            "start_state": "男主从演播厅侧翼进入，舞台空间和主持区已经建立。",
+            "end_state": "他在访谈位置站定，表情克制，画面自然衔接下一镜头。",
+            "narrative_purpose": "建立现代演播厅权威亮相和节目关系，保持专业、克制、正向氛围。",
+        }
+    if target.shot_number == 21:
+        return {
+            "subject_action_arc": "古言棋室意象中，黑金男主与月白女主在棋盘两侧安静对坐，视线交汇。",
+            "spatial_displacement": "两人保持桌案两侧距离，镜头从棋盘金色棋子缓慢抬至双人关系。",
+            "interaction_object": "棋子、棋盘和收鞘古剑作为静态权谋意象，重点放在礼仪距离和视线关系。",
+            "camera_movement": "低角度沿棋盘线条缓慢推进，再升到中景对峙构图。",
+            "environment_dynamics": "烛光与月光轻微流动，木格栅和暗金纹理保持稳定。",
+            "pacing": "固定6秒慢节奏，棋盘细节引入，最后停在安静对视。",
+            "start_state": "棋盘与金色棋子占据前景，人物在后景清楚可辨。",
+            "end_state": "两位主角隔棋盘对视，情绪克制含蓄。",
+            "narrative_purpose": "用棋局视觉建立策略爱情关系，保持静态礼仪、含蓄张力和高级感。",
+        }
+    if target.shot_number == 22:
+        return {
+            "subject_action_arc": "黑金男主在黑檀棋桌旁从容落下一枚金色棋子，神情冷静专注。",
+            "spatial_displacement": "手部从棋盒移向棋盘中央，人物身体保持稳定坐姿。",
+            "interaction_object": "金色棋子、黑檀棋盘、烛光和月光构成策略意象，动作集中在平静落子。",
+            "camera_movement": "从棋子近景缓慢后退到人物中景，保持桌面方向和座位关系清楚。",
+            "environment_dynamics": "烛火轻晃，窗外冷月映在深木纹理上，环境安静克制。",
+            "pacing": "固定6秒，落子动作清晰完成后留出一秒静止余韵。",
+            "start_state": "棋盘与棋盒位于前景，男主准备落子。",
+            "end_state": "棋子落定，男主目光抬起，棋室关系保持连续。",
+            "narrative_purpose": "表现冷静谋略与棋局关系，维持古言棋室的克制质感。",
+        }
+    if target.shot_number == 23:
+        return {
+            "subject_action_arc": "月白女主在灯火长街中稳步前行，回望棋局线索后继续向前。",
+            "spatial_displacement": "她从街道中景沿石板路前进，经过暖灯笼与木构店面，保持路线清楚。",
+            "interaction_object": "灯笼、夜雾、石板街和远处行人剪影营造平静街景氛围。",
+            "camera_movement": "镜头侧向平稳跟随，再轻微推近到三分之二身位。",
+            "environment_dynamics": "灯笼微晃，夜雾缓慢流动，背景人群只作匿名剪影。",
+            "pacing": "固定6秒温和推进，动作平静但有主动选择感。",
+            "start_state": "女主位于灯火长街中段，街道纵深和出口清楚。",
+            "end_state": "她转回前方继续前行，表情清醒坚定。",
+            "narrative_purpose": "表现女主主动进入棋局后的清醒选择，突出平静、坚定和古言氛围。",
         }
     return {
         "subject_action_arc": str(shot.get("action") or f"{target.shot_label} 的主体动作在一个连续镜头内完成。"),
