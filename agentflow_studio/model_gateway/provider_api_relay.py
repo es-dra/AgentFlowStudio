@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from agentflow_studio.model_gateway.artifact_host_policy import artifact_host_policy_from_provider
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_api_relay_http import post_multipart
@@ -18,7 +19,6 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
-CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com", ".r2.dev", "r2.52image.xyz")
 
 
 class ApiRelayAdapter:
@@ -93,7 +93,7 @@ class ApiRelayAdapter:
             "payload": payload,
             "output_dir": request.output_dir,
             "candidate_count": request.candidate_count,
-            "allowed_url_hosts": _allowed_url_hosts(service),
+            "allowed_url_hosts": _allowed_url_hosts(service, account),
             "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
         }
 
@@ -211,22 +211,13 @@ def _payload_format(service: dict[str, Any]) -> str:
     return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
 
 
-def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
-    value = service.get("allowed_artifact_hosts")
-    hosts = []
-    if isinstance(value, list):
-        hosts.extend(str(item).lower().strip() for item in value if str(item).strip())
-    if _is_crazyrouter_image_service(service):
-        hosts.extend(item for item in CRAZYROUTER_IMAGE_ARTIFACT_HOSTS if item not in hosts)
-    return tuple(hosts)
-
-
-def _is_crazyrouter_image_service(service: dict[str, Any]) -> bool:
-    if str(service.get("capability") or "") != "image":
-        return False
-    account_ref = str(service.get("account_ref") or "").lower()
-    base_url = str(service.get("base_url") or "").lower()
-    return "crazyrouter" in account_ref or "crazyrouter" in base_url
+def _allowed_url_hosts(service: dict[str, Any], account: dict[str, Any]) -> tuple[str, ...]:
+    policy = artifact_host_policy_from_provider(
+        service=service,
+        account=account,
+        allow_bucket_suffixes=False,
+    )
+    return policy.exact_hosts
 
 
 def _reference_images_payload(paths: tuple[Path | str, ...]) -> list[dict[str, Any]]:
