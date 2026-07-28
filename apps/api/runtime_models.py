@@ -269,7 +269,7 @@ class VideoGenerationRequest(BaseModel):
     provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str | None = Field(default=None, min_length=1)
     last_frame_image_asset_id: str | None = None
-    reference_image_asset_ids: list[str] = Field(default_factory=list, max_length=3)
+    reference_image_asset_ids: list[str] = Field(default_factory=list, max_length=4)
     reference_video_artifact_id: str | None = Field(default=None, min_length=1)
     input_source: VideoInputSource | None = None
     director_setup: DirectorSetup2D | None = None

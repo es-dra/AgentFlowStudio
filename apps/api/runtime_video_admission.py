@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -62,7 +63,8 @@ RESOLUTION = "720p"
 DURATION_SEC = 6
 MAX_DISPATCHES = 1
 AUTO_RETRY = 0
-MAX_ACTIVE_VIDEO_LANES = 2
+DEFAULT_MAX_ACTIVE_VIDEO_LANES = 4
+MAX_ACTIVE_VIDEO_LANES = DEFAULT_MAX_ACTIVE_VIDEO_LANES
 HARD_BUDGET_USD = Decimal("2.00")
 COMMANDS = {
     "compile",
@@ -122,9 +124,9 @@ def register_runtime_video_admission_routes(
                 for manifest in manifests
             ],
             "capacity": {
-                "max_active_lanes": MAX_ACTIVE_VIDEO_LANES,
+                "max_active_lanes": max_active_video_lanes(),
                 "active_lanes": active_count,
-                "available_lanes": max(0, MAX_ACTIVE_VIDEO_LANES - active_count),
+                "available_lanes": max(0, max_active_video_lanes() - active_count),
             },
             "provider_dispatch_count": sum(
                 int(manifest.get("provider_dispatch_count") or 0)
@@ -537,7 +539,6 @@ def video_admission_capability() -> dict[str, Any]:
         and artifact_hosts_configured
         and exact_input_upload_endpoint
         and input_host_configured
-        and pricing_verified
     )
     return {
         "service_id": SERVICE_ID,
@@ -572,6 +573,42 @@ def video_admission_capability() -> dict[str, Any]:
     }
 
 
+def max_active_video_lanes() -> int:
+    try:
+        value = int(os.environ.get("AFS_VIDEO_ADMISSION_MAX_ACTIVE_LANES", "") or 0)
+    except ValueError:
+        value = 0
+    if value <= 0:
+        value = _configured_video_account_capacity() or DEFAULT_MAX_ACTIVE_VIDEO_LANES
+    return max(1, min(12, value))
+
+
+def _configured_video_account_capacity() -> int:
+    try:
+        registry = load_provider_registry()
+        descriptor = registry.descriptor(SERVICE_ID)
+        pool_id = str(getattr(descriptor, "account_pool_id", "") or "")
+        pool = registry.store.account_pools.get(pool_id, {}) if pool_id else {}
+        entries = pool.get("accounts")
+        if not isinstance(entries, list):
+            return 1 if pool_id else 0
+        capacity = 0
+        for entry in entries:
+            if not isinstance(entry, Mapping) or entry.get("enabled", True) is not True:
+                continue
+            if entry.get("health_state") == "disabled":
+                continue
+            if entry.get("service_id") and entry.get("service_id") != SERVICE_ID:
+                continue
+            capabilities = entry.get("enabled_capabilities")
+            if capabilities and "video" not in list(capabilities):
+                continue
+            capacity += max(1, int(entry.get("concurrency_limit") or 1))
+        return capacity
+    except (ModelGatewayError, KeyError, OSError, ValueError, TypeError):
+        return 0
+
+
 def preview_video_admission_command(
     store: RuntimeStore,
     project_id: str,
@@ -599,6 +636,8 @@ def preview_video_admission_command(
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
+            allow_partial_references=command.get("allow_partial_references") is True,
+            partial_reference_reason=str(command.get("partial_reference_reason") or ""),
         )
         _append_receipt(manifest, "manifest_compiled", command, requested_at)
     elif command["type"] == "recompile_current":
@@ -615,6 +654,8 @@ def preview_video_admission_command(
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
+            allow_partial_references=command.get("allow_partial_references") is True,
+            partial_reference_reason=str(command.get("partial_reference_reason") or ""),
         )
         _append_receipt(manifest, "manifest_recompiled", command, requested_at)
     elif command["type"] == "create_new_round":
@@ -629,6 +670,8 @@ def preview_video_admission_command(
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
+            allow_partial_references=command.get("allow_partial_references") is True,
+            partial_reference_reason=str(command.get("partial_reference_reason") or ""),
             round_contract={
                 "kind": "independent_after_provider_rejection",
                 "prior_manifest_id": str(before.get("manifest_id") or ""),
@@ -650,6 +693,8 @@ def preview_video_admission_command(
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
+            allow_partial_references=command.get("allow_partial_references") is True,
+            partial_reference_reason=str(command.get("partial_reference_reason") or ""),
             round_contract={
                 "kind": "independent_comparison",
                 "prior_manifest_id": str(before.get("manifest_id") or ""),
@@ -675,6 +720,8 @@ def preview_video_admission_command(
             generation_mode=command.get("generation_mode"),
             selection_reason=command.get("selection_reason"),
             temporal_staging=command.get("temporal_staging"),
+            allow_partial_references=command.get("allow_partial_references") is True,
+            partial_reference_reason=str(command.get("partial_reference_reason") or ""),
             round_contract={
                 "kind": "next_shot",
                 "prior_manifest_id": str(before.get("manifest_id") or ""),
@@ -774,13 +821,21 @@ def compile_video_admission_manifest(
     generation_mode: Any = None,
     selection_reason: Any = None,
     temporal_staging: Any = None,
+    allow_partial_references: bool = False,
+    partial_reference_reason: str = "",
 ) -> dict[str, Any]:
     timestamp = created_at or _now()
     if not video_admission_capability()["configured"]:
         raise ValueError(
             "exact non-fast Seedance 2.0 720p/6s reference capability is not configured"
         )
-    source = _source_contract(store, project_id, shot_id=shot_id)
+    source = _source_contract(
+        store,
+        project_id,
+        shot_id=shot_id,
+        allow_partial_references=allow_partial_references,
+        partial_reference_reason=partial_reference_reason,
+    )
     capability = video_admission_capability()
     mode = validate_generation_mode(
         generation_mode,
@@ -1398,6 +1453,8 @@ def _source_contract(
     project_id: str,
     *,
     shot_id: str | None = None,
+    allow_partial_references: bool = False,
+    partial_reference_reason: str = "",
 ) -> dict[str, Any]:
     if not graph_has_authority(store, project_id):
         raise ValueError("video readiness requires an authoritative ProductionGraph")
@@ -1408,23 +1465,32 @@ def _source_contract(
     canonical_target_ids = _canonical_target_ids_for_shot(graph, shot_id)
     if not canonical_target_ids:
         raise ValueError("reference-conditioned video requires confirmed canonical shot assets")
-    reference_ids = _approved_reference_ids_for_targets(
+    reference_ids, missing_references = _approved_reference_ids_for_targets(
         graph,
         media_by_target,
         canonical_target_ids,
+        allow_partial_references=allow_partial_references,
     )
     slot_limit = max(1, int(video_admission_capability().get("reference_image_slots") or 4))
-    if len(reference_ids) > slot_limit:
-        raise ValueError(
-            f"reference-conditioned video can send at most {slot_limit} approved asset reference images"
-        )
+    selected_reference_ids = reference_ids[:slot_limit]
+    excluded_reference_ids = reference_ids[slot_limit:]
     references = [
         {
             **_validated_approved_image(store, project_id, graph, asset_id),
             "target_asset_id": target_id,
             "label": _canonical_target_label(graph, target_id),
         }
-        for target_id, asset_id in reference_ids
+        for target_id, asset_id in selected_reference_ids
+    ]
+    excluded_references = [
+        {
+            "target_asset_id": target_id,
+            "image_asset_id": asset_id,
+            "label": _canonical_target_label(graph, target_id),
+            "kind": _canonical_reference_asset_kind((graph.get("nodes") or {}).get(target_id) or {}),
+            "reason": "provider_reference_slot_limit",
+        }
+        for target_id, asset_id in excluded_reference_ids
     ]
     image_manifests = _image_admission_manifests(store, project_id)
     keyframe = _optional_approved_shot_keyframe(
@@ -1460,6 +1526,22 @@ def _source_contract(
         },
         "keyframe": keyframe,
         "references": references,
+        "reference_resolution": {
+            "allow_partial_references": bool(allow_partial_references),
+            "partial_reference_pack": bool(missing_references),
+            "partial_reason": (
+                str(partial_reference_reason or "").strip()[:600]
+                if missing_references
+                else ""
+            ),
+            "selection_priority": ["character", "scene", "prop"],
+            "provider_reference_slot_limit": slot_limit,
+            "selected_reference_count": len(references),
+            "missing_reference_count": len(missing_references),
+            "missing_references": missing_references,
+            "excluded_approved_reference_count": len(excluded_references),
+            "excluded_approved_references": excluded_references,
+        },
         "canonical_entities": labels,
         "shot_semantics": shot_semantics,
         "strict_first_frame_required": _shot_requires_strict_first_frame(shot, shot_semantics),
@@ -1568,17 +1650,55 @@ def _approved_reference_ids_for_targets(
     graph: Mapping[str, Any],
     media_by_target: Mapping[str, set[str]],
     target_ids: set[str],
-) -> list[tuple[str, str]]:
+    *,
+    allow_partial_references: bool = False,
+) -> tuple[list[tuple[str, str]], list[dict[str, Any]]]:
     reference_ids: list[tuple[str, str]] = []
-    for target_id in sorted(target_ids):
+    missing: list[dict[str, Any]] = []
+    for target_id in _ordered_reference_target_ids(graph, target_ids):
         selected_for_target = sorted(media_by_target.get(target_id, set()))
         if len(selected_for_target) != 1:
             label = _canonical_target_label(graph, target_id)
-            raise ValueError(
-                f"reference-conditioned video requires exactly one approved image for {label}"
+            kind = _canonical_reference_asset_kind((graph.get("nodes") or {}).get(target_id) or {})
+            missing.append(
+                {
+                    "target_asset_id": target_id,
+                    "label": label,
+                    "kind": kind,
+                    "missing_scene_ref": kind == "scene",
+                    "reason": (
+                        "missing_approved_reference_image"
+                        if not selected_for_target
+                        else "ambiguous_approved_reference_images"
+                    ),
+                }
             )
+            continue
         reference_ids.append((target_id, selected_for_target[0]))
-    return reference_ids
+    if missing and not allow_partial_references:
+        first = missing[0]
+        raise ValueError(
+            f"reference-conditioned video requires exactly one approved image for {first['label']}"
+        )
+    if not reference_ids:
+        raise ValueError("reference-conditioned video requires at least one approved asset reference image")
+    return reference_ids, missing
+
+
+def _ordered_reference_target_ids(
+    graph: Mapping[str, Any],
+    target_ids: set[str],
+) -> list[str]:
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), Mapping) else {}
+    priority = {"character": 0, "scene": 1, "prop": 2}
+    return sorted(
+        target_ids,
+        key=lambda target_id: (
+            priority.get(_canonical_reference_asset_kind(nodes.get(target_id) or {}), 9),
+            _canonical_target_label(graph, target_id),
+            target_id,
+        ),
+    )
 
 
 def _optional_approved_shot_keyframe(
@@ -2000,8 +2120,16 @@ def _apply_command(
         item["candidate"] = candidate
         _append_receipt(manifest, "candidate_recorded", command, timestamp)
     elif command_type == "record_failure":
-        if item.get("state") != "processing":
-            raise ValueError("only a processing video can record failure")
+        failure_from_reserved_without_dispatch = (
+            item.get("state") == "reserved"
+            and int(manifest.get("provider_dispatch_count") or 0) == 0
+            and str(item.get("network_disposition") or "") == "never_started"
+            and not str(item.get("provider_job_id") or "")
+            and not str(item.get("provider_task_fingerprint") or "")
+            and item.get("candidate") is None
+        )
+        if item.get("state") != "processing" and not failure_from_reserved_without_dispatch:
+            raise ValueError("only a processing video or unstarted reserved video can record failure")
         item["state"] = "failed"
         item["error_category"] = str(command.get("error_category") or "generation_failed")[:80]
         _append_receipt(manifest, "failure_recorded", command, timestamp)
@@ -2225,6 +2353,9 @@ def _safe_command(value: Any, *, lane_shot_id: str | None = None) -> dict[str, A
         safe["temporal_staging"] = validate_temporal_staging(
             command.get("temporal_staging")
         )
+        safe["allow_partial_references"] = command.get("allow_partial_references") is True
+        if command.get("partial_reference_reason"):
+            safe["partial_reference_reason"] = str(command.get("partial_reference_reason") or "")[:600]
     if command_type in {"compile", "create_next_shot"}:
         shot_id = str(command.get("shot_id") or lane_shot_id or "").strip()
         if lane_shot_id and shot_id != lane_shot_id:
@@ -2284,6 +2415,11 @@ def _provider_input_contract(
         else []
     )
     excluded = []
+    reference_resolution = (
+        source.get("reference_resolution")
+        if isinstance(source.get("reference_resolution"), Mapping)
+        else {}
+    )
     if generation_mode != FIRST_FRAME and first_frame:
         excluded.append(
             {
@@ -2301,6 +2437,30 @@ def _provider_input_contract(
             }
             for item in references
         )
+    for item in reference_resolution.get("missing_references", []):
+        if isinstance(item, Mapping):
+            excluded.append(
+                {
+                    "target_asset_id": str(item.get("target_asset_id") or ""),
+                    "label": str(item.get("label") or ""),
+                    "kind": str(item.get("kind") or ""),
+                    "role": "missing_reference_not_sent",
+                    "reason": str(item.get("reason") or "missing_approved_reference_image"),
+                    "missing_scene_ref": item.get("missing_scene_ref") is True,
+                }
+            )
+    for item in reference_resolution.get("excluded_approved_references", []):
+        if isinstance(item, Mapping):
+            excluded.append(
+                {
+                    "target_asset_id": str(item.get("target_asset_id") or ""),
+                    "image_asset_id": str(item.get("image_asset_id") or ""),
+                    "label": str(item.get("label") or ""),
+                    "kind": str(item.get("kind") or ""),
+                    "role": "approved_reference_not_sent",
+                    "reason": str(item.get("reason") or "provider_reference_slot_limit"),
+                }
+            )
     return {
         "mode": generation_mode,
         "first_frame": selected_first,
@@ -2438,6 +2598,15 @@ def _assert_new_round_eligible(
         )
         for block in blocks
     )
+    safety_rejected = any(
+        int(block.get("provider_http_status") or 0) == 400
+        and (
+            str(block.get("provider_error_code") or "") == "sensitive_words_detected"
+            or "content safety" in str(block.get("reason") or "").lower()
+            or "sensitive" in str(block.get("reason") or "").lower()
+        )
+        for block in blocks
+    )
     provider_not_ready = any(
         str(block.get("failure_class") or "").strip().lower() == "provider_not_ready"
         or str(block.get("block_id") or "").strip() == "remote_video_provider_not_ready"
@@ -2452,13 +2621,22 @@ def _assert_new_round_eligible(
             safe_manifest,
         )
     )
+    safety_rejected_pre_task = (
+        safety_rejected
+        and not _has_provider_task_identity(safe_manifest)
+        and _provider_not_ready_has_no_provider_task(
+            store.run_dir(project_id, str(item["provider_job_id"])),
+            manifest,
+            safe_manifest,
+        )
+    )
     if (
         safe_manifest.get("status") != "reconcile_required"
         or outputs not in (None, [])
         or not (
             (
                 safe_manifest.get("provider_calls_started") is True
-                and rejected
+                and (rejected or safety_rejected_pre_task)
             )
             or provider_not_ready_pre_task
         )
@@ -2911,9 +3089,10 @@ def _assert_video_lane_capacity(
         if str(item.get("manifest_id") or "") != current_manifest_id
         and _video_manifest_consumes_lane(store, project_id, item)
     ]
-    if len(active) >= MAX_ACTIVE_VIDEO_LANES:
+    limit = max_active_video_lanes()
+    if len(active) >= limit:
         raise ValueError(
-            f"video admission has reached the {MAX_ACTIVE_VIDEO_LANES}-lane active dispatch limit"
+            f"video admission has reached the {limit}-lane active dispatch limit"
         )
 
 

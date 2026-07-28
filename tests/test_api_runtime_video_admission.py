@@ -26,6 +26,7 @@ from apps.api.runtime_video_admission import (
     RESOLUTION,
     SERVICE_ID,
     QUERY_ENDPOINT,
+    _video_manifest_consumes_lane,
     claim_video_admission_dispatch,
     enforce_video_admission_request,
     load_video_admission_manifest,
@@ -40,6 +41,8 @@ from apps.api.runtime_video_dispatch_outbox import (
     prepare_dispatch_outbox,
     record_provider_task,
 )
+from apps.api.runtime_video_staging import build_temporal_prompt
+from tools import afs_video_direct_batch_runner as direct_batch_runner
 
 
 PNG_BYTES = base64.b64decode(
@@ -582,7 +585,7 @@ def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_
     assert prompt_contract["shot_action"] == TEMPORAL_STAGING["subject_action_arc"]
     assert prompt_contract["composition"] == "中景"
     assert prompt_contract["camera_movement"] == "沿操作台缓慢向前推进"
-    assert prompt_contract["emotion"] == "保持克制专注的检修压力"
+    assert prompt_contract["emotion"] == TEMPORAL_STAGING["narrative_purpose"]
     assert prompt_contract["keyword_rewrite"] is False
     assert prompt_contract["sample_fallback"] is False
     assert preview["provider_dispatch_count"] == 0
@@ -702,6 +705,297 @@ def test_reference_targets_exclude_scene_container_and_include_scene_resource(
     assert load_video_admission_manifest(store, project_id) == {}
 
 
+def test_reference_conditioned_manifest_allows_four_provider_refs(tmp_path) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    extra_prop = _upload(client, project_id, "second-prop-reference")
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-fourth-video-reference",
+        semantic_digest=canonical_digest({"extra_ref": extra_prop}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "prop-b",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "备用仪表盘"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-b",
+                "to_id": "shot-01",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "approved-extra-prop",
+                    "category": "artifact",
+                    "metadata": {
+                        "kind": "approved_image",
+                        "image_asset_id": extra_prop,
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-b",
+                "to_id": "approved-extra-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    manifest = _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-four-video-refs",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )["result"]["manifest"]
+    request = video_admission_generation_request(
+        manifest,
+        generated_at=REQUESTED_AT,
+    )
+
+    assert len(request["reference_image_asset_ids"]) == 4
+    assert set(request["reference_image_asset_ids"]) == {
+        media["character"],
+        media["scene"],
+        media["prop"],
+        extra_prop,
+    }
+    VideoGenerationRequest(**request)
+    assert manifest["provider_input_contract"]["frame_role_cardinality"]["reference_image"] == 4
+
+
+def test_partial_reference_compile_records_missing_scene_without_faking_input(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-partial-video-shot",
+        semantic_digest=canonical_digest({"partial": "shot-02"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "scene-missing",
+                    "category": "resource",
+                    "metadata": {"kind": "scene", "display_name": "未完成场景"},
+                },
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "shot-02",
+                    "category": "unit",
+                    "metadata": {
+                        "kind": "shot",
+                        "display_name": "镜头 02",
+                        "number": 2,
+                        "blocking": "巡夜人甲走向新空间",
+                        "shot_size": "中景",
+                        "camera_angle": "平视",
+                        "camera_movement": "横移跟随",
+                        "narrative_purpose": "进入下一段空间调度",
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-container-a",
+                "to_id": "shot-02",
+                "relation_type": "contains",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "character-a",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-a",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-missing",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+        ],
+    )
+
+    strict = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-02/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-partial-strict",
+                    "shot_id": "shot-02",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert strict.status_code == 422
+
+    partial = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-02/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-partial-allowed",
+                    "shot_id": "shot-02",
+                    "allow_partial_references": True,
+                    "partial_reference_reason": "测试允许场景缺图时使用主体和道具参考继续。",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert partial.status_code == 200, partial.text
+    manifest = partial.json()["result"]["manifest"]
+    resolution = manifest["source"]["reference_resolution"]
+    assert resolution["partial_reference_pack"] is True
+    assert resolution["partial_reason"] == "测试允许场景缺图时使用主体和道具参考继续。"
+    assert resolution["missing_references"] == [
+        {
+            "target_asset_id": "scene-missing",
+            "label": "未完成场景",
+            "kind": "scene",
+            "missing_scene_ref": True,
+            "reason": "missing_approved_reference_image",
+        }
+    ]
+    assert set(video_admission_generation_request(manifest, generated_at=REQUESTED_AT)["reference_image_asset_ids"]) == {
+        media["character"],
+        media["prop"],
+    }
+    assert any(
+        item["role"] == "missing_reference_not_sent"
+        and item["target_asset_id"] == "scene-missing"
+        for item in manifest["provider_input_contract"]["excluded_grounding_references"]
+    )
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-02") == {}
+
+
+def test_temporal_prompt_uses_explicit_staging_narrative_for_emotion() -> None:
+    contract = build_temporal_prompt(
+        mode="reference_conditioned",
+        selection_reason="使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        staging={
+            **TEMPORAL_STAGING,
+            "narrative_purpose": "用梦境隐喻表现创伤记忆和重生前奏，明确无伤害细节。",
+        },
+        shot={
+            "composition": "水下大全景",
+            "camera_angle": "轻微俯角",
+            "emotion": "濒死感打开前世创伤和重生设定",
+            "continuity_cues": [],
+        },
+        canonical_entities={
+            "characters": ["叶安安"],
+            "scenes": ["象征性深海"],
+            "props": [],
+        },
+    )
+
+    assert contract["emotion"] == "用梦境隐喻表现创伤记忆和重生前奏，明确无伤害细节。"
+    assert "濒死" not in contract["provider_prompt"]
+    assert "死亡" not in contract["provider_prompt"]
+    assert "血腥" not in contract["provider_prompt"]
+
+
+def test_direct_batch_targets_skip_post_only_and_unready_first_frame(tmp_path) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    for number in (2, 31, 33, 34, 35):
+        _add_ready_shot(store, project_id, f"shot-{number:02d}", number)
+
+    targets = direct_batch_runner.build_targets(store, project_id)
+    by_number = {target.shot_number: target for target in targets}
+
+    assert by_number[1].skip_reason == ""
+    assert by_number[2].skip_reason == ""
+    assert by_number[31].skip_reason == "post_only"
+    assert by_number[33].skip_reason == "post_only"
+    assert by_number[34].skip_reason == "post_only"
+    assert by_number[35].skip_reason == "requires_approved_first_frame"
+
+
+def test_direct_batch_dry_run_keeps_shot1_safe_and_provider_free(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    metadata = deepcopy(graph["nodes"]["shot-01"]["metadata"])
+    metadata.update(
+        {
+            "display_name": "深海坠落",
+            "action": "叶安安在象征性深海缓慢下沉",
+            "emotion": "濒死感打开前世创伤和重生设定",
+            "narrative_purpose": "濒死感打开前世创伤和重生设定",
+        }
+    )
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-shot1-policy-sensitive-source",
+        semantic_digest=canonical_digest({"shot": "shot-01", "metadata": metadata}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "shot-01",
+                    "category": "unit",
+                    "metadata": metadata,
+                },
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        direct_batch_runner,
+        "provider_pool_summary",
+        lambda: {
+            "dispatch_ready": True,
+            "service_id": SERVICE_ID,
+            "model": MODEL_ID,
+            "enabled_video_accounts": 4,
+            "concurrency_capacity": 4,
+        },
+    )
+
+    summary = direct_batch_runner.dry_run(store, project_id)
+
+    assert summary["eligible"] == 1
+    assert summary["skipped"] == 0
+    assert summary["provider_dispatch_count"] == 0
+    compiled = summary["compiled"][0]
+    assert compiled["shot_number"] == 1
+    assert compiled["generation_mode"] == "reference_conditioned"
+    assert compiled["reference_count"] == 3
+    assert compiled["shot1_policy_safe"] is True
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-01") == {}
+
+
 def test_video_compile_selects_explicit_non_first_active_unit_shot(tmp_path) -> None:
     client, store, project_id, media = _seed_ready_project(tmp_path)
     _add_second_ready_shot(store, project_id)
@@ -742,6 +1036,51 @@ def test_video_compile_selects_explicit_non_first_active_unit_shot(tmp_path) -> 
     }
     assert manifest["provider_dispatch_count"] == 0
     assert load_video_admission_manifest(store, project_id) == {}
+
+
+def test_unstarted_reserved_video_failure_releases_lane_without_dispatch(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-unstarted-reserved-failure",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {
+            "type": "reserve_dispatch",
+            "idempotency_key": "reserve-unstarted-reserved-failure",
+        },
+    )["result"]["manifest"]
+
+    assert reserved["item"]["state"] == "reserved"
+    assert reserved["item"]["network_disposition"] == "never_started"
+    assert reserved["provider_dispatch_count"] == 0
+
+    failed = _command(
+        client,
+        project_id,
+        {
+            "type": "record_failure",
+            "idempotency_key": "fail-unstarted-reserved",
+            "error_category": "provider_gate_closed",
+        },
+    )["result"]["manifest"]
+
+    assert failed["item"]["state"] == "failed"
+    assert failed["item"]["error_category"] == "provider_gate_closed"
+    assert failed["provider_dispatch_count"] == 0
+    assert failed["budget"]["dispatches_reserved"] == 1
+    assert failed["budget"]["remaining_dispatches"] == 0
+    assert failed["item"]["provider_job_id"] == ""
+    assert load_video_admission_manifest(store, project_id) == failed
+    assert _video_manifest_consumes_lane(store, project_id, failed) is False
 
 
 def test_video_compile_rejects_invalid_non_active_or_non_unit_shot_id(tmp_path) -> None:
@@ -1138,8 +1477,8 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert candidate["source"]["keyframe"] == {}
     assert [item["image_asset_id"] for item in candidate["source"]["references"]] == [
         media["character"],
-        media["prop"],
         media["scene"],
+        media["prop"],
     ]
     assert candidate["item"]["state"] == "planned"
     assert candidate["budget"]["dispatches_reserved"] == 0
@@ -1480,7 +1819,7 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
         "北侧检修站",
         "六角校准器",
         "缓慢向前推进",
-        "保持克制专注的检修压力",
+        TEMPORAL_STAGING["narrative_purpose"],
     ):
         assert value in prompt
     assert manifest["source"]["prompt_contract"]["keyword_rewrite"] is False
@@ -1629,7 +1968,7 @@ def test_video_admission_supports_two_explicit_shot_lanes_without_overwrite(tmp_
     assert lanes["capacity"] == {
         "max_active_lanes": MAX_ACTIVE_VIDEO_LANES,
         "active_lanes": 2,
-        "available_lanes": 0,
+        "available_lanes": MAX_ACTIVE_VIDEO_LANES - 2,
     }
     assert {
         (lane["shot_id"], lane["item_state"], lane["lane_active"])
@@ -1660,7 +1999,8 @@ def test_video_admission_supports_two_explicit_shot_lanes_without_overwrite(tmp_
     assert updated_2["item"]["state"] == "reconcile_required"
 
 
-def test_video_admission_blocks_third_active_lane_before_dispatch(tmp_path) -> None:
+def test_video_admission_blocks_third_active_lane_before_dispatch(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_VIDEO_ADMISSION_MAX_ACTIVE_LANES", "2")
     client, store, project_id, _ = _seed_ready_project(
         tmp_path,
         strict_first_frame_required=False,

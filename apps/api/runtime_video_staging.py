@@ -190,7 +190,7 @@ def build_temporal_prompt(
         f"Narrative purpose: {staging['narrative_purpose']}",
         f"Composition: {_text(shot.get('composition'))}",
         f"Camera angle: {_text(shot.get('camera_angle'))}",
-        f"Emotion: {_text(shot.get('emotion'))}",
+        f"Emotion: {staging['narrative_purpose']}",
         (
             "Continuity: "
             + (
@@ -216,7 +216,7 @@ def build_temporal_prompt(
         "camera_angle": _text(shot.get("camera_angle")),
         "camera_movement": staging["camera_movement"],
         "motion": staging["camera_movement"],
-        "emotion": _text(shot.get("emotion")),
+        "emotion": staging["narrative_purpose"],
         "continuity_cues": [
             _text(item)
             for item in shot.get("continuity_cues", [])
