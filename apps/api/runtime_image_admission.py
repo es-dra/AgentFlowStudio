@@ -253,6 +253,10 @@ def compile_image_admission_manifest(
     ]
     _assert_assets_creatively_ready(active)
     art_direction = _art_direction_contract(source.get("art_direction"), require_complete=True)
+    style_art_directions = _style_art_direction_contracts(
+        candidate_set,
+        fallback_confirmed_at=art_direction["confirmed_at"],
+    )
     characters = [item for item in active if item["asset_type"] == "character"]
     scenes = [item for item in active if item["asset_type"] == "scene"]
     props = [item for item in active if item["asset_type"] == "prop"]
@@ -313,7 +317,8 @@ def compile_image_admission_manifest(
                 "scene_plate",
                 "16:9",
                 source_fingerprint,
-                art_direction=art_direction,
+                art_direction=_asset_style_art_direction(asset, art_direction, style_art_directions),
+                shot_index=shot_index,
             )
         )
     for asset in sorted(props, key=lambda item: item["stable_id"]):
@@ -1621,6 +1626,7 @@ def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
         "demographics": str(value.get("demographics") or "").strip()[:240],
         "importance": str(value.get("importance") or ""),
         "visual_identity": str(value.get("visual_identity") or "").strip()[:600],
+        "style_domain_id": str(value.get("style_domain_id") or "").strip()[:120],
         "positive_traits": [
             str(item).strip()[:160]
             for item in value.get("positive_traits", [])
@@ -1668,6 +1674,7 @@ def _asset_item(
     source_fingerprint: str,
     *,
     art_direction: Mapping[str, Any],
+    shot_index: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     stable_id = str(asset["stable_id"])
     item = {
@@ -1688,8 +1695,45 @@ def _asset_item(
         "source_fingerprint": source_fingerprint,
         "state": "planned",
     }
+    if item_type == "scene_plate":
+        item["shot_reference_grounding"] = _scene_plate_shot_references(asset, shot_index or [])
     item["prompt_contract"] = _prompt_contract(item, art_direction=art_direction)
     return item
+
+
+def _asset_style_art_direction(
+    asset: Mapping[str, Any],
+    fallback: Mapping[str, Any],
+    style_art_directions: Mapping[str, Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    style_domain_id = str(asset.get("style_domain_id") or "").strip()
+    if style_domain_id and style_domain_id in style_art_directions:
+        return style_art_directions[style_domain_id]
+    return fallback
+
+
+def _scene_plate_shot_references(
+    asset: Mapping[str, Any],
+    shot_index: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    occurrence_ids = {
+        str(shot_id)
+        for shot_id in asset.get("occurrences", {}).get("shot_ids", [])
+        if str(shot_id).strip()
+    }
+    if not occurrence_ids:
+        return []
+    return [
+        deepcopy(shot)
+        for shot in sorted(
+            (
+                item
+                for item in shot_index
+                if str(item.get("shot_id") or "") in occurrence_ids
+            ),
+            key=lambda item: (int(item.get("number") or 0), str(item.get("shot_id") or "")),
+        )
+    ]
 
 
 def _keyframe_item(
@@ -1788,6 +1832,27 @@ def _art_direction_contract(value: Any, *, require_complete: bool) -> dict[str, 
             "图片准入需要先审核并确认统一美术方向"
             + (f"：缺少{'、'.join(missing)}" if missing else "")
         )
+    return result
+
+
+def _style_art_direction_contracts(
+    candidate_set: Mapping[str, Any],
+    *,
+    fallback_confirmed_at: str,
+) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for item in candidate_set.get("style_domains", []):
+        if not isinstance(item, Mapping):
+            continue
+        domain_id = str(item.get("art_direction_id") or item.get("domain_id") or "").strip()[:120]
+        if not domain_id:
+            continue
+        art_direction = _art_direction_contract(
+            {**item, "confirmed_at": str(item.get("confirmed_at") or fallback_confirmed_at)},
+            require_complete=False,
+        )
+        if all(art_direction.get(field) for field in ("visual_style", "medium", "palette", "lighting")):
+            result[domain_id] = art_direction
     return result
 
 
@@ -1890,6 +1955,8 @@ def _asset_grounding(asset: Mapping[str, Any]) -> dict[str, Any]:
     }
     if asset.get("demographics"):
         grounding["demographics"] = asset["demographics"]
+    if asset.get("style_domain_id"):
+        grounding["style_domain_id"] = asset["style_domain_id"]
     return grounding
 
 
@@ -1927,6 +1994,11 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
                     "；".join(
                         [
                             f"制作命名空间：{grounding['stable_id']}（仅供制作连续性，不得作为画面文字）",
+                            *(
+                                [f"风格域：{grounding['style_domain_id']}（仅用于风格隔离，不得作为画面文字）"]
+                                if grounding.get("style_domain_id")
+                                else []
+                            ),
                             f"名称：{grounding['display_name']}",
                             f"别名：{'、'.join(grounding['aliases']) or '无'}",
                             *(
@@ -1951,6 +2023,15 @@ def _prompt_contract(item: Mapping[str, Any], *, art_direction: Mapping[str, Any
         )
         if item.get("item_type") == "character_design":
             sections.extend(_character_reference_sections(grounding))
+        if item.get("item_type") == "scene_plate":
+            sections.extend(
+                _scene_plate_reference_sections(
+                    grounding,
+                    item.get("shot_reference_grounding")
+                    if isinstance(item.get("shot_reference_grounding"), list)
+                    else [],
+                )
+            )
     if shot:
         sections.append(
             (
@@ -2045,10 +2126,91 @@ def _character_context_safety_constraints(grounding: Mapping[str, Any]) -> list[
     return constraints
 
 
+def _scene_plate_reference_sections(
+    grounding: Mapping[str, Any],
+    shot_references: list[Any],
+) -> list[tuple[str, str]]:
+    shot_rows = [
+        item for item in shot_references if isinstance(item, Mapping) and str(item.get("shot_id") or "").strip()
+    ]
+    shot_lines = _scene_plate_shot_reference_lines(shot_rows)
+    return [
+        (
+            "场景制片参考",
+            "；".join(
+                [
+                    "16:9 production environment reference / scene plate，不是装饰性概念背景",
+                    "优先生成可复用的空场或轻人群环境板，服务后续镜头调度和连续性",
+                    "当氛围需要人群时只使用匿名背景剪影或虚化宾客，禁止引入可识别主角、明星脸或新的 featured character identity",
+                    f"保持场景资产身份：{grounding.get('visual_identity') or grounding.get('display_name') or ''}",
+                ]
+            ),
+        ),
+        (
+            "空间地理与调度",
+            "；".join(
+                [
+                    "画面必须有清楚可导航空间地理：前景/中景/背景 depth 分层",
+                    "明确入口、出口或 circulation path，能看出人物进入、移动、停留和离开的路线",
+                    "标出 key landmark positions，并保持方向、尺度、视线关系可复用",
+                    "至少两个 camera-accessible actor blocking/action zones，分别适合对话、接近、遮挡、交接或离场动作",
+                    "保留摄影机可用 sightlines，不用纯氛围光斑、烟雾或拥挤人群遮断表演空间",
+                ]
+            ),
+        ),
+        (
+            "镜头连续性覆盖",
+            "；".join(
+                [
+                    "空间设计必须能服务该场景资产在 ProductionGraph 中引用的每个镜头",
+                    f"引用镜头：{shot_lines or '未列出镜头标题；仍需保持全场景空间连续'}",
+                    "根据引用镜头的 title/id/purpose/action 摘要预留动作弧、互动距离、出入路线和视线轴",
+                    "同一场景在后续镜头中应能保持稳定 geography、camera axis、landmark order 和 blocking zone 关系",
+                ]
+            ),
+        ),
+        (
+            "光线材质连续性",
+            "；".join(
+                [
+                    "使用一致的 practical lighting，不依赖无法复现的抽象光效",
+                    "地面、水面、墙体、家具、金属、织物或其他主要材质的反射与明暗关系必须连续",
+                    "保持材质尺度和透视可信，避免廉价滤镜、过曝霓虹、无方向反光或纯虚化背景",
+                    "环境动态只作为可控氛围，不能破坏清楚空间读数和镜头连续性",
+                ]
+            ),
+        ),
+    ]
+
+
+def _scene_plate_shot_reference_lines(shot_rows: list[Mapping[str, Any]]) -> str:
+    lines = []
+    for shot in sorted(shot_rows, key=lambda item: (int(item.get("number") or 0), str(item.get("shot_id") or "")))[:16]:
+        parts = [
+            f"id={shot.get('shot_id')}",
+            f"title={shot.get('title') or '未提供'}",
+        ]
+        if shot.get("purpose"):
+            parts.append(f"purpose={shot['purpose']}")
+        if shot.get("action"):
+            parts.append(f"action={shot['action']}")
+        if shot.get("movement"):
+            parts.append(f"movement={shot['movement']}")
+        lines.append(" / ".join(str(part)[:220] for part in parts if str(part).strip()))
+    return "；".join(lines)
+
+
 def _prompt_negative_locks(item: Mapping[str, Any]) -> list[str]:
     locks = [_localized_negative_lock(value) for value in item.get("negative_locks", [])]
     if item.get("item_type") == "character_design":
         locks.append("禁止添加任何文字、字幕、标题、Logo、水印、界面、联系表标签、误生成文字或边框")
+    if item.get("item_type") == "scene_plate":
+        locks.extend(
+            [
+                "禁止添加任何文字、字幕、标题、Logo、水印、界面、地图标签、导视牌文字、误生成文字或边框",
+                "纯场景净板禁止新增可识别主角身份或未确认 featured character",
+            ]
+        )
     result: list[str] = []
     seen: set[str] = set()
     for lock in locks:

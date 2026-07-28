@@ -474,6 +474,32 @@ def current_project_locked_source_contract() -> dict:
             "shot_index": shots,
             "scene_count": 4,
             "shot_count": 35,
+            "style_domains": [
+                {
+                    "domain_id": "M-STY-01",
+                    "art_direction_id": "M-STY-01",
+                    "label": "现代重生甜虐",
+                    "visual_style": "商业级都市重生甜虐短剧；写实、表演清楚；前世冷青黑低饱和，泳池香槟金/暖白/蓝绿水光，演播厅黑金冷白。",
+                    "medium": "写实短剧摄影，真实人物表演，皮肤、织物、水面和舞台材质清楚。",
+                    "palette": "前世冷青黑低饱和；泳池香槟金/暖白/蓝绿水光；演播厅黑金冷白。",
+                    "lighting": "恐惧贴近移动浅景深、喜剧干净中近景、暧昧慢推距离压缩。",
+                    "negative_locks": ["禁止廉价网大滤镜"],
+                    "status": "approved",
+                    "owner_supplied": True,
+                },
+                {
+                    "domain_id": "A-STY-01",
+                    "art_direction_id": "A-STY-01",
+                    "label": "古言棋局",
+                    "visual_style": "高概念甜虐古言/爱情棋局/权谋寓言，架空东方。",
+                    "medium": "丝绸暗纹锦缎、旧铜、玉石、黑檀、冷锻钢。",
+                    "palette": "墨黑、暗金、朱红、月白。",
+                    "lighting": "构图强调对峙、遮挡、棋盘线条和距离。",
+                    "negative_locks": ["拒绝仙侠光污染", "拒绝廉价金粉", "拒绝无意义慢动作"],
+                    "status": "approved",
+                    "owner_supplied": True,
+                },
+            ],
         },
         "assets": assets,
         "art_direction": {
@@ -627,8 +653,68 @@ def test_character_design_prompt_does_not_invent_demographics_or_inflate_other_a
     assert "production reference sheet framing" in character_prompt
     assert "【基准身份参考】" not in scene_prompt
     assert "production reference sheet framing" not in scene_prompt
+    assert "production environment reference / scene plate" in scene_prompt
     assert "【变体连续性】" not in prop_prompt
     assert "同一张脸" not in prop_prompt
+
+
+def test_scene_plate_prompt_is_production_environment_reference_with_shot_continuity() -> None:
+    source = source_contract()
+    scene_asset = next(
+        asset for asset in source["asset_bible"]["assets"] if asset["stable_id"] == "asset-scene-a"
+    )
+    scene_asset["style_domain_id"] = "domain-modern-test"
+    scene_asset["visual_identity"] = "北侧检修站，玻璃顶棚、湿地面、金属门廊，入口朝东"
+    scene_asset["positive_traits"] = ["可见入口/出口", "湿地面反射连续", "保留巡夜路线"]
+    source["asset_bible"]["candidate_set"]["style_domains"] = [
+        {
+            "domain_id": "domain-modern-test",
+            "art_direction_id": "domain-modern-test",
+            "visual_style": "现代工业悬疑写实",
+            "medium": "电影摄影，金属、玻璃和潮湿混凝土材质清楚",
+            "palette": "冷绿灰与钠灯暖色对比",
+            "lighting": "入口顶灯和室内安全灯形成可复现 practical lighting",
+        },
+        {
+            "domain_id": "domain-unused-ancient",
+            "art_direction_id": "domain-unused-ancient",
+            "visual_style": "古代宫廷棋局",
+            "medium": "丝绸黑檀玉石",
+            "palette": "墨黑暗金",
+            "lighting": "烛火冷月",
+        },
+    ]
+
+    manifest = compile_image_admission_manifest(PROJECT_ID, source, created_at=REQUESTED_AT)
+    item = next(entry for entry in manifest["items"] if entry["target_asset_ids"] == ["asset-scene-a"])
+    prompt = item["prompt_contract"]["provider_prompt"]
+
+    assert item["item_type"] == "scene_plate"
+    assert item["aspect_ratio"] == "16:9"
+    assert item["size"] == "1280x720"
+    assert "制作命名空间：asset-scene-a" in prompt
+    assert "风格域：domain-modern-test" in prompt
+    assert "现代工业悬疑写实" in prompt
+    assert "古代宫廷棋局" not in prompt
+    assert "16:9 production environment reference / scene plate" in prompt
+    assert "不是装饰性概念背景" in prompt
+    assert "匿名背景剪影或虚化宾客" in prompt
+    assert "前景/中景/背景 depth 分层" in prompt
+    assert "入口、出口或 circulation path" in prompt
+    assert "key landmark positions" in prompt
+    assert "至少两个 camera-accessible actor blocking/action zones" in prompt
+    assert "sightlines" in prompt
+    assert "practical lighting" in prompt
+    assert "反射与明暗关系必须连续" in prompt
+    assert "引用镜头" in prompt
+    assert "scene-1-shot-1" in prompt
+    assert "scene-1-shot-6" in prompt
+    assert "根据引用镜头的 title/id/purpose/action 摘要" in prompt
+    assert "禁止添加任何文字、字幕、标题、Logo、水印、界面、地图标签、导视牌文字、误生成文字或边框" in prompt
+    assert "featured character" in prompt
+    assert "【基准身份参考】" not in prompt
+    assert "同一张脸" not in prompt
+    assert item["prompt_contract"]["provider_prompt_digest"] == canonical_digest(prompt)
 
 
 def test_current_project_mchar01_prompt_regression_changes_manifest_hash_deterministically() -> None:
@@ -638,6 +724,8 @@ def test_current_project_mchar01_prompt_regression_changes_manifest_hash_determi
 
     assert first["manifest_id"] == second["manifest_id"]
     assert first["manifest_hash"] == second["manifest_hash"]
+    assert first["manifest_id"] == "image-admission-e2a1d2c8370d9915"
+    assert first["manifest_hash"] == "e2a1d2c8370d9915d3eb883bf0a2597d6db4463a6b83b683c2a72b0c02e27325"
     assert first["manifest_hash"] != OLD_CURRENT_PROJECT_MANIFEST_HASH
     assert len(first["items"]) == 33
     assert first["selection_summary"] == {
@@ -670,6 +758,50 @@ def test_current_project_mchar01_prompt_regression_changes_manifest_hash_determi
     assert "人口与身份锚点" not in prompt
     assert "East Asian" not in prompt
     assert item["prompt_contract"]["provider_prompt_digest"] == canonical_digest(prompt)
+
+    scene_item = next(entry for entry in first["items"] if entry["target_asset_ids"] == ["M-ENV-03"])
+    scene_prompt = scene_item["prompt_contract"]["provider_prompt"]
+    scene_refs = [
+        reference["shot_id"]
+        for reference in scene_item.get("shot_reference_grounding", [])
+    ]
+
+    assert scene_item["item_id"] == "admit-scene_plate-d682ac4be7"
+    assert scene_item["item_type"] == "scene_plate"
+    assert scene_item["aspect_ratio"] == "16:9"
+    assert scene_item["size"] == "1280x720"
+    assert scene_item["prompt_contract"]["provider_prompt_digest"] == (
+        "964db078b781fef2a00645920c8dcd13896fde67339920e9294b60b95cef558e"
+    )
+    assert scene_item["prompt_contract"]["provider_prompt_digest"] == canonical_digest(scene_prompt)
+    assert scene_refs == [
+        "shot-embedded-f0879c54f044ebb3-01-04",
+        "shot-embedded-f0879c54f044ebb3-01-05",
+        "shot-embedded-f0879c54f044ebb3-01-06",
+        "shot-embedded-f0879c54f044ebb3-01-07",
+        "shot-embedded-f0879c54f044ebb3-01-08",
+    ]
+    assert "豪宅泳池派对" in scene_prompt
+    assert "制作命名空间：M-ENV-03" in scene_prompt
+    assert "风格域：M-STY-01" in scene_prompt
+    assert "商业级都市重生甜虐短剧" in scene_prompt
+    assert "夜间泳池、暖金庭院灯、蓝绿水面" in scene_prompt
+    assert "克制宾客背景" in scene_prompt
+    assert "16:9 production environment reference / scene plate" in scene_prompt
+    assert "不是装饰性概念背景" in scene_prompt
+    assert "匿名背景剪影或虚化宾客" in scene_prompt
+    assert "前景/中景/背景 depth 分层" in scene_prompt
+    assert "入口、出口或 circulation path" in scene_prompt
+    assert "至少两个 camera-accessible actor blocking/action zones" in scene_prompt
+    assert "sightlines" in scene_prompt
+    assert "practical lighting" in scene_prompt
+    assert "反射与明暗关系必须连续" in scene_prompt
+    assert "shot-embedded-f0879c54f044ebb3-01-04" in scene_prompt
+    assert "shot-embedded-f0879c54f044ebb3-01-08" in scene_prompt
+    assert "根据引用镜头的 title/id/purpose/action 摘要" in scene_prompt
+    assert "禁止添加任何文字、字幕、标题、Logo、水印、界面、地图标签、导视牌文字、误生成文字或边框" in scene_prompt
+    for ancient_term in ("古言", "棋局", "黑檀", "古剑", "棋子", "祭天"):
+        assert ancient_term not in scene_prompt
 
 
 def test_manifest_compile_fails_closed_for_visual_pending_or_missing_art_direction() -> None:
