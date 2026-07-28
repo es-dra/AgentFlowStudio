@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import VideoGenerationRequest
+from apps.api import runtime_video_direct_batch_routes as direct_batch_routes
 from apps.api.runtime_film_production_graph import _approved_media_projection
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
@@ -1174,6 +1175,103 @@ def test_direct_batch_operator_diagnostic_provider_block_returns_safe_packet(
     graph_after = ProductionGraphStore(store).load(project_id)
     assert graph_after["version"] == graph_before["version"]
     assert graph_after["graph_digest"] == graph_before["graph_digest"]
+
+
+def test_direct_batch_operator_diagnostic_candidate_summary_is_ledger_safe(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph_before = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph_before["version"],
+        idempotency_key="seed-ledger-safe-diagnostic-ref",
+        semantic_digest=canonical_digest({"diagnostic_ref": "A-PROP-01", "safe_ledger": True}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "A-PROP-01",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "金色棋子"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "A-PROP-01",
+                "to_id": "approved-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    class _FakeRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            assert capability == "video"
+            assert service_id == SERVICE_ID
+            return {"task": {"task_id": "diag-ledger-safe", "status": "submitted"}}
+
+    def _unsafe_poll_summary(*args, **kwargs) -> dict:
+        return {
+            "status": "succeeded",
+            "job_id": "job-ledger-safe",
+            "candidate_count": 1,
+            "candidates": [
+                {
+                    "candidate_id": "candidate_001",
+                    "preview_url": f"/projects/{project_id}/video-generations/job-ledger-safe/candidates/candidate_001/preview",
+                    "path": "/var/lib/afs-runtime/runs/project/job/video_candidates/candidate_001.mp4",
+                    "sha256": "a" * 64,
+                    "byte_count": 123,
+                    "technical_qa": {"file_present": True, "nonzero_bytes": True, "suffix": ".mp4"},
+                }
+            ],
+            "provider_calls_started": True,
+            "blocks": [],
+            "terminal": True,
+        }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _FakeRegistry(),
+    )
+    monkeypatch.setattr(
+        direct_batch_routes,
+        "_poll_diagnostic_job_to_terminal",
+        _unsafe_poll_summary,
+    )
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-safe-ledger-test",
+            "step": "single_reference",
+            "max_poll_sec": 30,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload_text = response.text
+    assert "/var/lib/" not in payload_text
+    assert "/projects/" not in payload_text
+    payload = response.json()
+    assert payload["status"] == "diagnostic_single_reference_accepted"
+    assert payload["result"]["poll"]["candidate_count"] == 1
+    ledger = read_json(
+        direct_batch_runner.batch_path(
+            store,
+            project_id,
+            "video-direct-diagnostic-safe-ledger-test",
+        )
+    )
+    ledger_text = str(ledger)
+    assert "/var/lib/" not in ledger_text
+    assert "/projects/" not in ledger_text
+    assert ledger["status"] == "diagnostic_single_reference_accepted"
+    assert ledger["results"][0]["poll"]["candidates"][0]["candidate_id"] == "candidate_001"
 
 
 def test_direct_batch_safety_rewrite_staging_is_positive_and_provider_free(

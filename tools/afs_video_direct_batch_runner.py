@@ -98,7 +98,7 @@ def load_batch_ledger(store: RuntimeStore, project_id: str, run_id: str) -> dict
 def save_batch_ledger(store: RuntimeStore, project_id: str, ledger: Mapping[str, Any]) -> None:
     path = batch_path(store, project_id, str(ledger["run_id"]))
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = dict(ledger)
+    payload = safe_ledger_payload(dict(ledger))
     payload["updated_at"] = utc_now()
     reject_unsafe_payload(payload)
     with exclusive_file_lock(path.with_suffix(".lock")):
@@ -117,6 +117,55 @@ def record_event(store: RuntimeStore, project_id: str, ledger: dict[str, Any], e
     }
     ledger.setdefault("events", []).append(safe)
     save_batch_ledger(store, project_id, ledger)
+
+
+def safe_ledger_payload(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text in {
+                "path",
+                "local_path",
+                "absolute_path",
+                "preview_url",
+                "url",
+                "storage_uri",
+                "ledger_path",
+                "suffix",
+            }:
+                continue
+            result[key_text] = safe_ledger_payload(item)
+        return result
+    if isinstance(value, list):
+        return [safe_ledger_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [safe_ledger_payload(item) for item in value]
+    if isinstance(value, Path):
+        return f"path_ref_{hashlib.sha256(str(value).encode('utf-8')).hexdigest()[:16]}"
+    if isinstance(value, str) and _unsafe_ledger_text(value):
+        return f"opaque_ref_{hashlib.sha256(value.encode('utf-8')).hexdigest()[:16]}"
+    return value
+
+
+def _unsafe_ledger_text(value: str) -> bool:
+    text = value.strip().lower()
+    if not text:
+        return False
+    return (
+        text.startswith("/")
+        or text.startswith("file:")
+        or text.startswith("http://")
+        or text.startswith("https://")
+        or "/projects/" in text
+        or "/video-generations/" in text
+        or "/candidates/" in text
+        or "/var/lib/" in text
+        or "/home/" in text
+        or "/opt/" in text
+        or ".mp4" in text
+        or ".mov" in text
+    )
 
 
 def provider_pool_summary() -> dict[str, Any]:
@@ -551,15 +600,25 @@ def candidate_technical_summary(store: RuntimeStore, project_id: str, manifest: 
     candidate_id = str(candidate.get("candidate_id") or "")
     path = candidate_file(store.run_dir(project_id, job_id), candidate_id) if job_id and candidate_id else None
     digest = ""
+    byte_count = int(candidate.get("byte_count") or 0)
     if path and path.is_file():
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        byte_count = path.stat().st_size
+    technical_qa = dict(candidate.get("technical_qa") or {})
+    if path:
+        technical_qa.update(
+            {
+                "file_present": path.is_file(),
+                "nonzero_bytes": byte_count > 0,
+            }
+        )
     return {
         "candidate_id": candidate_id,
         "job_id": job_id,
-        "preview_url": str(candidate.get("preview_url") or ""),
+        "candidate_preview_ref": f"{safe_id(job_id)}:{safe_id(candidate_id)}" if job_id and candidate_id else "",
         "sha256": digest or str(candidate.get("sha256") or ""),
-        "byte_count": int(candidate.get("byte_count") or 0),
-        "technical_qa": candidate.get("technical_qa") or {},
+        "byte_count": byte_count,
+        "technical_qa": technical_qa,
     }
 
 
@@ -862,9 +921,9 @@ def execute_batch(
         "run_id": run_id,
         "status": "completed",
         "concurrency": concurrency,
-        "results": results,
+        "results": safe_ledger_payload(results),
         "counts": count_results(results),
-        "ledger_path": str(batch_path(store, project_id, run_id)),
+        "ledger_ref": f"video_direct_batch:{safe_id(run_id)}",
     }
 
 

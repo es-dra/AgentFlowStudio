@@ -129,7 +129,7 @@ def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore
                 "shot_id": target.shot_id,
                 "shot_number": target.shot_number,
                 "result": proof,
-                "ledger_path": str(direct_batch.batch_path(store, project_id, run_id)),
+                "ledger_ref": f"video_direct_batch:{safe_id(run_id)}",
             }
         except Exception as exc:  # noqa: BLE001 - operator proof must return a bounded safe blocker.
             error = {
@@ -151,7 +151,7 @@ def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore
                 "shot_id": target.shot_id,
                 "shot_number": target.shot_number,
                 "result": error,
-                "ledger_path": str(direct_batch.batch_path(store, project_id, run_id)),
+                "ledger_ref": f"video_direct_batch:{safe_id(run_id)}",
             }
 
     @app.post("/studio/operator/projects/{project_id}/video-direct-batch/start")
@@ -229,6 +229,7 @@ def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore
             poll_interval_sec=body.poll_interval_sec,
             max_poll_sec=body.max_poll_sec,
         )
+        result = direct_batch.safe_ledger_payload(result)
         ledger["status"] = (
             f"diagnostic_{body.step}_accepted"
             if result["connectivity_proof_passed"]
@@ -243,7 +244,7 @@ def register_runtime_video_direct_batch_routes(app: FastAPI, store: RuntimeStore
             "project_id": project_id,
             "run_id": run_id,
             "result": result,
-            "ledger_path": str(direct_batch.batch_path(store, project_id, run_id)),
+            "ledger_ref": f"video_direct_batch:{safe_id(run_id)}",
         }
 
     @app.get("/studio/operator/projects/{project_id}/video-direct-batch/{run_id}")
@@ -571,14 +572,12 @@ def _diagnostic_candidate_summary(
     byte_count = path.stat().st_size if path and path.is_file() else int(candidate.get("byte_count") or 0)
     return {
         "candidate_id": candidate_id,
-        "preview_url": str(candidate.get("preview_url") or ""),
         "sha256": str(candidate.get("sha256") or ""),
-        "path": str(path) if path else "",
+        "candidate_preview_ref": f"{safe_id(job_id)}:{safe_id(candidate_id)}" if job_id and candidate_id else "",
         "byte_count": byte_count,
         "technical_qa": {
             "file_present": bool(path and path.is_file()),
             "nonzero_bytes": byte_count > 0,
-            "suffix": path.suffix.lower() if path else "",
         },
     }
 
@@ -687,7 +686,7 @@ def _batch_status_payload(
         "result_count": len(results),
         "event_count": len(ledger.get("events") or []),
         "provider_dispatch_count": int(ledger.get("provider_dispatch_count") or 0),
-        "ledger_path": str(direct_batch.batch_path(store, project_id, run_id)),
+        "ledger_ref": f"video_direct_batch:{safe_id(run_id)}",
         "updated_at": str(ledger.get("updated_at") or ""),
     }
 
