@@ -16,6 +16,9 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
   }).length;
   const capability = runtimeValue?.capability || {};
   const budgetContract = manifest?.budget_contract || runtimeValue?.budget_contract || {};
+  const historySummary = runtimeValue?.history_summary && typeof runtimeValue.history_summary === "object"
+    ? runtimeValue.history_summary
+    : {};
   const budget = manifest?.budget || {
     dispatches_reserved: 0,
     estimated_reserved_usd: "0.0000",
@@ -30,6 +33,7 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
     capability,
     budget_contract: budgetContract,
     budget,
+    history_summary: historySummary,
     ready_to_prepare: true,
     provider_dispatch_count: Number(manifest?.provider_dispatch_count || 0),
     actual_usd: manifest?.actual_usd ?? null,
@@ -118,6 +122,34 @@ export function imageAdmissionCommand(command, now = Date.now()) {
     idempotency_key: command.idempotency_key
       || `image-admission-${String(command.type || "command")}-${String(command.item_id || "manifest")}-${now}`,
   };
+}
+
+const IMAGE_ADMISSION_MANIFEST_SOURCE_COMMANDS = new Set([
+  "create_recovery_manifest",
+  "create_next_batch_manifest",
+  "inspect_next_batch",
+  "cancel_batch",
+]);
+
+export function imageAdmissionCommandSourceMatchesManifest(command, source, manifest) {
+  if (!IMAGE_ADMISSION_MANIFEST_SOURCE_COMMANDS.has(String(command?.type || ""))) {
+    return true;
+  }
+  const manifestSource = manifest?.source;
+  if (!manifestSource || typeof manifestSource !== "object") return true;
+  if (
+    manifestSource.production_graph_version
+    && Number(source?.production_graph_version || 0) !== Number(manifestSource.production_graph_version || 0)
+  ) {
+    return false;
+  }
+  if (
+    manifestSource.production_graph_digest
+    && String(source?.production_graph_digest || "") !== String(manifestSource.production_graph_digest || "")
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function imageAdmissionItemJobId(item) {

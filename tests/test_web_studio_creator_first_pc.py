@@ -583,6 +583,8 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
         assert beta["video"] is None
         assert projection["mediaSummary"] == {
             "approvedImages": 1,
+            "approvedAssetImages": 0,
+            "approvedShotImages": 1,
             "approvedVideos": 1,
             "readyShots": 1,
         }
@@ -600,6 +602,128 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
     assert canvas_video["params"]["previewAspectRatio"] == "1280:720"
     assert result["canvasVideoAspectRatio"] == "16 / 9"
     assert result["approvedVideoEdges"] == 1
+
+
+def test_approved_asset_media_projects_to_canvas_nodes_without_candidate_leakage() -> None:
+    projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
+    result_view_uri = (STUDIO / "src" / "node-result-view.js").as_uri()
+    script = f"""
+      import {{
+        applyProductionGraphCanvasProjection,
+        productionGraphWorkspaceProjection,
+      }} from {json.dumps(projection_uri)};
+      import {{ previewAspectRatio }} from {json.dumps(result_view_uri)};
+      const workspace = {{
+        status: "ready",
+        project_id: "asset-media-project",
+        graph_version: 21,
+        graph_digest: "graph-v21",
+        storyboard: {{ graph_version: 21, graph_digest: "graph-v21" }},
+        sequence: {{
+          script_revisions: [],
+          sequences: [],
+          characters: [
+            {{ node_id: "M-CHAR-01", state: "active", metadata: {{ display_name: "叶安安" }} }},
+            {{ node_id: "M-CHAR-03", state: "active", metadata: {{ display_name: "孟欣" }} }},
+          ],
+          scenes: [
+            {{ node_id: "M-ENV-03", state: "active", metadata: {{ name: "豪宅泳池派对" }} }},
+          ],
+          props: [],
+          reference_sets: [],
+          shots: [
+            {{ node_id: "shot-04", state: "active", metadata: {{ title: "泳池苏醒", duration_seconds: 6 }} }},
+          ],
+          production_aids: [],
+          approved_media: [
+            {{
+              media_node_id: "approved-mchar01",
+              media_kind: "image",
+              preview_url: "/projects/asset-media-project/image-assets/img-approved-mchar01/preview",
+              width: 960,
+              height: 1280,
+              target_node_ids: ["M-CHAR-01"],
+              approval_graph_version: 20,
+            }},
+            {{
+              media_node_id: "approved-menv03",
+              media_kind: "image",
+              preview_url: "/projects/asset-media-project/image-assets/img-approved-menv03/preview",
+              width: 1280,
+              height: 720,
+              target_node_ids: ["M-ENV-03"],
+              approval_graph_version: 21,
+            }},
+            {{
+              media_node_id: "approved-shot04",
+              media_kind: "image",
+              preview_url: "/projects/asset-media-project/image-assets/img-shot04/preview",
+              width: 1280,
+              height: 720,
+              target_node_ids: ["shot-04"],
+              approval_graph_version: 21,
+            }},
+          ],
+          dependencies: [
+            {{ from_id: "M-ENV-03", to_id: "shot-04", relation_type: "contains" }},
+            {{ from_id: "M-CHAR-01", to_id: "approved-mchar01", relation_type: "approved_image" }},
+            {{ from_id: "M-ENV-03", to_id: "approved-menv03", relation_type: "approved_image" }},
+            {{ from_id: "shot-04", to_id: "approved-shot04", relation_type: "approved_image" }},
+          ],
+        }},
+      }};
+      const pendingCandidateUrl = "/projects/asset-media-project/image-assets/img-pending-mchar03/preview";
+      const projection = productionGraphWorkspaceProjection(workspace);
+      const state = {{
+        nodes: {{}},
+        edges: {{}},
+        order: [],
+        selection: {{ nodeIds: [], edgeId: null }},
+        production: {{}},
+      }};
+      applyProductionGraphCanvasProjection(state, workspace);
+      const nodes = Object.values(state.nodes);
+      const character = nodes.find((node) => node.params?.productionGraphTruth?.graph_node_id === "M-CHAR-01");
+      const pending = nodes.find((node) => node.params?.productionGraphTruth?.graph_node_id === "M-CHAR-03");
+      const scene = nodes.find((node) => node.params?.productionGraphTruth?.graph_node_id === "M-ENV-03");
+      console.log(JSON.stringify({{
+        projection,
+        character,
+        pending,
+        scene,
+        characterAspect: previewAspectRatio(character),
+        sceneAspect: previewAspectRatio(scene),
+        leakedPendingCandidate: JSON.stringify(state).includes(pendingCandidateUrl),
+      }}));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)
+
+    assert result["projection"]["mediaSummary"] == {
+        "approvedImages": 3,
+        "approvedAssetImages": 2,
+        "approvedShotImages": 1,
+        "approvedVideos": 0,
+        "readyShots": 1,
+    }
+    character = result["character"]
+    assert character["previewUrl"].endswith("/img-approved-mchar01/preview")
+    assert character["status"] == "complete"
+    assert character["result"] == "已批准参考图已保存到当前项目。"
+    assert character["params"]["approvedMedia"]["media_node_id"] == "approved-mchar01"
+    assert character["params"]["approvedMedia"]["source_node_ids"] == ["M-CHAR-01"]
+    assert result["characterAspect"] == "3 / 4"
+    assert result["scene"]["previewUrl"].endswith("/img-approved-menv03/preview")
+    assert result["sceneAspect"] == "16 / 9"
+    assert result["pending"].get("previewUrl", "") == ""
+    assert result["pending"]["params"]["approvedMedia"] is None
+    assert result["leakedPendingCandidate"] is False
 
 
 def test_canvas_storyboard_bible_and_agent_remain_one_product_graph_projection() -> None:

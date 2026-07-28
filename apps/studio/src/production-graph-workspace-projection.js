@@ -10,7 +10,8 @@ export function productionGraphWorkspaceProjection(workspace = null) {
       scenes: [],
       shots: [],
       approvedMedia: [],
-      mediaSummary: { approvedImages: 0, approvedVideos: 0, readyShots: 0 },
+      approvedMediaByTarget: {},
+      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, readyShots: 0 },
       summary: emptySummary(),
     };
   }
@@ -29,7 +30,8 @@ export function productionGraphWorkspaceProjection(workspace = null) {
       scenes: [],
       shots: [],
       approvedMedia: [],
-      mediaSummary: { approvedImages: 0, approvedVideos: 0, readyShots: 0 },
+      approvedMediaByTarget: {},
+      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, readyShots: 0 },
       summary: emptySummary(),
     };
   }
@@ -40,8 +42,9 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     sequence.approved_media,
     workspace.project_id,
   );
+  const approvedMediaByTarget = Object.fromEntries(approvedMedia.byTarget.entries());
   const shots = array(sequence.shots).map((shot) => {
-    const media = approvedMedia.byTarget.get(String(shot.node_id || "")) || {};
+    const media = approvedMediaByTarget[String(shot.node_id || "")] || {};
     return {
       nodeId: canvasNodeId(shot.node_id),
       graphNodeId: String(shot.node_id || ""),
@@ -64,6 +67,8 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     name: String(scene.metadata?.name || ""),
     shots: shots.filter((shot) => shot.sceneNodeId === scene.node_id),
   }));
+  const shotTargetIds = new Set(shots.map((shot) => shot.graphNodeId));
+  const approvedImages = approvedMedia.items.filter((item) => item.mediaKind === "image");
 
   return {
     status: READY,
@@ -73,8 +78,15 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     scenes,
     shots,
     approvedMedia: approvedMedia.items,
+    approvedMediaByTarget,
     mediaSummary: {
-      approvedImages: approvedMedia.items.filter((item) => item.mediaKind === "image").length,
+      approvedImages: approvedImages.length,
+      approvedAssetImages: approvedImages.filter(
+        (item) => item.targetNodeIds.some((targetId) => !shotTargetIds.has(targetId)),
+      ).length,
+      approvedShotImages: approvedImages.filter(
+        (item) => item.targetNodeIds.some((targetId) => shotTargetIds.has(targetId)),
+      ).length,
       approvedVideos: approvedMedia.items.filter((item) => item.mediaKind === "video").length,
       readyShots: shots.filter((shot) => shot.preview || shot.video).length,
     },
@@ -291,11 +303,16 @@ function emptySummary() {
 
 function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY, projection) {
   const metadata = record.metadata || {};
+  const media = projection.approvedMediaByTarget?.[graphNodeId]?.image || null;
   const title = String(metadata.display_name || metadata.name || metadata.title || metadata.intent || fallbackTitle).trim() || fallbackTitle;
   const details = [];
   if (metadata.intent) details.push(String(metadata.intent));
   if (Number(metadata.duration_seconds || 0) > 0) details.push(`时长：${Number(metadata.duration_seconds).toFixed(1)} 秒`);
+  if (media) details.push("参考图：已批准");
   if (record.state === "invalidated") details.push("需要更新");
+  const aspectRatio = media?.width > 0 && media?.height > 0
+    ? `${media.width}:${media.height}`
+    : "";
   return {
     id,
     type,
@@ -306,13 +323,26 @@ function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY,
     h: 190,
     content: details.join("\n") || "已加入当前制作方案。",
     prompt: "",
-    status: record.state === "invalidated" ? "blocked" : "accepted",
-    result: null,
+    status: record.state === "invalidated" ? "blocked" : media ? "complete" : "accepted",
+    result: media ? "已批准参考图已保存到当前项目。" : null,
+    previewUrl: media?.previewUrl || "",
     groupId: null,
     collapsed: false,
     params: {
       productionGraphProjection: "canonical_production_graph_projection",
       productionGraphTruth: { graph_node_id: graphNodeId, graph_version: projection.graphVersion, graph_digest: projection.graphDigest },
+      approvedMedia: media ? {
+        media_node_id: media.mediaNodeId,
+        media_kind: media.mediaKind,
+        source_node_ids: media.targetNodeIds,
+        model: media.model,
+        resolution: media.resolution,
+        mime_type: media.mimeType,
+        width: media.width,
+        height: media.height,
+        approval_graph_version: media.approvalGraphVersion,
+      } : null,
+      previewAspectRatio: aspectRatio,
       provider_dispatch_count: 0,
     },
   };

@@ -565,6 +565,136 @@ def _compiled_locked_client(tmp_path, monkeypatch) -> tuple[TestClient, dict]:
     return client, source
 
 
+def test_public_image_admission_history_summary_reports_latest_target_lifecycle(tmp_path) -> None:
+    runtime_root = tmp_path / "runtime"
+    store = RuntimeStore(runtime_root)
+    store.ensure_project_manifest(PROJECT_ID)
+    root = runtime_root / "projects" / PROJECT_ID / "image_admission"
+    history = root / "history"
+    history.mkdir(parents=True)
+
+    def manifest(manifest_id: str, updated_at: str, items: list[dict]) -> dict:
+        return {
+            "schema_version": "afs.image_admission_manifest.v0.1",
+            "project_id": PROJECT_ID,
+            "manifest_id": manifest_id,
+            "manifest_hash": "a" * 64,
+            "status": "locked",
+            "updated_at": updated_at,
+            "items": items,
+        }
+
+    (history / "image-admission-old-failed.json").write_text(
+        json.dumps(
+            manifest(
+                "image-admission-old-failed",
+                "2026-07-24T00:00:00Z",
+                [
+                    {"item_id": "admit-character-a", "target_asset_ids": ["asset-character-a"], "state": "failed"},
+                    {"item_id": "admit-scene-a", "target_asset_ids": ["asset-scene-a"], "state": "failed"},
+                ],
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (history / "image-admission-recovered.json").write_text(
+        json.dumps(
+            manifest(
+                "image-admission-recovered",
+                "2026-07-24T01:00:00Z",
+                [{"item_id": "admit-character-a", "target_asset_ids": ["asset-character-a"], "state": "approved"}],
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (root / "manifest.json").write_text(
+        json.dumps(
+            manifest(
+                "image-admission-current",
+                "2026-07-24T02:00:00Z",
+                [{"item_id": "admit-scene-b", "target_asset_ids": ["asset-scene-b"], "state": "candidate"}],
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    client = TestClient(create_runtime_app(runtime_root=runtime_root))
+    response = client.get(f"/projects/{PROJECT_ID}/m6/image-admission")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["history_summary"] == {
+        "target_item_count": 3,
+        "approved_item_count": 1,
+        "candidate_item_count": 1,
+        "pending_item_count": 1,
+        "planned_item_count": 0,
+        "deferred_item_count": 1,
+        "rejected_item_count": 0,
+        "cancelled_item_count": 0,
+    }
+
+
+def test_fixed_manifest_approval_preview_tolerates_stale_browser_source_without_relaxing_continuation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, source = _compiled_locked_client(tmp_path, monkeypatch)
+    monkeypatch.setenv("AFS_ALLOW_DETERMINISTIC_MEDIA_FIXTURES", "true")
+    current = client.get(f"/projects/{PROJECT_ID}/m6/image-admission").json()["manifest"]
+    item = next(item for item in current["items"] if item["item_type"] == "character_design")
+    _command(
+        client,
+        {
+            "type": "record_candidate",
+            "item_id": item["item_id"],
+            "fixture": True,
+        },
+        source,
+    )
+    stale_source = deepcopy(source)
+    stale_source["asset_bible"]["assets"][0]["visual_identity"] = "stale browser-only source"
+
+    approve = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "approve",
+                "item_id": item["item_id"],
+                "idempotency_key": "stale-browser-source-approve-preview",
+            },
+            "source": stale_source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["command"]["type"] == "approve"
+    assert approve.json()["provider_dispatch_count"] == 0
+    preview_item = next(
+        entry
+        for entry in approve.json()["result"]["manifest"]["items"]
+        if entry["item_id"] == item["item_id"]
+    )
+    assert preview_item["state"] == "approved"
+
+    continuation = client.post(
+        f"/projects/{PROJECT_ID}/m6/image-admission/commands/preview",
+        json={
+            "command": {
+                "type": "inspect_next_batch",
+                "idempotency_key": "stale-browser-source-continuation-preview",
+            },
+            "source": stale_source,
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert continuation.status_code == 422
+    assert "image admission manifest source is stale" in continuation.json()["detail"]["details"]["raw_detail"]
+
+
 def test_manifest_compiler_produces_dynamic_unique_lineage_items_without_name_rules() -> None:
     manifest = compile_image_admission_manifest(PROJECT_ID, source_contract(), created_at=REQUESTED_AT)
 
