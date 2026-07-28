@@ -39,6 +39,7 @@ from apps.api.runtime_production_graph import (
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 from apps.api.runtime_video_candidates import candidate_file
 from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID
+from apps.api.runtime_video_dispatch_outbox import load_dispatch_outbox
 from apps.api.runtime_video_staging import (
     FIRST_FRAME,
     REFERENCE_CONDITIONED,
@@ -2179,6 +2180,15 @@ def _assert_new_round_eligible(
         or str(block.get("block_id") or "").strip() == "remote_video_provider_not_ready"
         for block in blocks
     )
+    provider_not_ready_pre_task = (
+        provider_not_ready
+        and not _has_provider_task_identity(safe_manifest)
+        and _provider_not_ready_has_no_provider_task(
+            store.run_dir(project_id, str(item["provider_job_id"])),
+            manifest,
+            safe_manifest,
+        )
+    )
     if (
         safe_manifest.get("status") != "reconcile_required"
         or outputs not in (None, [])
@@ -2187,13 +2197,58 @@ def _assert_new_round_eligible(
                 safe_manifest.get("provider_calls_started") is True
                 and rejected
             )
-            or (
-                safe_manifest.get("provider_calls_started") is not True
-                and provider_not_ready
-            )
+            or provider_not_ready_pre_task
         )
     ):
         raise ValueError("the prior video round is not safely classified as recoverable")
+
+
+def _provider_not_ready_has_no_provider_task(
+    output_dir: Path,
+    manifest: Mapping[str, Any],
+    safe_manifest: Mapping[str, Any],
+) -> bool:
+    if safe_manifest.get("provider_calls_started") is not True:
+        return True
+    try:
+        outbox = load_dispatch_outbox(output_dir)
+    except (OSError, ValueError):
+        return False
+    if not outbox:
+        return False
+    return (
+        str(outbox.get("project_id") or "") == str(manifest.get("project_id") or "")
+        and str(outbox.get("manifest_id") or "") == str(manifest.get("manifest_id") or "")
+        and str(outbox.get("manifest_hash") or "") == str(manifest.get("manifest_hash") or "")
+        and str(outbox.get("item_id") or "") == str((manifest.get("item") or {}).get("item_id") or "")
+        and outbox.get("state") == "reconcile_required"
+        and outbox.get("network_disposition") == "may_have_dispatched"
+        and outbox.get("reconcile_required") is True
+        and not _has_provider_task_identity(outbox)
+    )
+
+
+def _has_provider_task_identity(value: Mapping[str, Any]) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    for key in (
+        "provider_task_fingerprint",
+        "provider_task_id",
+        "task_id",
+        "remote_task_id",
+    ):
+        if str(value.get(key) or "").strip():
+            return True
+    for key in ("provider_task", "task"):
+        task = value.get(key)
+        if not isinstance(task, Mapping):
+            continue
+        if str(task.get("task_id") or "").strip():
+            return True
+        nested = task.get("task")
+        if isinstance(nested, Mapping) and str(nested.get("task_id") or "").strip():
+            return True
+    return False
 
 
 def _assert_next_shot_eligible(

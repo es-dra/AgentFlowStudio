@@ -33,6 +33,12 @@ from apps.api.runtime_video_admission import (
     video_admission_capability,
     video_admission_generation_request,
 )
+from apps.api.runtime_video_dispatch_outbox import (
+    mark_network_may_have_started,
+    mark_reconcile_required,
+    prepare_dispatch_outbox,
+    record_provider_task,
+)
 
 
 PNG_BYTES = base64.b64decode(
@@ -2477,6 +2483,184 @@ def test_provider_not_ready_reconcile_round_creates_same_shot_recovery_without_p
     assert candidate["round_contract"]["prior_round_preserved"] is True
     assert candidate["provider_dispatch_count"] == 0
     assert load_video_admission_manifest(store, project_id) == old_manifest
+
+
+def test_conservative_provider_not_ready_reconcile_round_uses_outbox_no_task_boundary(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-conservative-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {
+            "type": "reserve_dispatch",
+            "idempotency_key": "reserve-conservative-provider-not-ready",
+        },
+    )["result"]["manifest"]
+    job_id = "provider-not-ready-conservative-job"
+    output_dir = store.run_dir(project_id, job_id)
+    prepare_dispatch_outbox(
+        output_dir,
+        project_id=project_id,
+        job_id=job_id,
+        manifest_id=reserved["manifest_id"],
+        manifest_hash=reserved["manifest_hash"],
+        item_id=reserved["item"]["item_id"],
+    )
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+    mark_video_admission_network_started(store, project_id, job_id=job_id)
+    mark_network_may_have_started(output_dir)
+    mark_reconcile_required(output_dir, "provider_submit_outcome_unknown")
+    old_manifest = deepcopy(load_video_admission_manifest(store, project_id))
+    assert old_manifest["item"]["state"] == "reconcile_required"
+    assert old_manifest["item"]["network_disposition"] == "may_have_dispatched"
+    assert old_manifest["item"].get("provider_task_fingerprint") in (None, "")
+    assert old_manifest["item"]["candidate"] is None
+    safe_path = output_dir / "video_generation_safe_manifest.json"
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "failure_class": "provider_not_ready",
+            "stage": "reconcile_required",
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    body = {
+        "command": _reference_video_setup_command(
+            {
+                "type": "create_new_round",
+                "idempotency_key": "recover-conservative-provider-not-ready",
+            }
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["source"]["shot"]["shot_id"] == old_manifest["source"]["shot"]["shot_id"]
+    assert candidate["round_contract"]["prior_manifest_id"] == old_manifest["manifest_id"]
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_manifest
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_manifest['manifest_id']}.json"
+    )
+    assert archived == old_manifest
+
+
+def test_conservative_provider_not_ready_recovery_rejects_outbox_task_identity(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-provider-task-boundary",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-provider-task-boundary"},
+    )["result"]["manifest"]
+    job_id = "provider-not-ready-with-task-job"
+    output_dir = store.run_dir(project_id, job_id)
+    prepare_dispatch_outbox(
+        output_dir,
+        project_id=project_id,
+        job_id=job_id,
+        manifest_id=reserved["manifest_id"],
+        manifest_hash=reserved["manifest_hash"],
+        item_id=reserved["item"]["item_id"],
+    )
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+    mark_video_admission_network_started(store, project_id, job_id=job_id)
+    mark_network_may_have_started(output_dir)
+    record_provider_task(output_dir, {"task": {"task_id": "remote-task-001"}})
+    mark_reconcile_required(output_dir, "provider_submit_outcome_unknown")
+    safe_path = output_dir / "video_generation_safe_manifest.json"
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "failure_class": "provider_not_ready",
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "create_new_round",
+                    "idempotency_key": "recover-provider-task-boundary",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert load_video_admission_manifest(store, project_id)["item"]["state"] == "reconcile_required"
 
 
 @pytest.mark.parametrize("mutation", ["fingerprint", "candidate", "outputs", "started_not_ready"])
