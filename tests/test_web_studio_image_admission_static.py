@@ -61,11 +61,42 @@ def test_approved_image_refreshes_graph_bound_video_lineage_in_same_session() ->
         "async function confirmImageAdmissionCommand", 1
     )[1].split("async function commitImageAdmissionCommand", 1)[0]
 
-    assert "runtime.sequenceWorkspace?.()" in refresh_body
-    assert "runtime.loadVideoAdmission?.()" in refresh_body
+    assert "safely(runtime.sequenceWorkspace)" in refresh_body
+    assert "runtime.loadAssetBible" in refresh_body
+    assert "runtime.loadImageAdmission" in refresh_body
+    assert "safely(runtime.loadVideoAdmission)" in refresh_body
     assert "snapshot.videoAdmission = videoAdmission" in refresh_body
     assert 'confirmedCommand.type === "approve"' in confirm_body
     assert "await refreshGraphBoundRuntimeState();" in confirm_body
+
+
+def test_image_admission_browser_commands_refresh_canonical_source_before_preview() -> None:
+    shell = PRODUCT_SHELL.read_text(encoding="utf-8")
+    stage_body = shell.split("async function stageImageAdmissionCommand", 1)[1].split(
+        "async function confirmImageAdmissionCommand",
+        1,
+    )[0]
+    commit_body = shell.split("async function commitImageAdmissionCommand", 1)[1].split(
+        "async function dispatchImageAdmissionItem",
+        1,
+    )[0]
+    source_body = shell.split("async function refreshImageAdmissionCommandSource", 1)[1].split(
+        "async function dispatchImageAdmissionItem",
+        1,
+    )[0]
+
+    assert "const source = await refreshImageAdmissionCommandSource(stableCommand);" in stage_body
+    assert stage_body.index("refreshImageAdmissionCommandSource") < stage_body.index(
+        "previewImageAdmissionCommand(request)"
+    )
+    assert "const source = await refreshImageAdmissionCommandSource(stableCommand);" in commit_body
+    assert commit_body.index("refreshImageAdmissionCommandSource") < commit_body.index(
+        "previewImageAdmissionCommand(request)"
+    )
+    assert "await refreshGraphBoundRuntimeState();" in source_body
+    assert "source.production_graph_version" in source_body
+    assert "source.production_graph_digest" in source_body
+    assert "图片准入来源与当前清单不一致" in source_body
 
 
 def test_next_image_batch_is_creator_selected_and_separate_from_generation() -> None:
@@ -108,7 +139,8 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
             {{ item_id: "c", state: "failed" }}
           ]
         }},
-        capability: {{ image_gate_open: false, keyframe_continuity_ready: true }}
+        capability: {{ image_gate_open: false, keyframe_continuity_ready: true }},
+        history_summary: {{ target_item_count: 4, deferred_item_count: 2 }}
       }});
       console.log(JSON.stringify(result));
     """
@@ -121,6 +153,7 @@ def test_image_admission_projection_keeps_actual_billing_nullable_and_counts_sta
     assert result["counts"]["failed"] == 1
     assert result["actual_usd"] is None
     assert result["billing_verification_state"] == "unverified"
+    assert result["history_summary"]["deferred_item_count"] == 2
 
 
 def test_failed_image_guidance_exposes_safe_recovery_without_raw_error_or_old_ledger_reuse() -> None:
@@ -322,6 +355,9 @@ def test_image_candidate_review_requires_loaded_thumbnail_and_accessible_viewer(
     assert '"预览批准"' not in shell
     assert '"预览拒绝"' not in shell
     assert "approve.disabled = !media.canApprove" in shell
+    assert "定义 ${view.counts.approved}/${view.counts.total} 已确认" in shell
+    assert "imageMediaLifecycleLabel()" in shell
+    assert "张已暂缓" in shell
     assert "imageAdmissionMediaStates.set(key, state)" in shell
     assert 'import { setRuntimeMediaSource } from "./runtime-media-source.js";' in shell
     assert "setRuntimeMediaSource(image, previewUrl)" in shell

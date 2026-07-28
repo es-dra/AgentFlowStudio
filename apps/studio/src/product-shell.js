@@ -1036,14 +1036,22 @@ export function createProductShell(options = {}) {
 
   async function refreshGraphBoundRuntimeState(runtime = options.getRuntime?.()) {
     if (!runtime) return null;
-    const [workspace, videoAdmission] = await Promise.all([
-      runtime.sequenceWorkspace?.(),
-      runtime.loadVideoAdmission?.(),
+    const safely = (request) => Promise.resolve(request?.()).catch(() => null);
+    const [workspace, runtimeAssetBible, imageAdmission, videoAdmission] = await Promise.all([
+      safely(runtime.sequenceWorkspace),
+      safely(runtime.loadAssetBible),
+      safely(runtime.loadImageAdmission),
+      safely(runtime.loadVideoAdmission),
     ]);
     if (workspace) {
       snapshot.sequenceWorkspace = workspace;
       applyGraphWorkspace(workspace);
       snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+    }
+    if (runtimeAssetBible) snapshot.runtimeAssetBible = runtimeAssetBible;
+    if (imageAdmission) {
+      snapshot.imageAdmission = imageAdmission;
+      imageAdmissionPreview = null;
     }
     if (videoAdmission) {
       snapshot.videoAdmission = videoAdmission;
@@ -1298,16 +1306,12 @@ export function createProductShell(options = {}) {
       ["剧本", currentScriptRevisionId ? "已选择" : "待选择"],
       ["镜头", source ? `${source.scene_count} 场 · ${source.shot_count} 镜头` : "待安排"],
       ["创作资产", view.counts.total
-        ? `${view.counts.approved}/${view.counts.total} 已确认`
+        ? `定义 ${view.counts.approved}/${view.counts.total} 已确认`
         : source?.canonical_assets?.length
           ? `${source.canonical_assets.length} 项来源已确认`
           : "待整理"],
       ["美术方向", view.art_direction.status === "confirmed" ? "已确认" : "待确认"],
-      ["图片", imageAdmissionView().counts.approved
-        ? `${imageAdmissionView().counts.approved} 张已确认`
-        : imageAdmissionView().counts.candidate
-          ? `${imageAdmissionView().counts.candidate} 张待审看`
-          : "尚未生成"],
+      ["参考图", imageMediaLifecycleLabel()],
       ["视频", graphView().mediaSummary?.approvedVideos
         ? `${graphView().mediaSummary.approvedVideos} 条已确认`
         : videoAdmissionView().item?.state === "candidate"
@@ -1330,6 +1334,23 @@ export function createProductShell(options = {}) {
       bar.appendChild(watch);
     }
     return bar;
+  }
+
+  function imageMediaLifecycleLabel() {
+    const admission = imageAdmissionView();
+    const counts = admission.counts || {};
+    const approved = Number(graphView().mediaSummary?.approvedAssetImages ?? graphView().mediaSummary?.approvedImages ?? 0);
+    const candidate = Number(counts.candidate || 0);
+    const inFlight = Number(counts.reserved || 0) + Number(counts.processing || 0);
+    const planned = Number(counts.planned || 0);
+    const deferred = Number(admission.history_summary?.deferred_item_count ?? counts.failed ?? 0);
+    const parts = [];
+    if (approved) parts.push(`${approved} 张已批准`);
+    if (candidate) parts.push(`${candidate} 张待审看`);
+    if (inFlight) parts.push(`${inFlight} 张处理中`);
+    if (planned && !candidate && !inFlight) parts.push(`${planned} 张待生成`);
+    if (deferred) parts.push(`${deferred} 张已暂缓`);
+    return parts.length ? parts.join(" · ") : "尚未生成";
   }
 
   function assetBibleQualityGate(view) {
@@ -2604,9 +2625,10 @@ export function createProductShell(options = {}) {
     imageAdmissionOpen = true;
     try {
       const stableCommand = imageAdmissionCommand(command);
+      const source = await refreshImageAdmissionCommandSource(stableCommand);
       const request = {
         command: stableCommand,
-        source: imageAdmissionSource(),
+        source,
         requested_at: new Date().toISOString(),
       };
       const preview = await options.getRuntime?.().previewImageAdmissionCommand(request);
@@ -2661,9 +2683,11 @@ export function createProductShell(options = {}) {
   }
 
   async function commitImageAdmissionCommand(command) {
+    const stableCommand = imageAdmissionCommand(command);
+    const source = await refreshImageAdmissionCommandSource(stableCommand);
     const request = {
-      command: imageAdmissionCommand(command),
-      source: imageAdmissionSource(),
+      command: stableCommand,
+      source,
       requested_at: new Date().toISOString(),
     };
     const preview = await options.getRuntime?.().previewImageAdmissionCommand(request);
@@ -2677,6 +2701,33 @@ export function createProductShell(options = {}) {
       manifest: response?.result?.manifest || null,
     };
     return response?.result?.manifest || null;
+  }
+
+  async function refreshImageAdmissionCommandSource(command) {
+    const requestedProjectId = currentProductProjectId();
+    await refreshGraphBoundRuntimeState();
+    if (requestedProjectId && requestedProjectId !== currentProductProjectId()) {
+      throw new Error("项目已切换；请在当前项目重新预览图片准入。");
+    }
+    const source = imageAdmissionSource();
+    if (!source?.asset_bible || !Object.keys(source.asset_bible).length) {
+      throw new Error("图片准入需要当前已锁定的 Asset Bible；请刷新项目后重试。");
+    }
+    if (
+      command?.type !== "compile"
+      && imageAdmissionView().manifest?.source?.production_graph_version
+      && Number(source.production_graph_version || 0) !== Number(imageAdmissionView().manifest.source.production_graph_version || 0)
+    ) {
+      throw new Error("图片准入来源与当前清单不一致；请刷新后重试。");
+    }
+    if (
+      command?.type !== "compile"
+      && imageAdmissionView().manifest?.source?.production_graph_digest
+      && String(source.production_graph_digest || "") !== String(imageAdmissionView().manifest.source.production_graph_digest || "")
+    ) {
+      throw new Error("图片准入来源与当前清单不一致；请刷新后重试。");
+    }
+    return source;
   }
 
   async function dispatchImageAdmissionItem(item) {

@@ -16,6 +16,9 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
   }).length;
   const capability = runtimeValue?.capability || {};
   const budgetContract = manifest?.budget_contract || runtimeValue?.budget_contract || {};
+  const historySummary = runtimeValue?.history_summary && typeof runtimeValue.history_summary === "object"
+    ? runtimeValue.history_summary
+    : {};
   const budget = manifest?.budget || {
     dispatches_reserved: 0,
     estimated_reserved_usd: "0.0000",
@@ -30,6 +33,7 @@ export function imageAdmissionProjection(runtimeValue = null, mediaStates = {}) 
     capability,
     budget_contract: budgetContract,
     budget,
+    history_summary: historySummary,
     ready_to_prepare: true,
     provider_dispatch_count: Number(manifest?.provider_dispatch_count || 0),
     actual_usd: manifest?.actual_usd ?? null,

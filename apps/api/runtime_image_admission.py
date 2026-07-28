@@ -88,6 +88,7 @@ def register_runtime_image_admission_routes(
             "manifest": manifest,
             "capability": image_admission_capability(),
             "budget_contract": budget_contract(),
+            "history_summary": _image_admission_history_summary(store, project_id, manifest),
             "provider_dispatch_count": int((manifest or {}).get("budget", {}).get("dispatches_reserved") or 0),
             "external_cost_usd": str((manifest or {}).get("budget", {}).get("estimated_reserved_usd") or "0.0000"),
         }
@@ -973,6 +974,77 @@ def _historically_sent_item_ids(
     }
 
 
+def _image_admission_history_summary(
+    store: RuntimeStore,
+    project_id: str,
+    active: Mapping[str, Any],
+) -> dict[str, Any]:
+    manifests: list[Mapping[str, Any]] = []
+    history_dir = _manifest_path(store, project_id).parent / "history"
+    if history_dir.is_dir():
+        for path in sorted(history_dir.glob("*.json")):
+            archived = read_json(path)
+            reject_unsafe_payload(archived)
+            if (
+                archived.get("schema_version") != SCHEMA_VERSION
+                or archived.get("project_id") != project_id
+                or safe_id(str(archived.get("manifest_id") or "")) != path.stem
+            ):
+                raise ValueError("archived image manifest storage scope is invalid")
+            manifests.append(archived)
+    if active:
+        manifests.append(active)
+
+    def sort_key(manifest: Mapping[str, Any]) -> tuple[str, str]:
+        return (
+            str(manifest.get("updated_at") or manifest.get("locked_at") or manifest.get("created_at") or ""),
+            str(manifest.get("manifest_id") or ""),
+        )
+
+    latest_by_target: dict[str, str] = {}
+    for manifest in sorted(manifests, key=sort_key):
+        for item in manifest.get("items", []):
+            if not isinstance(item, Mapping):
+                continue
+            target_ids = []
+            for value in item.get("target_asset_ids", []):
+                raw = str(value).strip()
+                if raw:
+                    target_ids.append(safe_id(raw))
+            target_key = ",".join(sorted(target_ids)) or safe_id(str(item.get("item_id") or ""))
+            if not target_key:
+                continue
+            latest_by_target[target_key] = str(item.get("state") or "planned")
+
+    counts = {
+        "target_item_count": len(latest_by_target),
+        "approved_item_count": 0,
+        "candidate_item_count": 0,
+        "pending_item_count": 0,
+        "planned_item_count": 0,
+        "deferred_item_count": 0,
+        "rejected_item_count": 0,
+        "cancelled_item_count": 0,
+    }
+    for state in latest_by_target.values():
+        if state == "approved":
+            counts["approved_item_count"] += 1
+        elif state == "candidate":
+            counts["candidate_item_count"] += 1
+            counts["pending_item_count"] += 1
+        elif state in {"reserved", "processing"}:
+            counts["pending_item_count"] += 1
+        elif state == "planned":
+            counts["planned_item_count"] += 1
+        elif state == "failed":
+            counts["deferred_item_count"] += 1
+        elif state == "rejected":
+            counts["rejected_item_count"] += 1
+        elif state == "cancelled":
+            counts["cancelled_item_count"] += 1
+    return counts
+
+
 def _bind_approved_reference_media(
     store: RuntimeStore,
     project_id: str,
@@ -1565,6 +1637,15 @@ def _assert_source_current(
 ) -> None:
     if str(manifest.get("project_id") or "") != project_id:
         raise ValueError("image admission manifest project identity mismatch")
+    continuation_commands = {
+        "create_recovery_manifest",
+        "create_next_batch_manifest",
+        "inspect_next_batch",
+    }
+    source_fingerprint_commands = continuation_commands | {"cancel_batch"}
+    if command_type not in source_fingerprint_commands:
+        _assert_manifest_graph_current(store, project_id, manifest)
+        return
     source = _source_contract(project_id, source_value)
     fingerprint = canonical_digest(_source_fingerprint_payload(source))
     if fingerprint != manifest.get("source_fingerprint"):
@@ -1578,11 +1659,7 @@ def _assert_source_current(
         for item in manifest.get("accepted_graph_snapshots", [])
         if isinstance(item, Mapping)
     }
-    if command_type not in {
-        "create_recovery_manifest",
-        "create_next_batch_manifest",
-        "inspect_next_batch",
-    }:
+    if command_type not in continuation_commands:
         if observed_graph in accepted_graphs:
             return
         raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
@@ -1605,6 +1682,32 @@ def _assert_source_current(
     accepted_versions = {version for version, _digest in accepted_graphs}
     if not accepted_versions or observed_graph[0] <= max(accepted_versions):
         raise ValueError("image admission continuation graph lineage is stale")
+
+
+def _assert_manifest_graph_current(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    accepted_graphs = {
+        (int(item.get("version") or 0), str(item.get("graph_digest") or ""))
+        for item in manifest.get("accepted_graph_snapshots", [])
+        if isinstance(item, Mapping)
+    }
+    if not graph_path(store, project_id).is_file():
+        if (0, "") in accepted_graphs:
+            return
+        raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
+    try:
+        current_graph = ProductionGraphStore(store).load(project_id)
+    except ProductionGraphError as exc:
+        raise ValueError("image admission continuation graph lineage is unavailable") from exc
+    current_snapshot = (
+        int(current_graph.get("version") or 0),
+        str(current_graph.get("graph_digest") or ""),
+    )
+    if current_snapshot not in accepted_graphs:
+        raise ValueError("image admission ProductionGraph source is stale; compile and review a new manifest")
 
 
 def _asset(value: Mapping[str, Any]) -> dict[str, Any]:
