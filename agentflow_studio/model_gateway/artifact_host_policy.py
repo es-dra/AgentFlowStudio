@@ -49,6 +49,32 @@ def artifact_host_policy_from_service(service: Mapping[str, Any]) -> ArtifactHos
     )
 
 
+def artifact_host_policy_from_provider(
+    *,
+    service: Mapping[str, Any],
+    account: Mapping[str, Any],
+    allow_bucket_suffixes: bool = True,
+) -> ArtifactHostPolicy:
+    return artifact_host_policy(
+        exact_hosts=[
+            *_configured_list(account.get("allowed_artifact_hosts")),
+            *_configured_list(_artifact_download(account).get("allowed_hosts")),
+            *_configured_list(service.get("allowed_artifact_hosts")),
+            *_configured_list(_artifact_download(service).get("allowed_hosts")),
+        ],
+        bucket_host_suffixes=(
+            [
+                *_configured_list(account.get("allowed_artifact_host_suffixes")),
+                *_configured_list(_artifact_download(account).get("allowed_host_suffixes")),
+                *_configured_list(service.get("allowed_artifact_host_suffixes")),
+                *_configured_list(_artifact_download(service).get("allowed_host_suffixes")),
+            ]
+            if allow_bucket_suffixes
+            else []
+        ),
+    )
+
+
 def artifact_host_policy(
     *,
     exact_hosts: Any = None,
@@ -63,16 +89,29 @@ def artifact_host_policy(
     )
 
 
+def _artifact_download(value: Mapping[str, Any]) -> Mapping[str, Any]:
+    configured = value.get("artifact_download")
+    return configured if isinstance(configured, Mapping) else {}
+
+
+def _configured_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    raise ModelConfigError("Provider artifact host policy must be a list")
+
+
 def _normalize_configured_names(value: Any, *, kind: str) -> tuple[str, ...]:
     if value is None:
         return ()
     if not isinstance(value, (list, tuple)):
-        raise ModelConfigError(f"Seedance artifact {kind} policy must be a list")
+        raise ModelConfigError(f"Provider artifact {kind} policy must be a list")
     normalized: list[str] = []
     for item in value:
         host = _normalize_dns_name(str(item))
         if host is None:
-            raise ModelConfigError(f"Seedance artifact {kind} policy is invalid")
+            raise ModelConfigError(f"Provider artifact {kind} policy is invalid")
         if host not in normalized:
             normalized.append(host)
     return tuple(normalized)

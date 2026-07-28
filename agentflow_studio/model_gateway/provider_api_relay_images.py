@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
+import socket
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -232,11 +234,7 @@ def _decode_image_item(item: Any, *, allowed_url_hosts: tuple[str, ...], downloa
 
 def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout_sec: float) -> bytes:
     parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    if parsed.scheme not in {"https", "http"} or not host:
-        raise ModelGatewayError("API relay image URL must use HTTP(S)")
-    if not allowed_url_hosts or not _host_allowed(host, allowed_url_hosts):
-        raise ModelGatewayError(f"API relay image URL host is not allowed: {host}")
+    host = _validate_image_artifact_url(parsed, allowed_url_hosts=allowed_url_hosts)
     request = urllib.request.Request(
         url,
         headers={
@@ -245,8 +243,15 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+        with _open_image_url_no_redirect(request, timeout_sec=timeout_sec) as response:
+            final_url = str(getattr(response, "geturl", lambda: url)() or url)
+            _validate_image_artifact_url(urlparse(final_url), allowed_url_hosts=allowed_url_hosts)
+            content_type = _response_content_type(response)
+            if not content_type.startswith("image/"):
+                raise ModelGatewayError("API relay image URL response content type must be an image")
             image_bytes = response.read(MAX_IMAGE_DOWNLOAD_BYTES + 1)
+    except _ImageRedirectBlocked as exc:
+        raise ModelGatewayError("API relay image URL redirects are not allowed") from exc
     except TimeoutError as exc:
         raise ModelGatewayError("API relay image URL download timed out") from exc
     except urllib.error.HTTPError as exc:
@@ -260,16 +265,89 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     return image_bytes
 
 
+def _validate_image_artifact_url(parsed, *, allowed_url_hosts: tuple[str, ...]) -> str:
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not host:
+        raise ModelGatewayError("API relay image URL must use HTTPS")
+    if parsed.username or parsed.password:
+        raise ModelGatewayError("API relay image URL must not contain embedded credentials")
+    if not allowed_url_hosts or not _host_allowed(host, allowed_url_hosts):
+        raise ModelGatewayError(f"API relay image URL host is not allowed: {host}")
+    _validate_public_dns_resolution(host)
+    return host
+
+
 def _host_allowed(host: str, allowed_url_hosts: tuple[str, ...]) -> bool:
     for allowed in allowed_url_hosts:
         item = allowed.lower().strip()
         if not item:
             continue
-        if item.startswith(".") and (host == item[1:] or host.endswith(item)):
-            return True
         if host == item:
             return True
     return False
+
+
+def _validate_public_dns_resolution(host: str) -> None:
+    try:
+        direct_address = ipaddress.ip_address(host)
+    except ValueError:
+        direct_address = None
+    if direct_address is not None:
+        raise ModelGatewayError("API relay image URL host must be a DNS name")
+    try:
+        infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise ModelGatewayError("API relay image URL host could not be resolved") from exc
+    checked: set[str] = set()
+    for info in infos:
+        raw_address = str(info[4][0]).split("%", 1)[0]
+        if raw_address in checked:
+            continue
+        checked.add(raw_address)
+        try:
+            address = ipaddress.ip_address(raw_address)
+        except ValueError as exc:
+            raise ModelGatewayError("API relay image URL host resolved to an invalid address") from exc
+        if not address.is_global:
+            raise ModelGatewayError("API relay image URL host resolved to a non-public address")
+    if not checked:
+        raise ModelGatewayError("API relay image URL host could not be resolved")
+
+
+class _ImageRedirectBlocked(Exception):
+    pass
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+        raise _ImageRedirectBlocked(str(newurl))
+
+
+def _open_image_url_no_redirect(request: urllib.request.Request, *, timeout_sec: float):
+    opener = urllib.request.build_opener(_NoRedirectHandler)
+    return opener.open(request, timeout=timeout_sec)
+
+
+def _response_content_type(response: Any) -> str:
+    headers = getattr(response, "headers", None)
+    if headers is not None:
+        value = headers.get("Content-Type") or headers.get("content-type")
+        if value:
+            return str(value).split(";", 1)[0].strip().lower()
+    getheader = getattr(response, "getheader", None)
+    if callable(getheader):
+        value = getheader("Content-Type")
+        if value:
+            return str(value).split(";", 1)[0].strip().lower()
+    info = getattr(response, "info", None)
+    if callable(info):
+        metadata = info()
+        get_content_type = getattr(metadata, "get_content_type", None)
+        if callable(get_content_type):
+            value = get_content_type()
+            if value:
+                return str(value).split(";", 1)[0].strip().lower()
+    return ""
 
 
 def _mime_type_for_bytes(image_bytes: bytes) -> str:
