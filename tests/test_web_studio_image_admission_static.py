@@ -94,9 +94,66 @@ def test_image_admission_browser_commands_refresh_canonical_source_before_previe
         "previewImageAdmissionCommand(request)"
     )
     assert "await refreshGraphBoundRuntimeState();" in source_body
-    assert "source.production_graph_version" in source_body
-    assert "source.production_graph_digest" in source_body
+    assert "imageAdmissionCommandSourceMatchesManifest(command, source" in source_body
     assert "图片准入来源与当前清单不一致" in source_body
+
+
+def test_image_admission_browser_policy_allows_consecutive_fixed_actions_after_graph_advance() -> None:
+    script = f"""
+      import {{
+        imageAdmissionCommandSourceMatchesManifest,
+      }} from {json.dumps(WORKSPACE.as_uri())};
+      const manifest = {{
+        source: {{
+          production_graph_version: 31,
+          production_graph_digest: "graph-v31",
+        }},
+      }};
+      const refreshed = {{
+        production_graph_version: 32,
+        production_graph_digest: "graph-v32",
+      }};
+      const result = Object.fromEntries([
+        "approve",
+        "reject",
+        "record_candidate",
+        "record_job",
+        "record_failure",
+        "reserve_dispatch",
+        "create_recovery_manifest",
+        "create_next_batch_manifest",
+        "inspect_next_batch",
+        "cancel_batch",
+      ].map((type) => [
+        type,
+        imageAdmissionCommandSourceMatchesManifest({{ type }}, refreshed, manifest),
+      ]));
+      console.log(JSON.stringify(result));
+    """
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = json.loads(completed.stdout)
+
+    for command_type in (
+        "approve",
+        "reject",
+        "record_candidate",
+        "record_job",
+        "record_failure",
+        "reserve_dispatch",
+    ):
+        assert result[command_type] is True
+    for command_type in (
+        "create_recovery_manifest",
+        "create_next_batch_manifest",
+        "inspect_next_batch",
+        "cancel_batch",
+    ):
+        assert result[command_type] is False
 
 
 def test_next_image_batch_is_creator_selected_and_separate_from_generation() -> None:

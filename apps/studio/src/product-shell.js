@@ -19,6 +19,7 @@ import {
 } from "./asset-bible-workspace.js";
 import {
   imageAdmissionCommand,
+  imageAdmissionCommandSourceMatchesManifest,
   imageAdmissionGenerationRequest,
   imageAdmissionGenerationResult,
   imageAdmissionFailureGuidance,
@@ -2713,18 +2714,7 @@ export function createProductShell(options = {}) {
     if (!source?.asset_bible || !Object.keys(source.asset_bible).length) {
       throw new Error("图片准入需要当前已锁定的 Asset Bible；请刷新项目后重试。");
     }
-    if (
-      command?.type !== "compile"
-      && imageAdmissionView().manifest?.source?.production_graph_version
-      && Number(source.production_graph_version || 0) !== Number(imageAdmissionView().manifest.source.production_graph_version || 0)
-    ) {
-      throw new Error("图片准入来源与当前清单不一致；请刷新后重试。");
-    }
-    if (
-      command?.type !== "compile"
-      && imageAdmissionView().manifest?.source?.production_graph_digest
-      && String(source.production_graph_digest || "") !== String(imageAdmissionView().manifest.source.production_graph_digest || "")
-    ) {
+    if (!imageAdmissionCommandSourceMatchesManifest(command, source, imageAdmissionView().manifest)) {
       throw new Error("图片准入来源与当前清单不一致；请刷新后重试。");
     }
     return source;
