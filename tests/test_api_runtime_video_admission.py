@@ -1138,6 +1138,44 @@ def test_direct_batch_operator_diagnostic_runs_text_and_single_ref_without_graph
     assert current["graph_digest"] == graph["graph_digest"]
 
 
+def test_direct_batch_operator_diagnostic_provider_block_returns_safe_packet(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_before = ProductionGraphStore(store).load(project_id)
+
+    class _BlockedRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            raise ValueError("unsupported input mode for seedance_i2v: text_only")
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _BlockedRegistry(),
+    )
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-blocked-test",
+            "step": "text_only",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "diagnostic_text_only_blocked"
+    assert payload["result"]["connectivity_proof_passed"] is False
+    assert payload["result"]["input_mode"] == "text_only"
+    assert payload["result"]["block"]["reason"] == (
+        "unsupported input mode for seedance_i2v: text_only"
+    )
+    graph_after = ProductionGraphStore(store).load(project_id)
+    assert graph_after["version"] == graph_before["version"]
+    assert graph_after["graph_digest"] == graph_before["graph_digest"]
+
+
 def test_direct_batch_safety_rewrite_staging_is_positive_and_provider_free(
     tmp_path,
     monkeypatch,

@@ -461,7 +461,7 @@ def _run_provider_connectivity_diagnostic(
             },
         )
         write_json(output_dir / "video_generation_safe_manifest.json", manifest)
-        store.write_job(runtime_job(job_id, project_id, "blocked"))
+        store.write_job(runtime_job(job_id, project_id, "video_generation", "blocked"))
         return {
             "status": "diagnostic_blocked",
             "connectivity_proof_passed": False,
