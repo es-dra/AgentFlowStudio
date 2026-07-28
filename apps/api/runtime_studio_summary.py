@@ -249,6 +249,15 @@ def rework_preview(
     impact_refs: list[str] = []
     keep_refs: list[str] = []
     if target_id and graph is not None:
+        if _has_planned_rework(graph, target_id):
+            return {
+                "available": False,
+                "target_entity_id": target_id,
+                "impact_refs": [],
+                "keep_refs": [],
+                "cost_available": False,
+                "reason": "该镜头已有待执行的局部返工任务。",
+            }
         try:
             impact = impacted_descendants(graph, [target_id])
         except ProductionGraphError:
@@ -287,6 +296,19 @@ def _is_reworkable_unit(
         isinstance(node, Mapping)
         and node.get("category") == "unit"
         and node.get("state") != "invalidated"
+    )
+
+
+def _has_planned_rework(
+    graph: Mapping[str, Any],
+    target_entity_id: str,
+) -> bool:
+    prefix = f"rework-{target_entity_id}-v"
+    return any(
+        str(work_id).startswith(prefix)
+        and isinstance(work, Mapping)
+        and str(work.get("state") or "") == "planned"
+        for work_id, work in graph.get("work", {}).items()
     )
 
 

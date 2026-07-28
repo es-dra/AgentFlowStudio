@@ -194,6 +194,11 @@ def build_rework_preview(
             status_code=409,
             detail="local rework requires an active shot target",
         )
+    if _has_planned_rework(graph, target_id):
+        raise HTTPException(
+            status_code=409,
+            detail="local rework is already planned for this shot",
+        )
     try:
         impact = impacted_descendants(graph, [target_id])
     except ProductionGraphError as exc:
@@ -364,6 +369,19 @@ def _require_project_access(
 
 def _task_id(target_entity_id: str, graph_version: int) -> str:
     return safe_id(f"rework-{target_entity_id}-v{graph_version}")[:160]
+
+
+def _has_planned_rework(
+    graph: Mapping[str, Any],
+    target_entity_id: str,
+) -> bool:
+    prefix = f"rework-{target_entity_id}-v"
+    return any(
+        str(work_id).startswith(prefix)
+        and isinstance(work, Mapping)
+        and str(work.get("state") or "") == "planned"
+        for work_id, work in graph.get("work", {}).items()
+    )
 
 
 __all__ = (

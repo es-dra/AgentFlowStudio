@@ -144,6 +144,16 @@ def test_studio_rework_preview_is_read_only_and_confirm_creates_planned_task(
     assert replay.json()["idempotent_replay"] is True
     assert replay.json()["receipt_id"] == receipt["receipt_id"]
     assert replay.json()["provider_dispatch_count"] == 0
+    current = ProductionGraphStore(store).load("studio-command-project")
+    duplicate_preview = client.post(
+        "/api/v1/projects/studio-command-project/studio/commands/rework/preview",
+        json={
+            "target_entity_id": "shot-001",
+            "expected_graph_version": current["version"],
+            "expected_graph_digest": current["graph_digest"],
+        },
+    )
+    assert duplicate_preview.status_code == 409
 
 
 def test_studio_rework_preview_fails_closed_on_stale_or_invalid_target(
