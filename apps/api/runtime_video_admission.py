@@ -298,11 +298,25 @@ def _confirm_video_admission_command(
             }
         replay = _idempotent_receipt(existing, body.get("command"))
         if replay:
+            graph_mutation = 0
+            if (body.get("command") or {}).get("type") == "record_candidate":
+                existing, graph_mutation = ensure_video_candidate_graph_projection(
+                    store,
+                    graph_store,
+                    project_id,
+                    existing,
+                    idempotency_key=str(
+                        (body.get("command") or {}).get("idempotency_key")
+                        or f"record-candidate-{existing.get('manifest_id')}"
+                    ),
+                )
+                if graph_mutation:
+                    write_json(path, existing)
             return {
                 "schema_version": SCHEMA_VERSION,
                 "status": "confirmed",
                 "idempotent_replay": True,
-                "result": {"manifest": existing, "graph_mutation": 0},
+                "result": {"manifest": existing, "graph_mutation": graph_mutation},
                 "receipt": replay,
                 "provider_dispatch_count": 0,
                 "external_cost_usd": None,
@@ -318,6 +332,14 @@ def _confirm_video_admission_command(
         result = deepcopy(preview["result"]["manifest"])
         command = preview["command"]
         graph_mutation = 0
+        if command["type"] == "record_candidate":
+            result, graph_mutation = ensure_video_candidate_graph_projection(
+                store,
+                graph_store,
+                project_id,
+                result,
+                idempotency_key=str(command.get("idempotency_key") or ""),
+            )
         if command["type"] == "approve":
             result = _approve_to_graph(store, graph_store, project_id, result, command)
             graph_mutation = 1
@@ -1718,12 +1740,15 @@ def _optional_approved_shot_keyframe(
             for item in manifest.get("accepted_graph_snapshots", [])
             if isinstance(item, Mapping)
         }
-        approved_video_exists = any(
+        graph_media_projection_exists = any(
             node.get("state") == "active"
-            and (node.get("metadata") or {}).get("kind") == "approved_video"
+            and (node.get("metadata") or {}).get("kind") in {
+                "approved_video",
+                "pending_video_candidate",
+            }
             for node in (graph.get("nodes") or {}).values()
         )
-        if current_snapshot not in accepted and not approved_video_exists:
+        if current_snapshot not in accepted and not graph_media_projection_exists:
             continue
         try:
             keyframe, _source_manifest = _approved_shot_one_keyframe(
@@ -2259,6 +2284,192 @@ def _approve_to_graph(
     return manifest
 
 
+def ensure_video_candidate_graph_projection(
+    store: RuntimeStore,
+    graph_store: ProductionGraphStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+    *,
+    idempotency_key: str = "",
+) -> tuple[dict[str, Any], int]:
+    """Project a technically valid candidate into the canonical graph.
+
+    This records reviewable media visibility only.  It does not approve the
+    candidate or create an ``approved_video`` relation.
+    """
+    result = deepcopy(dict(manifest))
+    item = result.get("item") if isinstance(result.get("item"), Mapping) else {}
+    candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+    technical_qa = (
+        candidate.get("technical_qa")
+        if isinstance(candidate.get("technical_qa"), Mapping)
+        else {}
+    )
+    source = result.get("source") if isinstance(result.get("source"), Mapping) else {}
+    source_shot = source.get("shot") if isinstance(source.get("shot"), Mapping) else {}
+    source_shot_id = str(source_shot.get("shot_id") or "")
+    manifest_id = safe_id(str(result.get("manifest_id") or ""))
+    manifest_hash = str(result.get("manifest_hash") or "")
+    job_id = str(candidate.get("job_id") or "")
+    candidate_id = str(candidate.get("candidate_id") or "")
+    if (
+        item.get("state") != "candidate"
+        or technical_qa.get("status") != "pass"
+        or not manifest_id
+        or not manifest_hash
+        or len(manifest_hash) != 64
+        or not source_shot_id
+        or safe_id(source_shot_id) != source_shot_id
+        or not job_id
+        or safe_id(job_id) != job_id
+        or not candidate_id
+        or safe_id(candidate_id) != candidate_id
+    ):
+        raise ValueError("video candidate graph projection requires a current technical candidate")
+    path = candidate_file(store.run_dir(project_id, job_id), candidate_id)
+    if path is None:
+        raise ValueError("video candidate media is missing or unavailable for projection")
+    data = path.read_bytes()
+    if (
+        not data
+        or hashlib.sha256(data).hexdigest() != candidate.get("sha256")
+        or len(data) != int(candidate.get("byte_count") or 0)
+    ):
+        raise ValueError("video candidate projection differs from candidate media")
+    graph = graph_store.load(project_id)
+    shot_node = (graph.get("nodes") or {}).get(source_shot_id) or {}
+    if shot_node.get("category") != "unit" or shot_node.get("state") != "active":
+        raise ValueError("video candidate source shot is not active in ProductionGraph")
+    _assert_manifest_visual_source_current(store, project_id, result)
+    node_id = f"video-candidate-{manifest_id}"
+    if _pending_video_candidate_matches_graph(graph, result, node_id=node_id):
+        result.setdefault("item", {})["candidate_projection"] = {
+            "production_graph_node_id": node_id,
+            "graph_version": int(graph["version"]),
+            "graph_digest": str(graph["graph_digest"]),
+            "idempotent_replay": True,
+            "projected_at": _now(),
+        }
+        return result, 0
+    existing_node = (graph.get("nodes") or {}).get(node_id)
+    if existing_node:
+        raise ValueError("existing video candidate projection conflicts with this candidate")
+    metadata = {
+        "kind": "pending_video_candidate",
+        "review_state": "candidate",
+        "manifest_id": manifest_id,
+        "manifest_hash": manifest_hash,
+        "job_id": job_id,
+        "candidate_id": candidate_id,
+        "source_shot_id": source_shot_id,
+        "sha256": str(candidate.get("sha256") or ""),
+        "byte_count": int(candidate.get("byte_count") or 0),
+        "model": MODEL_ID,
+        "resolution": RESOLUTION,
+        "duration_sec": DURATION_SEC,
+        "generation_mode": str(
+            (result.get("provider_input_contract") or {}).get("mode")
+            or FIRST_FRAME
+        ),
+        "mime_type": str(technical_qa.get("container") or ""),
+        "width": int(technical_qa.get("width") or 0),
+        "height": int(technical_qa.get("height") or 0),
+        "codec": str(technical_qa.get("codec") or ""),
+        "technical_qa_status": str(technical_qa.get("status") or ""),
+        "approval_required": True,
+        "creative_approval_state": "pending",
+        "provider_reported_output_tokens": (
+            (candidate.get("usage_evidence") or {}).get("output_tokens")
+        ),
+    }
+    semantic = canonical_digest(
+        {
+            "pending_video_candidate": manifest_hash,
+            "candidate_sha256": metadata["sha256"],
+            "source_shot_id": source_shot_id,
+        }
+    )
+    updated = graph_store.append(
+        project_id,
+        expected_version=int(graph["version"]),
+        idempotency_key=(
+            f"video-candidate-graph-{idempotency_key}"
+            if idempotency_key
+            else f"video-candidate-graph-{manifest_id}"
+        ),
+        semantic_digest=semantic,
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": node_id,
+                    "category": "artifact",
+                    "state": "active",
+                    "metadata": metadata,
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": source_shot_id,
+                "to_id": node_id,
+                "relation_type": "video_candidate",
+            },
+        ],
+    )
+    result.setdefault("item", {})["candidate_projection"] = {
+        "production_graph_node_id": node_id,
+        "graph_version": int(updated["version"]),
+        "graph_digest": str(updated["graph_digest"]),
+        "idempotent_replay": bool(updated.get("idempotent_replay")),
+        "projected_at": _now(),
+    }
+    return result, 0 if updated.get("idempotent_replay") else 1
+
+
+def _pending_video_candidate_matches_graph(
+    graph: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    *,
+    node_id: str,
+) -> bool:
+    node = (graph.get("nodes") or {}).get(node_id)
+    if not isinstance(node, Mapping):
+        return False
+    metadata = node.get("metadata") if isinstance(node.get("metadata"), Mapping) else {}
+    item = manifest.get("item") if isinstance(manifest.get("item"), Mapping) else {}
+    candidate = item.get("candidate") if isinstance(item.get("candidate"), Mapping) else {}
+    source = manifest.get("source") if isinstance(manifest.get("source"), Mapping) else {}
+    source_shot = source.get("shot") if isinstance(source.get("shot"), Mapping) else {}
+    source_shot_id = str(source_shot.get("shot_id") or "")
+    relation_matches = [
+        relation for relation in graph.get("relations", [])
+        if relation.get("from_id") == source_shot_id
+        and relation.get("to_id") == node_id
+        and relation.get("relation_type") == "video_candidate"
+    ]
+    return (
+        node.get("category") == "artifact"
+        and node.get("state") == "active"
+        and metadata.get("kind") == "pending_video_candidate"
+        and metadata.get("review_state") == "candidate"
+        and metadata.get("manifest_hash") == manifest.get("manifest_hash")
+        and metadata.get("job_id") == candidate.get("job_id")
+        and metadata.get("candidate_id") == candidate.get("candidate_id")
+        and metadata.get("source_shot_id") == source_shot_id
+        and metadata.get("sha256") == candidate.get("sha256")
+        and _safe_positive_int(metadata.get("byte_count")) == int(candidate.get("byte_count") or 0)
+        and len(relation_matches) == 1
+    )
+
+
+def _safe_positive_int(value: Any) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number > 0 else None
+
+
 def _reconcile_existing_approval(
     graph_store: ProductionGraphStore,
     project_id: str,
@@ -2329,6 +2540,22 @@ def _assert_manifest_current(store: RuntimeStore, project_id: str, manifest: Map
         int(expected.get("version") or 0) != int(graph.get("version") or 0)
         or str(expected.get("graph_digest") or "") != str(graph.get("graph_digest") or "")
     ):
+        _assert_manifest_visual_source_current(store, project_id, manifest)
+
+
+def _assert_manifest_visual_source_current(
+    store: RuntimeStore,
+    project_id: str,
+    manifest: Mapping[str, Any],
+) -> None:
+    current_source = _source_contract(
+        store,
+        project_id,
+        shot_id=str((manifest.get("source", {}).get("shot") or {}).get("shot_id") or ""),
+    )
+    if canonical_digest(
+        _video_visual_source(manifest.get("source") or {})
+    ) != canonical_digest(_video_visual_source(current_source)):
         raise ValueError("video admission ProductionGraph source is stale")
 
 

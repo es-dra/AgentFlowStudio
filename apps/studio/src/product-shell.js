@@ -191,7 +191,7 @@ export function createProductShell(options = {}) {
     );
 
     const summary = node("div", "studio-header-summary");
-    const progress = Math.max(0, Math.min(100, Number(snapshot.project?.progress_percent || candidateDeliveryProgress(snapshot.project))));
+    const progress = deliveryProgressPercent();
     appendHeaderSummary(summary, progress);
 
     const actions = node("div", "studio-header-actions");
@@ -568,7 +568,7 @@ export function createProductShell(options = {}) {
     }
     status.append(
       node("strong", "", `制作序列 v${view.graphVersion}`),
-      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.mediaSummary?.approvedVideos || 0} 条视频已批准`),
+      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.mediaSummary?.pendingVideoCandidates || 0} 条视频待审看 · ${view.mediaSummary?.approvedVideos || 0} 条视频已批准`),
     );
     if (view.mediaSummary?.approvedVideos) {
       const watch = node("button", "studio-text-button", "播放已批准视频");
@@ -1314,7 +1314,9 @@ export function createProductShell(options = {}) {
           : "待整理"],
       ["美术方向", view.art_direction.status === "confirmed" ? "已确认" : "待确认"],
       ["参考图", imageMediaLifecycleLabel()],
-      ["视频", graphView().mediaSummary?.approvedVideos
+      ["视频", graphView().mediaSummary?.pendingVideoCandidates
+        ? `${graphView().mediaSummary.pendingVideoCandidates} 条待审看`
+        : graphView().mediaSummary?.approvedVideos
         ? `${graphView().mediaSummary.approvedVideos} 条已确认`
         : videoAdmissionView().item?.state === "candidate"
           ? "1 条待审看"
@@ -3966,6 +3968,8 @@ export function createProductShell(options = {}) {
       image.loading = "lazy";
       void setRuntimeMediaSource(image, shot.preview);
       media.appendChild(image);
+    } else if (shot.videoCandidate) {
+      media.innerHTML = `${icon("play", 20)}<span class="shot-empty-copy"><strong>视频候选待审看</strong><small>${escapeHtml(shot.description)}</small></span>`;
     } else {
       media.innerHTML = `${icon("image", 20)}<span class="shot-empty-copy"><strong>等待镜头画面</strong><small>${escapeHtml(shot.description)}</small></span>`;
     }
@@ -3975,6 +3979,8 @@ export function createProductShell(options = {}) {
     );
     if (shot.video) {
       media.appendChild(node("span", "shot-video-approved", "视频已保存"));
+    } else if (shot.videoCandidate) {
+      media.appendChild(node("span", "shot-video-approved", "视频待审看"));
     }
     const copy = node("span", "shot-copy");
     copy.append(
@@ -5378,6 +5384,7 @@ export function createProductShell(options = {}) {
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
       duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview),
       video: shot.video ? { ...shot.video, previewUrl: safePreview(shot.video.previewUrl) } : null,
+      videoCandidate: shot.videoCandidate ? { ...shot.videoCandidate, previewUrl: safePreview(shot.videoCandidate.previewUrl) } : null,
       state: shot.state, sceneId: shot.sceneNodeId }));
   }
 
@@ -5549,7 +5556,7 @@ export function createProductShell(options = {}) {
   }
   function generatedMediaCount() {
     return sceneModel().flatMap((scene) => scene.shots).filter(
-      (shot) => Boolean(shot.preview || shot.video),
+      (shot) => Boolean(shot.preview || shot.video || shot.videoCandidate),
     ).length;
   }
   function approvedVideoCount() {
@@ -5558,8 +5565,13 @@ export function createProductShell(options = {}) {
     ).length;
   }
   function mediaCompletionPercent() { return totalShots() ? Math.round((generatedMediaCount() / totalShots()) * 100) : 0; }
+  function deliveryProgressPercent() {
+    const graph = graphView();
+    if (graph.status === "ready" && totalShots()) return mediaCompletionPercent();
+    return Math.max(0, Math.min(100, Number(snapshot.project?.progress_percent || candidateDeliveryProgress(snapshot.project))));
+  }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
-  function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
+  function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "candidate" ? "待审看" : state === "blocked" ? "待处理" : "草稿"; }
   function graphStateLabel(state) {
     return ({ planned: "待制作", reserved: "已预留", dispatched: "处理中", succeeded: "已完成", candidate: "待选择",
       pending: "待审核", approved: "已通过", rejected: "已退回", redo_planned: "已安排返工",

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api import runtime_video_direct_batch_routes as direct_batch_routes
-from apps.api.runtime_film_production_graph import _approved_media_projection
+from apps.api.runtime_film_production_graph import _approved_media_projection, _sequence_workspace_projection
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore, read_json
@@ -2440,7 +2440,7 @@ def _stub_video_probe(monkeypatch) -> None:
     )
 
 
-def test_video_candidate_requires_human_approval_before_graph_writeback(
+def test_video_candidate_projects_pending_media_before_human_approval(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -2495,6 +2495,9 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         },
     )["result"]["manifest"]
     assert recorded["item"]["state"] == "candidate"
+    projection = recorded["item"]["candidate_projection"]
+    assert projection["production_graph_node_id"].startswith("video-candidate-video-admission-")
+    assert projection["graph_version"] == initial_graph["version"] + 1
     assert recorded["item"]["candidate"]["technical_qa"] == {
         "status": "pass",
         "container": "video/mp4",
@@ -2504,7 +2507,60 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         "codec": "mpeg4",
         "decode_probe": "passed",
     }
-    assert graph_store.load(project_id)["version"] == initial_graph["version"]
+    graph_after_candidate = graph_store.load(project_id)
+    candidate_node_id = projection["production_graph_node_id"]
+    candidate_node = graph_after_candidate["nodes"][candidate_node_id]
+    assert graph_after_candidate["version"] == initial_graph["version"] + 1
+    assert candidate_node["metadata"]["kind"] == "pending_video_candidate"
+    assert candidate_node["metadata"]["review_state"] == "candidate"
+    assert candidate_node["metadata"]["creative_approval_state"] == "pending"
+    assert candidate_node["metadata"]["sha256"] == candidate["sha256"]
+    assert {
+        "from_id": "shot-01",
+        "to_id": candidate_node_id,
+        "relation_type": "video_candidate",
+    } in graph_after_candidate["relations"]
+    workspace = _sequence_workspace_projection(
+        graph_after_candidate,
+        project_id=project_id,
+        store=store,
+    )
+    assert workspace["sequence"]["video_candidates"] == [
+        {
+            "media_node_id": candidate_node_id,
+            "media_kind": "video",
+            "review_state": "candidate",
+            "preview_url": (
+                f"/projects/{project_id}/video-generations/"
+                "video-job-001/candidates/candidate_001/preview"
+            ),
+            "mime_type": "video/mp4",
+            "container": "video/mp4",
+            "width": 1280,
+            "height": 720,
+            "duration_sec": 6.0,
+            "codec": "mpeg4",
+            "model": MODEL_ID,
+            "resolution": RESOLUTION,
+            "generation_mode": "first_frame",
+            "manifest_id": recorded["manifest_id"],
+            "manifest_hash": recorded["manifest_hash"],
+            "job_id": "video-job-001",
+            "candidate_id": "candidate_001",
+            "sha256": candidate["sha256"],
+            "byte_count": len(candidate_bytes),
+            "candidate_graph_version": None,
+            "lineage": {
+                "source_kind": "video_admission_candidate",
+                "target_relation": "video_candidate",
+            },
+            "target_node_ids": ["shot-01"],
+        }
+    ]
+    assert not [
+        relation for relation in graph_after_candidate["relations"]
+        if relation["relation_type"] == "approved_video"
+    ]
 
     preview = _command(
         client,
@@ -2513,7 +2569,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         confirm=False,
     )
     assert preview["result"]["graph_mutation"] == 0
-    assert graph_store.load(project_id)["version"] == initial_graph["version"]
+    assert graph_store.load(project_id)["version"] == graph_after_candidate["version"]
     approved = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/confirm",
         json={
@@ -2525,6 +2581,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
     assert approved.status_code == 200, approved.text
     assert approved.json()["result"]["graph_mutation"] == 1
     graph = graph_store.load(project_id)
+    assert graph["version"] == graph_after_candidate["version"] + 1
     approved_videos = [
         item
         for item in graph["nodes"].values()
