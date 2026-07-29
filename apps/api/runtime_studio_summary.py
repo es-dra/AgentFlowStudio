@@ -49,6 +49,48 @@ def allowed_actions(
                 ),
             )
         )
+    if surface == "script":
+        storyboard_target = _first_entity_id(entities, ("unit", "location", "collection"))
+        actions.append(
+            _action(
+                "continue_to_storyboard",
+                enabled=bool(storyboard_target),
+                target_entity_id=storyboard_target,
+                reason=(
+                    "沿当前剧本拆解进入分镜排布。"
+                    if storyboard_target
+                    else "当前项目尚未形成可进入分镜的剧本拆解。"
+                ),
+            )
+        )
+    if surface == "storyboard":
+        asset_target = _first_entity_id(entities, ("entity", "resource", "location"))
+        actions.append(
+            _action(
+                "continue_to_asset_bible",
+                enabled=bool(asset_target),
+                target_entity_id=asset_target,
+                reason=(
+                    "检查当前镜头依赖的角色、场景和道具设定。"
+                    if asset_target
+                    else "当前分镜还没有绑定可检查的资产设定。"
+                ),
+            )
+        )
+    if surface == "asset-bible":
+        canvas_target = _first_entity_id(entities, ("unit", "location", "entity", "resource"))
+        actions.append(
+            _action(
+                "return_to_canvas",
+                enabled=bool(canvas_target),
+                target_entity_id=canvas_target,
+                reason=(
+                    "带着当前资产上下文回到制作画布。"
+                    if canvas_target
+                    else "当前资产设定还没有可回到制作画布的对象。"
+                ),
+            )
+        )
     if surface == "review":
         review_target = safe_identifier(
             reviews[0].get("target_entity_id") if reviews else ""
@@ -91,6 +133,24 @@ def allowed_actions(
             )
         )
     return actions
+
+
+def _first_entity_id(
+    entities: list[Mapping[str, Any]],
+    entity_types: tuple[str, ...],
+) -> str:
+    for entity_type in entity_types:
+        target = next(
+            (
+                safe_identifier(item.get("entity_id"))
+                for item in entities
+                if str(item.get("entity_type") or "") == entity_type
+            ),
+            "",
+        )
+        if target:
+            return target
+    return ""
 
 
 def surface_summary(

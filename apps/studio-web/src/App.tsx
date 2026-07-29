@@ -12,9 +12,11 @@ import {
 
 const OverviewSurface = lazy(() => import("./surfaces/OverviewSurface"));
 const CanvasSurface = lazy(() => import("./surfaces/CanvasSurface"));
+const ScriptSurface = lazy(() => import("./surfaces/ScriptSurface"));
+const StoryboardSurface = lazy(() => import("./surfaces/StoryboardSurface"));
+const AssetBibleSurface = lazy(() => import("./surfaces/AssetBibleSurface"));
 const ReviewSurface = lazy(() => import("./surfaces/ReviewSurface"));
 const DeliverySurface = lazy(() => import("./surfaces/DeliverySurface"));
-const PlaceholderSurface = lazy(() => import("./surfaces/PlaceholderSurface"));
 
 export function App() {
   const [urlState, setUrlState] = useState<StudioUrlState>(() =>
@@ -95,12 +97,18 @@ function SurfaceOutlet({ data, urlState, onNavigate, onReload }: SurfaceOutletPr
       return <OverviewSurface {...shared} />;
     case "canvas":
       return <CanvasSurface {...shared} />;
+    case "script":
+      return <ScriptSurface {...shared} />;
+    case "storyboard":
+      return <StoryboardSurface {...shared} />;
+    case "asset-bible":
+      return <AssetBibleSurface {...shared} />;
     case "review":
       return <ReviewSurface {...shared} />;
     case "delivery":
       return <DeliverySurface {...shared} />;
     default:
-      return <PlaceholderSurface {...shared} surface={urlState.surface} />;
+      return <OverviewSurface {...shared} />;
   }
 }
 

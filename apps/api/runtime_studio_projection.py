@@ -31,28 +31,61 @@ STUDIO_SURFACES = (
 )
 SURFACE_CATEGORIES = {
     "overview": {"collection", "location", "unit", "artifact", "delivery"},
-    "script": {"input", "revision"},
+    "script": {"input", "revision", "collection", "location", "unit"},
     "storyboard": {"collection", "location", "unit"},
-    "asset-bible": {"entity", "location", "resource"},
+    "asset-bible": {"collection", "entity", "location", "resource"},
     "review": {"unit", "artifact"},
     "delivery": {"unit", "artifact", "delivery"},
 }
 PUBLIC_METADATA_KEYS = {
     "aliases",
     "appearance",
+    "approval_graph_version",
+    "approval_required",
+    "asset_bible_review_state",
+    "asset_bible_revision_id",
+    "asset_subtype",
     "blocking",
+    "camera_angle",
+    "camera_movement",
     "classification",
+    "continuity_states",
+    "creative_approval_state",
+    "duration_sec",
     "display_name",
     "duration_seconds",
+    "format",
+    "height",
     "intent",
     "kind",
+    "lighting",
     "lineage",
+    "movement",
     "name",
+    "negative_locks",
+    "order",
+    "owner_supplied",
+    "positive_traits",
+    "purpose",
+    "review_state",
+    "scene_order",
+    "shot_order",
+    "shot_size",
+    "sound",
     "space",
+    "source_digest",
+    "source_evidence",
+    "source_kind",
+    "source_shot_id",
     "style",
     "style_domain",
+    "style_domain_id",
     "target_duration_seconds",
+    "technical_qa_status",
     "title",
+    "transition",
+    "visual_identity",
+    "width",
 }
 
 
@@ -207,7 +240,7 @@ def _surface_entities(graph: Mapping[str, Any], surface: str) -> list[dict[str, 
         if isinstance(node, Mapping)
         and (selected_categories is None or str(node.get("category") or "") in selected_categories)
     }
-    if surface in {"storyboard", "review", "delivery"}:
+    if surface in {"storyboard", "asset-bible", "review", "delivery"}:
         selected_ids = _expand_required_neighbors(graph, selected_ids)
     entities = []
     for node_id, node in nodes.items():

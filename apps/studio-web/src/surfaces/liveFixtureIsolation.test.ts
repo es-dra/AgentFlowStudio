@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import { publicCopy, type StudioData } from "../api/studioAdapter";
 import type { StudioSurfaceEnvelope } from "../api/studioTypes";
 import { canvasView } from "./CanvasSurface";
+import { assetBibleView } from "./AssetBibleSurface";
 import { deliveryView } from "./DeliverySurface";
 import { overviewView } from "./OverviewSurface";
 import { reworkPreviewModel } from "./ReworkPreview";
 import { reviewView } from "./ReviewSurface";
+import { scriptView } from "./ScriptSurface";
+import { storyboardView } from "./StoryboardSurface";
 
 const fixtureFacts = [
   "镜头 03",
@@ -48,6 +51,9 @@ describe("live studio view models", () => {
     const output = JSON.stringify({
       overview: overviewView(data),
       canvas: canvasView(data),
+      script: scriptView(data),
+      storyboard: storyboardView(data),
+      assetBible: assetBibleView(data),
       review: reviewView(data),
       delivery: deliveryView(data),
       rework: reworkPreviewModel(data, {
@@ -203,6 +209,137 @@ describe("live studio view models", () => {
     expect(review.reworkAvailable).toBe(false);
     expect(review.reworkActionLabel).toBe("已有待执行返工任务");
     expect(review.reworkReason).toContain("已有待执行");
+  });
+
+  it("builds script, storyboard, and asset bible models from one live envelope", () => {
+    const data = liveData({
+      surface: "storyboard",
+      focused_entity: entity("shot-live-01", "unit", "真实镜头一", {
+        blocking: "林晚在屋顶边缘展开旧信，风压住纸角。",
+        camera_angle: "平视略低",
+        duration_seconds: 12,
+        intent: "确认旧信是否可以进入下一场。",
+        movement: "缓慢推进",
+        shot_order: 1,
+        shot_size: "近景",
+        sound: "纸张摩擦声和远处风声",
+        source_digest: "a".repeat(64),
+        transition: "切入"
+      }),
+      entities: [
+        entity("revision-live-01", "revision", "已确认剧本", {
+          source_digest: "a".repeat(64)
+        }),
+        entity("sequence-live-01", "collection", "制作序列", {
+          target_duration_seconds: 12
+        }),
+        entity("scene-live-01", "location", "真实场景一", {
+          order: 1,
+          purpose: "建立角色正在确认旧信。"
+        }),
+        entity("shot-live-01", "unit", "真实镜头一", {
+          blocking: "林晚在屋顶边缘展开旧信，风压住纸角。",
+          camera_angle: "平视略低",
+          duration_seconds: 12,
+          intent: "确认旧信是否可以进入下一场。",
+          movement: "缓慢推进",
+          shot_order: 1,
+          shot_size: "近景",
+          sound: "纸张摩擦声和远处风声",
+          source_digest: "a".repeat(64),
+          transition: "切入"
+        }),
+        entity("asset-live-letter", "resource", "旧信", {
+          asset_bible_review_state: "approved",
+          asset_bible_revision_id: "asset-bible-live-r1",
+          continuity_states: [{ label: "旧信跨屋顶镜头保持同一蜡封。", status: "confirmed" }],
+          kind: "prop",
+          negative_locks: ["不要替换为现代信封"],
+          positive_traits: ["红蜡封口", "纸张磨损"],
+          source_evidence: [{ excerpt: "林晚打开旧信。" }],
+          visual_identity: "褪色纸张、红蜡封口、边角磨损。"
+        }),
+        entity("character-live-lin", "entity", "林晚", {
+          kind: "character",
+          visual_identity: "银色发辫、深蓝斗篷、沉稳眼神。"
+        }),
+        entity("image-live-letter", "artifact", "旧信批准图", {
+          kind: "approved_image"
+        })
+      ],
+      relations: [
+        {
+          from_id: "sequence-live-01",
+          to_id: "scene-live-01",
+          relation_type: "contains"
+        },
+        {
+          from_id: "scene-live-01",
+          to_id: "shot-live-01",
+          relation_type: "contains"
+        },
+        {
+          from_id: "asset-live-letter",
+          to_id: "shot-live-01",
+          relation_type: "required_by"
+        },
+        {
+          from_id: "character-live-lin",
+          to_id: "shot-live-01",
+          relation_type: "required_by"
+        },
+        {
+          from_id: "asset-live-letter",
+          to_id: "image-live-letter",
+          relation_type: "approved_image"
+        }
+      ],
+      allowed_actions: [
+        {
+          action: "continue_to_storyboard",
+          enabled: true,
+          requires_preview: false,
+          target_entity_id: "shot-live-01",
+          reason: "沿当前剧本拆解进入分镜排布。"
+        },
+        {
+          action: "continue_to_asset_bible",
+          enabled: true,
+          requires_preview: false,
+          target_entity_id: "asset-live-letter",
+          reason: "检查当前镜头依赖的角色、场景和道具设定。"
+        },
+        {
+          action: "return_to_canvas",
+          enabled: true,
+          requires_preview: false,
+          target_entity_id: "shot-live-01",
+          reason: "带着当前资产上下文回到制作画布。"
+        }
+      ]
+    });
+
+    const script = scriptView(data, "shot-live-01");
+    const storyboard = storyboardView(data, "shot-live-01");
+    const assetBible = assetBibleView(data, "asset-live-letter");
+
+    expect(script.selectedBeatId).toBe("shot-live-01");
+    expect(script.beats[0]?.intent).toBe("确认旧信是否可以进入下一场。");
+    expect(script.primaryAction.enabled).toBe(true);
+    expect(storyboard.selectedShot.title).toBe("真实镜头一");
+    expect(storyboard.language.find((item) => item.label === "景别")?.value).toBe("近景");
+    expect(storyboard.assets.map((item) => item.label)).toContain("旧信");
+    expect(storyboard.primaryAction.entity).toBe("asset-live-letter");
+    expect(assetBible.selectedAsset.identity).toBe("褪色纸张、红蜡封口、边角磨损。");
+    expect(assetBible.selectedAsset.imageCountLabel).toBe("1 张");
+    expect(assetBible.usageShots[0]?.label).toBe("真实镜头一");
+    expect(assetBible.primaryAction.surface).toBe("canvas");
+    expect(assetBible.primaryAction.entity).toBe("shot-live-01");
+
+    const output = JSON.stringify({ script, storyboard, assetBible });
+    for (const fact of fixtureFacts) {
+      expect(output).not.toContain(fact);
+    }
   });
 });
 

@@ -14,18 +14,65 @@ def _candidate() -> dict:
         "source_digest": "a" * 64,
         "brief": {"brief_id": "brief-main"},
         "script_revision": {"revision_id": "revision-v1"},
-        "sequence": {"sequence_id": "sequence-main", "name": "第一集"},
-        "characters": [{"character_id": "character-lin", "display_name": "林晚"}],
-        "scenes": [{"scene_id": "scene-rooftop", "name": "屋顶"}],
-        "assets": [{"asset_id": "prop-letter", "name": "旧信", "kind": "prop"}],
+        "sequence": {
+            "sequence_id": "sequence-main",
+            "name": "第一集",
+            "target_duration_seconds": 12,
+        },
+        "characters": [
+            {
+                "character_id": "character-lin",
+                "display_name": "林晚",
+                "kind": "character",
+                "visual_identity": "银色发辫、深蓝斗篷、沉稳眼神。",
+                "positive_traits": ["银色发辫", "深蓝斗篷"],
+                "continuity_states": [
+                    {
+                        "label": "林晚在屋顶和旧信镜头保持同一造型。",
+                        "status": "confirmed",
+                    }
+                ],
+                "source_evidence": [{"excerpt": "林晚打开旧信。"}],
+                "asset_bible_review_state": "approved",
+            }
+        ],
+        "scenes": [
+            {
+                "scene_id": "scene-rooftop",
+                "name": "屋顶",
+                "order": 1,
+                "purpose": "建立角色正在确认旧信。",
+                "lighting": "冷蓝月光",
+            }
+        ],
+        "assets": [
+            {
+                "asset_id": "prop-letter",
+                "name": "旧信",
+                "kind": "prop",
+                "visual_identity": "褪色纸张、红蜡封口、边角磨损。",
+                "positive_traits": ["红蜡封口", "纸张磨损"],
+                "negative_locks": ["不要替换为现代信封"],
+                "source_evidence": [{"excerpt": "林晚打开旧信。"}],
+                "asset_bible_review_state": "approved",
+            }
+        ],
         "shots": [
             {
                 "shot_id": "shot-001",
                 "scene_id": "scene-rooftop",
+                "title": "打开旧信",
                 "character_refs": ["character-lin"],
                 "asset_refs": ["prop-letter"],
                 "duration_seconds": 6,
                 "intent": "林晚打开旧信。",
+                "blocking": "林晚在屋顶边缘展开旧信，风压住纸角。",
+                "shot_size": "近景",
+                "camera_angle": "平视略低",
+                "movement": "缓慢推进",
+                "sound": "纸张摩擦声和远处风声",
+                "transition": "切入",
+                "source_digest": "a" * 64,
             }
         ],
         "delivery_id": "delivery-main",
@@ -81,11 +128,40 @@ def test_studio_bff_surfaces_share_one_graph_version_and_digest(tmp_path) -> Non
     assert payloads["overview"]["resume_target"]["surface"] == "review"
     assert payloads["overview"]["resume_target"]["entity_id"] == "delivery-main"
     assert payloads["overview"]["agent_summary"]["based_on_project_version"] == 1
-    assert {item["entity_type"] for item in payloads["script"]["entities"]} == {"input", "revision"}
+    assert {"input", "revision", "collection", "location", "unit"} <= {
+        item["entity_type"] for item in payloads["script"]["entities"]
+    }
+    script_unit = next(
+        item for item in payloads["script"]["entities"]
+        if item["entity_type"] == "unit"
+    )
+    assert script_unit["metadata"]["blocking"] == "林晚在屋顶边缘展开旧信，风压住纸角。"
+    assert script_unit["metadata"]["source_digest"] == "a" * 64
     assert "unit" in {item["entity_type"] for item in payloads["storyboard"]["entities"]}
+    storyboard_action = next(
+        item for item in payloads["storyboard"]["allowed_actions"]
+        if item["action"] == "continue_to_asset_bible"
+    )
+    assert storyboard_action["enabled"] is True
     assert {"entity", "location", "resource"} <= {
         item["entity_type"] for item in payloads["asset-bible"]["entities"]
     }
+    asset = next(
+        item for item in payloads["asset-bible"]["entities"]
+        if item["entity_id"] == "prop-letter"
+    )
+    assert asset["metadata"]["visual_identity"] == "褪色纸张、红蜡封口、边角磨损。"
+    assert asset["metadata"]["source_evidence"][0]["excerpt"] == "林晚打开旧信。"
+    script_action = next(
+        item for item in payloads["script"]["allowed_actions"]
+        if item["action"] == "continue_to_storyboard"
+    )
+    asset_action = next(
+        item for item in payloads["asset-bible"]["allowed_actions"]
+        if item["action"] == "return_to_canvas"
+    )
+    assert script_action["enabled"] is True
+    assert asset_action["enabled"] is True
     assert payloads["review"]["review_queue"][0]["state"] == "pending"
     assert "delivery" in {item["entity_type"] for item in payloads["delivery"]["entities"]}
     assert payloads["delivery"]["cost_summary"]["available"] is False
