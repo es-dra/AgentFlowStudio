@@ -25,6 +25,17 @@ SCORE_KEYS = (
     "negative_constraint_safety",
     "preference_fit",
 )
+PRIMARY_SCORE_AXES = (
+    "visual_controllability",
+    "character_consistency",
+    "scene_continuity",
+    "provider_fit",
+)
+TIE_BREAKER_AXIS = "professional_alignment"
+# Small generation-target bias tips near ties; it must not override a clearly
+# stronger primary-axis score on another eligible candidate.
+GENERATION_TARGET_BIAS = 0.015
+SELECTION_METHOD = "weighted_primary_axes_with_target_bias"
 
 
 def build_creative_agent_decision(
@@ -39,7 +50,7 @@ def build_creative_agent_decision(
     constraint_layers = _constraint_layers(request, rules, slots, background, suppressed_context)
     section_prompt = _sections_to_prompt(sections)
     candidates = _candidates(request, section_prompt, constraint_layers, rules)
-    selected = _select_candidate(request, candidates)
+    selected = _select_candidate(request, candidates, constraint_layers)
     return {
         "agent_name": AGENT_NAME,
         "schema_version": "0.1.0",
@@ -59,14 +70,11 @@ def build_creative_agent_decision(
         "candidates": candidates,
         "selected_candidate": selected,
         "selection_policy": {
-            "method": "deterministic_pareto_frontier",
-            "primary_axes": [
-                "visual_controllability",
-                "character_consistency",
-                "scene_continuity",
-                "provider_fit",
-            ],
-            "tie_breaker": "professional_alignment",
+            "method": SELECTION_METHOD,
+            "primary_axes": list(PRIMARY_SCORE_AXES),
+            "tie_breaker": TIE_BREAKER_AXIS,
+            "generation_target_bias": GENERATION_TARGET_BIAS,
+            "hard_constraint_veto": "missing_hard_node_parameter_controls",
         },
         "provider_translation": _provider_translation(request, selected, constraint_layers),
         "feedback_policy": {
@@ -223,12 +231,52 @@ def _score(
     return {key: round(max(0.0, min(0.99, base[key])), 2) for key in SCORE_KEYS}
 
 
-def _select_candidate(request: PromptOptimizationRequest, candidates: list[dict[str, Any]]) -> dict[str, Any]:
-    preferred = "provider_safe_keyframe" if request.generation_target in {"image", "keyframe"} else "continuity_safe"
-    for candidate in candidates:
-        if candidate["candidate_id"] == preferred:
-            return candidate
-    return candidates[0]
+def _select_candidate(
+    request: PromptOptimizationRequest,
+    candidates: list[dict[str, Any]],
+    constraints: dict[str, Any],
+) -> dict[str, Any]:
+    if not candidates:
+        raise ValueError("creative agent requires at least one candidate")
+
+    eligible = [candidate for candidate in candidates if not _hard_constraint_veto(candidate, constraints)]
+    if not eligible:
+        eligible = list(candidates)
+
+    return max(
+        eligible,
+        key=lambda candidate: _selection_rank(request, candidate),
+    )
+
+
+def _hard_constraint_veto(candidate: dict[str, Any], constraints: dict[str, Any]) -> bool:
+    """Veto candidates that drop required hard node-parameter controls from the prompt."""
+    controls = _hard_control_sentence(constraints)
+    if not controls:
+        return False
+    prompt = str(candidate.get("canonical_prompt") or "")
+    return controls not in prompt
+
+
+def _selection_rank(
+    request: PromptOptimizationRequest,
+    candidate: dict[str, Any],
+) -> tuple[float, float, str]:
+    score = candidate.get("score") or {}
+    primary = sum(float(score.get(axis, 0.0)) for axis in PRIMARY_SCORE_AXES) / len(PRIMARY_SCORE_AXES)
+    tie = float(score.get(TIE_BREAKER_AXIS, 0.0))
+    biased = primary + _generation_target_bias(request, str(candidate.get("candidate_id") or ""))
+    # Candidate id is a stable final tie-breaker for full determinism.
+    return (round(biased, 6), round(tie, 6), str(candidate.get("candidate_id") or ""))
+
+
+def _generation_target_bias(request: PromptOptimizationRequest, candidate_id: str) -> float:
+    image_like = request.generation_target in {"image", "keyframe"}
+    if image_like and candidate_id == "provider_safe_keyframe":
+        return GENERATION_TARGET_BIAS
+    if not image_like and candidate_id == "continuity_safe":
+        return GENERATION_TARGET_BIAS
+    return 0.0
 
 
 def _provider_translation(
@@ -274,4 +322,10 @@ def _sections_to_prompt(sections: list[dict[str, str]]) -> str:
     return "\n".join(f"{section['title']}: {section['text']}" for section in sections)
 
 
-__all__ = ("AGENT_NAME", "build_creative_agent_decision")
+__all__ = (
+    "AGENT_NAME",
+    "GENERATION_TARGET_BIAS",
+    "PRIMARY_SCORE_AXES",
+    "SELECTION_METHOD",
+    "build_creative_agent_decision",
+)

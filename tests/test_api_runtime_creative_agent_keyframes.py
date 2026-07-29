@@ -46,6 +46,124 @@ def test_keyframe_artifact_host_rejection_has_stable_download_diagnostics() -> N
     assert block["attempt_count"] == 1
 
 
+def test_creative_agent_selection_is_score_driven_with_target_bias_and_hard_veto() -> None:
+    from apps.api.runtime_creative_agent import (
+        GENERATION_TARGET_BIAS,
+        SELECTION_METHOD,
+        _select_candidate,
+        build_creative_agent_decision,
+    )
+    from apps.api.runtime_models import PromptOptimizationRequest
+
+    keyframe_request = PromptOptimizationRequest(
+        node_id="image-node-selection-001",
+        node_type="image",
+        prompt_text="A quiet founder stands in a glass studio at night.",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={"aspect_ratio": "9:16", "shot_scale": "wide shot"},
+        generated_at="2026-07-29T12:00:00+08:00",
+    )
+    script_request = keyframe_request.model_copy(
+        update={"node_id": "script-node-selection-001", "node_type": "script", "generation_target": "script"}
+    )
+
+    keyframe_decision = build_creative_agent_decision(
+        keyframe_request,
+        sections=[{"title": "Intent", "text": "controllable keyframe"}],
+        rules=[{"rule_id": "rule_light", "domain": "lighting", "weight": 0.9}],
+        slots={"subject": "founder", "scene": "glass studio", "preference": "flashy"},
+        background=[{"kind": "character"}],
+        suppressed_context=[{"reason": "soft_preference_conflict"}],
+    )
+    script_decision = build_creative_agent_decision(
+        script_request,
+        sections=[{"title": "Intent", "text": "continuity-safe script beat"}],
+        rules=[{"rule_id": "rule_light", "domain": "lighting", "weight": 0.9}],
+        slots={"subject": "founder", "scene": "glass studio", "preference": "flashy"},
+        background=[{"kind": "character"}],
+        suppressed_context=[],
+    )
+
+    assert keyframe_decision["selection_policy"]["method"] == SELECTION_METHOD
+    assert keyframe_decision["selection_policy"]["generation_target_bias"] == GENERATION_TARGET_BIAS
+    assert keyframe_decision["selected_candidate"]["candidate_id"] == "provider_safe_keyframe"
+    assert script_decision["selected_candidate"]["candidate_id"] == "continuity_safe"
+    assert all("aspect ratio 9:16" in candidate["canonical_prompt"].lower() for candidate in keyframe_decision["candidates"])
+
+    hard_controls = "aspect ratio 9:16; shot scale wide shot"
+    constraints = {
+        "hard_constraints": [
+            {"source": "node_parameters", "key": "aspect_ratio", "value": "9:16"},
+            {"source": "node_parameters", "key": "shot_scale", "value": "wide shot"},
+        ]
+    }
+    vetoed = [
+        {
+            "candidate_id": "continuity_safe",
+            "canonical_prompt": "Missing hard controls on purpose",
+            "score": {
+                "visual_controllability": 0.99,
+                "character_consistency": 0.99,
+                "scene_continuity": 0.99,
+                "provider_fit": 0.99,
+                "professional_alignment": 0.99,
+            },
+        },
+        {
+            "candidate_id": "provider_safe_keyframe",
+            "canonical_prompt": f"Brief\nHard Controls: {hard_controls}",
+            "score": {
+                "visual_controllability": 0.70,
+                "character_consistency": 0.70,
+                "scene_continuity": 0.70,
+                "provider_fit": 0.70,
+                "professional_alignment": 0.70,
+            },
+        },
+    ]
+    assert _select_candidate(keyframe_request, vetoed, constraints)["candidate_id"] == "provider_safe_keyframe"
+
+    continuity_dominates = [
+        {
+            "candidate_id": "continuity_safe",
+            "canonical_prompt": f"Continuity brief\nHard Controls: {hard_controls}",
+            "score": {
+                "visual_controllability": 0.92,
+                "character_consistency": 0.98,
+                "scene_continuity": 0.98,
+                "provider_fit": 0.90,
+                "professional_alignment": 0.90,
+            },
+        },
+        {
+            "candidate_id": "provider_safe_keyframe",
+            "canonical_prompt": f"Provider brief\nHard Controls: {hard_controls}",
+            "score": {
+                "visual_controllability": 0.80,
+                "character_consistency": 0.80,
+                "scene_continuity": 0.80,
+                "provider_fit": 0.88,
+                "professional_alignment": 0.80,
+            },
+        },
+        {
+            "candidate_id": "expressive_cinematic",
+            "canonical_prompt": f"Expressive brief\nHard Controls: {hard_controls}",
+            "score": {
+                "visual_controllability": 0.81,
+                "character_consistency": 0.81,
+                "scene_continuity": 0.81,
+                "provider_fit": 0.81,
+                "professional_alignment": 0.85,
+            },
+        },
+    ]
+    selected = _select_candidate(keyframe_request, continuity_dominates, constraints)
+    assert selected["candidate_id"] == "continuity_safe"
+
+
 def test_prompt_optimizer_records_creative_agent_candidates_and_node_constraints(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
@@ -95,6 +213,8 @@ def test_prompt_optimizer_records_creative_agent_candidates_and_node_constraints
         "provider_safe_keyframe",
     }
     assert selected["candidate_id"] in {candidate["candidate_id"] for candidate in agent["candidates"]}
+    assert selected["candidate_id"] == "provider_safe_keyframe"
+    assert agent["selection_policy"]["method"] == "weighted_primary_axes_with_target_bias"
     assert selected["score"]["visual_controllability"] >= selected["score"]["preference_fit"]
     assert agent["provider_translation"]["capability"] == "image_keyframe"
     assert agent["provider_translation"]["provider"] == "image_relay"

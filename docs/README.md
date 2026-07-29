@@ -24,6 +24,8 @@ claims need explicit gates and matching evidence.
 - [GFR execution projection](GFR_EXECUTION_PROJECTION.md)
 - [Current architecture](current_architecture.md)
 - [Project Manifest contract](project_manifest_contract.md)
+- [Creative agent working-mode baseline](architecture/AFS_CREATIVE_AGENT_WORKING_MODE_BASELINE_20260729.md)
+- [Creative intent control agent engineering summary](architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md)
 
 ## Current Product Surface
 

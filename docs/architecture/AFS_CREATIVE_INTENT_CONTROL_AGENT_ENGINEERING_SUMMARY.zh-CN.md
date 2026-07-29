@@ -4,7 +4,7 @@
 
 执行标准：智能体输出必须区分 canonical brief、provider prompt、候选评分、选择理由和安全 trace。内部可以使用导演、摄影、灯光、美术、连续性和 provider 适配等视角，但前端不展示多智能体过程。图片/关键帧 gate 通过前，不接视频；未经确认的反馈只能是候选证据，不能成为强记忆。
 
-Date: 2026-06-12
+Date: 2026-06-12; selection-policy update 2026-07-29
 
 This repo stores only the safe engineering projection of the creative intent
 control agent. The detailed algorithm discussion and patent-candidate notes
@@ -22,10 +22,20 @@ node prompt
 -> background character / scene context
 -> hard / strong / soft constraint layering
 -> three candidate creative briefs
--> deterministic score and selection
+-> weighted primary-axis scores + generation_target bias + hard-control veto
 -> canonical prompt + provider translation
 -> safe trace and manifest
 ```
+
+Selection policy method: `weighted_primary_axes_with_target_bias`.
+It is not a true Pareto frontier. Primary axes are
+`visual_controllability`, `character_consistency`, `scene_continuity`, and
+`provider_fit`, with `professional_alignment` as the tie-breaker. Generation
+target only applies a small bias; hard node-parameter controls veto candidates
+that drop those controls from the canonical prompt.
+
+Current working-mode baseline:
+[AFS_CREATIVE_AGENT_WORKING_MODE_BASELINE_20260729.md](AFS_CREATIVE_AGENT_WORKING_MODE_BASELINE_20260729.md)
 
 The user-facing Studio surface still shows only the node prompt optimization
 action and result. It does not expose memory review, knowledgebase management,
