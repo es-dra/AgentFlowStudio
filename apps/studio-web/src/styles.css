@@ -1439,6 +1439,44 @@ p {
   line-height: 1.5;
 }
 
+.rework-command-state,
+.rework-receipt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  color: var(--text-secondary);
+  background: #161c21;
+  font-size: 13px;
+}
+
+.rework-command-state--error,
+.rework-command-state--stale {
+  border-color: rgba(247, 181, 84, 0.42);
+  color: #ffd8a3;
+  background: rgba(247, 181, 84, 0.08);
+}
+
+.rework-receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rework-receipt span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.rework-receipt strong {
+  color: var(--text-primary);
+}
+
+.rework-receipt small {
+  color: var(--text-muted);
+}
+
 .rework-panel > footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;

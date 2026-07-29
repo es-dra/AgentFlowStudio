@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   IconAlertCircle,
   IconArrowRight,
@@ -8,6 +8,9 @@ import {
 } from "@tabler/icons-react";
 
 import type { SurfaceProps } from "../App";
+import {
+  stateLabel
+} from "../api/studioAdapter";
 import { MediaStage, formatSeconds } from "../components/MediaStage";
 
 export default function DeliverySurface({
@@ -16,20 +19,18 @@ export default function DeliverySurface({
   onNavigate
 }: SurfaceProps) {
   const view = useMemo(() => deliveryView(data), [data]);
-  const initialBlocker = Math.max(
+  const selectedBlocker = Math.max(
     0,
     view.blockers.findIndex((item) => item.id === urlState.blocker)
   );
-  const [selectedBlocker, setSelectedBlocker] = useState(initialBlocker);
   const blocker = view.blockers[selectedBlocker];
 
   const chooseBlocker = (index: number) => {
-    setSelectedBlocker(index);
     onNavigate({ blocker: view.blockers[index]?.id ?? "" });
   };
 
   const continueBlocker = () => {
-    if (!blocker) return;
+    if (!blocker?.actionable) return;
     onNavigate({
       surface: blocker.surface,
       entity: blocker.entity,
@@ -44,11 +45,11 @@ export default function DeliverySurface({
           <div>
             <p className="eyebrow">合成交付</p>
             <div className="object-title">
-              <h1>当前合成版本 · 版本{toChineseNumber(view.version)}</h1>
-              <span className="status status--warning">尚未就绪</span>
+              <h1>{view.title}</h1>
+              <span className={`status status--${view.statusTone}`}>{view.statusLabel}</span>
             </div>
           </div>
-          <span>当前可播放 {formatSeconds(view.playableDuration)} / 目标 {formatSeconds(view.targetDuration)}</span>
+          <span>{view.durationLabel}</span>
         </header>
 
         {view.mediaUrl ? (
@@ -60,46 +61,51 @@ export default function DeliverySurface({
         ) : (
           <div className="media-unavailable media-unavailable--large">
             <IconMovie aria-hidden="true" size={28} />
-            当前服务信封尚未提供受控交付媒体地址
+            {view.mediaEmpty}
           </div>
         )}
 
         <section className="timeline" aria-label="装配时间线">
-          <div className="timeline__tracks">
-            {view.shots.map((shot) => (
-              <button
-                key={shot.id}
-                type="button"
-                className={`timeline-shot timeline-shot--${shot.tone}`}
-                style={{ flexGrow: Math.max(shot.duration, 6) }}
-                onClick={() => {
-                  const index = view.blockers.findIndex(
-                    (item) => item.entity === shot.id
-                  );
-                  if (index >= 0) chooseBlocker(index);
-                }}
-              >
-                <span>镜头 {String(shot.sequence).padStart(2, "0")}</span>
-                <strong>{shot.label}</strong>
-                <small>{shot.duration} 秒 · {shot.status}</small>
-              </button>
-            ))}
-          </div>
-          <div className="timeline__axis" aria-hidden="true">
-            <span>00:00</span>
-            <span>00:22</span>
-            <span>00:50</span>
-            <span>01:17</span>
-          </div>
-          <div className="timeline__legend">
-            <span><IconCircleCheck aria-hidden="true" size={16} />已完成</span>
-            <span><IconAlertCircle aria-hidden="true" size={16} />待处理</span>
-          </div>
+          {view.shots.length ? (
+            <>
+              <div className="timeline__tracks">
+                {view.shots.map((shot) => (
+                  <button
+                    key={shot.id}
+                    type="button"
+                    className={`timeline-shot timeline-shot--${shot.tone}`}
+                    style={{ flexGrow: Math.max(shot.duration ?? 6, 6) }}
+                    onClick={() => {
+                      const index = view.blockers.findIndex(
+                        (item) => item.entity === shot.id
+                      );
+                      if (index >= 0) chooseBlocker(index);
+                    }}
+                  >
+                    <span>{shot.sequenceLabel}</span>
+                    <strong>{shot.label}</strong>
+                    <small>{shot.durationLabel} · {shot.status}</small>
+                  </button>
+                ))}
+              </div>
+              {view.timelineMarks.length ? (
+                <div className="timeline__axis" aria-hidden="true">
+                  {view.timelineMarks.map((mark) => <span key={mark}>{mark}</span>)}
+                </div>
+              ) : null}
+              <div className="timeline__legend">
+                <span><IconCircleCheck aria-hidden="true" size={16} />已完成</span>
+                <span><IconAlertCircle aria-hidden="true" size={16} />待处理</span>
+              </div>
+            </>
+          ) : (
+            <p className="empty-inline">服务端尚未提供交付时间线。</p>
+          )}
         </section>
 
         <footer className="delivery-spec">
           <span>最终交付配置</span>
-          <strong>1920 × 1080 / 24 帧 / 立体声</strong>
+          <strong>{view.specLabel}</strong>
         </footer>
       </div>
 
@@ -111,7 +117,7 @@ export default function DeliverySurface({
           </div>
         </div>
         <ol className="blocker-list">
-          {view.blockers.map((item, index) => (
+          {view.blockers.length ? view.blockers.map((item, index) => (
             <li key={item.id}>
               <button
                 type="button"
@@ -127,28 +133,35 @@ export default function DeliverySurface({
                 <IconArrowRight aria-hidden="true" size={17} />
               </button>
             </li>
-          ))}
+          )) : (
+            <li>
+              <p className="empty-inline">当前交付投影没有阻塞明细。</p>
+            </li>
+          )}
         </ol>
 
         <section className="version-list">
           <p className="eyebrow">版本记录</p>
-          {view.versions.map((item) => (
+          {view.versions.length ? view.versions.map((item) => (
             <div key={item.version} className={item.current ? "version-row is-current" : "version-row"}>
               <span>
-                <strong>版本{toChineseNumber(item.version)}</strong>
+                <strong>{item.label}</strong>
                 <small>{formatSeconds(item.duration)}</small>
               </span>
               <time>{item.time}</time>
               <IconPlayerPlayFilled aria-label="播放此版本" size={17} />
             </div>
-          ))}
+          )) : (
+            <p className="empty-inline">当前真实项目没有可播放交付版本。</p>
+          )}
         </section>
 
         <button
           className="button button--primary button--large"
           type="button"
           onClick={continueBlocker}
-          disabled={!blocker}
+          disabled={!blocker?.actionable}
+          title={blocker?.actionable ? "继续处理阻塞项" : "当前阻塞项没有可导航目标"}
         >
           继续处理阻塞项
           <IconArrowRight aria-hidden="true" size={18} />
@@ -167,19 +180,25 @@ export default function DeliverySurface({
   );
 }
 
-function deliveryView(data: SurfaceProps["data"]) {
+export function deliveryView(data: SurfaceProps["data"]) {
   if (data.source === "fixture") {
     const fixture = data.fixture;
     return {
-      version: fixture.delivery.deliveryVersion,
+      title: `当前合成版本 · 版本${toChineseNumber(fixture.delivery.deliveryVersion)}`,
+      statusLabel: "尚未就绪",
+      statusTone: "warning",
       playableDuration: fixture.delivery.playableDurationSeconds,
       targetDuration: fixture.project.targetDurationSeconds,
+      durationLabel: `当前可播放 ${formatSeconds(fixture.delivery.playableDurationSeconds)} / 目标 ${formatSeconds(fixture.project.targetDurationSeconds)}`,
       mediaUrl: fixture.shots[2]?.imageUrl ?? "",
+      mediaEmpty: "当前服务端尚未提供受控交付媒体地址",
       shots: fixture.shots.map((shot) => ({
         id: shot.shotRef,
         sequence: shot.sequence,
+        sequenceLabel: `镜头 ${String(shot.sequence).padStart(2, "0")}`,
         label: shot.displayName,
         duration: shot.durationSeconds,
+        durationLabel: `${shot.durationSeconds} 秒`,
         status:
           shot.videoStatus === "review_pending"
             ? "待审核"
@@ -204,7 +223,8 @@ function deliveryView(data: SurfaceProps["data"]) {
           note: "8 秒 · 需要导演决定",
           surface: "review" as const,
           entity: "shot-03",
-          candidate: "candidate-shot-03-video-v2"
+          candidate: "candidate-shot-03-video-v2",
+          actionable: true
         },
         {
           id: "shot-05-task",
@@ -212,7 +232,8 @@ function deliveryView(data: SurfaceProps["data"]) {
           note: "9 秒 · 当前进度 46%",
           surface: "canvas" as const,
           entity: "shot-05",
-          candidate: ""
+          candidate: "",
+          actionable: true
         },
         {
           id: "shot-07-missing",
@@ -220,50 +241,55 @@ function deliveryView(data: SurfaceProps["data"]) {
           note: "13 秒 · 等待发起制作",
           surface: "canvas" as const,
           entity: "shot-07",
-          candidate: ""
+          candidate: "",
+          actionable: true
         }
       ],
       versions: [
-        { version: 3, duration: 47, time: "今天 14:32", current: true },
-        { version: 2, duration: 47, time: "今天 11:08", current: false },
-        { version: 1, duration: 22, time: "昨天 18:40", current: false }
-      ]
+        { version: 3, label: "版本三", duration: 47, time: "今天 14:32", current: true },
+        { version: 2, label: "版本二", duration: 47, time: "今天 11:08", current: false },
+        { version: 1, label: "版本一", duration: 22, time: "昨天 18:40", current: false }
+      ],
+      timelineMarks: ["00:00", "00:22", "00:50", "01:17"],
+      specLabel: "1920 × 1080 / 24 帧 / 立体声"
     };
   }
 
+  const envelope = data.envelope;
+  const summary = envelope.delivery_summary;
+  const hasDelivery = summary.playable;
+  const playableDuration = 0;
+  const blockerCount = summary.blocker_count;
+  const blockers = blockerCount > 0
+    ? [
+        {
+          id: "delivery-blockers",
+          label: `服务端报告 ${blockerCount} 个阻塞项`,
+          note: "当前交付摘要尚未提供阻塞明细",
+          surface: "delivery" as const,
+          entity: "",
+          candidate: "",
+          duration: 0,
+          actionable: false
+        }
+      ]
+    : [];
   return {
-    version: data.envelope.project_version,
-    playableDuration: 0,
+    title: hasDelivery ? "服务端标记可播放交付" : "尚未形成可播放交付",
+    statusLabel: stateLabel(summary.state),
+    statusTone: hasDelivery ? "success" : blockerCount > 0 ? "warning" : "muted",
+    playableDuration,
     targetDuration: 0,
+    durationLabel: `当前可播放 ${formatSeconds(playableDuration)} / 目标时长待服务端提供`,
     mediaUrl: "",
-    shots: data.envelope.entities.map((entity, index) => ({
-      id: entity.entity_id,
-      sequence: index + 1,
-      label: entity.label,
-      duration: Number(entity.metadata.duration_seconds ?? 0),
-      status: entity.state,
-      tone: entity.state === "active" ? "active" : "muted"
-    })),
-    blockers: data.envelope.recovery_summary.attention_required
-      ? [
-          {
-            id: "recovery-attention",
-            label: "制作任务需要核对",
-            note: data.envelope.recovery_summary.message,
-            surface: "delivery" as const,
-            entity: "",
-            candidate: ""
-          }
-        ]
-      : [],
-    versions: [
-      {
-        version: data.envelope.project_version,
-        duration: 0,
-        time: "服务端当前版本",
-        current: true
-      }
-    ]
+    mediaEmpty: hasDelivery
+      ? "当前交付摘要未提供受控媒体地址"
+      : "当前真实项目没有已采用视频或交付记录，尚未形成可播放交付",
+    shots: [],
+    blockers,
+    versions: [],
+    timelineMarks: [],
+    specLabel: "交付规格尚未提供"
   };
 }
 

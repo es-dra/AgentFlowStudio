@@ -16,6 +16,7 @@ import {
 
 import {
   liveNotice,
+  publicCopy,
   projectCheckpoint,
   projectName,
   type StudioData
@@ -60,6 +61,7 @@ export function AppShell({
 
   const name = data ? projectName(data) : "正在读取项目";
   const checkpoint = data ? projectCheckpoint(data) : "读取检查点";
+  const canPlay = data?.source === "fixture" || data?.envelope.delivery_summary.playable === true;
 
   return (
     <div className={`app-shell ${agentOpen ? "agent-is-open" : ""}`}>
@@ -81,7 +83,7 @@ export function AppShell({
           className="toolbar-button"
           type="button"
           disabled
-          title="当前信封没有撤销入口"
+          title="当前服务端没有撤销入口"
         >
           <IconArrowBackUp aria-hidden="true" size={18} />
           撤销
@@ -90,13 +92,15 @@ export function AppShell({
           className="toolbar-button"
           type="button"
           disabled
-          title="当前信封没有恢复入口"
+          title="当前服务端没有恢复入口"
         >
           恢复
         </button>
         <button
           className="toolbar-button"
           type="button"
+          disabled={!canPlay}
+          title={canPlay ? "播放当前交付版本" : "当前真实项目尚未形成可播放交付"}
           onClick={() => onNavigate({ surface: "delivery" })}
         >
           <IconPlayerPlayFilled aria-hidden="true" size={17} />
@@ -200,7 +204,7 @@ function AgentContent({
   surface: AppSurface;
   data: StudioData | null;
 }) {
-  const content = agentCopy(surface);
+  const content = agentCopy(surface, data);
   return (
     <div className="agent-panel">
       <div>
@@ -223,7 +227,7 @@ function AgentContent({
         <span>依据</span>
         <p>
           {data?.source === "live"
-            ? `基于服务端版本 ${data.envelope.project_version}`
+            ? `基于服务端版本 ${data.envelope.agent_summary.based_on_project_version}`
             : "基于界面样例版本 32，不会直接执行操作"}
         </p>
       </section>
@@ -231,7 +235,27 @@ function AgentContent({
   );
 }
 
-function agentCopy(surface: AppSurface) {
+function agentCopy(surface: AppSurface, data: StudioData | null) {
+  if (data?.source === "live") {
+    const envelope = data.envelope;
+    const focused =
+      envelope.focused_entity ??
+      envelope.entities.find((item) => item.entity_id === envelope.agent_summary.entity_id) ??
+      null;
+    const target =
+      focused?.label ||
+      (envelope.agent_summary.entity_id ? "服务端对象" : surfaceLabel(surface));
+    const headline = publicCopy(envelope.agent_summary.headline || envelope.surface_summary.headline);
+    return {
+      object: target,
+      reason: headline || "服务端尚未提供当前工作面的助手建议。",
+      suggestion:
+        envelope.agent_summary.state === "attention_required"
+          ? "先处理服务端标记的注意事项；所有写动作仍保持关闭。"
+          : "查看当前投影内容；缺少回执的动作不会执行。"
+    };
+  }
+
   switch (surface) {
     case "overview":
       return {

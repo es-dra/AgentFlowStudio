@@ -55,6 +55,7 @@ export function App() {
               data={studio.data}
               urlState={urlState}
               onNavigate={navigate}
+              onReload={studio.reload}
             />
           </Suspense>
         ) : null}
@@ -66,11 +67,12 @@ export function App() {
 interface SurfaceOutletProps {
   data: StudioData;
   urlState: StudioUrlState;
-  onNavigate: (patch: Partial<StudioUrlState>) => void;
+  onNavigate: (patch: Partial<StudioUrlState>, replace?: boolean) => void;
+  onReload: () => void;
 }
 
-function SurfaceOutlet({ data, urlState, onNavigate }: SurfaceOutletProps) {
-  const shared = { data, urlState, onNavigate };
+function SurfaceOutlet({ data, urlState, onNavigate, onReload }: SurfaceOutletProps) {
+  const shared = { data, urlState, onNavigate, onReload };
   if (data.source === "live" && !hasLiveSurfaceContent(data)) {
     return (
       <section className="surface-state surface-state--embedded" aria-live="polite">
@@ -115,5 +117,6 @@ function SurfaceSkeleton() {
 export interface SurfaceProps {
   data: StudioData;
   urlState: StudioUrlState;
-  onNavigate: (patch: Partial<StudioUrlState>) => void;
+  onNavigate: (patch: Partial<StudioUrlState>, replace?: boolean) => void;
+  onReload: () => void;
 }
