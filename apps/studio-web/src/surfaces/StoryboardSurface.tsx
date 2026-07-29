@@ -392,7 +392,7 @@ export function storyboardView(
     nextContext:
       primaryAction.enabled
         ? "进入 Asset Bible 后继续检查当前镜头的角色、场景和道具锁定。"
-        : "后端尚未允许进入资产检查，当前保持只读。",
+        : "当前项目尚未开放资产检查，当前保持只读。",
     primaryAction: selectedShot
       ? primaryAction
       : disabledPrimaryAction("资产未准备", "当前没有选中的镜头。", "asset-bible")

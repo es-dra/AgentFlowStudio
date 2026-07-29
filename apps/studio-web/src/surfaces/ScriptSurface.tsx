@@ -215,7 +215,7 @@ export function scriptView(
       sequenceLabel: data.fixture.project.episodeName,
       revisionLabel: "界面样例 · 不写入项目",
       readiness: "样例剧本拆解用于界面检查；真实项目只读取统一项目脉络。",
-      sourceLabel: "fixture",
+      sourceLabel: "界面样例 · 不写入项目",
       readOnlyLabel: "样例只读",
       sceneCount: scenes.length,
       shotCount: data.fixture.shots.length,
@@ -325,7 +325,7 @@ export function scriptView(
     revisionLabel: revision?.label ? `剧本版本 · ${revision.label}` : "剧本版本待补齐",
     readiness:
       shotEntities.length > 0
-        ? "当前读取的是已确认剧本在项目脉络中的场次与镜头意图；剧本文字全文尚未进入 Studio BFF 投影。"
+        ? "当前展示已确认的场次与镜头意图；完整剧本文字尚未接入当前工作面。"
         : "当前只读到剧本版本，还没有可进入分镜的镜头拆解。",
     sourceLabel: envelope.authority_mode === "graph_v1" ? "真实项目脉络" : "旧项目文件",
     readOnlyLabel: primaryAction.enabled ? "可继续导航" : "只读待准备",
@@ -353,7 +353,7 @@ export function scriptView(
     nextContext:
       primaryAction.enabled
         ? "进入分镜后保留当前项目与选中镜头。"
-        : "后端尚未允许继续分镜导航，当前保持只读。",
+        : "当前项目尚未开放进入分镜，当前保持只读。",
     primaryAction: shotEntities.length
       ? primaryAction
       : disabledPrimaryAction("分镜未准备", "当前项目没有可进入分镜的镜头。", "storyboard")

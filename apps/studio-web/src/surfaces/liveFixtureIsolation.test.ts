@@ -23,6 +23,20 @@ const fixtureFacts = [
   "仅用于界面检查"
 ];
 
+const internalCreatorCopyTerms = [
+  /\bBFF\b/i,
+  /\bfixture\b/i,
+  /\bprotocol\b/i,
+  /\binternal\b/i,
+  /raw\s*id/i,
+  /\bproject_id\b/i,
+  /\bentity_id\b/i,
+  /\btarget_entity_id\b/i,
+  /\bschema_version\b/i,
+  /provider_dispatch_count/i,
+  /graph_v1/i
+];
+
 describe("live studio view models", () => {
   it("does not leak v0.2 fixture facts into sparse live mode", () => {
     const data = liveData({
@@ -335,6 +349,12 @@ describe("live studio view models", () => {
     expect(assetBible.usageShots[0]?.label).toBe("真实镜头一");
     expect(assetBible.primaryAction.surface).toBe("canvas");
     expect(assetBible.primaryAction.entity).toBe("shot-live-01");
+    expect(script.readiness).toContain("完整剧本文字尚未接入当前工作面");
+
+    const creatorCopy = creationSurfaceVisibleCopy(script, storyboard, assetBible);
+    for (const term of internalCreatorCopyTerms) {
+      expect(creatorCopy).not.toMatch(term);
+    }
 
     const output = JSON.stringify({ script, storyboard, assetBible });
     for (const fact of fixtureFacts) {
@@ -342,6 +362,92 @@ describe("live studio view models", () => {
     }
   });
 });
+
+function creationSurfaceVisibleCopy(
+  script: ReturnType<typeof scriptView>,
+  storyboard: ReturnType<typeof storyboardView>,
+  assetBible: ReturnType<typeof assetBibleView>
+): string {
+  return JSON.stringify({
+    script: {
+      sequenceLabel: script.sequenceLabel,
+      revisionLabel: script.revisionLabel,
+      readiness: script.readiness,
+      sourceLabel: script.sourceLabel,
+      readOnlyLabel: script.readOnlyLabel,
+      scenes: script.scenes.map(({ label, orderLabel, purpose, durationLabel }) => ({
+        label,
+        orderLabel,
+        purpose,
+        durationLabel
+      })),
+      beats: script.beats.map(({ orderLabel, title, intent, durationLabel, trace }) => ({
+        orderLabel,
+        title,
+        intent,
+        durationLabel,
+        trace
+      })),
+      selectedDetail: script.selectedDetail,
+      nextContext: script.nextContext,
+      primaryAction: pickActionCopy(script.primaryAction)
+    },
+    storyboard: {
+      sequenceLabel: storyboard.sequenceLabel,
+      sourceLabel: storyboard.sourceLabel,
+      readiness: storyboard.readiness,
+      scenes: storyboard.scenes.map(({ label, orderLabel, purpose, durationLabel, shotCount }) => ({
+        label,
+        orderLabel,
+        purpose,
+        durationLabel,
+        shotCount
+      })),
+      shots: storyboard.shots.map(({ title, orderLabel, durationLabel, status }) => ({
+        title,
+        orderLabel,
+        durationLabel,
+        status
+      })),
+      selectedShot: storyboard.selectedShot,
+      language: storyboard.language,
+      assetHeading: storyboard.assetHeading,
+      assets: storyboard.assets.map(({ label, kind }) => ({ label, kind })),
+      nextContext: storyboard.nextContext,
+      primaryAction: pickActionCopy(storyboard.primaryAction)
+    },
+    assetBible: {
+      sourceLabel: assetBible.sourceLabel,
+      readiness: assetBible.readiness,
+      assetCountLabel: assetBible.assetCountLabel,
+      projectVersionLabel: assetBible.projectVersionLabel,
+      readOnlyLabel: assetBible.readOnlyLabel,
+      traceHeading: assetBible.traceHeading,
+      assets: assetBible.assets.map(({ label, kind, usageLabel, status }) => ({
+        label,
+        kind,
+        usageLabel,
+        status
+      })),
+      selectedAsset: assetBible.selectedAsset,
+      usageShots: assetBible.usageShots.map(({ label, durationLabel }) => ({
+        label,
+        durationLabel
+      })),
+      primaryAction: pickActionCopy(assetBible.primaryAction)
+    }
+  });
+}
+
+function pickActionCopy(action: {
+  label: string;
+  reason: string;
+}) {
+  return {
+    label: action.label,
+    reason: action.reason
+  };
+}
 
 function liveData(
   overrides: Partial<StudioSurfaceEnvelope> = {}
