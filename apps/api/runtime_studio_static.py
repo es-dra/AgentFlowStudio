@@ -35,9 +35,10 @@ def configure_site_static(app: FastAPI, site_root: Path = DEFAULT_SITE_ROOT) -> 
     )
 
 
-def configure_studio_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROOT) -> None:
-    root = Path(studio_root)
-    if not root.exists():
+def configure_studio_static(app: FastAPI, studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> None:
+    root = Path(studio_web_root)
+    index = root / "index.html"
+    if not index.is_file():
         return
 
     @app.get("/studio", include_in_schema=False)
@@ -46,7 +47,7 @@ def configure_studio_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROO
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon_redirect() -> RedirectResponse:
-        return RedirectResponse(url="/studio/favicon.svg")
+        return RedirectResponse(url="/studio-legacy/favicon.svg")
 
     app.mount(
         "/studio",
@@ -72,7 +73,37 @@ def configure_studio_next_static(app: FastAPI, studio_web_root: Path = DEFAULT_S
     )
 
 
-def studio_static_status(studio_root: Path = DEFAULT_STUDIO_ROOT) -> dict[str, bool | str]:
+def configure_studio_legacy_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROOT) -> None:
+    root = Path(studio_root)
+    if not root.exists():
+        return
+
+    @app.get("/studio-legacy", include_in_schema=False)
+    def studio_legacy_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/studio-legacy/")
+
+    app.mount(
+        "/studio-legacy",
+        NoStoreStaticFiles(directory=root, html=True),
+        name="afs_studio_legacy",
+    )
+
+
+def studio_static_status(
+    studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT,
+) -> dict[str, bool | str]:
+    return _studio_web_static_status(studio_web_root, route="/studio/", role="primary")
+
+
+def studio_next_static_status(
+    studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT,
+) -> dict[str, bool | str]:
+    return _studio_web_static_status(studio_web_root, route="/studio-next/", role="alias")
+
+
+def studio_legacy_static_status(
+    studio_root: Path = DEFAULT_STUDIO_ROOT,
+) -> dict[str, bool | str]:
     root = Path(studio_root)
     root_exists = root.exists()
     index_exists = (root / "index.html").is_file()
@@ -80,15 +111,17 @@ def studio_static_status(studio_root: Path = DEFAULT_STUDIO_ROOT) -> dict[str, b
     ready = root_exists and index_exists and entry_js_exists
     status = "ready" if ready else "missing" if not root_exists else "incomplete"
     return {
-        "mounted": root_exists,
+        "mounted": ready,
         "root_exists": root_exists,
         "index_exists": index_exists,
         "entry_js_exists": entry_js_exists,
         "status": status,
+        "route": "/studio-legacy/",
+        "role": "legacy",
     }
 
 
-def studio_next_static_status(studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> dict[str, bool | str]:
+def _studio_web_static_status(studio_web_root: Path, *, route: str, role: str) -> dict[str, bool | str]:
     root = Path(studio_web_root)
     root_exists = root.exists()
     index_exists = (root / "index.html").is_file()
@@ -101,7 +134,8 @@ def studio_next_static_status(studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -
         "index_exists": index_exists,
         "assets_dir_exists": assets_dir_exists,
         "status": status,
-        "route": "/studio-next/",
+        "route": route,
+        "role": role,
     }
 
 
@@ -111,8 +145,10 @@ __all__ = (
     "DEFAULT_STUDIO_WEB_ROOT",
     "NoStoreStaticFiles",
     "configure_site_static",
+    "configure_studio_legacy_static",
     "configure_studio_next_static",
     "configure_studio_static",
+    "studio_legacy_static_status",
     "studio_next_static_status",
     "studio_static_status",
 )

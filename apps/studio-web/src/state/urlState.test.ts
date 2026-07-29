@@ -31,6 +31,35 @@ describe("studio URL state", () => {
     });
   });
 
+  it("accepts legacy project query but writes canonical project_id", () => {
+    const initial = readStudioUrlState(
+      "?project=legacy-project&surface=script&entity=scene-03"
+    );
+    const nextUrl = patchStudioUrl(initial, { surface: "storyboard" });
+
+    expect(initial).toMatchObject({
+      projectId: "legacy-project",
+      surface: "script",
+      entity: "scene-03"
+    });
+    expect(nextUrl).toContain("project_id=legacy-project");
+    expect(nextUrl).not.toContain("project=");
+    expect(readStudioUrlState(nextUrl)).toMatchObject({
+      projectId: "legacy-project",
+      surface: "storyboard",
+      entity: "scene-03"
+    });
+  });
+
+  it("prefers project_id when both current and legacy project query are present", () => {
+    const state = readStudioUrlState(
+      "?project=legacy-project&project_id=canonical-project&surface=canvas"
+    );
+
+    expect(state.projectId).toBe("canonical-project");
+    expect(state.surface).toBe("canvas");
+  });
+
   it("rejects unknown surfaces and forced states", () => {
     const state = readStudioUrlState("?surface=debug&ui_state=success");
 

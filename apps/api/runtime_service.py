@@ -98,8 +98,10 @@ from apps.api.runtime_studio_static import (
     DEFAULT_STUDIO_ROOT,
     DEFAULT_STUDIO_WEB_ROOT,
     configure_site_static,
+    configure_studio_legacy_static,
     configure_studio_next_static,
     configure_studio_static,
+    studio_legacy_static_status,
     studio_next_static_status,
     studio_static_status,
 )
@@ -169,7 +171,8 @@ def create_runtime_app(
         return runtime_health_payload(
             runtime_root=runtime_root,
             studio_static={
-                **studio_static_status(studio_root),
+                **studio_static_status(studio_web_root),
+                "legacy": studio_legacy_static_status(studio_root),
                 "studio_next": studio_next_static_status(studio_web_root),
             },
             runtime_bind_host=runtime_bind_host,
@@ -451,8 +454,9 @@ def create_runtime_app(
     register_runtime_embedded_creative_action_routes(app, store, auth)
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)
-    configure_studio_static(app, studio_root)
     configure_studio_next_static(app, studio_web_root)
+    configure_studio_legacy_static(app, studio_root)
+    configure_studio_static(app, studio_web_root)
 
     return app
 

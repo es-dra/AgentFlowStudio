@@ -25,9 +25,12 @@ export function readStudioUrlState(search: string): StudioUrlState {
   const rawState = params.get("ui_state");
   const rawExpected = params.get("expected_version");
   const expected = rawExpected === null ? Number.NaN : Number(rawExpected);
+  const projectId =
+    params.get("project_id")?.trim() ||
+    params.get("project")?.trim() ||
+    "studio-1785154250742-86s0uf";
   return {
-    projectId:
-      params.get("project_id")?.trim() || "studio-1785154250742-86s0uf",
+    projectId,
     surface: isAppSurface(rawSurface) ? rawSurface : "overview",
     candidate: params.get("candidate")?.trim() || "",
     entity: params.get("entity")?.trim() || "",

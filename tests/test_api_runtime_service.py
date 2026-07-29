@@ -26,10 +26,20 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "AFS_RUNTIME_SERVICE_HOST",
     ):
         monkeypatch.delenv(name, raising=False)
-    studio_next_root = tmp_path / "studio-next"
-    (studio_next_root / "assets").mkdir(parents=True)
-    (studio_next_root / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
-    client = TestClient(create_runtime_app(runtime_root=tmp_path, studio_web_root=studio_next_root))
+    studio_web_root = tmp_path / "studio-web" / "dist"
+    (studio_web_root / "assets").mkdir(parents=True)
+    (studio_web_root / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
+    studio_legacy_root = tmp_path / "studio-legacy"
+    (studio_legacy_root / "src").mkdir(parents=True)
+    (studio_legacy_root / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
+    (studio_legacy_root / "src" / "main.js").write_text("console.log('legacy')", encoding="utf-8")
+    client = TestClient(
+        create_runtime_app(
+            runtime_root=tmp_path,
+            studio_root=studio_legacy_root,
+            studio_web_root=studio_web_root,
+        )
+    )
 
     health = client.get("/health").json()
     capabilities = client.get("/capabilities").json()
@@ -47,8 +57,19 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "mounted": True,
         "root_exists": True,
         "index_exists": True,
-        "entry_js_exists": True,
+        "assets_dir_exists": True,
         "status": "ready",
+        "route": "/studio/",
+        "role": "primary",
+        "legacy": {
+            "mounted": True,
+            "root_exists": True,
+            "index_exists": True,
+            "entry_js_exists": True,
+            "status": "ready",
+            "route": "/studio-legacy/",
+            "role": "legacy",
+        },
         "studio_next": {
             "mounted": True,
             "root_exists": True,
@@ -56,6 +77,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
             "assets_dir_exists": True,
             "status": "ready",
             "route": "/studio-next/",
+            "role": "alias",
         },
     }
     assert health["provider_gates"] == {
@@ -177,8 +199,19 @@ def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_
         "mounted": False,
         "root_exists": False,
         "index_exists": False,
-        "entry_js_exists": False,
+        "assets_dir_exists": False,
         "status": "missing",
+        "route": "/studio/",
+        "role": "primary",
+        "legacy": {
+            "mounted": False,
+            "root_exists": False,
+            "index_exists": False,
+            "entry_js_exists": False,
+            "status": "missing",
+            "route": "/studio-legacy/",
+            "role": "legacy",
+        },
         "studio_next": {
             "mounted": False,
             "root_exists": False,
@@ -186,6 +219,7 @@ def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_
             "assets_dir_exists": False,
             "status": "missing",
             "route": "/studio-next/",
+            "role": "alias",
         },
     }
     assert str(tmp_path).lower() not in serialized
@@ -245,30 +279,82 @@ def test_runtime_service_allows_local_studio_cors(tmp_path) -> None:
 
 
 def test_runtime_service_serves_studio_static_entry_without_private_paths(tmp_path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    react_root = tmp_path / "studio-web" / "dist"
+    react_assets = react_root / "assets"
+    react_assets.mkdir(parents=True)
+    (react_root / "index.html").write_text(
+        '<title>AFS 制作工作区</title><div id="root"></div>'
+        '<script type="module" src="/studio/assets/index.js"></script>',
+        encoding="utf-8",
+    )
+    (react_assets / "index.js").write_text("console.log('react')", encoding="utf-8")
+
+    legacy_root = tmp_path / "studio-legacy"
+    legacy_src = legacy_root / "src"
+    legacy_src.mkdir(parents=True)
+    (legacy_root / "index.html").write_text(
+        '<title>AFS Studio 创作图谱</title><div id="app"></div>'
+        '<script type="module" src="./src/main.js"></script>',
+        encoding="utf-8",
+    )
+    (legacy_root / "favicon.svg").write_text("<svg></svg>", encoding="utf-8")
+    (legacy_src / "main.js").write_text("function createStore() { return {}; }", encoding="utf-8")
+
+    client = TestClient(
+        create_runtime_app(
+            runtime_root=tmp_path / "runtime",
+            studio_root=legacy_root,
+            studio_web_root=react_root,
+        )
+    )
 
     redirect = client.get("/studio", follow_redirects=False)
     index = client.get("/studio/")
+    primary_js = client.get("/studio/assets/index.js")
+    next_alias = client.get("/studio-next/")
+    next_alias_js = client.get("/studio-next/assets/index.js")
+    legacy_redirect = client.get("/studio-legacy", follow_redirects=False)
+    legacy_index = client.get("/studio-legacy/")
     favicon_redirect = client.get("/favicon.ico", follow_redirects=False)
-    favicon = client.get("/studio/favicon.svg")
-    app_js = client.get("/studio/src/main.js")
-    serialized = (index.text + app_js.text).lower()
+    favicon = client.get("/studio-legacy/favicon.svg")
+    legacy_js = client.get("/studio-legacy/src/main.js")
+    serialized = "\n".join(
+        [
+            index.text,
+            primary_js.text,
+            next_alias.text,
+            next_alias_js.text,
+            legacy_index.text,
+            legacy_js.text,
+        ]
+    ).lower()
 
     assert redirect.status_code in {307, 308}
     assert redirect.headers["location"] == "/studio/"
+    assert legacy_redirect.status_code in {307, 308}
+    assert legacy_redirect.headers["location"] == "/studio-legacy/"
     assert favicon_redirect.status_code in {307, 308}
-    assert favicon_redirect.headers["location"] == "/studio/favicon.svg"
+    assert favicon_redirect.headers["location"] == "/studio-legacy/favicon.svg"
     assert favicon.status_code == 200
     assert favicon.headers["cache-control"] == "no-store"
     assert "<svg" in favicon.text
     assert index.status_code == 200
-    assert '<div id="app">' in index.text
-    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in index.text
-    assert '<script type="module" src="./src/main.js"></script>' in index.text
-    assert app_js.status_code == 200
+    assert "AFS 制作工作区" in index.text
+    assert '<div id="root">' in index.text
+    assert '<script type="module" src="/studio/assets/index.js"></script>' in index.text
+    assert primary_js.status_code == 200
+    assert next_alias.status_code == 200
+    assert "AFS 制作工作区" in next_alias.text
+    assert next_alias_js.status_code == 200
+    assert legacy_index.status_code == 200
+    assert "AFS Studio 创作图谱" in legacy_index.text
+    assert '<script type="module" src="./src/main.js"></script>' in legacy_index.text
+    assert legacy_js.status_code == 200
     assert index.headers["cache-control"] == "no-store"
-    assert app_js.headers["cache-control"] == "no-store"
-    assert "createStore" in app_js.text
+    assert primary_js.headers["cache-control"] == "no-store"
+    assert legacy_js.headers["cache-control"] == "no-store"
+    assert "react" in primary_js.text
+    assert "createStore" in legacy_js.text
     assert "d:\\" not in serialized
     assert "c:\\" not in serialized
     assert "api_key" not in serialized
