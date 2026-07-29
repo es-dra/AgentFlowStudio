@@ -585,7 +585,12 @@ def enforce_image_admission_keyframe_request(
         raise ValueError("image request prompt differs from the locked creative grounding contract")
     if canonical_digest(expected_prompt) != prompt_contract.get("provider_prompt_digest"):
         raise ValueError("image request prompt contract digest is invalid")
-    if request.style != validated["manifest"].get("art_direction", {}).get("visual_style"):
+    expected_art_direction = (
+        prompt_contract.get("art_direction")
+        if isinstance(prompt_contract.get("art_direction"), Mapping)
+        else validated["manifest"].get("art_direction", {})
+    )
+    if request.style != expected_art_direction.get("visual_style"):
         raise ValueError("image request style differs from the locked art direction")
     if list(request.asset_refs or []) != list(item.get("reference_media_ids") or []):
         raise ValueError("keyframe request references differ from the locked manifest")

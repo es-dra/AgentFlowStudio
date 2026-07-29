@@ -337,6 +337,16 @@ def _sequence_workspace_projection(
         project_id=project_id,
         store=store,
     )
+    video_candidates = _pending_video_candidate_projection(
+        nodes,
+        graph["relations"],
+        project_id=project_id,
+        store=store,
+    )
+    video_candidate_artifacts = _pending_video_candidate_artifact_nodes(
+        nodes,
+        graph["relations"],
+    )
     versions = sorted(({"version": item["version"]} for item in graph["idempotency"].values()), key=lambda item: item["version"], reverse=True)
     return {"status": "ready", "project_id": safe_id(project_id),
             "graph_version": graph["version"], "graph_digest": graph["graph_digest"],
@@ -345,11 +355,70 @@ def _sequence_workspace_projection(
             "characters": [node for node in nodes.values() if node.get("category") == "entity"],
             "sequences": sequences, "scenes": scenes, "shots": units, "props": props, "reference_sets": references, "production_aids": production_aids,
             "approved_media": approved_media,
+            "video_candidates": video_candidates,
+            "artifact_nodes": video_candidate_artifacts,
             "dependencies": graph["relations"], "tasks": list(graph["work"].values()), "candidates": list(graph["artifacts"].values()),
             "selections": [{"selection_key": key, **value} for key, value in graph["selections"].items()],
             "reviews": list(graph["reviews"].values()), "delivery_plan": list(graph["deliveries"].values()), "version_history": versions},
             "storyboard": {"mode": "read_only", "graph_version": graph["version"], "graph_digest": graph["graph_digest"], "shots": units},
             "evidence_details_available": True, "provider_dispatch_count": 0, "cost_usd": 0}
+
+
+def _pending_video_candidate_artifact_nodes(
+    nodes: Mapping[str, Mapping[str, Any]],
+    relations: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    relation_candidate_ids = {
+        str(relation.get("to_id") or "")
+        for relation in relations
+        if relation.get("relation_type") == "video_candidate"
+    }
+    safe_metadata_keys = {
+        "kind",
+        "review_state",
+        "creative_approval_state",
+        "technical_qa_status",
+        "source_shot_id",
+        "manifest_id",
+        "manifest_hash",
+        "job_id",
+        "candidate_id",
+        "sha256",
+        "byte_count",
+        "mime_type",
+        "container",
+        "codec",
+        "width",
+        "height",
+        "duration_sec",
+        "model",
+        "resolution",
+        "generation_mode",
+    }
+    artifacts: list[dict[str, Any]] = []
+    for node_id, record in nodes.items():
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        if (
+            node_id not in relation_candidate_ids
+            or record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or metadata.get("kind") != "pending_video_candidate"
+            or metadata.get("review_state") != "candidate"
+        ):
+            continue
+        artifacts.append(
+            {
+                "node_id": node_id,
+                "category": "artifact",
+                "state": "active",
+                "metadata": {
+                    key: deepcopy(value)
+                    for key, value in metadata.items()
+                    if key in safe_metadata_keys
+                },
+            }
+        )
+    return artifacts
 
 
 def _approved_media_projection(
@@ -469,14 +538,96 @@ def _approved_media_projection(
     return approved_media
 
 
+def _pending_video_candidate_projection(
+    nodes: Mapping[str, Mapping[str, Any]],
+    relations: list[Mapping[str, Any]],
+    *,
+    project_id: str,
+    store: RuntimeStore | None = None,
+) -> list[dict[str, Any]]:
+    if store is None:
+        return []
+    targets_by_candidate: dict[str, list[str]] = {}
+    for relation in relations:
+        if relation.get("relation_type") != "video_candidate":
+            continue
+        candidate_id = str(relation.get("to_id") or "")
+        target_id = str(relation.get("from_id") or "")
+        if candidate_id and target_id in nodes:
+            targets_by_candidate.setdefault(candidate_id, []).append(target_id)
+    candidates: list[dict[str, Any]] = []
+    for node_id, record in nodes.items():
+        metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+        targets = sorted(set(targets_by_candidate.get(node_id, [])))
+        job_id = str(metadata.get("job_id") or "")
+        candidate_id = str(metadata.get("candidate_id") or "")
+        source_shot_id = str(metadata.get("source_shot_id") or "")
+        if (
+            record.get("category") != "artifact"
+            or record.get("state") != "active"
+            or metadata.get("kind") != "pending_video_candidate"
+            or metadata.get("review_state") != "candidate"
+            or targets != [source_shot_id]
+            or not job_id
+            or safe_id(job_id) != job_id
+            or not candidate_id
+            or safe_id(candidate_id) != candidate_id
+            or not source_shot_id
+        ):
+            continue
+        media_path = candidate_file(store.run_dir(project_id, job_id), candidate_id)
+        expected_sha = str(metadata.get("sha256") or "")
+        byte_count = _positive_int(metadata.get("byte_count"))
+        if (
+            media_path is None
+            or len(expected_sha) != 64
+            or not byte_count
+            or media_path.stat().st_size != byte_count
+            or _file_sha256(media_path) != expected_sha
+        ):
+            continue
+        candidates.append(
+            {
+                "media_node_id": node_id,
+                "media_kind": "video",
+                "review_state": "candidate",
+                "preview_url": (
+                    f"/projects/{safe_id(project_id)}/video-generations/"
+                    f"{safe_id(job_id)}/candidates/{safe_id(candidate_id)}/preview"
+                ),
+                "mime_type": str(metadata.get("mime_type") or "video/mp4"),
+                "container": str(metadata.get("mime_type") or "video/mp4"),
+                "width": int(metadata.get("width") or 0),
+                "height": int(metadata.get("height") or 0),
+                "duration_sec": float(metadata.get("duration_sec") or 0),
+                "codec": str(metadata.get("codec") or ""),
+                "model": str(metadata.get("model") or ""),
+                "resolution": str(metadata.get("resolution") or ""),
+                "generation_mode": str(metadata.get("generation_mode") or ""),
+                "manifest_id": str(metadata.get("manifest_id") or ""),
+                "manifest_hash": str(metadata.get("manifest_hash") or ""),
+                "job_id": job_id,
+                "candidate_id": candidate_id,
+                "sha256": expected_sha,
+                "byte_count": byte_count,
+                "candidate_graph_version": _graph_event_version(record),
+                "lineage": {
+                    "source_kind": "video_admission_candidate",
+                    "target_relation": "video_candidate",
+                },
+                "target_node_ids": [source_shot_id],
+            }
+        )
+    return candidates
+
+
 def _approved_video_receipts(
     store: RuntimeStore | None,
     project_id: str,
 ) -> dict[str, dict[str, Any]]:
     if store is None:
         return {}
-    root = store.projects_dir / safe_id(project_id) / "video_admission"
-    paths = [root / "manifest.json", *sorted((root / "history").glob("*.json"))]
+    paths = _video_admission_manifest_paths(store, project_id, include_history=True)
     receipts: dict[str, dict[str, Any]] = {}
     for path in paths:
         if not path.is_file():
@@ -555,6 +706,37 @@ def _approved_video_receipts(
             "_media_path": media_path,
         }
     return receipts
+
+
+def _video_admission_manifest_paths(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    include_history: bool,
+) -> list[Path]:
+    root = store.projects_dir / safe_id(project_id) / "video_admission"
+    paths: list[Path] = []
+    active = root / "manifest.json"
+    if active.is_file():
+        paths.append(active)
+    if include_history:
+        paths.extend(path for path in sorted((root / "history").glob("*.json")) if path.is_file())
+    lanes = root / "lanes"
+    if lanes.is_dir():
+        for lane in sorted(path for path in lanes.iterdir() if path.is_dir()):
+            manifest = lane / "manifest.json"
+            if manifest.is_file():
+                paths.append(manifest)
+            if include_history:
+                paths.extend(path for path in sorted((lane / "history").glob("*.json")) if path.is_file())
+    return paths
+
+
+def _graph_event_version(record: Mapping[str, Any]) -> int | None:
+    try:
+        return int((record.get("metadata") or {}).get("graph_version") or 0) or None
+    except (TypeError, ValueError):
+        return None
 
 
 def _video_receipt_matches_node(

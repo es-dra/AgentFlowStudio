@@ -1261,7 +1261,7 @@ def _upload_response() -> _JsonResponse:
             ),
             "mime_type": "image/png",
             "size": len(PNG_BYTES),
-            "expires_at": "2026-07-29T00:00:00Z",
+            "expires_at": "2099-07-29T00:00:00Z",
         }
     )
 

@@ -163,7 +163,21 @@ const planned = deriveProductionCopilotState({
     item: { state: "planned" },
   },
 });
-process.stdout.write(JSON.stringify({ ready, otherShot, planned }));
+const newRound = deriveProductionCopilotState({
+  ...common,
+  videoAdmission: {
+    status: "locked",
+    readiness: {
+      status: "new_round_ready",
+      shot_id: "shot-01",
+      reference_count: 3,
+      new_round_allowed: true,
+    },
+    selected_shot_ready: true,
+    item: { state: "reconcile_required" },
+  },
+});
+process.stdout.write(JSON.stringify({ ready, otherShot, planned, newRound }));
 '''
     )
 
@@ -182,12 +196,32 @@ process.stdout.write(JSON.stringify({ ready, otherShot, planned }));
         "reason": "视频准备清单已保存；下一步审核最终模型、参考组、时长和费用停止线，再决定是否发送。",
         "enabled": True,
     }
+    assert result["newRound"]["next_valid_action"] == {
+        "action": "prepare_shot_video",
+        "label": "建立新视频清单",
+        "reason": "上一次发送已安全归档；可建立新的单次视频清单，不会重放旧任务。",
+        "enabled": True,
+    }
+
+
+def test_safe_video_new_round_readiness_is_creator_visible() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    bible = (STUDIO / "src" / "asset-bible-workspace.js").read_text(encoding="utf-8")
+    workspace = (STUDIO / "src" / "video-admission-workspace.js").read_text(encoding="utf-8")
+
+    assert '"new_round_ready"' in workspace
+    assert "videoAdmissionCanEnterPanel(videoAdmissionView().readiness)" in shell
+    assert "videoAdmissionCanPrepare(videoAdmissionView().readiness)" in shell
+    assert "safeNewRoundVideo" in shell
+    assert "建立新视频清单" in shell
+    assert "videoAdmissionCanPrepare(videoAdmission?.readiness)" in bible
 
 
 def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> None:
     shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
     panel = (STUDIO / "src" / "agent-chat-panel.js").read_text(encoding="utf-8")
     workspace = (STUDIO / "src" / "video-admission-workspace.js").read_text(encoding="utf-8")
+    runtime = (STUDIO / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
     storyboard = shell.split("function buildStoryboardContent()", 1)[1].split(
         "function buildMediaOperationsContent()", 1
@@ -195,6 +229,15 @@ def test_storyboard_copilot_and_chat_share_real_video_admission_preview() -> Non
     assert '"准备镜头视频"' in storyboard
     assert "currentShotVideoAdmissionReady()" in storyboard
     assert "openCurrentShotVideoPreparation()" in storyboard
+    assert "&& Boolean(shot.preview)" not in shell
+    assert "shot_id: view.source?.shot?.shot_id || currentShot().graphNodeId || \"\"" in shell
+    assert "loadCurrentShotVideoAdmission" in shell
+    assert "previewVideoAdmissionRuntimeCommand" in shell
+    assert "confirmVideoAdmissionRuntimeCommand" in shell
+    assert "selectedShotId !== (currentShot().graphNodeId || \"\")" in shell
+    assert "loadVideoAdmissionLane(shotId)" in runtime
+    assert "previewVideoAdmissionLaneCommand(shotId, payload)" in runtime
+    assert "confirmVideoAdmissionLaneCommand(shotId, payload)" in runtime
 
     open_flow = shell.split("async function openCurrentShotVideoPreparation()", 1)[1].split(
         "function handleAgentVideoPreparation()", 1
@@ -231,3 +274,24 @@ def test_video_confirmation_remains_two_step_and_never_auto_dispatches_from_entr
     assert 'if (commandType === "reserve_dispatch")' in confirm
     assert "await dispatchVideoAdmissionItem()" in confirm
     assert 'commandType === "reserve_dispatch" ? "确认并发送" : "确认"' in shell
+    assert '"发送当前视频任务"' in shell
+    assert '"正在发送视频任务…"' in shell
+    assert "dispatchReservedVideoAdmissionItem" in shell
+
+
+def test_stale_video_panel_has_reachable_fallback_action() -> None:
+    shell = (STUDIO / "src" / "product-shell.js").read_text(encoding="utf-8")
+    stale_branch = shell.split('if (view.lineage?.status === "stale")', 1)[1].split(
+        'if (view.readiness?.status !== "ready" && view.status === "empty")',
+        1,
+    )[0]
+
+    assert 'view.lineage.rebuild_allowed || view.readiness?.rebuild_allowed' in stale_branch
+    assert '"recompile_current"' in stale_branch
+    assert '"按当前版本重新准备"' in stale_branch
+    assert "view.readiness?.new_round_allowed" in stale_branch
+    assert '"create_new_round"' in stale_branch
+    assert '"建立新的单次视频清单"' in stale_branch
+    assert 'item.state === "reconcile_required" && item.job_id' in stale_branch
+    assert '"检查视频进度"' in stale_branch
+    assert "pollVideoAdmissionItem()" in stale_branch

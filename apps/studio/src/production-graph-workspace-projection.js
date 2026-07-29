@@ -11,7 +11,9 @@ export function productionGraphWorkspaceProjection(workspace = null) {
       shots: [],
       approvedMedia: [],
       approvedMediaByTarget: {},
-      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, readyShots: 0 },
+      videoCandidates: [],
+      videoCandidatesByTarget: {},
+      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, pendingVideoCandidates: 0, generatedVideos: 0, readyShots: 0 },
       summary: emptySummary(),
     };
   }
@@ -31,7 +33,9 @@ export function productionGraphWorkspaceProjection(workspace = null) {
       shots: [],
       approvedMedia: [],
       approvedMediaByTarget: {},
-      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, readyShots: 0 },
+      videoCandidates: [],
+      videoCandidatesByTarget: {},
+      mediaSummary: { approvedImages: 0, approvedAssetImages: 0, approvedShotImages: 0, approvedVideos: 0, pendingVideoCandidates: 0, generatedVideos: 0, readyShots: 0 },
       summary: emptySummary(),
     };
   }
@@ -42,9 +46,15 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     sequence.approved_media,
     workspace.project_id,
   );
+  const videoCandidates = pendingVideoCandidateProjection(
+    videoCandidateProjectionInputs(sequence, relations, workspace.project_id),
+    workspace.project_id,
+  );
   const approvedMediaByTarget = Object.fromEntries(approvedMedia.byTarget.entries());
+  const videoCandidatesByTarget = Object.fromEntries(videoCandidates.byTarget.entries());
   const shots = array(sequence.shots).map((shot) => {
     const media = approvedMediaByTarget[String(shot.node_id || "")] || {};
+    const candidate = videoCandidatesByTarget[String(shot.node_id || "")] || null;
     return {
       nodeId: canvasNodeId(shot.node_id),
       graphNodeId: String(shot.node_id || ""),
@@ -56,9 +66,12 @@ export function productionGraphWorkspaceProjection(workspace = null) {
         ? "blocked"
         : shot.metadata?.review_state === "approved" || media.image || media.video
           ? "ready"
+          : candidate
+            ? "candidate"
           : "draft",
       preview: media.image?.previewUrl || "",
       video: media.video || null,
+      videoCandidate: candidate,
     };
   });
   const scenes = array(sequence.scenes).map((scene) => ({
@@ -79,6 +92,8 @@ export function productionGraphWorkspaceProjection(workspace = null) {
     shots,
     approvedMedia: approvedMedia.items,
     approvedMediaByTarget,
+    videoCandidates: videoCandidates.items,
+    videoCandidatesByTarget,
     mediaSummary: {
       approvedImages: approvedImages.length,
       approvedAssetImages: approvedImages.filter(
@@ -88,7 +103,9 @@ export function productionGraphWorkspaceProjection(workspace = null) {
         (item) => item.targetNodeIds.some((targetId) => shotTargetIds.has(targetId)),
       ).length,
       approvedVideos: approvedMedia.items.filter((item) => item.mediaKind === "video").length,
-      readyShots: shots.filter((shot) => shot.preview || shot.video).length,
+      pendingVideoCandidates: videoCandidates.items.length,
+      generatedVideos: approvedMedia.items.filter((item) => item.mediaKind === "video").length + videoCandidates.items.length,
+      readyShots: shots.filter((shot) => shot.preview || shot.video || shot.videoCandidate).length,
     },
     summary: {
       scriptRevisions: array(sequence.script_revisions).filter(
@@ -174,7 +191,10 @@ export function applyProductionGraphCanvasProjection(state, workspace) {
       slot += 1;
     });
   }
-  for (const media of projection.approvedMedia.filter((item) => item.mediaKind === "video")) {
+  for (const media of [
+    ...projection.approvedMedia.filter((item) => item.mediaKind === "video"),
+    ...projection.videoCandidates,
+  ]) {
     const graphNodeId = media.mediaNodeId;
     const id = canvasNodeId(graphNodeId);
     nodeMap.set(graphNodeId, id);
@@ -296,6 +316,149 @@ function approvedMediaProjection(value, projectId) {
   return { byTarget, items };
 }
 
+function pendingVideoCandidateProjection(value, projectId) {
+  const expectedProject = String(projectId || "");
+  const routePattern = /^\/projects\/([A-Za-z0-9_.-]+)\/video-generations\/[A-Za-z0-9_.-]+\/candidates\/candidate_\d{3}\/preview$/;
+  const byTarget = new Map();
+  const ambiguousTargets = new Set();
+  const accepted = [];
+  for (const media of array(value)) {
+    const previewUrl = String(media?.preview_url || "");
+    const match = previewUrl.match(routePattern);
+    if (
+      String(media?.media_kind || "") !== "video"
+      || String(media?.review_state || "") !== "candidate"
+      || !match
+      || !expectedProject
+      || match[1] !== expectedProject
+    ) {
+      continue;
+    }
+    const record = {
+      mediaNodeId: String(media?.media_node_id || ""),
+      mediaKind: "video",
+      reviewState: "candidate",
+      previewUrl,
+      mimeType: String(media?.mime_type || "video/mp4"),
+      container: String(media?.container || "video/mp4"),
+      width: Number(media?.width || 0),
+      height: Number(media?.height || 0),
+      durationSeconds: Number(media?.duration_sec || 0),
+      codec: String(media?.codec || ""),
+      model: String(media?.model || ""),
+      resolution: String(media?.resolution || ""),
+      generationMode: String(media?.generation_mode || ""),
+      manifestId: String(media?.manifest_id || ""),
+      manifestHash: String(media?.manifest_hash || ""),
+      jobId: String(media?.job_id || ""),
+      candidateId: String(media?.candidate_id || ""),
+      sha256: String(media?.sha256 || ""),
+      byteCount: Number(media?.byte_count || 0),
+      targetNodeIds: array(media?.target_node_ids).map((item) => String(item || "")).filter(Boolean),
+      lineage: media?.lineage && typeof media.lineage === "object"
+        ? {
+          sourceKind: String(media.lineage.source_kind || ""),
+          targetRelation: String(media.lineage.target_relation || ""),
+        }
+        : null,
+    };
+    if (!record.mediaNodeId || !record.targetNodeIds.length || record.targetNodeIds.length !== 1) continue;
+    const targetId = record.targetNodeIds[0];
+    if (ambiguousTargets.has(targetId)) continue;
+    if (byTarget.has(targetId)) {
+      byTarget.delete(targetId);
+      ambiguousTargets.add(targetId);
+      continue;
+    }
+    accepted.push(record);
+    byTarget.set(targetId, record);
+  }
+  const items = accepted.filter((media) => byTarget.get(media.targetNodeIds[0]) === media);
+  return { byTarget, items };
+}
+
+function videoCandidateProjectionInputs(sequence, relations, projectId) {
+  const explicit = array(sequence.video_candidates);
+  const explicitIds = new Set(
+    explicit.map((item) => String(item?.media_node_id || "")).filter(Boolean),
+  );
+  const fromGraphRelations = pendingVideoCandidateRecordsFromArtifactNodes(
+    sequence.artifact_nodes,
+    relations,
+    projectId,
+  ).filter((item) => !explicitIds.has(String(item.media_node_id || "")));
+  return [...explicit, ...fromGraphRelations];
+}
+
+function pendingVideoCandidateRecordsFromArtifactNodes(artifactNodes, relations, projectId) {
+  const expectedProject = String(projectId || "");
+  if (!expectedProject) return [];
+  const safeId = /^[A-Za-z0-9_.-]+$/;
+  const targetsByCandidate = new Map();
+  for (const relation of array(relations)) {
+    if (relation?.relation_type !== "video_candidate") continue;
+    const mediaNodeId = String(relation.to_id || "");
+    const targetNodeId = String(relation.from_id || "");
+    if (!mediaNodeId || !targetNodeId) continue;
+    targetsByCandidate.set(mediaNodeId, [
+      ...(targetsByCandidate.get(mediaNodeId) || []),
+      targetNodeId,
+    ]);
+  }
+  const records = [];
+  for (const node of array(artifactNodes)) {
+    const mediaNodeId = String(node?.node_id || node?.id || "");
+    const metadata = node?.metadata && typeof node.metadata === "object" ? node.metadata : {};
+    const jobId = String(metadata.job_id || "");
+    const candidateId = String(metadata.candidate_id || "");
+    const sourceShotId = String(metadata.source_shot_id || "");
+    const targets = uniqueStrings(targetsByCandidate.get(mediaNodeId)).sort();
+    if (
+      !mediaNodeId
+      || node?.category !== "artifact"
+      || node?.state !== "active"
+      || metadata.kind !== "pending_video_candidate"
+      || metadata.review_state !== "candidate"
+      || metadata.technical_qa_status !== "pass"
+      || targets.length !== 1
+      || targets[0] !== sourceShotId
+      || !sourceShotId
+      || !safeId.test(jobId)
+      || !safeId.test(candidateId)
+      || candidateId.match(/^candidate_\d{3}$/) === null
+    ) {
+      continue;
+    }
+    records.push({
+      media_node_id: mediaNodeId,
+      media_kind: "video",
+      review_state: "candidate",
+      preview_url: `/projects/${expectedProject}/video-generations/${jobId}/candidates/${candidateId}/preview`,
+      mime_type: String(metadata.mime_type || "video/mp4"),
+      container: String(metadata.container || metadata.mime_type || "video/mp4"),
+      width: Number(metadata.width || 0),
+      height: Number(metadata.height || 0),
+      duration_sec: Number(metadata.duration_sec || 0),
+      codec: String(metadata.codec || ""),
+      model: String(metadata.model || ""),
+      resolution: String(metadata.resolution || ""),
+      generation_mode: String(metadata.generation_mode || ""),
+      manifest_id: String(metadata.manifest_id || ""),
+      manifest_hash: String(metadata.manifest_hash || ""),
+      job_id: jobId,
+      candidate_id: candidateId,
+      sha256: String(metadata.sha256 || ""),
+      byte_count: Number(metadata.byte_count || 0),
+      target_node_ids: [sourceShotId],
+      lineage: {
+        source_kind: "production_graph_artifact_node",
+        target_relation: "video_candidate",
+      },
+    });
+  }
+  return records;
+}
+
 function emptySummary() {
   return { scriptRevisions: 0, sequences: 0, characters: 0, locations: 0, props: 0, referenceSets: 0, tasks: 0, candidates: 0,
     productionAids: 0, selections: 0, reviews: 0, pendingReviews: 0, rejectedReviews: 0, deliveries: 0, versionHistory: [] };
@@ -304,11 +467,13 @@ function emptySummary() {
 function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY, projection) {
   const metadata = record.metadata || {};
   const media = projection.approvedMediaByTarget?.[graphNodeId]?.image || null;
+  const videoCandidate = projection.videoCandidatesByTarget?.[graphNodeId] || null;
   const title = String(metadata.display_name || metadata.name || metadata.title || metadata.intent || fallbackTitle).trim() || fallbackTitle;
   const details = [];
   if (metadata.intent) details.push(String(metadata.intent));
   if (Number(metadata.duration_seconds || 0) > 0) details.push(`时长：${Number(metadata.duration_seconds).toFixed(1)} 秒`);
   if (media) details.push("参考图：已批准");
+  if (videoCandidate) details.push("视频候选：待审看");
   if (record.state === "invalidated") details.push("需要更新");
   const aspectRatio = media?.width > 0 && media?.height > 0
     ? `${media.width}:${media.height}`
@@ -323,8 +488,8 @@ function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY,
     h: 190,
     content: details.join("\n") || "已加入当前制作方案。",
     prompt: "",
-    status: record.state === "invalidated" ? "blocked" : media ? "complete" : "accepted",
-    result: media ? "已批准参考图已保存到当前项目。" : null,
+    status: record.state === "invalidated" ? "blocked" : media || videoCandidate ? "complete" : "accepted",
+    result: media ? "已批准参考图已保存到当前项目。" : videoCandidate ? "视频候选已写入当前项目，等待审看批准。" : null,
     previewUrl: media?.previewUrl || "",
     groupId: null,
     collapsed: false,
@@ -342,6 +507,24 @@ function canvasNode(record, id, graphNodeId, type, fallbackTitle, slot, originY,
         height: media.height,
         approval_graph_version: media.approvalGraphVersion,
       } : null,
+      videoCandidate: videoCandidate ? {
+        media_node_id: videoCandidate.mediaNodeId,
+        media_kind: videoCandidate.mediaKind,
+        review_state: videoCandidate.reviewState,
+        source_node_ids: videoCandidate.targetNodeIds,
+        model: videoCandidate.model,
+        resolution: videoCandidate.resolution,
+        mime_type: videoCandidate.mimeType,
+        width: videoCandidate.width,
+        height: videoCandidate.height,
+        duration_sec: videoCandidate.durationSeconds,
+        generation_mode: videoCandidate.generationMode,
+        manifest_id: videoCandidate.manifestId,
+        manifest_hash: videoCandidate.manifestHash,
+        job_id: videoCandidate.jobId,
+        candidate_id: videoCandidate.candidateId,
+        preview_url: videoCandidate.previewUrl,
+      } : null,
       previewAspectRatio: aspectRatio,
       provider_dispatch_count: 0,
     },
@@ -355,7 +538,9 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
   return {
     id,
     type: media.mediaKind,
-    title: media.mediaKind === "video" ? "已批准镜头视频" : "已批准镜头图片",
+    title: media.reviewState === "candidate"
+      ? "待审看镜头视频候选"
+      : media.mediaKind === "video" ? "已批准镜头视频" : "已批准镜头图片",
     x: 80 + (slot % 4) * 330,
     y: originY + Math.floor(slot / 4) * 240,
     w: 300,
@@ -363,7 +548,9 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
     content: "",
     prompt: "",
     status: "complete",
-    result: media.mediaKind === "video" ? "视频已保存到当前项目。" : "图片已保存到当前项目。",
+    result: media.reviewState === "candidate"
+      ? "视频候选已写入当前项目，等待审看批准。"
+      : media.mediaKind === "video" ? "视频已保存到当前项目。" : "图片已保存到当前项目。",
     previewUrl: media.previewUrl,
     groupId: null,
     collapsed: false,
@@ -374,7 +561,7 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         graph_version: projection.graphVersion,
         graph_digest: projection.graphDigest,
       },
-      approvedMedia: {
+      approvedMedia: media.reviewState === "candidate" ? null : {
         media_kind: media.mediaKind,
         source_node_ids: media.targetNodeIds,
         model: media.model,
@@ -388,6 +575,25 @@ function mediaCanvasNode(media, id, graphNodeId, slot, originY, projection) {
         height: media.height,
         approval_graph_version: media.approvalGraphVersion,
       },
+      videoCandidate: media.reviewState === "candidate" ? {
+        media_node_id: media.mediaNodeId,
+        media_kind: media.mediaKind,
+        review_state: media.reviewState,
+        source_node_ids: media.targetNodeIds,
+        model: media.model,
+        resolution: media.resolution,
+        generation_mode: media.generationMode,
+        duration_sec: media.durationSeconds,
+        mime_type: media.mimeType,
+        container: media.container,
+        codec: media.codec,
+        width: media.width,
+        height: media.height,
+        manifest_id: media.manifestId,
+        job_id: media.jobId,
+        candidate_id: media.candidateId,
+        preview_url: media.previewUrl,
+      } : null,
       previewAspectRatio: aspectRatio,
       provider_dispatch_count: 0,
     },
@@ -414,6 +620,10 @@ function pushOrder(state, nodeId) {
 
 function canvasNodeId(value) {
   return `production_graph_${String(value || "").replace(/[^A-Za-z0-9_.:-]/g, "_").slice(0, 160)}`;
+}
+
+function uniqueStrings(value) {
+  return [...new Set(array(value).map((item) => String(item || "")).filter(Boolean))];
 }
 
 function array(value) {

@@ -32,6 +32,8 @@ import {
 } from "./image-admission-workspace.js";
 import {
   videoAdmissionCommand,
+  videoAdmissionCanEnterPanel,
+  videoAdmissionCanPrepare,
   videoAdmissionGenerationRequest,
   videoAdmissionGenerationResult,
   videoAdmissionProjection,
@@ -190,7 +192,7 @@ export function createProductShell(options = {}) {
     );
 
     const summary = node("div", "studio-header-summary");
-    const progress = Math.max(0, Math.min(100, Number(snapshot.project?.progress_percent || candidateDeliveryProgress(snapshot.project))));
+    const progress = deliveryProgressPercent();
     appendHeaderSummary(summary, progress);
 
     const actions = node("div", "studio-header-actions");
@@ -567,7 +569,7 @@ export function createProductShell(options = {}) {
     }
     status.append(
       node("strong", "", `制作序列 v${view.graphVersion}`),
-      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.mediaSummary?.approvedVideos || 0} 条视频已批准`),
+      node("span", "", `${view.summary.characters} 角色 · ${view.summary.locations} 场景 · ${view.shots.length} 镜头 · ${view.mediaSummary?.pendingVideoCandidates || 0} 条视频待审看 · ${view.mediaSummary?.approvedVideos || 0} 条视频已批准`),
     );
     if (view.mediaSummary?.approvedVideos) {
       const watch = node("button", "studio-text-button", "播放已批准视频");
@@ -1038,11 +1040,10 @@ export function createProductShell(options = {}) {
   async function refreshGraphBoundRuntimeState(runtime = options.getRuntime?.()) {
     if (!runtime) return null;
     const safely = (request) => Promise.resolve(request?.()).catch(() => null);
-    const [workspace, runtimeAssetBible, imageAdmission, videoAdmission] = await Promise.all([
+    const [workspace, runtimeAssetBible, imageAdmission] = await Promise.all([
       safely(runtime.sequenceWorkspace),
       safely(runtime.loadAssetBible),
       safely(runtime.loadImageAdmission),
-      safely(runtime.loadVideoAdmission),
     ]);
     if (workspace) {
       snapshot.sequenceWorkspace = workspace;
@@ -1054,6 +1055,7 @@ export function createProductShell(options = {}) {
       snapshot.imageAdmission = imageAdmission;
       imageAdmissionPreview = null;
     }
+    const videoAdmission = await loadCurrentShotVideoAdmission(runtime);
     if (videoAdmission) {
       snapshot.videoAdmission = videoAdmission;
       videoAdmissionPreview = null;
@@ -1246,7 +1248,7 @@ export function createProductShell(options = {}) {
           render();
         });
         headerActions.appendChild(admission);
-        if (["ready", "stale"].includes(videoAdmissionView().readiness?.status)) {
+        if (videoAdmissionCanEnterPanel(videoAdmissionView().readiness)) {
           const videoApproved = (graphView().mediaSummary?.approvedVideos || 0) > 0;
           const video = node(
             "button",
@@ -1313,13 +1315,15 @@ export function createProductShell(options = {}) {
           : "待整理"],
       ["美术方向", view.art_direction.status === "confirmed" ? "已确认" : "待确认"],
       ["参考图", imageMediaLifecycleLabel()],
-      ["视频", graphView().mediaSummary?.approvedVideos
+      ["视频", graphView().mediaSummary?.pendingVideoCandidates
+        ? `${graphView().mediaSummary.pendingVideoCandidates} 条待审看`
+        : graphView().mediaSummary?.approvedVideos
         ? `${graphView().mediaSummary.approvedVideos} 条已确认`
         : videoAdmissionView().item?.state === "candidate"
           ? "1 条待审看"
           : videoAdmissionView().readiness?.status === "stale"
             ? "需按当前版本更新"
-            : videoAdmissionView().readiness?.status === "ready"
+            : videoAdmissionCanPrepare(videoAdmissionView().readiness)
             ? "可准备"
             : "等待关键帧"],
     ];
@@ -2895,12 +2899,23 @@ export function createProductShell(options = {}) {
           ? `${shotLabel} 的画面语义未变化；已批准关键帧与 ${view.source?.references?.length || 0} 张参考图可复用。`
           : view.readiness?.next_action || "当前镜头画面来源需要重新确认。",
       ));
-      if (view.lineage.rebuild_allowed) {
+      if (view.lineage.rebuild_allowed || view.readiness?.rebuild_allowed) {
         stale.appendChild(buildVideoGenerationSetup(
           view,
           "recompile_current",
           "按当前版本重新准备",
         ));
+      } else if (view.readiness?.new_round_allowed) {
+        stale.appendChild(buildVideoGenerationSetup(
+          view,
+          "create_new_round",
+          "建立新的单次视频清单",
+        ));
+      } else if (item.state === "reconcile_required" && item.job_id) {
+        const recover = node("button", "studio-secondary-button", "检查视频进度");
+        recover.type = "button";
+        recover.addEventListener("click", () => void pollVideoAdmissionItem());
+        stale.appendChild(recover);
       }
       panel.appendChild(stale);
       return panel;
@@ -2971,7 +2986,24 @@ export function createProductShell(options = {}) {
         panel.appendChild(generate);
       }
     } else if (item.state === "reserved") {
-      panel.appendChild(node("p", "", "单次额度已确认；等待发送当前视频任务。"));
+      const reservePending = videoAdmissionPending
+        && videoAdmissionPendingCommand === "dispatch_reserved";
+      const send = node(
+        "button",
+        "studio-primary-button",
+        reservePending ? "正在发送视频任务…" : "发送当前视频任务",
+      );
+      send.type = "button";
+      send.disabled = !snapshot.mediaGates?.video || reservePending;
+      send.dataset.videoAdmissionCommand = "dispatch_reserved";
+      send.title = !snapshot.mediaGates?.video
+        ? "视频能力尚未启用；不会发送任务。"
+        : "只发送当前已预留的单镜头视频任务；不会重复创建清单。";
+      send.addEventListener("click", () => void dispatchReservedVideoAdmissionItem());
+      panel.append(
+        node("p", "", "单次额度已确认；可发送当前视频任务。系统会记录同一任务标识，刷新不会重复提交。"),
+        send,
+      );
     } else if (item.state === "reconcile_required" && view.readiness?.new_round_allowed) {
       panel.append(
         node("strong", "", "上一次发送被上游拒绝"),
@@ -3096,6 +3128,7 @@ export function createProductShell(options = {}) {
     prepare.disabled = setupPending || !videoAdmissionSetupComplete(setup);
     prepare.addEventListener("click", () => void stageVideoAdmissionCommand({
       type: commandType,
+      shot_id: view.source?.shot?.shot_id || currentShot().graphNodeId || "",
       generation_mode: setup.generation_mode,
       selection_reason: setup.selection_reason,
       temporal_staging: { ...setup.temporal_staging },
@@ -3234,8 +3267,9 @@ export function createProductShell(options = {}) {
         command: videoAdmissionCommand(command),
         requested_at: new Date().toISOString(),
       };
-      const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
-      videoAdmissionPreview = { ...preview, request };
+      const laneShotId = videoAdmissionCommandShotId(request.command);
+      const preview = await previewVideoAdmissionRuntimeCommand(request, laneShotId);
+      videoAdmissionPreview = { ...preview, request, lane_shot_id: laneShotId };
     } catch (error) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频准备预览失败");
     } finally {
@@ -3267,10 +3301,13 @@ export function createProductShell(options = {}) {
     const preview = videoAdmissionPreview;
     if (!preview) return;
     try {
-      const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
-        ...preview.request,
-        preview_digest: preview.preview_digest,
-      });
+      const response = await confirmVideoAdmissionRuntimeCommand(
+        {
+          ...preview.request,
+          preview_digest: preview.preview_digest,
+        },
+        preview.lane_shot_id || videoAdmissionCommandShotId(preview.request?.command),
+      );
       snapshot.videoAdmission = {
         ...(snapshot.videoAdmission || {}),
         status: response?.result?.manifest?.status || "locked",
@@ -3323,11 +3360,15 @@ export function createProductShell(options = {}) {
       command: videoAdmissionCommand(command),
       requested_at: new Date().toISOString(),
     };
-    const preview = await options.getRuntime?.().previewVideoAdmissionCommand(request);
-    const response = await options.getRuntime?.().confirmVideoAdmissionCommand({
-      ...request,
-      preview_digest: preview.preview_digest,
-    });
+    const laneShotId = videoAdmissionCommandShotId(request.command);
+    const preview = await previewVideoAdmissionRuntimeCommand(request, laneShotId);
+    const response = await confirmVideoAdmissionRuntimeCommand(
+      {
+        ...request,
+        preview_digest: preview.preview_digest,
+      },
+      laneShotId,
+    );
     snapshot.videoAdmission = {
       ...(snapshot.videoAdmission || {}),
       status: response?.result?.manifest?.status || "locked",
@@ -3354,6 +3395,27 @@ export function createProductShell(options = {}) {
       videoAdmissionError = options.formatError?.(error) || String(error?.message || error || "视频任务发送失败");
     }
     render();
+  }
+
+  async function dispatchReservedVideoAdmissionItem() {
+    if (videoAdmissionPending) {
+      videoAdmissionOpen = true;
+      render();
+      return;
+    }
+    videoAdmissionError = "";
+    videoAdmissionOpen = true;
+    videoAdmissionPending = true;
+    videoAdmissionPendingCommand = "dispatch_reserved";
+    render();
+    try {
+      await dispatchVideoAdmissionItem();
+    } finally {
+      videoAdmissionPending = false;
+      videoAdmissionPendingCommand = "";
+      render();
+      focusVideoAdmissionPanel();
+    }
   }
 
   async function pollVideoAdmissionItem() {
@@ -3569,14 +3631,19 @@ export function createProductShell(options = {}) {
       ? "empty"
       : String(videoView.item?.state || "");
     const rebuildVideo = currentShotVideoAdmissionRebuildable();
+    const safeNewRoundVideo = currentShotVideoAdmissionReady()
+      && videoActionState === "reconcile_required"
+      && videoView.readiness?.new_round_allowed === true;
     if (
       (currentShotVideoAdmissionReady() || rebuildVideo)
-      && ["empty", "planned"].includes(videoActionState)
+      && (["empty", "planned"].includes(videoActionState) || safeNewRoundVideo)
     ) {
       const videoActionLabel = videoAdmissionPending
         ? "正在准备…"
         : rebuildVideo
           ? "按当前版本重新准备"
+        : safeNewRoundVideo
+          ? "建立新视频清单"
         : videoView.item?.state === "planned"
           ? "确认镜头视频"
           : "准备镜头视频";
@@ -3617,6 +3684,8 @@ export function createProductShell(options = {}) {
       sectionEl.appendChild(buildApprovedShotVideo(currentShot(), {
         lineage: approvedVideoLineageForShot(currentShot()),
       }));
+    } else if (currentShot().videoCandidate) {
+      sectionEl.appendChild(buildPendingShotVideoCandidate(currentShot()));
     }
     return sectionEl;
   }
@@ -3933,13 +4002,15 @@ export function createProductShell(options = {}) {
     card.id = `storyboard-shot-${selection.sceneIndex}-${index}`;
     card.setAttribute("aria-pressed", String(index === selection.shotIndex));
     card.setAttribute("aria-label", `镜头 ${index + 1}：${shot.title}`);
-    const media = node("span", `shot-media ${shot.preview ? "has-preview" : "empty"}`);
+    const media = node("span", `shot-media ${shot.preview || shot.videoCandidate ? "has-preview" : "empty"}`);
     if (shot.preview) {
       const image = document.createElement("img");
       image.alt = `${shot.title} 镜头预览`;
       image.loading = "lazy";
       void setRuntimeMediaSource(image, shot.preview);
       media.appendChild(image);
+    } else if (shot.videoCandidate) {
+      media.innerHTML = `${icon("play", 20)}<span class="shot-empty-copy"><strong>视频候选待审看</strong><small>${escapeHtml(shot.description)}</small></span>`;
     } else {
       media.innerHTML = `${icon("image", 20)}<span class="shot-empty-copy"><strong>等待镜头画面</strong><small>${escapeHtml(shot.description)}</small></span>`;
     }
@@ -3949,6 +4020,8 @@ export function createProductShell(options = {}) {
     );
     if (shot.video) {
       media.appendChild(node("span", "shot-video-approved", "视频已保存"));
+    } else if (shot.videoCandidate) {
+      media.appendChild(node("span", "shot-video-approved", "视频待审看"));
     }
     const copy = node("span", "shot-copy");
     copy.append(
@@ -3959,6 +4032,49 @@ export function createProductShell(options = {}) {
     card.append(media, copy);
     card.addEventListener("click", () => selectContext(selection.sceneIndex, index));
     return card;
+  }
+
+  function buildPendingShotVideoCandidate(shot) {
+    const candidate = shot.videoCandidate || {};
+    const sectionEl = node("section", "approved-shot-video pending-shot-video-candidate");
+    sectionEl.setAttribute("aria-label", `${shot.title || "当前镜头"}待审看视频候选`);
+    const copy = node("div", "approved-shot-video-copy");
+    copy.append(
+      node("span", "eyebrow", "待审看候选"),
+      node("h2", "", `${shot.title || "当前镜头"}视频候选`),
+      node("p", "", "这是已通过技术检查并写入当前项目的候选视频；批准前不会覆盖正式镜头关系。"),
+    );
+    const facts = node("dl", "approved-shot-video-facts");
+    for (const [label, value] of [
+      ["模型", candidate.model || "待审看模型"],
+      ["生成方式", approvedVideoGenerationModeLabel(candidate.generationMode)],
+      ["规格", [candidate.resolution, candidate.durationSeconds ? `${candidate.durationSeconds} 秒` : ""].filter(Boolean).join(" · ") || "候选已保存"],
+      ["状态", "视频候选待审看"],
+    ]) {
+      facts.append(node("dt", "", label), node("dd", "", value));
+    }
+    copy.appendChild(facts);
+    sectionEl.appendChild(copy);
+    if (candidate.previewUrl) {
+      const frame = node("div", "approved-shot-video-frame");
+      const video = document.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", `${shot.title || "当前镜头"}视频候选播放器`);
+      video.addEventListener("loadeddata", () => {
+        frame.dataset.mediaState = "ready";
+      }, { once: true });
+      video.addEventListener("error", () => {
+        frame.dataset.mediaState = "error";
+      }, { once: true });
+      void setRuntimeMediaSource(video, candidate.previewUrl);
+      frame.appendChild(video);
+      sectionEl.appendChild(frame);
+    } else {
+      sectionEl.appendChild(node("p", "approved-shot-video-unavailable", "视频候选记录已保存，但当前媒体文件不可播放。"));
+    }
+    return sectionEl;
   }
 
   function buildApprovedShotVideo(shot, { lineage = null } = {}) {
@@ -4367,6 +4483,22 @@ export function createProductShell(options = {}) {
     }
     syncCanvasSelection();
     render();
+    const selectedShotId = currentShot().graphNodeId || "";
+    const selectedProjectId = currentProductProjectId();
+    if (selectedShotId) {
+      void loadCurrentShotVideoAdmission(options.getRuntime?.()).then((videoAdmission) => {
+        if (
+          !videoAdmission
+          || selectedProjectId !== currentProductProjectId()
+          || selectedShotId !== (currentShot().graphNodeId || "")
+        ) return;
+        snapshot.videoAdmission = videoAdmission;
+        videoAdmissionPreview = null;
+        videoAdmissionError = "";
+        videoAdmissionMediaState = "idle";
+        render();
+      }).catch(() => {});
+    }
     requestCanvasSafeAreaUpdate();
     requestAnimationFrame(focusCurrentContext);
   }
@@ -5080,7 +5212,11 @@ export function createProductShell(options = {}) {
         if (stopIfStale(activeProjectId)) return;
         try { imageAdmission = await projectRuntime?.loadImageAdmission?.(); } catch { imageAdmission = null; }
         if (stopIfStale(activeProjectId)) return;
-        try { videoAdmission = await projectRuntime?.loadVideoAdmission?.(); } catch { videoAdmission = null; }
+        if (sequenceWorkspace) {
+          snapshot.sequenceWorkspace = sequenceWorkspace;
+          snapshot.studioState = options.getStudioState?.() || snapshot.studioState;
+        }
+        try { videoAdmission = await loadCurrentShotVideoAdmission(projectRuntime); } catch { videoAdmission = null; }
         if (stopIfStale(activeProjectId)) return;
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
         if (stopIfStale(activeProjectId)) return;
@@ -5332,6 +5468,7 @@ export function createProductShell(options = {}) {
       title: cleanTitle(shot.title || shotTitle(index)), description: cleanDescription(shot.description || "等待补充镜头说明"),
       duration: `${shot.durationSeconds.toFixed(1)}s`, preview: safePreview(shot.preview),
       video: shot.video ? { ...shot.video, previewUrl: safePreview(shot.video.previewUrl) } : null,
+      videoCandidate: shot.videoCandidate ? { ...shot.videoCandidate, previewUrl: safePreview(shot.videoCandidate.previewUrl) } : null,
       state: shot.state, sceneId: shot.sceneNodeId }));
   }
 
@@ -5356,6 +5493,45 @@ export function createProductShell(options = {}) {
   }
   function videoAdmissionView() {
     return videoAdmissionProjection(snapshot.videoAdmission, videoAdmissionMediaState);
+  }
+  function currentVideoAdmissionShotId(command = null) {
+    return String(
+      command?.shot_id
+      || currentShot().graphNodeId
+      || videoAdmissionView().source?.shot?.shot_id
+      || "",
+    );
+  }
+  async function loadCurrentShotVideoAdmission(runtime = options.getRuntime?.()) {
+    if (!runtime) return null;
+    const shotId = currentVideoAdmissionShotId();
+    if (shotId && typeof runtime.loadVideoAdmissionLane === "function") {
+      try {
+        return await runtime.loadVideoAdmissionLane(shotId);
+      } catch {
+        return runtime.loadVideoAdmission?.() || null;
+      }
+    }
+    return runtime.loadVideoAdmission?.() || null;
+  }
+  function videoAdmissionCommandShotId(command = null) {
+    return currentVideoAdmissionShotId(command);
+  }
+  async function previewVideoAdmissionRuntimeCommand(request, laneShotId = "") {
+    const runtime = options.getRuntime?.();
+    const shotId = String(laneShotId || "");
+    if (shotId && typeof runtime?.previewVideoAdmissionLaneCommand === "function") {
+      return runtime.previewVideoAdmissionLaneCommand(shotId, request);
+    }
+    return runtime?.previewVideoAdmissionCommand(request);
+  }
+  async function confirmVideoAdmissionRuntimeCommand(request, laneShotId = "") {
+    const runtime = options.getRuntime?.();
+    const shotId = String(laneShotId || "");
+    if (shotId && typeof runtime?.confirmVideoAdmissionLaneCommand === "function") {
+      return runtime.confirmVideoAdmissionLaneCommand(shotId, request);
+    }
+    return runtime?.confirmVideoAdmissionCommand(request);
   }
   function graphApprovedShotForAdmission(view = videoAdmissionView()) {
     const sourceShotId = String(view.source?.shot?.shot_id || "");
@@ -5421,10 +5597,9 @@ export function createProductShell(options = {}) {
   function currentShotVideoAdmissionReady() {
     const readiness = videoAdmissionView().readiness || {};
     const shot = currentShot();
-    return readiness.status === "ready"
+    return videoAdmissionCanPrepare(readiness)
       && Boolean(readiness.shot_id)
-      && readiness.shot_id === shot.graphNodeId
-      && Boolean(shot.preview);
+      && readiness.shot_id === shot.graphNodeId;
   }
   function currentShotVideoAdmissionRebuildable() {
     const view = videoAdmissionView();
@@ -5432,8 +5607,7 @@ export function createProductShell(options = {}) {
     const shot = currentShot();
     return view.lineage?.status === "stale"
       && view.lineage?.rebuild_allowed === true
-      && readiness.shot_id === shot.graphNodeId
-      && Boolean(shot.preview);
+      && readiness.shot_id === shot.graphNodeId;
   }
   function hasStoryFacts() { return shotModel().length > 0; }
   function projectDisplayName() {
@@ -5464,7 +5638,7 @@ export function createProductShell(options = {}) {
   }
   function generatedMediaCount() {
     return sceneModel().flatMap((scene) => scene.shots).filter(
-      (shot) => Boolean(shot.preview || shot.video),
+      (shot) => Boolean(shot.preview || shot.video || shot.videoCandidate),
     ).length;
   }
   function approvedVideoCount() {
@@ -5473,8 +5647,13 @@ export function createProductShell(options = {}) {
     ).length;
   }
   function mediaCompletionPercent() { return totalShots() ? Math.round((generatedMediaCount() / totalShots()) * 100) : 0; }
+  function deliveryProgressPercent() {
+    const graph = graphView();
+    if (graph.status === "ready" && totalShots()) return mediaCompletionPercent();
+    return Math.max(0, Math.min(100, Number(snapshot.project?.progress_percent || candidateDeliveryProgress(snapshot.project))));
+  }
   function pendingCount() { return Number(snapshot.project?.decision_inbox?.pending_count || 0) + Number(snapshot.project?.crew?.blocked_count || 0); }
-  function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "blocked" ? "待处理" : "草稿"; }
+  function shotStateLabel(state) { return state === "ready" ? "已确认" : state === "candidate" ? "待审看" : state === "blocked" ? "待处理" : "草稿"; }
   function graphStateLabel(state) {
     return ({ planned: "待制作", reserved: "已预留", dispatched: "处理中", succeeded: "已完成", candidate: "待选择",
       pending: "待审核", approved: "已通过", rejected: "已退回", redo_planned: "已安排返工",

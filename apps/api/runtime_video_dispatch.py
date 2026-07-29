@@ -376,6 +376,11 @@ def submit_video_generation(
         input_source=video_input_source_contract(request),
         duration_contract=video_duration_contract(request.duration_sec),
         model_name_override=SEEDANCE_MODEL_ID if request.provider_service_id == SEEDANCE_SERVICE_ID else None,
+        routing_key=(
+            f"{project_id}:{request.provider_service_id}:"
+            f"{request.video_admission_manifest_id or ''}:"
+            f"{request.video_admission_item_id or request.node_id}:{job_id}"
+        ),
     )
     runtime_file_event(
         "video",

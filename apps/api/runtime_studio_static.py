@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 DEFAULT_SITE_ROOT = Path(__file__).resolve().parents[1] / "site"
 DEFAULT_STUDIO_ROOT = Path(__file__).resolve().parents[1] / "studio"
+DEFAULT_STUDIO_WEB_ROOT = Path(__file__).resolve().parents[1] / "studio-web" / "dist"
 
 
 class NoStoreStaticFiles(StaticFiles):
@@ -54,6 +55,23 @@ def configure_studio_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROO
     )
 
 
+def configure_studio_next_static(app: FastAPI, studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> None:
+    root = Path(studio_web_root)
+    index = root / "index.html"
+    if not index.is_file():
+        return
+
+    @app.get("/studio-next", include_in_schema=False)
+    def studio_next_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/studio-next/")
+
+    app.mount(
+        "/studio-next",
+        NoStoreStaticFiles(directory=root, html=True),
+        name="afs_studio_next",
+    )
+
+
 def studio_static_status(studio_root: Path = DEFAULT_STUDIO_ROOT) -> dict[str, bool | str]:
     root = Path(studio_root)
     root_exists = root.exists()
@@ -70,11 +88,31 @@ def studio_static_status(studio_root: Path = DEFAULT_STUDIO_ROOT) -> dict[str, b
     }
 
 
+def studio_next_static_status(studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> dict[str, bool | str]:
+    root = Path(studio_web_root)
+    root_exists = root.exists()
+    index_exists = (root / "index.html").is_file()
+    assets_dir_exists = (root / "assets").is_dir()
+    ready = root_exists and index_exists and assets_dir_exists
+    status = "ready" if ready else "missing" if not root_exists else "incomplete"
+    return {
+        "mounted": ready,
+        "root_exists": root_exists,
+        "index_exists": index_exists,
+        "assets_dir_exists": assets_dir_exists,
+        "status": status,
+        "route": "/studio-next/",
+    }
+
+
 __all__ = (
     "DEFAULT_SITE_ROOT",
     "DEFAULT_STUDIO_ROOT",
+    "DEFAULT_STUDIO_WEB_ROOT",
     "NoStoreStaticFiles",
     "configure_site_static",
+    "configure_studio_next_static",
     "configure_studio_static",
+    "studio_next_static_status",
     "studio_static_status",
 )

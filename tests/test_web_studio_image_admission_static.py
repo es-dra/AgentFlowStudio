@@ -64,7 +64,7 @@ def test_approved_image_refreshes_graph_bound_video_lineage_in_same_session() ->
     assert "safely(runtime.sequenceWorkspace)" in refresh_body
     assert "runtime.loadAssetBible" in refresh_body
     assert "runtime.loadImageAdmission" in refresh_body
-    assert "safely(runtime.loadVideoAdmission)" in refresh_body
+    assert "loadCurrentShotVideoAdmission(runtime)" in refresh_body
     assert "snapshot.videoAdmission = videoAdmission" in refresh_body
     assert 'confirmedCommand.type === "approve"' in confirm_body
     assert "await refreshGraphBoundRuntimeState();" in confirm_body

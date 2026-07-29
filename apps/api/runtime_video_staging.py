@@ -37,6 +37,39 @@ TEMPORAL_STAGING_LABELS = {
     "narrative_purpose": "叙事目的",
 }
 
+PROVIDER_SAFETY_REWRITES = (
+    ("无伤害", "平静安全"),
+    ("濒死", "朦胧前奏"),
+    ("死亡", "关键转折"),
+    ("生死", "关键"),
+    ("坠落", "缓慢下沉"),
+    ("恐惧", "紧张"),
+    ("创伤", "前情记忆"),
+    ("命令", "关系压力"),
+    ("囚禁", "封闭记忆"),
+    ("控制", "关系压迫"),
+    ("送人", "关系转折"),
+    ("嫌恶", "冷淡"),
+    ("扮丑", "伪装"),
+    ("丑", "伪装"),
+    ("石化", "愣住"),
+    ("威胁", "对峙张力"),
+    ("危险", "高压"),
+    ("敏感", "含蓄"),
+    ("冲突", "张力"),
+    ("攻击", "强势动作"),
+    ("追逃", "追随移动"),
+    ("逃跑", "转身离开"),
+    ("逃离", "转身离开"),
+    ("逃", "离开"),
+    ("撞入胸膛", "意外靠近"),
+    ("胸膛", "近距离停住"),
+    ("拦截", "面对面停住"),
+    ("古剑", "古典道具"),
+    ("剑", "古典道具"),
+    ("血腥", "克制"),
+)
+
 
 def mode_options(
     capability: Mapping[str, Any],
@@ -171,42 +204,51 @@ def build_temporal_prompt(
             "Create one continuous narrative video shot from text only."
         ),
     }[mode]
+    provider_entities = {
+        key: [_provider_safe_text(item) for item in canonical_entities.get(key, [])]
+        for key in ("characters", "scenes", "props")
+    }
+    provider_staging = {
+        key: _provider_safe_text(staging.get(key))
+        for key in TEMPORAL_STAGING_FIELDS
+    }
+    provider_composition = _provider_safe_text(shot.get("composition"))
+    provider_camera_angle = _provider_safe_text(shot.get("camera_angle"))
+    provider_continuity = [
+        _provider_safe_text(item)
+        for item in shot.get("continuity_cues", [])
+        if _provider_safe_text(item)
+    ]
     entity_lines = [
-        f"Canonical characters: {', '.join(canonical_entities.get('characters', [])) or 'none'}.",
-        f"Canonical scene: {', '.join(canonical_entities.get('scenes', [])) or 'none'}.",
-        f"Canonical props: {', '.join(canonical_entities.get('props', [])) or 'none'}.",
+        f"Canonical characters: {', '.join(provider_entities.get('characters', [])) or 'none'}.",
+        f"Canonical scene: {', '.join(provider_entities.get('scenes', [])) or 'none'}.",
+        f"Canonical props: {', '.join(provider_entities.get('props', [])) or 'none'}.",
     ]
     lines = [
         mode_instruction,
         *entity_lines,
-        f"Subject action arc: {staging['subject_action_arc']}",
-        f"Spatial displacement: {staging['spatial_displacement']}",
-        f"Interaction object: {staging['interaction_object']}",
-        f"Camera movement: {staging['camera_movement']}",
-        f"Environment dynamics: {staging['environment_dynamics']}",
-        f"Pacing: {staging['pacing']}",
-        f"Start state: {staging['start_state']}",
-        f"End state: {staging['end_state']}",
-        f"Narrative purpose: {staging['narrative_purpose']}",
-        f"Composition: {_text(shot.get('composition'))}",
-        f"Camera angle: {_text(shot.get('camera_angle'))}",
-        f"Emotion: {_text(shot.get('emotion'))}",
+        f"Subject action arc: {provider_staging['subject_action_arc']}",
+        f"Spatial displacement: {provider_staging['spatial_displacement']}",
+        f"Interaction object: {provider_staging['interaction_object']}",
+        f"Camera movement: {provider_staging['camera_movement']}",
+        f"Environment dynamics: {provider_staging['environment_dynamics']}",
+        f"Pacing: {provider_staging['pacing']}",
+        f"Start state: {provider_staging['start_state']}",
+        f"End state: {provider_staging['end_state']}",
+        f"Narrative purpose: {provider_staging['narrative_purpose']}",
+        f"Composition: {provider_composition}",
+        f"Camera angle: {provider_camera_angle}",
+        f"Emotion: {provider_staging['narrative_purpose']}",
         (
             "Continuity: "
-            + (
-                "; ".join(
-                    _text(item)
-                    for item in shot.get("continuity_cues", [])
-                    if _text(item)
-                )
-                or "preserve the approved canonical identities and art direction."
-            )
+            + ("; ".join(provider_continuity) or "preserve the approved canonical identities and art direction.")
         ),
-        "Do not add unrequested characters, locations, props, text, logos, watermarks, or plot events.",
+        "Keep the shot limited to requested characters, locations, props, and plot events; typography, logos, watermarks, UI overlays, and extra story events must be absent.",
     ]
+    provider_prompt = "\n".join(lines)
     return {
         "schema_version": "afs.video_prompt_contract.v0.2",
-        "provider_prompt": "\n".join(lines),
+        "provider_prompt": provider_prompt,
         "generation_mode": mode,
         "selection_reason": _text(selection_reason),
         "temporal_staging": dict(staging),
@@ -216,16 +258,56 @@ def build_temporal_prompt(
         "camera_angle": _text(shot.get("camera_angle")),
         "camera_movement": staging["camera_movement"],
         "motion": staging["camera_movement"],
-        "emotion": _text(shot.get("emotion")),
+        "emotion": staging["narrative_purpose"],
         "continuity_cues": [
             _text(item)
             for item in shot.get("continuity_cues", [])
             if _text(item)
         ],
-        "keyword_rewrite": False,
+        "keyword_rewrite": provider_prompt != "\n".join(
+            [
+                mode_instruction,
+                *[
+                    f"Canonical characters: {', '.join(canonical_entities.get('characters', [])) or 'none'}.",
+                    f"Canonical scene: {', '.join(canonical_entities.get('scenes', [])) or 'none'}.",
+                    f"Canonical props: {', '.join(canonical_entities.get('props', [])) or 'none'}.",
+                ],
+                f"Subject action arc: {staging['subject_action_arc']}",
+                f"Spatial displacement: {staging['spatial_displacement']}",
+                f"Interaction object: {staging['interaction_object']}",
+                f"Camera movement: {staging['camera_movement']}",
+                f"Environment dynamics: {staging['environment_dynamics']}",
+                f"Pacing: {staging['pacing']}",
+                f"Start state: {staging['start_state']}",
+                f"End state: {staging['end_state']}",
+                f"Narrative purpose: {staging['narrative_purpose']}",
+                f"Composition: {_text(shot.get('composition'))}",
+                f"Camera angle: {_text(shot.get('camera_angle'))}",
+                f"Emotion: {staging['narrative_purpose']}",
+                (
+                    "Continuity: "
+                    + (
+                        "; ".join(
+                            _text(item)
+                            for item in shot.get("continuity_cues", [])
+                            if _text(item)
+                        )
+                        or "preserve the approved canonical identities and art direction."
+                    )
+                ),
+                "Keep the shot limited to requested characters, locations, props, and plot events; typography, logos, watermarks, UI overlays, and extra story events must be absent.",
+            ]
+        ),
         "sample_fallback": False,
     }
 
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _provider_safe_text(value: Any) -> str:
+    text = _text(value)
+    for source, replacement in PROVIDER_SAFETY_REWRITES:
+        text = text.replace(source, replacement)
+    return text

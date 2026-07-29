@@ -26,7 +26,10 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "AFS_RUNTIME_SERVICE_HOST",
     ):
         monkeypatch.delenv(name, raising=False)
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    studio_next_root = tmp_path / "studio-next"
+    (studio_next_root / "assets").mkdir(parents=True)
+    (studio_next_root / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path, studio_web_root=studio_next_root))
 
     health = client.get("/health").json()
     capabilities = client.get("/capabilities").json()
@@ -46,6 +49,14 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "index_exists": True,
         "entry_js_exists": True,
         "status": "ready",
+        "studio_next": {
+            "mounted": True,
+            "root_exists": True,
+            "index_exists": True,
+            "assets_dir_exists": True,
+            "status": "ready",
+            "route": "/studio-next/",
+        },
     }
     assert health["provider_gates"] == {
         "llm": False,
@@ -152,7 +163,12 @@ def test_runtime_health_keeps_repo_relative_runtime_root_non_persisted(tmp_path)
 
 def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_path) -> None:
     missing_studio_root = tmp_path / "missing-studio"
-    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime", studio_root=missing_studio_root))
+    missing_studio_next_root = tmp_path / "missing-studio-next"
+    client = TestClient(create_runtime_app(
+        runtime_root=tmp_path / "runtime",
+        studio_root=missing_studio_root,
+        studio_web_root=missing_studio_next_root,
+    ))
 
     health = client.get("/health").json()
     serialized = json.dumps(health, ensure_ascii=False).lower()
@@ -163,6 +179,14 @@ def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_
         "index_exists": False,
         "entry_js_exists": False,
         "status": "missing",
+        "studio_next": {
+            "mounted": False,
+            "root_exists": False,
+            "index_exists": False,
+            "assets_dir_exists": False,
+            "status": "missing",
+            "route": "/studio-next/",
+        },
     }
     assert str(tmp_path).lower() not in serialized
     assert "d:\\" not in serialized

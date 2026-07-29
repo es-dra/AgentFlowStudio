@@ -4,7 +4,7 @@ import os
 from typing import Any
 from uuid import uuid4
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from agentflow.harness.json_io import exclusive_file_lock, write_json
@@ -18,17 +18,15 @@ from apps.api.runtime_auth_invites import (
 from apps.api.runtime_auth_files import public_user, read_or_default
 from apps.api.runtime_auth_rate_limit import clear_auth_failures, enforce_auth_rate_limit, record_auth_failure
 from apps.api.runtime_auth_security import (
-    bearer_token,
     enabled,
     hash_text,
-    new_session_token,
     normalize_email,
     normalize_invite_code,
     now,
     password_hash,
-    session_expired,
     verify_password,
 )
+from apps.api.runtime_auth_sessions import RuntimeAuthSessionMixin
 from apps.api.runtime_logging import audit_event
 from apps.api.runtime_store import RuntimeStore, safe_id
 
@@ -36,10 +34,6 @@ from apps.api.runtime_store import RuntimeStore, safe_id
 AUTH_ENABLED_ENV = "AFS_AUTH_ENABLED"
 AUTH_INVITE_CODES_ENV = "AFS_INVITE_CODES"
 AUTH_OPEN_SIGNUP_ENV = "AFS_AUTH_ALLOW_OPEN_SIGNUP"
-AUTH_SESSION_TTL_HOURS_ENV = "AFS_AUTH_SESSION_TTL_HOURS"
-DEFAULT_SESSION_TTL_HOURS = 168
-
-
 class AuthRegisterRequest(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=8)
@@ -52,7 +46,7 @@ class AuthLoginRequest(BaseModel):
     password: str = Field(min_length=1)
 
 
-class RuntimeAuthStore:
+class RuntimeAuthStore(RuntimeAuthSessionMixin):
     def __init__(self, store: RuntimeStore, env: dict[str, str] | None = None) -> None:
         self.store = store
         self.env = env if env is not None else os.environ
@@ -74,13 +68,6 @@ class RuntimeAuthStore:
 
     def invite_registration_available(self) -> bool:
         return self.open_signup_enabled() or bool(self._invites().get("invites"))
-
-    def session_ttl_hours(self) -> int:
-        try:
-            value = int(str(self.env.get(AUTH_SESSION_TTL_HOURS_ENV, "")).strip())
-        except ValueError:
-            value = DEFAULT_SESSION_TTL_HOURS
-        return max(1, min(value, 24 * 30))
 
     def seed_invites_from_env(self) -> None:
         with exclusive_file_lock(self.lock_path):
@@ -174,58 +161,6 @@ class RuntimeAuthStore:
                 return dict(user)
         return None
 
-    def user_from_request(self, request: Request) -> dict[str, Any] | None:
-        token = bearer_token(request.headers.get("authorization", ""))
-        if not token:
-            return None
-        with exclusive_file_lock(self.lock_path):
-            token_hash = hash_text(token)
-            sessions = self._sessions()
-            session = sessions["sessions"].get(token_hash)
-            if not session:
-                return None
-            if session_expired(session, ttl_hours=self.session_ttl_hours()):
-                sessions["sessions"].pop(token_hash, None)
-                write_json(self.sessions_path, sessions)
-                return None
-            user = self._users()["users"].get(str(session.get("user_id", "")))
-            if not user or user.get("status") != "active":
-                return None
-            session["last_seen_at"] = now()
-            write_json(self.sessions_path, sessions)
-            return dict(user)
-
-    def require_user(self, request: Request) -> dict[str, Any]:
-        user = self.user_from_request(request)
-        if not user:
-            raise HTTPException(status_code=401, detail="authentication required")
-        request.state.afs_user = user
-        return user
-
-    def create_session(self, user_id: str) -> str:
-        with exclusive_file_lock(self.lock_path):
-            return self._create_session_unlocked(user_id)
-
-    def _create_session_unlocked(self, user_id: str) -> str:
-        token = new_session_token()
-        sessions = self._sessions()
-        sessions["sessions"][hash_text(token)] = {
-            "user_id": user_id,
-            "created_at": now(),
-            "last_seen_at": now(),
-        }
-        write_json(self.sessions_path, sessions)
-        return token
-
-    def revoke_request_session(self, request: Request) -> None:
-        token = bearer_token(request.headers.get("authorization", ""))
-        if not token:
-            return
-        with exclusive_file_lock(self.lock_path):
-            sessions = self._sessions()
-            if sessions["sessions"].pop(hash_text(token), None) is not None:
-                write_json(self.sessions_path, sessions)
-
     def register_project_owner(self, project_id: str, user_id: str) -> None:
         with exclusive_file_lock(self.lock_path):
             owners = self._project_owners()
@@ -289,9 +224,6 @@ class RuntimeAuthStore:
 
     def _invites(self) -> dict[str, Any]:
         return read_or_default(self.invites_path, {"schema_version": "0.1.0", "invites": {}})
-
-    def _sessions(self) -> dict[str, Any]:
-        return read_or_default(self.sessions_path, {"schema_version": "0.1.0", "sessions": {}})
 
     def _project_owners(self) -> dict[str, Any]:
         return read_or_default(self.project_owners_path, {"schema_version": "0.1.0", "project_owners": {}})

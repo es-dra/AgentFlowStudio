@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import VideoGenerationRequest
-from apps.api.runtime_film_production_graph import _approved_media_projection
+from apps.api import runtime_video_direct_batch_routes as direct_batch_routes
+from apps.api.runtime_film_production_graph import _approved_media_projection, _sequence_workspace_projection
 from apps.api.runtime_production_graph import ProductionGraphStore, canonical_digest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore, read_json
@@ -20,11 +21,13 @@ from apps.api.runtime_video_admission import (
     CREATE_ENDPOINT,
     DURATION_SEC,
     HARD_BUDGET_USD,
+    MAX_ACTIVE_VIDEO_LANES,
     MAX_DISPATCHES,
     MODEL_ID,
     RESOLUTION,
     SERVICE_ID,
     QUERY_ENDPOINT,
+    _video_manifest_consumes_lane,
     claim_video_admission_dispatch,
     enforce_video_admission_request,
     load_video_admission_manifest,
@@ -33,6 +36,15 @@ from apps.api.runtime_video_admission import (
     video_admission_capability,
     video_admission_generation_request,
 )
+from apps.api.runtime_video_direct_batch_routes import OPERATOR_CONFIRMATION
+from apps.api.runtime_video_dispatch_outbox import (
+    mark_network_may_have_started,
+    mark_reconcile_required,
+    prepare_dispatch_outbox,
+    record_provider_task,
+)
+from apps.api.runtime_video_staging import build_temporal_prompt
+from tools import afs_video_direct_batch_runner as direct_batch_runner
 
 
 PNG_BYTES = base64.b64decode(
@@ -305,9 +317,17 @@ def _seed_ready_project(
         {
             "type": "node_upserted",
             "node": {
-                "node_id": "scene-a",
+                "node_id": "scene-container-a",
                 "category": "location",
-                "metadata": {"display_name": "北侧检修站"},
+                "metadata": {"display_name": "第一场"},
+            },
+        },
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": "scene-a",
+                "category": "resource",
+                "metadata": {"kind": "scene", "display_name": "北侧检修站"},
             },
         },
         {
@@ -358,6 +378,12 @@ def _seed_ready_project(
         {
             "type": "relation_upserted",
             "from_id": "scene-a",
+            "to_id": "shot-01",
+            "relation_type": "required_by",
+        },
+        {
+            "type": "relation_upserted",
+            "from_id": "scene-container-a",
             "to_id": "shot-01",
             "relation_type": "contains",
         },
@@ -466,6 +492,76 @@ def _seed_ready_project(
     return client, store, project_id, media
 
 
+def _add_second_ready_shot(store: RuntimeStore, project_id: str) -> dict:
+    return _add_ready_shot(store, project_id, "shot-02", 2)
+
+
+def _add_ready_shot(
+    store: RuntimeStore,
+    project_id: str,
+    shot_id: str,
+    number: int,
+    *,
+    metadata: dict | None = None,
+) -> dict:
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    display = f"镜头 {number:02d}"
+    details = {
+        "kind": "shot",
+        "display_name": display,
+        "number": number,
+        "intent": f"完成第 {number:02d} 个动作段落",
+        "blocking": "巡夜人甲离开操作台转向检修门",
+        "shot_size": "中近景",
+        "camera_angle": "平视",
+        "camera_movement": "横移跟随",
+        "narrative_purpose": "推进检修任务进入下一空间",
+        "continuity_cues": ["延续北侧检修站照明与六角校准器位置"],
+        **(metadata or {}),
+    }
+    return graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key=f"seed-video-{shot_id}",
+        semantic_digest=canonical_digest({"shot": shot_id, "metadata": details}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": shot_id,
+                    "category": "unit",
+                    "metadata": details,
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "character-a",
+                "to_id": shot_id,
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-a",
+                "to_id": shot_id,
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-a",
+                "to_id": shot_id,
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-container-a",
+                "to_id": shot_id,
+                "relation_type": "contains",
+            },
+        ],
+    )
+
+
 def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_path) -> None:
     client, _, project_id, _ = _seed_ready_project(
         tmp_path,
@@ -491,7 +587,7 @@ def test_video_readiness_normalizes_equivalent_production_graph_shot_fields(tmp_
     assert prompt_contract["shot_action"] == TEMPORAL_STAGING["subject_action_arc"]
     assert prompt_contract["composition"] == "中景"
     assert prompt_contract["camera_movement"] == "沿操作台缓慢向前推进"
-    assert prompt_contract["emotion"] == "保持克制专注的检修压力"
+    assert prompt_contract["emotion"] == TEMPORAL_STAGING["narrative_purpose"]
     assert prompt_contract["keyword_rewrite"] is False
     assert prompt_contract["sample_fallback"] is False
     assert preview["provider_dispatch_count"] == 0
@@ -573,6 +669,814 @@ def test_reference_conditioned_manifest_sends_real_identity_references_without_f
         media["prop"],
     }
     assert load_video_admission_manifest(store, project_id) == reserved
+
+
+def test_reference_targets_exclude_scene_container_and_include_scene_resource(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+
+    preview = _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-canonical-scene-resource",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+        confirm=False,
+    )
+    manifest = preview["result"]["manifest"]
+
+    assert manifest["source"]["canonical_entities"] == {
+        "characters": ["巡夜人甲"],
+        "scenes": ["北侧检修站"],
+        "props": ["六角校准器"],
+    }
+    assert {
+        item["target_asset_id"]: item["image_asset_id"]
+        for item in manifest["source"]["references"]
+    } == {
+        "character-a": media["character"],
+        "scene-a": media["scene"],
+        "prop-a": media["prop"],
+    }
+    assert "第一场" not in manifest["source"]["prompt_contract"]["provider_prompt"]
+    assert preview["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == {}
+
+
+def test_reference_conditioned_manifest_allows_four_provider_refs(tmp_path) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    extra_prop = _upload(client, project_id, "second-prop-reference")
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-fourth-video-reference",
+        semantic_digest=canonical_digest({"extra_ref": extra_prop}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "prop-b",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "备用仪表盘"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-b",
+                "to_id": "shot-01",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "approved-extra-prop",
+                    "category": "artifact",
+                    "metadata": {
+                        "kind": "approved_image",
+                        "image_asset_id": extra_prop,
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-b",
+                "to_id": "approved-extra-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    manifest = _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-four-video-refs",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )["result"]["manifest"]
+    request = video_admission_generation_request(
+        manifest,
+        generated_at=REQUESTED_AT,
+    )
+
+    assert len(request["reference_image_asset_ids"]) == 4
+    assert set(request["reference_image_asset_ids"]) == {
+        media["character"],
+        media["scene"],
+        media["prop"],
+        extra_prop,
+    }
+    VideoGenerationRequest(**request)
+    assert manifest["provider_input_contract"]["frame_role_cardinality"]["reference_image"] == 4
+
+
+def test_partial_reference_compile_records_missing_scene_without_faking_input(
+    tmp_path,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-partial-video-shot",
+        semantic_digest=canonical_digest({"partial": "shot-02"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "scene-missing",
+                    "category": "resource",
+                    "metadata": {"kind": "scene", "display_name": "未完成场景"},
+                },
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "shot-02",
+                    "category": "unit",
+                    "metadata": {
+                        "kind": "shot",
+                        "display_name": "镜头 02",
+                        "number": 2,
+                        "blocking": "巡夜人甲走向新空间",
+                        "shot_size": "中景",
+                        "camera_angle": "平视",
+                        "camera_movement": "横移跟随",
+                        "narrative_purpose": "进入下一段空间调度",
+                    },
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-container-a",
+                "to_id": "shot-02",
+                "relation_type": "contains",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "character-a",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "prop-a",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "scene-missing",
+                "to_id": "shot-02",
+                "relation_type": "required_by",
+            },
+        ],
+    )
+
+    strict = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-02/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-partial-strict",
+                    "shot_id": "shot-02",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert strict.status_code == 422
+
+    partial = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-02/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-partial-allowed",
+                    "shot_id": "shot-02",
+                    "allow_partial_references": True,
+                    "partial_reference_reason": "测试允许场景缺图时使用主体和道具参考继续。",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert partial.status_code == 200, partial.text
+    manifest = partial.json()["result"]["manifest"]
+    resolution = manifest["source"]["reference_resolution"]
+    assert resolution["partial_reference_pack"] is True
+    assert resolution["partial_reason"] == "测试允许场景缺图时使用主体和道具参考继续。"
+    assert resolution["missing_references"] == [
+        {
+            "target_asset_id": "scene-missing",
+            "label": "未完成场景",
+            "kind": "scene",
+            "missing_scene_ref": True,
+            "reason": "missing_approved_reference_image",
+        }
+    ]
+    assert set(video_admission_generation_request(manifest, generated_at=REQUESTED_AT)["reference_image_asset_ids"]) == {
+        media["character"],
+        media["prop"],
+    }
+    assert any(
+        item["role"] == "missing_reference_not_sent"
+        and item["target_asset_id"] == "scene-missing"
+        for item in manifest["provider_input_contract"]["excluded_grounding_references"]
+    )
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-02") == {}
+
+
+def test_temporal_prompt_uses_explicit_staging_narrative_for_emotion() -> None:
+    contract = build_temporal_prompt(
+        mode="reference_conditioned",
+        selection_reason="使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        staging={
+            **TEMPORAL_STAGING,
+            "narrative_purpose": "用梦境隐喻表现创伤记忆和重生前奏，明确无伤害细节。",
+        },
+        shot={
+            "composition": "水下大全景",
+            "camera_angle": "轻微俯角",
+            "emotion": "濒死感打开前世创伤和重生设定",
+            "continuity_cues": [],
+        },
+        canonical_entities={
+            "characters": ["叶安安"],
+            "scenes": ["象征性深海"],
+            "props": [],
+        },
+    )
+
+    assert contract["emotion"] == "用梦境隐喻表现创伤记忆和重生前奏，明确无伤害细节。"
+    assert "濒死" not in contract["provider_prompt"]
+    assert "死亡" not in contract["provider_prompt"]
+    assert "血腥" not in contract["provider_prompt"]
+
+
+def test_direct_batch_targets_skip_post_only_and_unready_first_frame(tmp_path) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    for number in (2, 31, 33, 34, 35):
+        _add_ready_shot(store, project_id, f"shot-{number:02d}", number)
+
+    targets = direct_batch_runner.build_targets(store, project_id)
+    by_number = {target.shot_number: target for target in targets}
+
+    assert by_number[1].skip_reason == ""
+    assert by_number[2].skip_reason == ""
+    assert by_number[31].skip_reason == "post_only"
+    assert by_number[33].skip_reason == "post_only"
+    assert by_number[34].skip_reason == "post_only"
+    assert by_number[35].skip_reason == "requires_approved_first_frame"
+
+
+def test_direct_batch_dry_run_keeps_shot1_safe_and_provider_free(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    metadata = deepcopy(graph["nodes"]["shot-01"]["metadata"])
+    metadata.update(
+        {
+            "display_name": "深海坠落",
+            "action": "叶安安在象征性深海缓慢下沉",
+            "emotion": "濒死感打开前世创伤和重生设定",
+            "narrative_purpose": "濒死感打开前世创伤和重生设定",
+        }
+    )
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-shot1-policy-sensitive-source",
+        semantic_digest=canonical_digest({"shot": "shot-01", "metadata": metadata}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "shot-01",
+                    "category": "unit",
+                    "metadata": metadata,
+                },
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        direct_batch_runner,
+        "provider_pool_summary",
+        lambda: {
+            "dispatch_ready": True,
+            "service_id": SERVICE_ID,
+            "model": MODEL_ID,
+            "enabled_video_accounts": 4,
+            "concurrency_capacity": 4,
+        },
+    )
+
+    summary = direct_batch_runner.dry_run(store, project_id)
+
+    assert summary["eligible"] == 1
+    assert summary["skipped"] == 0
+    assert summary["provider_dispatch_count"] == 0
+    compiled = summary["compiled"][0]
+    assert compiled["shot_number"] == 1
+    assert compiled["generation_mode"] == "reference_conditioned"
+    assert compiled["reference_count"] == 3
+    assert compiled["shot1_policy_safe"] is True
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-01") == {}
+
+
+def test_direct_batch_operator_proof_records_service_process_task_identity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _add_second_ready_shot(store, project_id)
+
+    def _fake_dispatch_once(
+        store: RuntimeStore,
+        project_id: str,
+        run_id: str,
+        manifest: dict,
+        *,
+        job_id: str | None = None,
+    ) -> dict:
+        request = VideoGenerationRequest(
+            **{
+                **video_admission_generation_request(
+                    manifest,
+                    generated_at=REQUESTED_AT,
+                ),
+                "quota_override_confirmed": True,
+            }
+        )
+        job_id = job_id or store.new_job_id("video_generation", project_id)
+        claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+        mark_video_admission_network_started(store, project_id, job_id=job_id)
+        mark_video_admission_task_recorded(
+            store,
+            project_id,
+            job_id=job_id,
+            provider_task_fingerprint="proof-task-fingerprint",
+        )
+        return {
+            "status": "submitted",
+            "job": {"job_id": job_id, "status": "submitted"},
+            "provider_calls_started": True,
+            "safe_manifest": {"blocks": []},
+            "candidate_previews": [],
+        }
+
+    monkeypatch.setattr(direct_batch_runner, "dispatch_once", _fake_dispatch_once)
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/proof",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-proof-test",
+            "shot_number": 2,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "proof_passed"
+    assert payload["result"]["connectivity_proof_passed"] is True
+    assert payload["result"]["has_provider_task_fingerprint"] is True
+    manifest = load_video_admission_manifest(store, project_id, shot_id="shot-02")
+    assert manifest["item"]["state"] == "processing"
+    assert manifest["item"]["network_disposition"] == "dispatched_with_task_identity"
+    assert manifest["provider_dispatch_count"] == 1
+
+
+def test_direct_batch_operator_diagnostic_runs_text_and_single_ref_without_graph_mutation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph = graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-diagnostic-gold-piece-ref",
+        semantic_digest=canonical_digest({"diagnostic_ref": "A-PROP-01"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "A-PROP-01",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "金色棋子"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "A-PROP-01",
+                "to_id": "approved-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    class _FakeRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            assert capability == "video"
+            assert service_id == SERVICE_ID
+            assert request.duration_sec == 6
+            assert request.resolution == "720p"
+            assert request.aspect_ratio == "16:9"
+            return {
+                "task": {
+                    "task_id": f"diag-{request.input_mode}",
+                    "status": "submitted",
+                }
+            }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _FakeRegistry(),
+    )
+
+    text = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-text-test",
+            "step": "text_only",
+        },
+    )
+    ref = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-ref-test",
+            "step": "single_reference",
+        },
+    )
+
+    assert text.status_code == 200, text.text
+    assert ref.status_code == 200, ref.text
+    assert text.json()["result"]["has_provider_task_fingerprint"] is True
+    assert text.json()["result"]["input_mode"] == "text_only"
+    assert ref.json()["result"]["has_provider_task_fingerprint"] is True
+    assert ref.json()["result"]["input_mode"] == "reference_images"
+    assert ref.json()["result"]["reference_asset_id"] == media["prop"]
+    current = graph_store.load(project_id)
+    assert current["version"] == graph["version"]
+    assert current["graph_digest"] == graph["graph_digest"]
+
+
+def test_direct_batch_operator_diagnostic_provider_block_returns_safe_packet(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_before = ProductionGraphStore(store).load(project_id)
+
+    class _BlockedRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            raise ValueError("unsupported input mode for seedance_i2v: text_only")
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _BlockedRegistry(),
+    )
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-blocked-test",
+            "step": "text_only",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "diagnostic_text_only_blocked"
+    assert payload["result"]["connectivity_proof_passed"] is False
+    assert payload["result"]["input_mode"] == "text_only"
+    assert payload["result"]["block"]["reason"] == (
+        "unsupported input mode for seedance_i2v: text_only"
+    )
+    graph_after = ProductionGraphStore(store).load(project_id)
+    assert graph_after["version"] == graph_before["version"]
+    assert graph_after["graph_digest"] == graph_before["graph_digest"]
+
+
+def test_direct_batch_operator_diagnostic_candidate_summary_is_ledger_safe(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph_before = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph_before["version"],
+        idempotency_key="seed-ledger-safe-diagnostic-ref",
+        semantic_digest=canonical_digest({"diagnostic_ref": "A-PROP-01", "safe_ledger": True}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "A-PROP-01",
+                    "category": "resource",
+                    "metadata": {"kind": "prop", "display_name": "金色棋子"},
+                },
+            },
+            {
+                "type": "relation_upserted",
+                "from_id": "A-PROP-01",
+                "to_id": "approved-prop",
+                "relation_type": "approved_image",
+            },
+        ],
+    )
+
+    class _FakeRegistry:
+        def submit(self, capability: str, service_id: str, request) -> dict:
+            assert capability == "video"
+            assert service_id == SERVICE_ID
+            return {"task": {"task_id": "diag-ledger-safe", "status": "submitted"}}
+
+    def _unsafe_poll_summary(*args, **kwargs) -> dict:
+        return {
+            "status": "succeeded",
+            "job_id": "job-ledger-safe",
+            "candidate_count": 1,
+            "candidates": [
+                {
+                    "candidate_id": "candidate_001",
+                    "preview_url": f"/projects/{project_id}/video-generations/job-ledger-safe/candidates/candidate_001/preview",
+                    "path": "/var/lib/afs-runtime/runs/project/job/video_candidates/candidate_001.mp4",
+                    "sha256": "a" * 64,
+                    "byte_count": 123,
+                    "technical_qa": {"file_present": True, "nonzero_bytes": True, "suffix": ".mp4"},
+                }
+            ],
+            "provider_calls_started": True,
+            "blocks": [],
+            "terminal": True,
+        }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_video_direct_batch_routes.load_provider_registry",
+        lambda: _FakeRegistry(),
+    )
+    monkeypatch.setattr(
+        direct_batch_routes,
+        "_poll_diagnostic_job_to_terminal",
+        _unsafe_poll_summary,
+    )
+
+    response = client.post(
+        f"/studio/operator/projects/{project_id}/video-direct-batch/diagnostic",
+        json={
+            "operator_confirmation": OPERATOR_CONFIRMATION,
+            "run_id": "video-direct-diagnostic-safe-ledger-test",
+            "step": "single_reference",
+            "max_poll_sec": 30,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload_text = response.text
+    assert "/var/lib/" not in payload_text
+    assert "/projects/" not in payload_text
+    payload = response.json()
+    assert payload["status"] == "diagnostic_single_reference_accepted"
+    assert payload["result"]["poll"]["candidate_count"] == 1
+    ledger = read_json(
+        direct_batch_runner.batch_path(
+            store,
+            project_id,
+            "video-direct-diagnostic-safe-ledger-test",
+        )
+    )
+    ledger_text = str(ledger)
+    assert "/var/lib/" not in ledger_text
+    assert "/projects/" not in ledger_text
+    assert ledger["status"] == "diagnostic_single_reference_accepted"
+    assert ledger["results"][0]["poll"]["candidates"][0]["candidate_id"] == "candidate_001"
+
+
+def test_direct_batch_safety_rewrite_staging_is_positive_and_provider_free(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _, store, project_id, _ = _seed_ready_project(tmp_path)
+    for number in (10, 21, 22, 23):
+        _add_ready_shot(
+            store,
+            project_id,
+            f"shot-{number:02d}",
+            number,
+            metadata={
+                "display_name": f"敏感源镜头 {number:02d}",
+                "blocking": "旧源文本包含冲突和危险词但不应进入新轮主体动作",
+                "narrative_purpose": "旧源文本包含伤害和威胁但不应进入新轮情绪",
+            },
+        )
+    monkeypatch.setattr(
+        direct_batch_runner,
+        "provider_pool_summary",
+        lambda: {
+            "dispatch_ready": True,
+            "service_id": SERVICE_ID,
+            "model": MODEL_ID,
+            "enabled_video_accounts": 2,
+            "concurrency_capacity": 2,
+        },
+    )
+
+    summary = direct_batch_runner.dry_run(store, project_id)
+    by_number = {item["shot_number"]: item for item in summary["compiled"]}
+
+    for number in (10, 21, 22, 23):
+        assert by_number[number]["reference_count"] == 3
+        manifest = direct_batch_runner.admission_command(
+            store,
+            project_id,
+            f"shot-{number:02d}",
+            {
+                "type": "compile",
+                "shot_id": f"shot-{number:02d}",
+                "generation_mode": "reference_conditioned",
+                "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+                "temporal_staging": direct_batch_runner.temporal_staging_for_target(
+                    store,
+                    project_id,
+                    direct_batch_runner.BatchTarget(
+                        f"shot-{number:02d}",
+                        number,
+                        f"镜头 {number:02d}",
+                        "reference_conditioned",
+                        3,
+                    ),
+                ),
+                "idempotency_key": f"safety-rewrite-preview-{number}",
+            },
+            confirm=False,
+        )["result"]["manifest"]
+        prompt = manifest["source"]["prompt_contract"]["provider_prompt"]
+        assert "旧源文本" not in prompt
+        assert "伤害" not in prompt
+        assert "威胁" not in prompt
+        assert "危险" not in prompt
+    assert summary["provider_dispatch_count"] == 0
+
+
+def test_video_compile_selects_explicit_non_first_active_unit_shot(tmp_path) -> None:
+    client, store, project_id, media = _seed_ready_project(tmp_path)
+    _add_second_ready_shot(store, project_id)
+
+    implicit = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {"type": "compile", "idempotency_key": "compile-ambiguous"}
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert implicit.status_code == 422
+    assert "explicit shot_id" in implicit.text
+
+    preview = _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-shot-02",
+            "shot_id": "shot-02",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+        confirm=False,
+    )
+    manifest = preview["result"]["manifest"]
+
+    assert manifest["source"]["shot"]["shot_id"] == "shot-02"
+    assert manifest["source"]["shot"]["number"] == 2
+    assert manifest["item"]["item_id"] == "video-shot-02"
+    assert {item["image_asset_id"] for item in manifest["source"]["references"]} == {
+        media["character"],
+        media["scene"],
+        media["prop"],
+    }
+    assert manifest["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == {}
+
+
+def test_unstarted_reserved_video_failure_releases_lane_without_dispatch(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-unstarted-reserved-failure",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {
+            "type": "reserve_dispatch",
+            "idempotency_key": "reserve-unstarted-reserved-failure",
+        },
+    )["result"]["manifest"]
+
+    assert reserved["item"]["state"] == "reserved"
+    assert reserved["item"]["network_disposition"] == "never_started"
+    assert reserved["provider_dispatch_count"] == 0
+
+    failed = _command(
+        client,
+        project_id,
+        {
+            "type": "record_failure",
+            "idempotency_key": "fail-unstarted-reserved",
+            "error_category": "provider_gate_closed",
+        },
+    )["result"]["manifest"]
+
+    assert failed["item"]["state"] == "failed"
+    assert failed["item"]["error_category"] == "provider_gate_closed"
+    assert failed["provider_dispatch_count"] == 0
+    assert failed["budget"]["dispatches_reserved"] == 1
+    assert failed["budget"]["remaining_dispatches"] == 0
+    assert failed["item"]["provider_job_id"] == ""
+    assert load_video_admission_manifest(store, project_id) == failed
+    assert _video_manifest_consumes_lane(store, project_id, failed) is False
+
+
+def test_video_compile_rejects_invalid_non_active_or_non_unit_shot_id(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="seed-invalid-shot-targets",
+        semantic_digest=canonical_digest({"invalid": "shot-targets"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "inactive-shot",
+                    "category": "unit",
+                    "state": "inactive",
+                    "metadata": {"kind": "shot", "display_name": "停用镜头"},
+                },
+            },
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "scene-asset-not-shot",
+                    "category": "resource",
+                    "metadata": {"kind": "scene", "display_name": "非镜头资产"},
+                },
+            },
+        ],
+    )
+
+    for shot_id, reason in (
+        ("missing-shot", "not present"),
+        ("inactive-shot", "active unit shot"),
+        ("scene-asset-not-shot", "active unit shot"),
+    ):
+        response = client.post(
+            f"/projects/{project_id}/m6/video-admission/commands/preview",
+            json={
+                "command": _reference_video_setup_command(
+                    {
+                        "type": "compile",
+                        "idempotency_key": f"compile-{shot_id}",
+                        "shot_id": shot_id,
+                    }
+                ),
+                "requested_at": REQUESTED_AT,
+            },
+        )
+        assert response.status_code == 422
+        assert reason in response.text
 
 
 def test_reference_conditioned_manifest_does_not_require_approved_shot_keyframe(
@@ -776,6 +1680,7 @@ def _command(
         "compile",
         "recompile_current",
         "create_new_round",
+        "create_next_shot",
     }:
         command = _video_setup_command(command)
     body = {
@@ -791,6 +1696,32 @@ def _command(
         return preview.json()
     response = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _lane_command(
+    client: TestClient,
+    project_id: str,
+    shot_id: str,
+    command: dict,
+    *,
+    confirm: bool = True,
+) -> dict:
+    if command.get("type") in {"compile", "recompile_current", "create_new_round"}:
+        command = _reference_video_setup_command(command)
+    body = {"command": command, "requested_at": REQUESTED_AT}
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/{shot_id}/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    if not confirm:
+        return preview.json()
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/{shot_id}/commands/confirm",
         json={**body, "preview_digest": preview.json()["preview_digest"]},
     )
     assert response.status_code == 200, response.text
@@ -890,8 +1821,8 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert candidate["source"]["keyframe"] == {}
     assert [item["image_asset_id"] for item in candidate["source"]["references"]] == [
         media["character"],
-        media["prop"],
         media["scene"],
+        media["prop"],
     ]
     assert candidate["item"]["state"] == "planned"
     assert candidate["budget"]["dispatches_reserved"] == 0
@@ -935,6 +1866,179 @@ def test_stale_video_manifest_rebuilds_from_historical_approved_keyframe_without
     assert replay.json()["idempotent_replay"] is True
     assert load_video_admission_manifest(store, project_id) == rebuilt
     assert read_json(image_path) == image_before
+
+
+def test_stale_reserved_video_manifest_rebuilds_current_graph_without_dispatch(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(client, project_id, {"type": "compile", "idempotency_key": "compile-before-reserve"})
+    _command(client, project_id, {"type": "reserve_dispatch", "idempotency_key": "reserve-before-stale"})
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    assert old_video["item"]["state"] == "reserved"
+    assert old_video["provider_dispatch_count"] == 0
+
+    _, graph = _rotate_image_manifest_after_graph_update(store, project_id)
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "stale"
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["readiness"]["rebuild_allowed"] is True
+    assert state["lineage"]["current_graph_version"] == graph["version"]
+
+    body = {
+        "command": _reference_video_setup_command(
+            {"type": "recompile_current", "idempotency_key": "recompile-stale-reserved"}
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    rebuilt = confirmed.json()["result"]["manifest"]
+
+    assert rebuilt["source"]["production_graph"]["version"] == graph["version"]
+    assert rebuilt["item"]["state"] == "planned"
+    assert rebuilt["budget"]["dispatches_reserved"] == 0
+    assert rebuilt["budget"]["remaining_dispatches"] == 1
+    assert rebuilt["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_video['manifest_id']}.json"
+    )
+    assert archived == old_video
+
+
+def test_stale_recoverable_reconcile_video_manifest_rebuilds_current_graph_without_dispatch(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-before-stale-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-before-stale-provider-not-ready"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        request,
+        job_id="stale-provider-not-ready-job",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="stale-provider-not-ready-job",
+    )
+    safe_path = (
+        store.run_dir(project_id, "stale-provider-not-ready-job")
+        / "video_generation_safe_manifest.json"
+    )
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": False,
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+    old_video = deepcopy(load_video_admission_manifest(store, project_id))
+    graph_store = ProductionGraphStore(store)
+    graph = graph_store.load(project_id)
+    graph = graph_store.append(
+        project_id,
+        expected_version=graph["version"],
+        idempotency_key="advance-graph-with-unrelated-video-candidate",
+        semantic_digest=canonical_digest({"unrelated": "video-candidate-projection"}),
+        events=[
+            {
+                "type": "node_upserted",
+                "node": {
+                    "node_id": "unrelated-safe-artifact",
+                    "category": "artifact",
+                    "metadata": {"kind": "diagnostic"},
+                },
+            }
+        ],
+    )
+
+    state = client.get(f"/projects/{project_id}/m6/video-admission").json()
+
+    assert state["readiness"]["status"] == "stale"
+    assert state["lineage"]["keyframe_reuse"] in {"verified_current", "updated_approved_source"}
+    assert state["lineage"]["rebuild_allowed"] is True
+    assert state["readiness"]["rebuild_allowed"] is True
+
+    body = {
+        "command": _reference_video_setup_command(
+            {
+                "type": "recompile_current",
+                "idempotency_key": "recompile-stale-provider-not-ready",
+            }
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    assert load_video_admission_manifest(store, project_id) == old_video
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["source"]["production_graph"]["version"] == graph["version"]
+    assert candidate["item"]["state"] == "planned"
+    assert candidate["provider_dispatch_count"] == 0
+    assert candidate["budget"]["dispatches_reserved"] == 0
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_video['manifest_id']}.json"
+    )
+    assert archived == old_video
+    assert read_json(safe_path)["outputs"] == []
 
 
 def test_stale_video_rebuild_fails_closed_when_graph_advances_during_confirmation(
@@ -1232,7 +2336,7 @@ def test_video_admission_locks_exact_non_fast_single_dispatch_contract(tmp_path)
         "北侧检修站",
         "六角校准器",
         "缓慢向前推进",
-        "保持克制专注的检修压力",
+        TEMPORAL_STAGING["narrative_purpose"],
     ):
         assert value in prompt
     assert manifest["source"]["prompt_contract"]["keyword_rewrite"] is False
@@ -1330,7 +2434,170 @@ def test_video_admission_reservation_is_idempotent_and_dispatch_claim_is_exactly
             project_id,
             request,
             job_id="video-job-002",
+        )
+
+
+def test_video_admission_supports_two_explicit_shot_lanes_without_overwrite(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
     )
+    _add_second_ready_shot(store, project_id)
+
+    lane_1 = _lane_command(
+        client,
+        project_id,
+        "shot-01",
+        {
+            "type": "compile",
+            "idempotency_key": "lane-shot-01",
+            "shot_id": "shot-01",
+        },
+    )["result"]["manifest"]
+    lane_2 = _lane_command(
+        client,
+        project_id,
+        "shot-02",
+        {
+            "type": "compile",
+            "idempotency_key": "lane-shot-02",
+            "shot_id": "shot-02",
+        },
+    )["result"]["manifest"]
+    assert lane_1["source"]["shot"]["shot_id"] == "shot-01"
+    assert lane_2["source"]["shot"]["shot_id"] == "shot-02"
+    assert lane_1["manifest_id"] != lane_2["manifest_id"]
+    assert load_video_admission_manifest(store, project_id) == {}
+
+    reserved_1 = _lane_command(
+        client,
+        project_id,
+        "shot-01",
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-lane-01"},
+    )["result"]["manifest"]
+    reserved_2 = _lane_command(
+        client,
+        project_id,
+        "shot-02",
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-lane-02"},
+    )["result"]["manifest"]
+    lanes = client.get(f"/projects/{project_id}/m6/video-admission/lanes").json()
+    assert lanes["capacity"] == {
+        "max_active_lanes": MAX_ACTIVE_VIDEO_LANES,
+        "active_lanes": 2,
+        "available_lanes": MAX_ACTIVE_VIDEO_LANES - 2,
+    }
+    assert {
+        (lane["shot_id"], lane["item_state"], lane["lane_active"])
+        for lane in lanes["lanes"]
+    } == {
+        ("shot-01", "reserved", True),
+        ("shot-02", "reserved", True),
+    }
+
+    request_1 = VideoGenerationRequest(
+        **video_admission_generation_request(reserved_1, generated_at=REQUESTED_AT)
+    )
+    request_2 = VideoGenerationRequest(
+        **video_admission_generation_request(reserved_2, generated_at=REQUESTED_AT)
+    )
+    assert enforce_video_admission_request(store, project_id, request_1)["manifest_id"] == reserved_1["manifest_id"]
+    assert enforce_video_admission_request(store, project_id, request_2)["manifest_id"] == reserved_2["manifest_id"]
+    claim_video_admission_dispatch(store, project_id, request_1, job_id="video-job-lane-01")
+    claim_video_admission_dispatch(store, project_id, request_2, job_id="video-job-lane-02")
+    mark_video_admission_network_started(store, project_id, job_id="video-job-lane-01")
+    mark_video_admission_network_started(store, project_id, job_id="video-job-lane-02")
+
+    updated_1 = load_video_admission_manifest(store, project_id, shot_id="shot-01")
+    updated_2 = load_video_admission_manifest(store, project_id, shot_id="shot-02")
+    assert updated_1["item"]["provider_job_id"] == "video-job-lane-01"
+    assert updated_1["item"]["state"] == "reconcile_required"
+    assert updated_2["item"]["provider_job_id"] == "video-job-lane-02"
+    assert updated_2["item"]["state"] == "reconcile_required"
+
+
+def test_video_admission_blocks_third_active_lane_before_dispatch(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_VIDEO_ADMISSION_MAX_ACTIVE_LANES", "2")
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+    )
+    _add_second_ready_shot(store, project_id)
+    _add_ready_shot(store, project_id, "shot-03", 3)
+
+    for shot_id in ("shot-01", "shot-02"):
+        _lane_command(
+            client,
+            project_id,
+            shot_id,
+            {
+                "type": "compile",
+                "idempotency_key": f"compile-{shot_id}",
+                "shot_id": shot_id,
+            },
+        )
+        _lane_command(
+            client,
+            project_id,
+            shot_id,
+            {"type": "reserve_dispatch", "idempotency_key": f"reserve-{shot_id}"},
+        )
+
+    _lane_command(
+        client,
+        project_id,
+        "shot-03",
+        {
+            "type": "compile",
+            "idempotency_key": "compile-shot-03",
+            "shot_id": "shot-03",
+        },
+    )
+    blocked = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-03/commands/preview",
+        json={
+            "command": {
+                "type": "reserve_dispatch",
+                "idempotency_key": "reserve-shot-03",
+            },
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert blocked.status_code == 422
+    assert "2-lane active dispatch limit" in blocked.json()["detail"]["details"]["raw_detail"]
+    assert load_video_admission_manifest(store, project_id, shot_id="shot-03")[
+        "provider_dispatch_count"
+    ] == 0
+
+
+def test_video_admission_rejects_structured_post_only_shot(tmp_path) -> None:
+    client, store, project_id, _ = _seed_ready_project(
+        tmp_path,
+        strict_first_frame_required=False,
+    )
+    _add_ready_shot(
+        store,
+        project_id,
+        "shot-post-only",
+        31,
+        metadata={"video_dispatch_policy": "post_only"},
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/lanes/shot-post-only/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "compile",
+                    "idempotency_key": "compile-post-only",
+                    "shot_id": "shot-post-only",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert "post-only" in response.json()["detail"]["details"]["raw_detail"]
 
 
 def _stub_video_probe(monkeypatch) -> None:
@@ -1346,7 +2613,7 @@ def _stub_video_probe(monkeypatch) -> None:
     )
 
 
-def test_video_candidate_requires_human_approval_before_graph_writeback(
+def test_video_candidate_projects_pending_media_before_human_approval(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -1401,6 +2668,9 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         },
     )["result"]["manifest"]
     assert recorded["item"]["state"] == "candidate"
+    projection = recorded["item"]["candidate_projection"]
+    assert projection["production_graph_node_id"].startswith("video-candidate-video-admission-")
+    assert projection["graph_version"] == initial_graph["version"] + 1
     assert recorded["item"]["candidate"]["technical_qa"] == {
         "status": "pass",
         "container": "video/mp4",
@@ -1410,7 +2680,88 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         "codec": "mpeg4",
         "decode_probe": "passed",
     }
-    assert graph_store.load(project_id)["version"] == initial_graph["version"]
+    graph_after_candidate = graph_store.load(project_id)
+    candidate_node_id = projection["production_graph_node_id"]
+    candidate_node = graph_after_candidate["nodes"][candidate_node_id]
+    assert graph_after_candidate["version"] == initial_graph["version"] + 1
+    assert candidate_node["metadata"]["kind"] == "pending_video_candidate"
+    assert candidate_node["metadata"]["review_state"] == "candidate"
+    assert candidate_node["metadata"]["creative_approval_state"] == "pending"
+    assert candidate_node["metadata"]["sha256"] == candidate["sha256"]
+    assert {
+        "from_id": "shot-01",
+        "to_id": candidate_node_id,
+        "relation_type": "video_candidate",
+    } in graph_after_candidate["relations"]
+    workspace = _sequence_workspace_projection(
+        graph_after_candidate,
+        project_id=project_id,
+        store=store,
+    )
+    assert workspace["sequence"]["video_candidates"] == [
+        {
+            "media_node_id": candidate_node_id,
+            "media_kind": "video",
+            "review_state": "candidate",
+            "preview_url": (
+                f"/projects/{project_id}/video-generations/"
+                "video-job-001/candidates/candidate_001/preview"
+            ),
+            "mime_type": "video/mp4",
+            "container": "video/mp4",
+            "width": 1280,
+            "height": 720,
+            "duration_sec": 6.0,
+            "codec": "mpeg4",
+            "model": MODEL_ID,
+            "resolution": RESOLUTION,
+            "generation_mode": "first_frame",
+            "manifest_id": recorded["manifest_id"],
+            "manifest_hash": recorded["manifest_hash"],
+            "job_id": "video-job-001",
+            "candidate_id": "candidate_001",
+            "sha256": candidate["sha256"],
+            "byte_count": len(candidate_bytes),
+            "candidate_graph_version": None,
+            "lineage": {
+                "source_kind": "video_admission_candidate",
+                "target_relation": "video_candidate",
+            },
+            "target_node_ids": ["shot-01"],
+        }
+    ]
+    assert workspace["sequence"]["artifact_nodes"] == [
+        {
+            "node_id": candidate_node_id,
+            "category": "artifact",
+            "state": "active",
+            "metadata": {
+                "kind": "pending_video_candidate",
+                "manifest_id": recorded["manifest_id"],
+                "manifest_hash": recorded["manifest_hash"],
+                "job_id": "video-job-001",
+                "candidate_id": "candidate_001",
+                "source_shot_id": "shot-01",
+                "review_state": "candidate",
+                "creative_approval_state": "pending",
+                "technical_qa_status": "pass",
+                "sha256": candidate["sha256"],
+                "byte_count": len(candidate_bytes),
+                "mime_type": "video/mp4",
+                "codec": "mpeg4",
+                "width": 1280,
+                "height": 720,
+                "duration_sec": 6.0,
+                "model": MODEL_ID,
+                "resolution": RESOLUTION,
+                "generation_mode": "first_frame",
+            },
+        }
+    ]
+    assert not [
+        relation for relation in graph_after_candidate["relations"]
+        if relation["relation_type"] == "approved_video"
+    ]
 
     preview = _command(
         client,
@@ -1419,7 +2770,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
         confirm=False,
     )
     assert preview["result"]["graph_mutation"] == 0
-    assert graph_store.load(project_id)["version"] == initial_graph["version"]
+    assert graph_store.load(project_id)["version"] == graph_after_candidate["version"]
     approved = client.post(
         f"/projects/{project_id}/m6/video-admission/commands/confirm",
         json={
@@ -1431,6 +2782,7 @@ def test_video_candidate_requires_human_approval_before_graph_writeback(
     assert approved.status_code == 200, approved.text
     assert approved.json()["result"]["graph_mutation"] == 1
     graph = graph_store.load(project_id)
+    assert graph["version"] == graph_after_candidate["version"] + 1
     approved_videos = [
         item
         for item in graph["nodes"].values()
@@ -2003,7 +3355,541 @@ def test_rejected_video_round_creates_one_independent_first_frame_round_without_
     assert load_video_admission_manifest(store, project_id) == active
 
 
-def test_video_readiness_requires_literal_shot_one_and_exact_reference_pack(tmp_path) -> None:
+def test_terminal_video_round_creates_explicit_next_shot_without_provider(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _add_second_ready_shot(store, project_id)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-shot-01",
+            "shot_id": "shot-01",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    planned = load_video_admission_manifest(store, project_id)
+    premature = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "create_next_shot",
+                    "idempotency_key": "premature-next-shot",
+                    "shot_id": "shot-02",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert premature.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == planned
+
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-shot-01"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    _claim_for_test(store, project_id, request, job_id="video-job-shot-01")
+    failed = _command(
+        client,
+        project_id,
+        {
+            "type": "record_failure",
+            "idempotency_key": "fail-shot-01",
+            "error_category": "provider_failed",
+        },
+    )["result"]["manifest"]
+    same_shot = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "create_next_shot",
+                    "idempotency_key": "next-same-shot",
+                    "shot_id": "shot-01",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert same_shot.status_code == 422
+    assert load_video_admission_manifest(store, project_id) == failed
+
+    body = {
+        "command": _reference_video_setup_command(
+            {
+                "type": "create_next_shot",
+                "idempotency_key": "next-shot-02",
+                "shot_id": "shot-02",
+            }
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["source"]["shot"]["shot_id"] == "shot-02"
+    assert candidate["round_contract"] == {
+        "kind": "next_shot",
+        "prior_manifest_id": failed["manifest_id"],
+        "prior_manifest_hash": failed["manifest_hash"],
+        "prior_shot_id": "shot-01",
+        "next_shot_id": "shot-02",
+        "prior_round_preserved": True,
+        "prior_round_replay_allowed": False,
+    }
+    assert candidate["provider_contract"]["max_dispatches"] == MAX_DISPATCHES
+    assert candidate["provider_contract"]["auto_retry"] == AUTO_RETRY
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == failed
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["source"]["shot"]["shot_id"] == "shot-02"
+    assert active["provider_dispatch_count"] == 0
+    readiness = client.get(f"/projects/{project_id}/m6/video-admission")
+    assert readiness.status_code == 200
+    assert readiness.json()["readiness"]["status"] == "ready"
+    assert readiness.json()["readiness"]["shot_id"] == "shot-02"
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{failed['manifest_id']}.json"
+    )
+    assert archived == failed
+
+
+def test_same_shot_new_round_preserves_non_first_shot_without_provider(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _add_second_ready_shot(store, project_id)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-shot-02",
+            "shot_id": "shot-02",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-shot-02"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        request,
+        job_id="provider-job-rejected-shot-02",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="provider-job-rejected-shot-02",
+    )
+    old_manifest = deepcopy(load_video_admission_manifest(store, project_id))
+    safe_path = (
+        store.run_dir(project_id, "provider-job-rejected-shot-02")
+        / "video_generation_safe_manifest.json"
+    )
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "provider_http_status": 400,
+                    "provider_error_code": "InvalidParameter",
+                    "provider_error_message": "InvalidParameter",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    preview = _command(
+        client,
+        project_id,
+        {
+            "type": "create_new_round",
+            "idempotency_key": "same-shot-new-round",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+        confirm=False,
+    )
+    candidate = preview["result"]["manifest"]
+    assert candidate["source"]["shot"]["shot_id"] == "shot-02"
+    assert candidate["round_contract"]["prior_manifest_id"] == old_manifest["manifest_id"]
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_manifest
+
+
+def test_provider_not_ready_reconcile_round_creates_same_shot_recovery_without_provider(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-before-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-before-provider-not-ready"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        request,
+        job_id="provider-not-ready-job",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id="provider-not-ready-job",
+    )
+    old_manifest = deepcopy(load_video_admission_manifest(store, project_id))
+    safe_path = (
+        store.run_dir(project_id, "provider-not-ready-job")
+        / "video_generation_safe_manifest.json"
+    )
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": False,
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    preview = _command(
+        client,
+        project_id,
+        {
+            "type": "create_new_round",
+            "idempotency_key": "recover-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+        confirm=False,
+    )
+    candidate = preview["result"]["manifest"]
+    assert candidate["source"]["shot"]["shot_id"] == "shot-01"
+    assert candidate["round_contract"]["kind"] == "independent_after_provider_rejection"
+    assert candidate["round_contract"]["prior_round_preserved"] is True
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_manifest
+
+
+def test_conservative_provider_not_ready_reconcile_round_uses_outbox_no_task_boundary(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-conservative-provider-not-ready",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {
+            "type": "reserve_dispatch",
+            "idempotency_key": "reserve-conservative-provider-not-ready",
+        },
+    )["result"]["manifest"]
+    job_id = "provider-not-ready-conservative-job"
+    output_dir = store.run_dir(project_id, job_id)
+    prepare_dispatch_outbox(
+        output_dir,
+        project_id=project_id,
+        job_id=job_id,
+        manifest_id=reserved["manifest_id"],
+        manifest_hash=reserved["manifest_hash"],
+        item_id=reserved["item"]["item_id"],
+    )
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+    mark_video_admission_network_started(store, project_id, job_id=job_id)
+    mark_network_may_have_started(output_dir)
+    mark_reconcile_required(output_dir, "provider_submit_outcome_unknown")
+    old_manifest = deepcopy(load_video_admission_manifest(store, project_id))
+    assert old_manifest["item"]["state"] == "reconcile_required"
+    assert old_manifest["item"]["network_disposition"] == "may_have_dispatched"
+    assert old_manifest["item"].get("provider_task_fingerprint") in (None, "")
+    assert old_manifest["item"]["candidate"] is None
+    safe_path = output_dir / "video_generation_safe_manifest.json"
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "failure_class": "provider_not_ready",
+            "stage": "reconcile_required",
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    body = {
+        "command": _reference_video_setup_command(
+            {
+                "type": "create_new_round",
+                "idempotency_key": "recover-conservative-provider-not-ready",
+            }
+        ),
+        "requested_at": REQUESTED_AT,
+    }
+    preview = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json=body,
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = preview.json()["result"]["manifest"]
+    assert candidate["source"]["shot"]["shot_id"] == old_manifest["source"]["shot"]["shot_id"]
+    assert candidate["round_contract"]["prior_manifest_id"] == old_manifest["manifest_id"]
+    assert candidate["provider_dispatch_count"] == 0
+    assert load_video_admission_manifest(store, project_id) == old_manifest
+
+    confirmed = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/confirm",
+        json={**body, "preview_digest": preview.json()["preview_digest"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    active = load_video_admission_manifest(store, project_id)
+    assert active == confirmed.json()["result"]["manifest"]
+    assert active["provider_dispatch_count"] == 0
+    archived = read_json(
+        store.projects_dir
+        / project_id
+        / "video_admission"
+        / "history"
+        / f"{old_manifest['manifest_id']}.json"
+    )
+    assert archived == old_manifest
+
+
+def test_conservative_provider_not_ready_recovery_rejects_outbox_task_identity(
+    tmp_path,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": "compile-provider-task-boundary",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": "reserve-provider-task-boundary"},
+    )["result"]["manifest"]
+    job_id = "provider-not-ready-with-task-job"
+    output_dir = store.run_dir(project_id, job_id)
+    prepare_dispatch_outbox(
+        output_dir,
+        project_id=project_id,
+        job_id=job_id,
+        manifest_id=reserved["manifest_id"],
+        manifest_hash=reserved["manifest_hash"],
+        item_id=reserved["item"]["item_id"],
+    )
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(store, project_id, request, job_id=job_id)
+    mark_video_admission_network_started(store, project_id, job_id=job_id)
+    mark_network_may_have_started(output_dir)
+    record_provider_task(output_dir, {"task": {"task_id": "remote-task-001"}})
+    mark_reconcile_required(output_dir, "provider_submit_outcome_unknown")
+    safe_path = output_dir / "video_generation_safe_manifest.json"
+    write_json(
+        safe_path,
+        {
+            "schema_version": "afs_video_generation_safe_manifest.v0.1",
+            "status": "reconcile_required",
+            "project_id": project_id,
+            "provider_calls_started": True,
+            "failure_class": "provider_not_ready",
+            "outputs": [],
+            "blocks": [
+                {
+                    "block_id": "remote_video_provider_not_ready",
+                    "failure_class": "provider_not_ready",
+                    "reason": "Video provider configuration is not ready.",
+                    "provider_raw_response_stored": False,
+                }
+            ],
+        },
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "create_new_round",
+                    "idempotency_key": "recover-provider-task-boundary",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+    assert load_video_admission_manifest(store, project_id)["item"]["state"] == "reconcile_required"
+
+
+@pytest.mark.parametrize("mutation", ["fingerprint", "candidate", "outputs", "started_not_ready"])
+def test_provider_not_ready_new_round_rejects_uncertain_network_identity(
+    tmp_path,
+    mutation: str,
+) -> None:
+    client, store, project_id, _ = _seed_ready_project(tmp_path)
+    _command(
+        client,
+        project_id,
+        {
+            "type": "compile",
+            "idempotency_key": f"compile-boundary-{mutation}",
+            "generation_mode": "reference_conditioned",
+            "selection_reason": "使用已批准资产参考约束身份与连续性，不锁定首帧。",
+        },
+    )
+    reserved = _command(
+        client,
+        project_id,
+        {"type": "reserve_dispatch", "idempotency_key": f"reserve-boundary-{mutation}"},
+    )["result"]["manifest"]
+    request = VideoGenerationRequest(
+        **video_admission_generation_request(reserved, generated_at=REQUESTED_AT)
+    )
+    claim_video_admission_dispatch(
+        store,
+        project_id,
+        request,
+        job_id=f"provider-not-ready-{mutation}",
+    )
+    mark_video_admission_network_started(
+        store,
+        project_id,
+        job_id=f"provider-not-ready-{mutation}",
+    )
+    manifest = load_video_admission_manifest(store, project_id)
+    safe_manifest = {
+        "schema_version": "afs_video_generation_safe_manifest.v0.1",
+        "status": "reconcile_required",
+        "project_id": project_id,
+        "provider_calls_started": False,
+        "outputs": [],
+        "blocks": [
+            {
+                "block_id": "remote_video_provider_not_ready",
+                "failure_class": "provider_not_ready",
+                "reason": "Video provider configuration is not ready.",
+                "provider_raw_response_stored": False,
+            }
+        ],
+    }
+    if mutation == "fingerprint":
+        manifest["item"]["provider_task_fingerprint"] = "remote-task-fingerprint"
+    elif mutation == "candidate":
+        manifest["item"]["candidate"] = {}
+    elif mutation == "outputs":
+        safe_manifest["outputs"] = [{"candidate_id": "candidate_001"}]
+    elif mutation == "started_not_ready":
+        safe_manifest["provider_calls_started"] = True
+    write_json(store.projects_dir / project_id / "video_admission" / "manifest.json", manifest)
+    write_json(
+        store.run_dir(project_id, f"provider-not-ready-{mutation}")
+        / "video_generation_safe_manifest.json",
+        safe_manifest,
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/m6/video-admission/commands/preview",
+        json={
+            "command": _reference_video_setup_command(
+                {
+                    "type": "create_new_round",
+                    "idempotency_key": f"recover-boundary-{mutation}",
+                }
+            ),
+            "requested_at": REQUESTED_AT,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_video_readiness_uses_shot_id_and_requires_exact_reference_pack(tmp_path) -> None:
     client, store, project_id, _ = _seed_ready_project(tmp_path)
     path = store.projects_dir / project_id / "image_admission" / "manifest.json"
     manifest = read_json(path)
@@ -2022,8 +3908,9 @@ def test_video_readiness_requires_literal_shot_one_and_exact_reference_pack(tmp_
             "requested_at": REQUESTED_AT,
         },
     )
-    assert preview.status_code == 422
-    assert "首帧图生视频需要明确选择" in preview.json()["detail"]["details"]["raw_detail"]
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["result"]["manifest"]["source"]["shot"]["shot_id"] == "shot-01"
+    assert load_video_admission_manifest(store, project_id) == {}
 
     manifest["source"]["shot_grounding"]["shots"][0]["number"] = 1
     manifest["items"][0]["reference_asset_ids"] = ["character-a", "scene-a"]

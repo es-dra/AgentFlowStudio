@@ -195,6 +195,65 @@ def test_auth_enabled_projects_are_owner_scoped(tmp_path, monkeypatch) -> None:
     assert client.get("/projects/alpha-project/manifest", headers=beta_headers).status_code == 403
 
 
+def test_protected_request_reuses_middleware_user_lookup(tmp_path, monkeypatch) -> None:
+    client = _auth_client(tmp_path, monkeypatch)
+    alpha = _register(client, invite_code="alpha-invite", email="alpha@example.com")
+    headers = _auth_headers(alpha["session_token"])
+    original = RuntimeAuthStore.user_from_request
+    calls = 0
+
+    def counted(self, request):
+        nonlocal calls
+        calls += 1
+        return original(self, request)
+
+    monkeypatch.setattr(RuntimeAuthStore, "user_from_request", counted)
+
+    response = client.get("/projects", headers=headers)
+
+    assert response.status_code == 200
+    assert calls == 1
+
+
+def test_recent_session_is_not_rewritten_by_repeated_authenticated_gets(tmp_path, monkeypatch) -> None:
+    client = _auth_client(tmp_path, monkeypatch)
+    alpha = _register(client, invite_code="alpha-invite", email="alpha@example.com")
+    headers = _auth_headers(alpha["session_token"])
+    sessions_path = tmp_path / "auth" / "sessions.json"
+    before = sessions_path.read_bytes()
+
+    first = client.get("/projects", headers=headers)
+    after_first = sessions_path.read_bytes()
+    second = client.get("/projects", headers=headers)
+    after_second = sessions_path.read_bytes()
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert after_first == before
+    assert after_second == before
+
+
+def test_stale_session_last_seen_is_touched_once(tmp_path, monkeypatch) -> None:
+    client = _auth_client(tmp_path, monkeypatch)
+    alpha = _register(client, invite_code="alpha-invite", email="alpha@example.com")
+    headers = _auth_headers(alpha["session_token"])
+    sessions_path = tmp_path / "auth" / "sessions.json"
+    sessions = json.loads(sessions_path.read_text(encoding="utf-8"))
+    token_hash = next(iter(sessions["sessions"]))
+    sessions["sessions"][token_hash]["last_seen_at"] = "2026-07-28T00:00:00+00:00"
+    sessions_path.write_text(json.dumps(sessions), encoding="utf-8")
+
+    first = client.get("/projects", headers=headers)
+    after_first = sessions_path.read_bytes()
+    second = client.get("/projects", headers=headers)
+    after_second = sessions_path.read_bytes()
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert after_second == after_first
+    assert b"2026-07-28T00:00:00+00:00" not in after_first
+
+
 def test_auth_scope_covers_studio_state_assets_jobs_and_artifacts(tmp_path, monkeypatch) -> None:
     client = _auth_client(tmp_path, monkeypatch)
     alpha = _register(client, invite_code="alpha-invite", email="alpha@example.com")

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 def test_runtime_service_v02_lists_imports_and_exports_projects_without_private_paths(tmp_path, monkeypatch) -> None:
@@ -104,8 +105,9 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path, 
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 
 
-def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(tmp_path, monkeypatch) -> None:
-    # GET /projects is now a mainline Studio project listing route.
+def test_runtime_service_lists_projects_without_rewriting_artifact_index(tmp_path, monkeypatch) -> None:
+    # GET /projects is a read path. Index recovery belongs to explicit
+    # maintenance/migration, not a high-fanout creator request.
     monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
@@ -116,14 +118,20 @@ def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(t
             "goal": "Recover a local artifact index after an interrupted write.",
         },
     )
-    (tmp_path / "artifact_index.json").write_text("", encoding="utf-8")
+    index_before = (tmp_path / "artifact_index.json").read_bytes()
+
+    def unexpected_registration(*args, **kwargs):
+        raise AssertionError("GET /projects must not register artifacts")
+
+    monkeypatch.setattr(RuntimeStore, "register_artifact", unexpected_registration)
 
     project_list = client.get("/projects")
-    index = json.loads((tmp_path / "artifact_index.json").read_text(encoding="utf-8"))
+    index_after = (tmp_path / "artifact_index.json").read_bytes()
 
     assert project_list.status_code == 200
     assert project_list.json()["projects"][0]["project_id"] == "proj_recover_index"
-    assert index["artifacts"]
+    assert project_list.json()["projects"][0]["artifact"]["role"] == "project_manifest"
+    assert index_after == index_before
 
 
 def test_runtime_service_v02_routes_are_hidden_by_default(tmp_path, monkeypatch) -> None:
