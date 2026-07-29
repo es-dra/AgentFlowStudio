@@ -74,6 +74,8 @@ from apps.api.runtime_video_admission import register_runtime_video_admission_ro
 from apps.api.runtime_video_direct_batch_routes import register_runtime_video_direct_batch_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
+from apps.api.runtime_studio_bff import register_runtime_studio_bff_routes
+from apps.api.runtime_studio_commands import register_runtime_studio_command_routes
 from apps.api.runtime_sprite import register_runtime_sprite_routes
 from apps.api.runtime_visual_assets import register_runtime_visual_asset_routes
 from apps.api.runtime_video_revision_routes import register_runtime_video_revision_routes
@@ -94,8 +96,11 @@ from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import (
     DEFAULT_SITE_ROOT,
     DEFAULT_STUDIO_ROOT,
+    DEFAULT_STUDIO_WEB_ROOT,
     configure_site_static,
+    configure_studio_next_static,
     configure_studio_static,
+    studio_next_static_status,
     studio_static_status,
 )
 
@@ -139,6 +144,7 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
 def create_runtime_app(
     runtime_root: Path = DEFAULT_RUNTIME_ROOT,
     studio_root: Path = DEFAULT_STUDIO_ROOT,
+    studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT,
     site_root: Path = DEFAULT_SITE_ROOT,
     runtime_bind_host: str | None = None,
 ) -> FastAPI:
@@ -162,7 +168,10 @@ def create_runtime_app(
     def health() -> dict[str, Any]:
         return runtime_health_payload(
             runtime_root=runtime_root,
-            studio_static=studio_static_status(studio_root),
+            studio_static={
+                **studio_static_status(studio_root),
+                "studio_next": studio_next_static_status(studio_web_root),
+            },
             runtime_bind_host=runtime_bind_host,
         )
 
@@ -408,6 +417,8 @@ def create_runtime_app(
     register_runtime_episode_workspace_routes(app, store, auth)
     register_runtime_creator_production_saga_routes(app, store, auth)
     register_runtime_product_read_model_routes(app, store, auth)
+    register_runtime_studio_bff_routes(app, store, auth)
+    register_runtime_studio_command_routes(app, store, auth)
     register_runtime_adaptive_canvas_v2_routes(app, store, auth)
     register_runtime_manga_first_l4a_routes(app, store, auth)
     register_runtime_script_core_truth_routes(app, store, auth)
@@ -441,6 +452,7 @@ def create_runtime_app(
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)
     configure_studio_static(app, studio_root)
+    configure_studio_next_static(app, studio_web_root)
 
     return app
 

@@ -143,7 +143,10 @@ class RuntimeStore:
                 continue
             manifest = read_json(path)
             validate_project_manifest(manifest)
-            artifact = self.register_artifact(path, role="project_manifest")
+            # Listing projects is a read path. Project creation/import owns index
+            # registration; a GET must not rewrite and fsync the global index once
+            # per project.
+            artifact = self.artifact_ref_for_path(path, role="project_manifest")
             summaries.append(project_summary(manifest, artifact))
         return summaries
 
@@ -277,7 +280,8 @@ class RuntimeStore:
                 jobs.append(public_job(job))
         return jobs
 
-    def register_artifact(self, path: Path, *, role: str) -> dict[str, Any]:
+    def artifact_ref_for_path(self, path: Path, *, role: str) -> dict[str, Any]:
+        """Build the stable public reference for an artifact without mutating the index."""
         resolved = Path(path).resolve()
         if not _path_exists(resolved):
             raise FileNotFoundError(str(path))
@@ -296,11 +300,22 @@ class RuntimeStore:
         project_id = _project_id_from_artifact_relative_path(relative_path)
         if project_id:
             entry["project_id"] = project_id
+        return public_artifact_ref(entry)
+
+    def register_artifact(self, path: Path, *, role: str) -> dict[str, Any]:
+        ref = self.artifact_ref_for_path(path, role=role)
+        entry = {
+            **ref,
+            "relative_path": Path(path).resolve().relative_to(self.root.resolve()).as_posix(),
+        }
+        project_id = _project_id_from_artifact_relative_path(str(entry["relative_path"]))
+        if project_id:
+            entry["project_id"] = project_id
         with exclusive_file_lock(self.index_transaction_lock_path):
             index = self._artifact_index()
-            index.setdefault("artifacts", {})[artifact_id] = entry
+            index.setdefault("artifacts", {})[str(ref["artifact_id"])] = entry
             write_json(self.index_path, index)
-        return public_artifact_ref(entry)
+        return ref
 
     def artifact_project_id(self, artifact_id: str) -> str:
         index = self._artifact_index()

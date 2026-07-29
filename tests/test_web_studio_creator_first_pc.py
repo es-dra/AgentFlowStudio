@@ -605,7 +605,6 @@ def test_approved_video_projects_into_storyboard_canvas_and_counts_after_refresh
     assert result["canvasVideoAspectRatio"] == "16 / 9"
     assert result["approvedVideoEdges"] == 1
 
-
 def test_pending_video_candidate_projects_into_storyboard_canvas_without_approval() -> None:
     projection_uri = (STUDIO / "src" / "production-graph-workspace-projection.js").as_uri()
     script = f"""

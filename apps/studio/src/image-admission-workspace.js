@@ -124,6 +124,34 @@ export function imageAdmissionCommand(command, now = Date.now()) {
   };
 }
 
+const IMAGE_ADMISSION_MANIFEST_SOURCE_COMMANDS = new Set([
+  "create_recovery_manifest",
+  "create_next_batch_manifest",
+  "inspect_next_batch",
+  "cancel_batch",
+]);
+
+export function imageAdmissionCommandSourceMatchesManifest(command, source, manifest) {
+  if (!IMAGE_ADMISSION_MANIFEST_SOURCE_COMMANDS.has(String(command?.type || ""))) {
+    return true;
+  }
+  const manifestSource = manifest?.source;
+  if (!manifestSource || typeof manifestSource !== "object") return true;
+  if (
+    manifestSource.production_graph_version
+    && Number(source?.production_graph_version || 0) !== Number(manifestSource.production_graph_version || 0)
+  ) {
+    return false;
+  }
+  if (
+    manifestSource.production_graph_digest
+    && String(source?.production_graph_digest || "") !== String(manifestSource.production_graph_digest || "")
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function imageAdmissionItemJobId(item) {
   return String(item?.provider_job_id || "");
 }
