@@ -198,16 +198,18 @@ def _safe_health(health: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _safe_studio_static(value: Any) -> dict[str, bool | str]:
-    if not isinstance(value, dict):
-        value = {}
-    return {
-        "mounted": bool(value.get("mounted")),
-        "root_exists": bool(value.get("root_exists")),
-        "index_exists": bool(value.get("index_exists")),
-        "entry_js_exists": bool(value.get("entry_js_exists")),
-        "status": str(value.get("status") or "missing"),
+def _safe_studio_static(value: Any) -> dict[str, Any]:
+    value = value if isinstance(value, dict) else {}
+    safe: dict[str, Any] = {
+        key: bool(value.get(key)) for key in ("mounted", "root_exists", "index_exists", "assets_dir_exists", "entry_js_exists")
     }
+    safe.update(
+        status=str(value.get("status") or "missing"), route=str(value.get("route") or ""), role=str(value.get("role") or "")
+    )
+    for key in ("legacy", "studio_next"):
+        if isinstance(value.get(key), dict):
+            safe[key] = _safe_studio_static(value.get(key))
+    return safe
 
 
 def _safe_provider_gates(value: Any) -> dict[str, bool]:

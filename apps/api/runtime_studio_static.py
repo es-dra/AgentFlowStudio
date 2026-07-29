@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlencode
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -38,6 +39,12 @@ def configure_site_static(app: FastAPI, site_root: Path = DEFAULT_SITE_ROOT) -> 
 def configure_studio_static(app: FastAPI, studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> None:
     root = Path(studio_web_root)
     index = root / "index.html"
+
+    @app.get("/studio/episode-workspace", include_in_schema=False)
+    @app.get("/studio/episode-workspace/", include_in_schema=False)
+    def studio_episode_workspace_redirect(request: Request) -> RedirectResponse:
+        return RedirectResponse(url=_episode_workspace_redirect_url(request))
+
     if not index.is_file():
         return
 
@@ -54,6 +61,19 @@ def configure_studio_static(app: FastAPI, studio_web_root: Path = DEFAULT_STUDIO
         NoStoreStaticFiles(directory=root, html=True),
         name="afs_studio",
     )
+
+
+def _episode_workspace_redirect_url(request: Request) -> str:
+    params: dict[str, str] = {}
+    project_id = (
+        request.query_params.get("project_id")
+        or request.query_params.get("project")
+        or ""
+    ).strip()
+    if project_id:
+        params["project_id"] = project_id
+    params["surface"] = "storyboard"
+    return f"/studio/?{urlencode(params)}"
 
 
 def configure_studio_next_static(app: FastAPI, studio_web_root: Path = DEFAULT_STUDIO_WEB_ROOT) -> None:

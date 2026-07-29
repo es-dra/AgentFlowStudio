@@ -95,8 +95,11 @@ def test_safe_runtime_health_keeps_only_public_readiness_fields() -> None:
             "mounted": True,
             "root_exists": True,
             "index_exists": False,
+            "assets_dir_exists": False,
             "entry_js_exists": False,
             "status": "ready",
+            "route": "",
+            "role": "",
         },
         "provider_gates": {"llm": True, "video": False},
         "readiness": {

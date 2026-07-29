@@ -120,7 +120,12 @@ def test_http_acceptance_reuses_contract_with_safe_report(tmp_path: Path, monkey
     monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "false")
     monkeypatch.setenv("AFS_ALLOW_EXTERNAL_DOWNLOAD", "false")
 
-    app = create_runtime_app(runtime_root=tmp_path / "runtime")
+    studio_root, studio_web_root = _studio_static_roots(tmp_path)
+    app = create_runtime_app(
+        runtime_root=tmp_path / "runtime",
+        studio_root=studio_root,
+        studio_web_root=studio_web_root,
+    )
     client = RuntimeTestClientAdapter(TestClient(app))
 
     def fake_http_client(base_url: str):
@@ -162,7 +167,12 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
     monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "false")
     monkeypatch.setenv("AFS_ALLOW_EXTERNAL_DOWNLOAD", "false")
 
-    app = create_runtime_app(runtime_root=tmp_path / "runtime")
+    studio_root, studio_web_root = _studio_static_roots(tmp_path)
+    app = create_runtime_app(
+        runtime_root=tmp_path / "runtime",
+        studio_root=studio_root,
+        studio_web_root=studio_web_root,
+    )
     client = RuntimeTestClientAdapter(TestClient(app))
 
     def fake_http_client(base_url: str):
@@ -199,7 +209,15 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
     assert checks["runtime_health"]["status"] == "passed"
     assert checks["auth_surface"]["status"] == "passed"
     assert checks["studio_static"]["status"] == "passed"
+    assert checks["studio_static"]["evidence"]["role"] == "primary"
+    assert checks["studio_static"]["evidence"]["route"] == "/studio/"
+    assert checks["studio_static"]["evidence"]["assets_dir_exists"] is True
+    assert checks["studio_static"]["evidence"]["legacy"]["role"] == "legacy"
+    assert checks["studio_static"]["evidence"]["studio_next"]["role"] == "alias"
     assert checks["provider_gate_projection"]["status"] == "passed"
+    assert report["safe_health"]["studio_static"]["role"] == "primary"
+    assert report["safe_health"]["studio_static"]["legacy"]["route"] == "/studio-legacy/"
+    assert report["safe_health"]["studio_static"]["studio_next"]["route"] == "/studio-next/"
     assert report["safe_health"]["provider_gates"] == {
         "llm": True,
         "image": True,
@@ -224,6 +242,17 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
     assert "provider_raw_response" not in serialized
     assert "data_base64" not in serialized
     assert str(tmp_path) not in serialized
+
+
+def _studio_static_roots(tmp_path: Path) -> tuple[Path, Path]:
+    studio_root = tmp_path / "studio-legacy"
+    (studio_root / "src").mkdir(parents=True)
+    (studio_root / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
+    (studio_root / "src" / "main.js").write_text("console.log('legacy')", encoding="utf-8")
+    studio_web_root = tmp_path / "studio-web" / "dist"
+    (studio_web_root / "assets").mkdir(parents=True)
+    (studio_web_root / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
+    return studio_root, studio_web_root
 
 
 def test_http_preflight_rejects_missing_base_url_without_invite_code_requirement() -> None:

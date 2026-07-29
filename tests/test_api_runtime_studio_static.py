@@ -51,6 +51,16 @@ def test_primary_studio_serves_react_build_with_legacy_and_next_aliases(tmp_path
     assert primary_asset.status_code == 200
     assert "react" in primary_asset.text
 
+    episode_workspace = client.get(
+        "/studio/episode-workspace/?project=legacy-project&episode=episode-001&version=episode-001-v1",
+        follow_redirects=False,
+    )
+    assert episode_workspace.status_code in {307, 308}
+    assert (
+        episode_workspace.headers["location"]
+        == "/studio/?project_id=legacy-project&surface=storyboard"
+    )
+
     next_redirect = client.get("/studio-next", follow_redirects=False)
     assert next_redirect.status_code in {307, 308}
     assert next_redirect.headers["location"] == "/studio-next/"
@@ -134,6 +144,15 @@ def test_studio_primary_and_next_mounts_are_noop_without_react_index(tmp_path):
     assert client.get("/studio/").status_code == 404
     assert client.get("/studio-next/").status_code == 404
     assert client.get("/studio-legacy/").status_code == 200
+    episode_workspace = client.get(
+        "/studio/episode-workspace/?project=legacy-project",
+        follow_redirects=False,
+    )
+    assert episode_workspace.status_code in {307, 308}
+    assert (
+        episode_workspace.headers["location"]
+        == "/studio/?project_id=legacy-project&surface=storyboard"
+    )
 
 
 def test_runtime_service_registers_studio_command_routes(tmp_path):

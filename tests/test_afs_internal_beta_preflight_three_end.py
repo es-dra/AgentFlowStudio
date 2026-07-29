@@ -12,7 +12,16 @@ from tools.afs_internal_beta_acceptance_client import RuntimeTestClientAdapter
 
 def test_http_preflight_can_embed_safe_three_end_status(tmp_path: Path, monkeypatch) -> None:
     _enable_auth_preflight_env(monkeypatch)
-    client = RuntimeTestClientAdapter(TestClient(create_runtime_app(runtime_root=tmp_path / "runtime")))
+    studio_root, studio_web_root = _studio_static_roots(tmp_path)
+    client = RuntimeTestClientAdapter(
+        TestClient(
+            create_runtime_app(
+                runtime_root=tmp_path / "runtime",
+                studio_root=studio_root,
+                studio_web_root=studio_web_root,
+            )
+        )
+    )
     captured: dict[str, object] = {}
 
     def fake_http_client(base_url: str):
@@ -69,6 +78,10 @@ def test_http_preflight_can_embed_safe_three_end_status(tmp_path: Path, monkeypa
     assert captured["repo_root"] == tmp_path / "repo"
     assert captured["server"] == "afs-bwg-ops"
     assert report["status"] == "ready_for_http_acceptance"
+    assert checks["studio_static"]["status"] == "passed"
+    assert checks["studio_static"]["evidence"]["role"] == "primary"
+    assert checks["studio_static"]["evidence"]["legacy"]["role"] == "legacy"
+    assert checks["studio_static"]["evidence"]["studio_next"]["role"] == "alias"
     assert report["three_end_status"]["status"] == "aligned"
     assert report["three_end_status"]["readiness_claims"]["runtime_three_end_alignment_evidence"] is True
     assert report["three_end_status"]["readiness_claims"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
@@ -98,7 +111,16 @@ def test_http_preflight_can_embed_safe_three_end_status(tmp_path: Path, monkeypa
 
 def test_http_preflight_marks_three_end_drift_as_needs_attention(tmp_path: Path, monkeypatch) -> None:
     _enable_auth_preflight_env(monkeypatch)
-    client = RuntimeTestClientAdapter(TestClient(create_runtime_app(runtime_root=tmp_path / "runtime")))
+    studio_root, studio_web_root = _studio_static_roots(tmp_path)
+    client = RuntimeTestClientAdapter(
+        TestClient(
+            create_runtime_app(
+                runtime_root=tmp_path / "runtime",
+                studio_root=studio_root,
+                studio_web_root=studio_web_root,
+            )
+        )
+    )
 
     def fake_http_client(base_url: str):
         assert base_url == "https://afs.example.test"
@@ -134,8 +156,20 @@ def test_http_preflight_marks_three_end_drift_as_needs_attention(tmp_path: Path,
     checks = {item["check_id"]: item for item in report["checks"]}
     assert report["status"] == "needs_attention"
     assert report["summary"]["failed_check_count"] == 1
+    assert checks["studio_static"]["status"] == "passed"
     assert checks["three_end_status"]["status"] == "failed"
     assert checks["three_end_status"]["provider_calls_started"] is False
+
+
+def _studio_static_roots(tmp_path: Path) -> tuple[Path, Path]:
+    studio_root = tmp_path / "studio-legacy"
+    (studio_root / "src").mkdir(parents=True)
+    (studio_root / "index.html").write_text("<div id=\"app\"></div>", encoding="utf-8")
+    (studio_root / "src" / "main.js").write_text("console.log('legacy')", encoding="utf-8")
+    studio_web_root = tmp_path / "studio-web" / "dist"
+    (studio_web_root / "assets").mkdir(parents=True)
+    (studio_web_root / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
+    return studio_root, studio_web_root
 
 
 def _enable_auth_preflight_env(monkeypatch) -> None:

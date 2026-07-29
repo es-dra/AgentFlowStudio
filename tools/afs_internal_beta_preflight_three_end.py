@@ -92,16 +92,24 @@ def _safe_runtime_health(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _safe_studio_static(value: Any) -> dict[str, bool | str]:
+def _safe_studio_static(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         value = {}
-    return {
+    safe: dict[str, Any] = {
         "mounted": bool(value.get("mounted")),
         "root_exists": bool(value.get("root_exists")),
         "index_exists": bool(value.get("index_exists")),
+        "assets_dir_exists": bool(value.get("assets_dir_exists")),
         "entry_js_exists": bool(value.get("entry_js_exists")),
         "status": str(value.get("status") or "missing"),
+        "route": str(value.get("route") or ""),
+        "role": str(value.get("role") or ""),
     }
+    if isinstance(value.get("legacy"), dict):
+        safe["legacy"] = _safe_studio_static(value.get("legacy"))
+    if isinstance(value.get("studio_next"), dict):
+        safe["studio_next"] = _safe_studio_static(value.get("studio_next"))
+    return safe
 
 
 def _safe_provider_gates(value: Any) -> dict[str, bool]:

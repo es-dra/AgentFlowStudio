@@ -153,13 +153,32 @@ def _run(module: str, script: str, payload: dict[str, object]) -> dict[str, obje
 
 
 def test_workspace_is_mounted_under_existing_production_studio_tree(tmp_path: Path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    react_root = tmp_path / "studio-web" / "dist"
+    (react_root / "assets").mkdir(parents=True)
+    (react_root / "index.html").write_text(
+        '<title>AFS 制作工作区</title><div id="root"></div>',
+        encoding="utf-8",
+    )
+    client = TestClient(
+        create_runtime_app(runtime_root=tmp_path, studio_web_root=react_root)
+    )
 
-    response = client.get("/studio/episode-workspace/")
+    response = client.get(
+        "/studio/episode-workspace/?project=creator-ui-project&episode=episode-001&version=episode-001-v1",
+        follow_redirects=False,
+    )
 
-    assert response.status_code == 200
-    assert "AFS · 单集制作工作区" in response.text
-    assert client.get("/studio/").status_code == 200
+    assert response.status_code in {307, 308}
+    assert (
+        response.headers["location"]
+        == "/studio/?project_id=creator-ui-project&surface=storyboard"
+    )
+    primary = client.get(response.headers["location"])
+    legacy = client.get("/studio-legacy/episode-workspace/")
+    assert primary.status_code == 200
+    assert "AFS 制作工作区" in primary.text
+    assert legacy.status_code == 200
+    assert "AFS · 单集制作工作区" in legacy.text
 
 
 def test_product_source_uses_real_authenticated_routes_without_local_business_state() -> None:
