@@ -41,7 +41,7 @@ export default function StoryboardSurface({
           <p className="eyebrow">分镜</p>
           <h1>还没有可排布的镜头</h1>
           <p>
-            当前项目没有从统一项目脉络投影出镜头列表。
+            当前项目还没有形成可排布的镜头列表。
             页面不会用静态镜头卡片冒充制作状态。
           </p>
           <button

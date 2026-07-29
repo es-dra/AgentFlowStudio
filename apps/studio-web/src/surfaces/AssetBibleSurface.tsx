@@ -42,7 +42,7 @@ export default function AssetBibleSurface({
           <p className="eyebrow">资产设定</p>
           <h1>还没有可复用的角色、场景或道具</h1>
           <p>
-            当前项目没有从统一项目脉络投影出资产设定。
+            当前项目还没有形成可复用的资产设定。
             页面不会创建平行资产清单。
           </p>
           <button

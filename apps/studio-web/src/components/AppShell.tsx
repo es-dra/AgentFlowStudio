@@ -263,7 +263,7 @@ function agentCopy(surface: AppSurface, data: StudioData | null) {
       suggestion:
         envelope.agent_summary.state === "attention_required"
           ? "先处理当前注意事项；未经确认的写动作仍保持关闭。"
-          : "查看当前投影内容；缺少回执的动作不会执行。"
+          : "查看当前工作面内容；缺少回执的动作不会执行。"
     };
   }
 

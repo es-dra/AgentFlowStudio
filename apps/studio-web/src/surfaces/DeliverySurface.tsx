@@ -135,7 +135,7 @@ export default function DeliverySurface({
             </li>
           )) : (
             <li>
-              <p className="empty-inline">当前交付投影没有阻塞明细。</p>
+              <p className="empty-inline">当前交付还没有阻塞明细。</p>
             </li>
           )}
         </ol>

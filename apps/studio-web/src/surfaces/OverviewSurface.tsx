@@ -45,7 +45,7 @@ export default function OverviewSurface({
             className="button button--primary button--large"
             type="button"
             disabled={!view.primaryAction.enabled}
-            title={view.primaryAction.enabled ? view.primaryAction.help : "当前服务投影没有可执行的下一步"}
+            title={view.primaryAction.enabled ? view.primaryAction.help : "当前没有可执行的下一步"}
             onClick={() =>
               onNavigate({
                 surface: view.primaryAction.surface,
@@ -85,7 +85,7 @@ export default function OverviewSurface({
             className="text-action"
             type="button"
             disabled={!view.decision.enabled}
-            title={view.decision.enabled ? view.decision.actionLabel : "当前没有后端候选回执"}
+            title={view.decision.enabled ? view.decision.actionLabel : view.decision.disabledTitle}
             onClick={() =>
               onNavigate({
                 surface: view.decision.surface,
@@ -220,6 +220,7 @@ export function overviewView(data: SurfaceProps["data"]) {
         tone: "warning",
         description: "候选版本二存在 06–08 秒灯塔光束轻微跳变，需要决定采用或预览局部返工。",
         actionLabel: "查看候选与影响",
+        disabledTitle: "当前没有待审核候选回执",
         enabled: true,
         surface: "review" as AppSurface,
         candidate: fixture.project.resumeTarget.entityRef,
@@ -295,6 +296,7 @@ export function overviewView(data: SurfaceProps["data"]) {
             ? "候选已有可追溯证据；前往审核工作面查看。"
             : "当前候选尚无结构化质量说明；只能查看候选身份，不能采用或返工。",
           actionLabel: "查看候选与影响",
+          disabledTitle: "当前没有待审核候选回执",
           enabled: true,
           surface: "review" as AppSurface,
           candidate: pendingItem.target_entity_id,
@@ -306,6 +308,7 @@ export function overviewView(data: SurfaceProps["data"]) {
           tone: "muted",
           description: "当前没有审核队列。页面不会编造镜头、秒数或候选说明。",
           actionLabel: "等待审核回执",
+          disabledTitle: "当前没有待审核候选回执",
           enabled: false,
           surface: "review" as AppSurface,
           candidate: "",
@@ -320,7 +323,7 @@ export function overviewView(data: SurfaceProps["data"]) {
       mediaAlt: "当前交付媒体预览",
       actionLabel: "播放当前版本",
       emptyText: hasDelivery
-        ? "当前交付投影没有受控媒体地址"
+        ? "当前交付还没有可预览媒体地址"
         : "当前真实项目没有已采用视频或交付记录，尚未形成可播放交付"
     },
     coverage: [

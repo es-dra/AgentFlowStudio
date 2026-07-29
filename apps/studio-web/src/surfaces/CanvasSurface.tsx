@@ -286,7 +286,7 @@ export function canvasView(data: SurfaceProps["data"]) {
         ? `前往${entityLabel(envelope, primaryCandidate, "候选对象")}审核`
         : "等待审核候选",
       enabled: Boolean(primaryCandidate),
-      reason: envelope.resume_target.reason || "当前服务投影没有审核目标",
+      reason: envelope.resume_target.reason || "当前没有可审核目标",
       surface: firstAvailableSurface(envelope.resume_target.surface, "review"),
       candidate: primaryCandidate,
       entity: primaryCandidate

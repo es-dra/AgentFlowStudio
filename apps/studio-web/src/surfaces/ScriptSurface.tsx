@@ -40,7 +40,7 @@ export default function ScriptSurface({
           <p className="eyebrow">剧本</p>
           <h1>还没有可进入分镜的剧本拆解</h1>
           <p>
-            当前项目没有从统一项目脉络投影出剧本版本、场次或镜头意图。
+            当前项目还没有形成可进入分镜的剧本版本、场次或镜头意图。
             页面不会补写静态剧情。
           </p>
           <button

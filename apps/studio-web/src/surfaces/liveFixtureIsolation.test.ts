@@ -26,15 +26,22 @@ const fixtureFacts = [
 const internalCreatorCopyTerms = [
   /\bBFF\b/i,
   /\bfixture\b/i,
+  /后端/,
+  /接口/,
+  /协议/,
   /\bprotocol\b/i,
   /\binternal\b/i,
+  /\bprovider\b/i,
   /raw\s*id/i,
   /\bproject_id\b/i,
   /\bentity_id\b/i,
   /\btarget_entity_id\b/i,
   /\bschema_version\b/i,
   /provider_dispatch_count/i,
-  /graph_v1/i
+  /graph_v1/i,
+  /ProductionGraph/,
+  /event_cursor/,
+  /\bdigest\b/i
 ];
 
 describe("live studio view models", () => {
@@ -62,8 +69,9 @@ describe("live studio view models", () => {
       rework_preview: unavailableRework()
     });
 
+    const overview = overviewView(data);
     const output = JSON.stringify({
-      overview: overviewView(data),
+      overview,
       canvas: canvasView(data),
       script: scriptView(data),
       storyboard: storyboardView(data),
@@ -80,7 +88,9 @@ describe("live studio view models", () => {
     for (const fact of fixtureFacts) {
       expect(output).not.toContain(fact);
     }
-    expect(overviewView(data).delivery.title).toBe("尚未形成可播放交付");
+    expect(overview.decision.disabledTitle).toBe("当前没有待审核候选回执");
+    expect(visibleOverviewCopy(overview)).not.toMatch(/后端|服务投影|交付投影/);
+    expect(overview.delivery.title).toBe("尚未形成可播放交付");
     expect(deliveryView(data).versions).toHaveLength(0);
     expect(deliveryView(data).playableDuration).toBe(0);
   });
@@ -436,6 +446,19 @@ function creationSurfaceVisibleCopy(
       })),
       primaryAction: pickActionCopy(assetBible.primaryAction)
     }
+  });
+}
+
+function visibleOverviewCopy(overview: ReturnType<typeof overviewView>): string {
+  return JSON.stringify({
+    episode: overview.episode,
+    projectStatus: overview.projectStatus,
+    primaryAction: overview.primaryAction,
+    decision: overview.decision,
+    delivery: overview.delivery,
+    coverage: overview.coverage,
+    nextWork: overview.nextWork,
+    changes: overview.changes
   });
 }
 
