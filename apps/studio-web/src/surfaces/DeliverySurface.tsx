@@ -99,7 +99,7 @@ export default function DeliverySurface({
               </div>
             </>
           ) : (
-            <p className="empty-inline">服务端尚未提供交付时间线。</p>
+            <p className="empty-inline">当前项目尚未形成交付时间线。</p>
           )}
         </section>
 
@@ -113,7 +113,7 @@ export default function DeliverySurface({
         <div className="section-heading">
           <div>
             <p className="eyebrow">交付检查</p>
-            <h2>阻塞项（{view.blockers.length}）</h2>
+            <h2>阻塞项（{view.blockerCount}）</h2>
           </div>
         </div>
         <ol className="blocker-list">
@@ -161,16 +161,16 @@ export default function DeliverySurface({
           type="button"
           onClick={continueBlocker}
           disabled={!blocker?.actionable}
-          title={blocker?.actionable ? "继续处理阻塞项" : "当前阻塞项没有可导航目标"}
+          title={blocker?.actionable ? view.primaryActionLabel : "当前阻塞项没有可导航目标"}
         >
-          继续处理阻塞项
+          {view.primaryActionLabel}
           <IconArrowRight aria-hidden="true" size={18} />
         </button>
         <button
           className="button button--quiet"
           type="button"
           disabled
-          title="阻塞清零并由服务端允许后才能创建交付版本"
+          title="处理完全部阻塞项后才能创建交付版本"
         >
           创建交付版本
         </button>
@@ -191,7 +191,7 @@ export function deliveryView(data: SurfaceProps["data"]) {
       targetDuration: fixture.project.targetDurationSeconds,
       durationLabel: `当前可播放 ${formatSeconds(fixture.delivery.playableDurationSeconds)} / 目标 ${formatSeconds(fixture.project.targetDurationSeconds)}`,
       mediaUrl: fixture.shots[2]?.imageUrl ?? "",
-      mediaEmpty: "当前服务端尚未提供受控交付媒体地址",
+      mediaEmpty: "当前版本尚无可预览的交付媒体",
       shots: fixture.shots.map((shot) => ({
         id: shot.shotRef,
         sequence: shot.sequence,
@@ -245,6 +245,8 @@ export function deliveryView(data: SurfaceProps["data"]) {
           actionable: true
         }
       ],
+      blockerCount: 3,
+      primaryActionLabel: "继续处理阻塞项",
       versions: [
         { version: 3, label: "版本三", duration: 47, time: "今天 14:32", current: true },
         { version: 2, label: "版本二", duration: 47, time: "今天 11:08", current: false },
@@ -264,29 +266,31 @@ export function deliveryView(data: SurfaceProps["data"]) {
     ? [
         {
           id: "delivery-blockers",
-          label: `服务端报告 ${blockerCount} 个阻塞项`,
-          note: "当前交付摘要尚未提供阻塞明细",
-          surface: "delivery" as const,
+          label: `当前有 ${blockerCount} 个阻塞项`,
+          note: "交付摘要尚未提供阻塞明细，可回到制作画布继续处理",
+          surface: "canvas" as const,
           entity: "",
           candidate: "",
           duration: 0,
-          actionable: false
+          actionable: true
         }
       ]
     : [];
   return {
-    title: hasDelivery ? "服务端标记可播放交付" : "尚未形成可播放交付",
+    title: hasDelivery ? "交付版本可播放" : "尚未形成可播放交付",
     statusLabel: stateLabel(summary.state),
     statusTone: hasDelivery ? "success" : blockerCount > 0 ? "warning" : "muted",
     playableDuration,
     targetDuration: 0,
-    durationLabel: `当前可播放 ${formatSeconds(playableDuration)} / 目标时长待服务端提供`,
+    durationLabel: `当前可播放 ${formatSeconds(playableDuration)} / 目标时长待项目补充`,
     mediaUrl: "",
     mediaEmpty: hasDelivery
       ? "当前交付摘要未提供受控媒体地址"
       : "当前真实项目没有已采用视频或交付记录，尚未形成可播放交付",
     shots: [],
     blockers,
+    blockerCount,
+    primaryActionLabel: "返回制作画布",
     versions: [],
     timelineMarks: [],
     specLabel: "交付规格尚未提供"

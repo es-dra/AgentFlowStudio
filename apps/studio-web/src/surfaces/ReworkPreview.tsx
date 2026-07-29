@@ -42,7 +42,10 @@ export function ReworkPreview({
   onConfirmed,
   onClose
 }: ReworkPreviewProps) {
+  const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [preview, setPreview] = useState<StudioReworkPreviewReceipt | null>(null);
   const [receipt, setReceipt] = useState<StudioReworkConfirmReceipt | null>(null);
@@ -59,13 +62,41 @@ export function ReworkPreview({
   });
 
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, []);
 
   useEffect(() => {
     if (data.source === "fixture") return;
@@ -91,7 +122,7 @@ export function ReworkPreview({
       .then((nextPreview) => {
         setPreview(nextPreview);
         setCommandState("ready");
-        setMessage("影响预览已返回；当前仍不会派发远端制作。");
+        setMessage("影响范围已确认；当前尚未开始远端制作。");
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -127,7 +158,7 @@ export function ReworkPreview({
       .then((nextReceipt) => {
         setReceipt(nextReceipt);
         setCommandState("confirmed");
-        setMessage("已创建本地返工计划；状态为 planned_not_dispatched。");
+        setMessage("返工计划已保存；尚未开始远端制作。");
         onConfirmed(nextReceipt);
       })
       .catch((error: unknown) => {
@@ -142,14 +173,27 @@ export function ReworkPreview({
   };
 
   return (
-    <div className="rework-layer" role="dialog" aria-modal="true" aria-labelledby="rework-title">
-      <button className="rework-backdrop" type="button" aria-label="关闭局部返工预览" onClick={onClose} />
-      <section className="rework-panel">
+    <div className="rework-layer">
+      <button
+        className="rework-backdrop"
+        type="button"
+        tabIndex={-1}
+        aria-label="关闭局部返工预览"
+        onClick={onClose}
+      />
+      <section
+        ref={dialogRef}
+        className="rework-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rework-title"
+        aria-describedby="rework-summary"
+      >
         <header>
           <div>
             <p className="eyebrow">局部返工预览</p>
             <h2 id="rework-title">{view.title}</h2>
-            <p>{view.summary}</p>
+            <p id="rework-summary">{view.summary}</p>
           </div>
           <button
             ref={closeRef}
@@ -175,7 +219,7 @@ export function ReworkPreview({
               />
             ) : (
               <div className="media-unavailable media-unavailable--large">
-                服务端尚未提供当前候选媒体
+                当前候选尚无可预览媒体
               </div>
             )}
           </section>
@@ -191,7 +235,7 @@ export function ReworkPreview({
               />
             ) : (
               <div className="media-unavailable media-unavailable--large">
-                服务端尚未提供返工预览媒体
+                返工计划尚无可预览媒体
               </div>
             )}
           </section>
@@ -217,9 +261,9 @@ export function ReworkPreview({
 
         {receipt ? (
           <div className="rework-receipt" role="status">
-            <span>回执</span>
-            <strong>{receipt.dispatch_state}</strong>
-            <small>任务 {receipt.task_id} 已计划，远端制作派发 {receipt.provider_dispatch_count} 次。</small>
+            <span>计划状态</span>
+            <strong>返工计划已保存</strong>
+            <small>当前仅创建计划，尚未开始远端制作。</small>
           </div>
         ) : null}
 
@@ -290,28 +334,28 @@ export function reworkPreviewModel(
   const receipt = candidate.preview;
   const targetId = receipt?.target_entity_id || availability.target_entity_id || candidate.title;
   const cost = receipt?.cost_available || availability.cost_available
-    ? "服务端标记费用可用，金额尚未进入当前 v0.2 回执"
-    : "费用未知";
+    ? "费用信息尚未完整提供"
+    : "费用待确认";
 
   return {
     title: entityLabel(envelope, targetId, candidate.title),
     summary: receipt
-      ? `预览已绑定项目版本 ${receipt.graph_version}，远端制作派发 ${receipt.provider_dispatch_count} 次。`
-      : availability.reason || "服务端尚未提供局部返工预览说明。",
+      ? `影响范围已绑定项目版本 ${receipt.graph_version}；尚未开始远端制作。`
+      : publicCopy(availability.reason) || "当前项目尚未提供局部返工说明。",
     currentImageUrl: candidate.imageUrl,
     previewImageUrl: "",
     durationSeconds: Math.max(candidate.durationSeconds, 1),
     range: undefined,
     impact: receipt
-      ? labelsForRefs(envelope, receipt.impact_refs, "预览回执未返回影响对象")
-      : "等待预览回执返回后展示",
+      ? labelsForRefs(envelope, receipt.impact_refs, "影响对象待补充")
+      : "完成影响计算后展示",
     keep: receipt
-      ? labelsForRefs(envelope, receipt.keep_refs, "预览回执未返回保留对象")
-      : "等待预览回执返回后展示",
+      ? labelsForRefs(envelope, receipt.keep_refs, "保留对象待补充")
+      : "完成影响计算后展示",
     cost,
-    estimatedTime: "当前预览合同未提供耗时",
-    goal: "调整目标尚未进入当前预览回执",
-    recovery: "恢复说明尚未进入当前预览回执"
+    estimatedTime: "预计耗时暂不可用",
+    goal: "调整目标待补充",
+    recovery: "发生问题时保留当前候选"
   };
 }
 
@@ -322,7 +366,7 @@ function labelsForRefs(
 ): string {
   if (!refs.length) return fallback;
   return refs
-    .map((ref) => entityLabel(envelope, ref, "服务端对象"))
+    .map((ref) => entityLabel(envelope, ref, "当前对象"))
     .join("；");
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { StudioData } from "../api/studioAdapter";
+import { publicCopy, type StudioData } from "../api/studioAdapter";
 import type { StudioSurfaceEnvelope } from "../api/studioTypes";
 import { canvasView } from "./CanvasSurface";
 import { deliveryView } from "./DeliverySurface";
@@ -116,7 +116,7 @@ describe("live studio view models", () => {
       durationSeconds: 12,
       range: [3, 5]
     });
-    expect(pendingRework.impact).toBe("等待预览回执返回后展示");
+    expect(pendingRework.impact).toBe("完成影响计算后展示");
 
     const rework = reworkPreviewModel(data, {
       imageUrl: "",
@@ -141,9 +141,47 @@ describe("live studio view models", () => {
     });
     expect(rework.impact).toBe("真实镜头一");
     expect(rework.keep).toBe("真实场景一");
-    expect(rework.cost).toBe("费用未知");
-    expect(rework.estimatedTime).toBe("当前预览合同未提供耗时");
+    expect(rework.cost).toBe("费用待确认");
+    expect(rework.estimatedTime).toBe("预计耗时暂不可用");
+    expect(rework.summary).not.toContain("provider_dispatch_count");
+    expect(rework.summary).not.toContain("v0.2");
     expect(rework.range).toBeUndefined();
+  });
+
+  it("projects honest review-empty and delivery-blocker states", () => {
+    const data = liveData({
+      surface: "review",
+      review_queue: [],
+      artifact_summaries: [],
+      delivery_summary: {
+        state: "blocked",
+        blocker_count: 35,
+        delivery_version_id: "",
+        playable: false
+      }
+    });
+
+    const review = reviewView(data);
+    const delivery = deliveryView(data);
+
+    expect(review.isEmpty).toBe(true);
+    expect(review.projectVersion).toBe(33);
+    expect(delivery.blockerCount).toBe(35);
+    expect(delivery.blockers).toHaveLength(1);
+    expect(delivery.blockers[0]?.actionable).toBe(true);
+    expect(delivery.blockers[0]?.surface).toBe("canvas");
+    expect(delivery.primaryActionLabel).toBe("返回制作画布");
+  });
+
+  it("translates internal command states before presenting creator copy", () => {
+    const copy = publicCopy(
+      "planned_not_dispatched provider_dispatch_count graph_v1 in_progress BFF"
+    );
+
+    expect(copy).toBe(
+      "返工计划已保存，尚未开始制作 制作派发状态 项目脉络 制作中 项目数据"
+    );
+    expect(copy).not.toContain("planned_not_dispatched");
   });
 
   it("disables duplicate live rework when the service reports a planned task", () => {

@@ -78,7 +78,7 @@ function SurfaceOutlet({ data, urlState, onNavigate, onReload }: SurfaceOutletPr
       <section className="surface-state surface-state--embedded" aria-live="polite">
         <p className="eyebrow">当前工作面</p>
         <h1>还没有可显示的制作对象</h1>
-        <p>项目仍然安全保留。完成制作脉络初始化后，这里会显示服务端对象。</p>
+        <p>项目仍然安全保留。完成制作脉络初始化后，这里会显示可继续制作的内容。</p>
         <button
           className="button button--primary"
           type="button"

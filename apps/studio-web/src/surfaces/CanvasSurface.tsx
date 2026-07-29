@@ -29,9 +29,14 @@ export default function CanvasSurface({
 }: SurfaceProps) {
   const [zoom, setZoom] = useState(100);
   const view = useMemo(() => canvasView(data), [data]);
+  const focusedEntityIsVisible = view.nodes.some(
+    (item) => item.id === view.focusedEntity
+  );
   const selectedEntity = view.nodes.some((item) => item.id === urlState.entity)
     ? urlState.entity
-    : view.focusedEntity || view.nodes[0]?.id || "";
+    : focusedEntityIsVisible
+      ? view.focusedEntity
+      : view.nodes[0]?.id || "";
   const selected = view.nodes.find((item) => item.id === selectedEntity);
   const currentTask = view.nodes.find((item) => item.tone === "active");
   const primaryDisabled = !view.primaryAction.enabled;
@@ -45,8 +50,8 @@ export default function CanvasSurface({
       <section className="canvas surface">
         <div className="surface-state surface-state--embedded" aria-live="polite">
           <p className="eyebrow">制作画布</p>
-          <h1>当前服务端未返回可展示对象</h1>
-          <p>页面不会加载未由服务端提供的节点。请等待服务端返回 surface_summary 或 entities。</p>
+          <h1>当前项目还没有可展示对象</h1>
+          <p>页面不会补入虚构节点。完成剧本或分镜后，可继续在这里组织制作关系。</p>
           <button
             className="button button--primary"
             type="button"
@@ -119,7 +124,7 @@ export default function CanvasSurface({
             className="control-button"
             type="button"
             disabled={!currentTask}
-            title={currentTask ? "定位服务端标记的当前任务" : "当前投影没有进行中的任务"}
+            title={currentTask ? "定位当前制作任务" : "当前没有进行中的任务"}
             onClick={() => {
               if (currentTask) chooseEntity(currentTask.id);
             }}
@@ -188,7 +193,7 @@ export default function CanvasSurface({
             className="text-action"
             type="button"
             disabled
-            title={selected ? "服务端尚未提供对象影响详情路由" : "请先选择对象"}
+            title={selected ? "当前对象尚无可查看的影响详情" : "请先选择对象"}
           >
             查看来源与影响
           </button>
@@ -274,7 +279,7 @@ export function canvasView(data: SurfaceProps["data"]) {
     title:
       publicCopy(summary.headline) ||
       envelope.focused_entity?.label ||
-      entityLabel(envelope, focusedEntity, "服务端制作结构"),
+      entityLabel(envelope, focusedEntity, "当前制作结构"),
     subtitle: `${summary.entity_count} 个对象 · ${summary.attention_count} 个需注意`,
     primaryAction: {
       label: primaryCandidate
@@ -326,7 +331,7 @@ function liveScenes(
       const duration = sumDurations(childNodes);
       return {
         id: entity.entity_id,
-        label: entity.label || entityById.get(entity.entity_id)?.label || "服务端分组",
+        label: entity.label || entityById.get(entity.entity_id)?.label || "当前分组",
         duration,
         durationLabel: duration === null ? `${childNodes.length} 个对象` : `${duration} 秒`,
         nodes: childNodes
@@ -340,7 +345,7 @@ function liveScenes(
   return [
     {
       id: "live-entities",
-      label: "服务端制作对象",
+      label: "当前制作对象",
       duration,
       durationLabel: duration === null ? `${fallbackNodes.length} 个对象` : `${duration} 秒`,
       nodes: fallbackNodes

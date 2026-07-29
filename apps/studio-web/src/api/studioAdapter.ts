@@ -46,7 +46,11 @@ export function publicCopy(value: string | undefined, fallback = ""): string {
   return text
     .replaceAll("当前工作面已从 ProductionGraph 投影", "当前工作面已由项目脉络确认")
     .replaceAll("ProductionGraph", "项目脉络")
-    .replace(/\bBFF\b/g, "服务端")
+    .replace(/\bBFF\b/g, "项目数据")
+    .replaceAll("planned_not_dispatched", "返工计划已保存，尚未开始制作")
+    .replace(/\bprovider_dispatch_count\b/g, "制作派发状态")
+    .replace(/\bgraph_v1\b/g, "项目脉络")
+    .replace(/\bin_progress\b/g, "制作中")
     .replaceAll("adopted video/delivery", "已采用视频或交付记录")
     .replace(/\bpreview\b/g, "预览");
 }
@@ -75,7 +79,7 @@ export function liveNotice(data: StudioData): string {
   if (data.envelope.authority_mode === "legacy_file") {
     return "项目尚未建立制作脉络";
   }
-  return `服务端已确认 · 版本 ${data.envelope.project_version}`;
+  return `项目已同步 · 版本 ${data.envelope.project_version}`;
 }
 
 export function entityById(
@@ -90,7 +94,7 @@ export function entityById(
 export function entityLabel(
   envelope: StudioSurfaceEnvelope,
   entityId: string | undefined,
-  fallback = "服务端对象"
+  fallback = "当前对象"
 ): string {
   const entity = entityById(envelope, entityId);
   const label = String(entity?.label ?? "").trim();

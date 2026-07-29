@@ -36,7 +36,7 @@ export default function PlaceholderSurface({
         <IconListDetails aria-hidden="true" size={28} />
         {entities.length ? (
           <>
-            <h2>服务端对象摘要</h2>
+            <h2>当前对象摘要</h2>
             <ul>
               {entities.map((entity) => (
                 <li key={entity.entity_id}>

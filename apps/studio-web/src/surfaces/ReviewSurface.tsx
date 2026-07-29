@@ -45,6 +45,34 @@ export default function ReviewSurface({
     onNavigate({ candidate: id, entity: entityId ?? nextCandidate?.entityId ?? id });
   };
 
+  if (view.isEmpty) {
+    return (
+      <section className="review review--empty surface">
+        <div className="review-empty">
+          <span className="review-empty__icon" aria-hidden="true">
+            <IconCircleCheck size={26} stroke={1.6} />
+          </span>
+          <p className="eyebrow">生成审核</p>
+          <h1>当前没有待审核内容</h1>
+          <p>
+            所有真实候选都已处理，或当前项目尚未形成候选。
+            这里不会把普通项目对象当成候选展示。
+          </p>
+          <span className="review-empty__meta">
+            项目版本 {view.projectVersion} 已同步
+          </span>
+          <button
+            className="button button--primary"
+            type="button"
+            onClick={() => onNavigate({ surface: "canvas", candidate: "", entity: "" })}
+          >
+            返回制作画布
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="review surface">
       <aside className="review-queue" aria-label="审核队列">
@@ -82,7 +110,7 @@ export default function ReviewSurface({
           </section>
         ))}
         {queueTotal === 0 ? (
-          <p className="empty-inline">当前服务端没有返回审核队列。</p>
+          <p className="empty-inline">当前项目没有待审核内容。</p>
         ) : null}
         <span className="queue-total">共 {queueTotal} 个待处理对象</span>
       </aside>
@@ -113,7 +141,7 @@ export default function ReviewSurface({
         ) : (
           <div className="media-unavailable media-unavailable--large">
             <IconPhoto aria-hidden="true" size={28} />
-            当前服务端尚未提供受控媒体地址
+            当前候选尚无可预览媒体
           </div>
         )}
 
@@ -136,7 +164,7 @@ export default function ReviewSurface({
             ))}
           </section>
         ) : (
-          <p className="empty-inline">当前真实投影没有候选版本，不补入未由服务端提供的候选。</p>
+          <p className="empty-inline">当前项目没有候选版本，页面不会补入虚构候选。</p>
         )}
 
         <div className="review-detail-grid">
@@ -156,7 +184,7 @@ export default function ReviewSurface({
                 ))}
               </ul>
             ) : (
-              <p className="empty-inline">服务端尚未提供结构化质量检查。</p>
+              <p className="empty-inline">当前候选尚无结构化质量检查。</p>
             )}
           </section>
           <section>
@@ -170,7 +198,7 @@ export default function ReviewSurface({
             className="button button--primary button--large"
             type="button"
             disabled
-            title="服务端尚未提供候选采用确认路由"
+            title="当前候选尚不支持确认采用"
           >
             确认采用
           </button>
@@ -179,7 +207,7 @@ export default function ReviewSurface({
             className="button button--quiet"
             type="button"
             disabled
-            title="服务端尚未提供候选对比路由"
+            title="当前候选尚不支持版本对比"
           >
             <IconArrowsDiff aria-hidden="true" size={18} />
             对比上一版
@@ -262,6 +290,8 @@ export function reviewView(data: SurfaceProps["data"]) {
           : "上一版用于比较，不会覆盖当前查看。"
       }));
     return {
+      isEmpty: false,
+      projectVersion: fixture.project.projectVersion,
       header: {
         breadcrumb: "第二场 · 灯塔警示 / 镜头 03",
         title: "灯塔远景",
@@ -317,7 +347,7 @@ export function reviewView(data: SurfaceProps["data"]) {
     id: item.artifact_id,
     entityId: item.artifact_id,
     label: `候选版本 ${item.version}`,
-    note: item.selected ? "服务端标记为已采用" : stateLabel(item.state),
+    note: item.selected ? "项目记录为已采用" : stateLabel(item.state),
     duration: 0,
     durationLabel: "",
     imageUrl: "",
@@ -335,12 +365,14 @@ export function reviewView(data: SurfaceProps["data"]) {
     envelope.entities.find((item) => item.entity_id === envelope.resume_target.entity_id) ??
     null;
   return {
+    isEmpty: envelope.review_queue.length === 0 && envelope.artifact_summaries.length === 0,
+    projectVersion: envelope.project_version,
     header: {
       breadcrumb: publicCopy(envelope.surface_summary.headline, "生成审核"),
       title: focused?.label || "暂无待审核候选",
       status: envelope.review_queue.length ? "待审核" : "只读",
       tone: envelope.review_queue.length ? "warning" : "muted",
-      adoptionLabel: envelope.review_queue.length ? "等待服务端决定" : "没有候选回执"
+      adoptionLabel: envelope.review_queue.length ? "等待你的决定" : "没有候选记录"
     },
     candidates,
     queue: [
@@ -349,7 +381,7 @@ export function reviewView(data: SurfaceProps["data"]) {
         items: data.envelope.review_queue.map((item) => ({
           id: item.review_id,
           entityId: item.target_entity_id,
-          label: entityLabel(envelope, item.target_entity_id, "服务端候选对象"),
+          label: entityLabel(envelope, item.target_entity_id, "当前候选"),
           note: stateLabel(item.state),
           candidateId: candidateByEntity.get(item.target_entity_id) ?? item.target_entity_id,
           imageUrl: "",
@@ -366,7 +398,7 @@ export function reviewView(data: SurfaceProps["data"]) {
         : "等待局部返工预览",
     reworkReason:
       publicCopy(envelope.rework_preview.reason) ||
-      "服务端尚未提供局部返工预览回执，不能展示影响、费用或耗时。"
+      "当前项目尚未形成局部返工预览，不能展示影响、费用或耗时。"
   };
 }
 

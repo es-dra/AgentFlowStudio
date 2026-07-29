@@ -36,7 +36,7 @@ export default function OverviewSurface({
           <p>{view.episode}</p>
           <div className="inline-facts">
             <span><IconProgress aria-hidden="true" size={16} />{view.projectStatus}</span>
-            <span>{view.targetDuration === null ? "目标总时长待服务端提供" : `目标总时长 ${formatSeconds(view.targetDuration)}`}</span>
+            <span>{view.targetDuration === null ? "目标总时长待项目补充" : `目标总时长 ${formatSeconds(view.targetDuration)}`}</span>
             <span>项目版本 {projectVersion(data)}</span>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function OverviewSurface({
                 <span className="work-list__number work-list__number--muted">0</span>
                 <div>
                   <strong>没有待处理队列</strong>
-                  <small>当前服务端未返回审核候选或下一步工作。</small>
+                  <small>当前项目没有待审核候选或下一步工作。</small>
                 </div>
               </li>
             )}
@@ -184,7 +184,7 @@ export default function OverviewSurface({
             </ul>
           ) : (
             <p className="empty-inline">
-              当前服务端尚未提供最近变化摘要。
+              当前项目尚未形成最近变化摘要。
             </p>
           )}
         </section>
@@ -231,7 +231,7 @@ export function overviewView(data: SurfaceProps["data"]) {
         mediaUrl: fixture.shots[2]?.imageUrl ?? "",
         mediaAlt: "当前合成版本预览",
         actionLabel: "播放当前版本",
-        emptyText: "当前服务端尚未提供受控媒体地址"
+        emptyText: "当前项目尚无可预览媒体"
       },
       coverage: [
         { label: "资产覆盖", value: `${adoptedAssets}/${fixture.assets.length}`, note: "1 项待审核" },
@@ -284,16 +284,16 @@ export function overviewView(data: SurfaceProps["data"]) {
       candidate: primaryCandidate,
       entity: primaryEntity,
       enabled: envelope.resume_target.available,
-      help: envelope.resume_target.reason || (pendingItem ? "前往服务端审核队列中的候选" : "当前没有审核候选，先查看制作画布")
+      help: envelope.resume_target.reason || (pendingItem ? "前往审核队列中的候选" : "当前没有审核候选，先查看制作画布")
     },
     decision: pendingItem
       ? {
-          title: entityLabel(envelope, pendingItem.target_entity_id, "服务端候选对象"),
+          title: entityLabel(envelope, pendingItem.target_entity_id, "当前候选"),
           status: pendingItem.state,
           tone: "warning",
           description: pendingItem.evidence_refs.length
-            ? "服务端提供了候选证据引用；前往审核工作面查看。"
-            : "服务端尚未提供结构化质量说明；只能查看候选身份，不能采用或返工。",
+            ? "候选已有可追溯证据；前往审核工作面查看。"
+            : "当前候选尚无结构化质量说明；只能查看候选身份，不能采用或返工。",
           actionLabel: "查看候选与影响",
           enabled: true,
           surface: "review" as AppSurface,
@@ -304,7 +304,7 @@ export function overviewView(data: SurfaceProps["data"]) {
           title: "当前没有待审核候选",
           status: "只读",
           tone: "muted",
-          description: "服务端未返回审核队列。页面不会显示未由服务端提供的镜头、秒数或候选说明。",
+          description: "当前没有审核队列。页面不会编造镜头、秒数或候选说明。",
           actionLabel: "等待审核回执",
           enabled: false,
           surface: "review" as AppSurface,
@@ -313,11 +313,11 @@ export function overviewView(data: SurfaceProps["data"]) {
         },
     delivery: {
       title: hasDelivery && delivery.delivery_version_id
-          ? "服务端交付版本"
+          ? "当前交付版本"
         : "尚未形成可播放交付",
       playableDuration,
       mediaUrl: "",
-      mediaAlt: "服务端交付媒体预览",
+      mediaAlt: "当前交付媒体预览",
       actionLabel: "播放当前版本",
       emptyText: hasDelivery
         ? "当前交付投影没有受控媒体地址"
@@ -326,16 +326,16 @@ export function overviewView(data: SurfaceProps["data"]) {
     coverage: [
       { label: "工作面对象", value: String(summary.entity_count), note: publicCopy(summary.headline) },
       { label: "待审核", value: String(pending), note: "不在前端推断采用数量" },
-      { label: "制作任务", value: String(envelope.task_summaries.length), note: "服务端任务摘要" },
+      { label: "制作任务", value: String(envelope.task_summaries.length), note: "当前任务摘要" },
       {
         label: "交付状态",
         value: stateLabel(delivery.state),
-        note: delivery.playable ? "服务端标记可播放" : "当前没有可播放交付"
+        note: delivery.playable ? "当前版本可播放" : "当前没有可播放交付"
       }
     ],
     nextWork: envelope.review_queue.length
       ? envelope.review_queue.slice(0, 3).map((item) => ({
-          label: entityLabel(envelope, item.target_entity_id, "服务端候选对象"),
+          label: entityLabel(envelope, item.target_entity_id, "当前候选"),
           note: item.state,
           tone: "warning"
         }))

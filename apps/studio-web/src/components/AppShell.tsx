@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   IconArrowBackUp,
   IconChevronLeft,
@@ -50,6 +50,7 @@ export function AppShell({
   onNavigate
 }: AppShellProps) {
   const [agentOpen, setAgentOpen] = useState(false);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -58,6 +59,14 @@ export function AppShell({
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
+
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center"
+    });
+  }, [surface]);
 
   const name = data ? projectName(data) : "正在读取项目";
   const checkpoint = data ? projectCheckpoint(data) : "读取检查点";
@@ -83,7 +92,7 @@ export function AppShell({
           className="toolbar-button"
           type="button"
           disabled
-          title="当前服务端没有撤销入口"
+          title="当前项目尚未提供撤销能力"
         >
           <IconArrowBackUp aria-hidden="true" size={18} />
           撤销
@@ -92,7 +101,7 @@ export function AppShell({
           className="toolbar-button"
           type="button"
           disabled
-          title="当前服务端没有恢复入口"
+          title="当前项目尚未提供恢复能力"
         >
           恢复
         </button>
@@ -140,6 +149,7 @@ export function AppShell({
 
       <nav className="surface-nav" aria-label="项目工作面">
         <button
+          ref={surface === "overview" ? activeTabRef : undefined}
           className={surface === "overview" ? "surface-tab is-active" : "surface-tab"}
           type="button"
           aria-current={surface === "overview" ? "page" : undefined}
@@ -151,6 +161,7 @@ export function AppShell({
         {studioSurfaces.map((item) => (
           <button
             key={item}
+            ref={surface === item ? activeTabRef : undefined}
             className={surface === item ? "surface-tab is-active" : "surface-tab"}
             type="button"
             aria-current={surface === item ? "page" : undefined}
@@ -227,7 +238,7 @@ function AgentContent({
         <span>依据</span>
         <p>
           {data?.source === "live"
-            ? `基于服务端版本 ${data.envelope.agent_summary.based_on_project_version}`
+            ? `基于项目版本 ${data.envelope.agent_summary.based_on_project_version}`
             : "基于界面样例版本 32，不会直接执行操作"}
         </p>
       </section>
@@ -244,14 +255,14 @@ function agentCopy(surface: AppSurface, data: StudioData | null) {
       null;
     const target =
       focused?.label ||
-      (envelope.agent_summary.entity_id ? "服务端对象" : surfaceLabel(surface));
+      (envelope.agent_summary.entity_id ? "当前制作对象" : surfaceLabel(surface));
     const headline = publicCopy(envelope.agent_summary.headline || envelope.surface_summary.headline);
     return {
       object: target,
-      reason: headline || "服务端尚未提供当前工作面的助手建议。",
+      reason: headline || "当前项目尚未提供这个工作面的助手建议。",
       suggestion:
         envelope.agent_summary.state === "attention_required"
-          ? "先处理服务端标记的注意事项；所有写动作仍保持关闭。"
+          ? "先处理当前注意事项；未经确认的写动作仍保持关闭。"
           : "查看当前投影内容；缺少回执的动作不会执行。"
     };
   }
@@ -284,7 +295,7 @@ function agentCopy(surface: AppSurface, data: StudioData | null) {
     default:
       return {
         object: "当前工作面",
-        reason: "服务端已保留项目上下文。",
+        reason: "项目已保留当前制作上下文。",
         suggestion: "查看当前对象摘要，或返回制作画布继续。"
       };
   }

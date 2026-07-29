@@ -1079,6 +1079,57 @@ p {
   grid-template-columns: 304px minmax(0, 1fr);
 }
 
+.review--empty {
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  min-height: 100%;
+  padding: clamp(32px, 8vh, 88px) 24px;
+}
+
+.review-empty {
+  display: grid;
+  justify-items: center;
+  width: min(100%, 620px);
+  border: 1px solid var(--line);
+  border-radius: var(--media-radius);
+  padding: clamp(36px, 6vw, 64px);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(64, 191, 161, 0.09), transparent 48%),
+    var(--surface-1);
+  text-align: center;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+}
+
+.review-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(98, 211, 180, 0.32);
+  border-radius: 50%;
+  color: var(--success);
+  background: rgba(58, 139, 118, 0.12);
+}
+
+.review-empty h1 {
+  margin-top: 8px;
+  font-size: clamp(26px, 4vw, 36px);
+}
+
+.review-empty > p:not(.eyebrow) {
+  max-width: 510px;
+  margin-top: 14px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.review-empty__meta {
+  margin: 20px 0 24px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .review-queue {
   display: flex;
   flex-direction: column;
