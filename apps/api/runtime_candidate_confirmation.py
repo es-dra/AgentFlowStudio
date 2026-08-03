@@ -47,7 +47,9 @@ from apps.api.runtime_script_improved_extraction import (
     ExtractStatus,
     ExtractedItem,
     ExtractionResult,
+    ScriptProfileFacetExtraction,
     extract_characters_and_scenes,
+    extract_script_profile_facets,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -110,7 +112,7 @@ class CandidateReviewItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fact_id: str
-    entity_kind: Literal["character", "scene"]
+    entity_kind: Literal["character", "scene", "script_profile"]
     entity_id: str
     field_path: str
     text: str
@@ -136,7 +138,7 @@ class MissingSlotItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slot_id: str
-    entity_kind: Literal["character", "scene"]
+    entity_kind: Literal["character", "scene", "script_profile"]
     field_path: str
     message: str
     status: Literal["missing"] = "missing"
@@ -297,9 +299,44 @@ def extracted_item_to_candidate_fact(
     )
 
 
+def script_profile_facet_to_candidate_fact(
+    facet: ScriptProfileFacetExtraction,
+    *,
+    entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+    source_text: str,
+) -> CandidateFact:
+    item = facet.item
+    status = _status_from_extract(item.status)
+    spans = _evidence_for(source_text, item.evidence or item.text)
+    if status == CandidateStatus.MISSING:
+        spans = []
+    return CandidateFact(
+        fact_id=_id("fact"),
+        entity_kind="script_profile",
+        entity_id=entity_id,
+        field_path=facet.field_path,
+        claim=ClaimedText(
+            text=item.text,
+            confidence=item.confidence,
+            evidence_spans=spans,
+            uncertainty_note=facet.uncertainty_note,
+        ),
+        status=status,
+        project_id=project_id,
+        source_revision_id=source_revision_id,
+        source_revision_digest=source_revision_digest,
+        producer="deterministic_extractor",
+        produced_at=_now(),
+    )
+
+
 def build_review_bundle_from_extraction(
     extraction: ExtractionResult,
     *,
+    script_profile_facets: list[ScriptProfileFacetExtraction] | None = None,
     source_text: str,
     project_id: str,
     source_revision_id: str,
@@ -338,6 +375,26 @@ def build_review_bundle_from_extraction(
         )
         facts.append(fact)
         items.append(_fact_to_review_item(fact, producer_method=sc.method, decision=decisions.get(fact.fact_id)))
+
+    profile_revision_key = hashlib.sha256(source_revision_id.encode("utf-8")).hexdigest()[:24]
+    profile_entity_id = f"script_profile_{profile_revision_key}"
+    for facet in script_profile_facets or []:
+        fact = script_profile_facet_to_candidate_fact(
+            facet,
+            entity_id=profile_entity_id,
+            project_id=project_id,
+            source_revision_id=source_revision_id,
+            source_revision_digest=digest,
+            source_text=source_text,
+        )
+        facts.append(fact)
+        items.append(
+            _fact_to_review_item(
+                fact,
+                producer_method=facet.item.method,
+                decision=decisions.get(fact.fact_id),
+            )
+        )
 
     if extraction.character_name_status == ExtractStatus.MISSING:
         missing.append(
@@ -411,9 +468,11 @@ def open_ledger_from_extraction(
     title_hint: str | None = None,
 ) -> tuple[FactLedger, CandidateReviewBundle]:
     extraction = extract_characters_and_scenes(source_text)
+    script_profile_facets = extract_script_profile_facets(source_text)
     digest = revision_digest(source_text)
     bundle, facts = build_review_bundle_from_extraction(
         extraction,
+        script_profile_facets=script_profile_facets,
         source_text=source_text,
         project_id=project_id,
         source_revision_id=source_revision_id,
@@ -473,6 +532,37 @@ def _require_pending(ledger: FactLedger, fact_id: str) -> CandidateFact:
     return ledger.candidates[fact_id]
 
 
+def _supersede_matching_authority(
+    ledger: FactLedger,
+    candidate: CandidateFact,
+    *,
+    when: datetime,
+) -> list[AuthoritativeFactRecord]:
+    superseded: list[AuthoritativeFactRecord] = []
+    for record in ledger.authoritative_records:
+        if (
+            record.validity == AuthorityValidity.ACTIVE
+            and record.fact.entity_id == candidate.entity_id
+            and record.fact.field_path == candidate.field_path
+            and record.fact.source_revision_id == ledger.current_revision_id
+        ):
+            record.validity = AuthorityValidity.SUPERSEDED
+            record.invalidated_at = when
+            superseded.append(record)
+    return superseded
+
+
+def _link_superseded_authority(
+    record: AuthoritativeFactRecord,
+    superseded: list[AuthoritativeFactRecord],
+) -> None:
+    if not superseded:
+        return
+    record.supersedes_record_id = superseded[-1].record_id
+    for prior in superseded:
+        prior.superseded_by_record_id = record.record_id
+
+
 def accept_candidate(
     ledger: FactLedger,
     fact_id: str,
@@ -493,7 +583,9 @@ def accept_candidate(
     )
     ledger.candidates[fact_id] = confirmed
     auth = promote_candidate_fact(confirmed, authoritative_fact_id=_id("auth"), promoted_at=when)
+    superseded = _supersede_matching_authority(ledger, confirmed, when=when)
     record = AuthoritativeFactRecord(record_id=_id("arec"), fact=auth)
+    _link_superseded_authority(record, superseded)
     ledger.authoritative_records.append(record)
     ledger.review_decisions[fact_id] = ReviewDecision.ACCEPTED
     ledger.append_change(
@@ -552,26 +644,9 @@ def edit_and_confirm_candidate(
     )
     ledger.candidates[fact_id] = updated
     auth = promote_candidate_fact(updated, authoritative_fact_id=_id("auth"), promoted_at=when)
-    prior_id: str | None = None
-    for rec in ledger.authoritative_records:
-        if (
-            rec.validity == AuthorityValidity.ACTIVE
-            and rec.fact.entity_id == updated.entity_id
-            and rec.fact.field_path == updated.field_path
-            and rec.fact.source_revision_id == ledger.current_revision_id
-        ):
-            rec.validity = AuthorityValidity.SUPERSEDED
-            rec.invalidated_at = when
-            prior_id = rec.record_id
-    record = AuthoritativeFactRecord(
-        record_id=_id("arec"),
-        fact=auth,
-        supersedes_record_id=prior_id,
-    )
-    if prior_id:
-        for rec in ledger.authoritative_records:
-            if rec.record_id == prior_id:
-                rec.superseded_by_record_id = record.record_id
+    superseded = _supersede_matching_authority(ledger, updated, when=when)
+    record = AuthoritativeFactRecord(record_id=_id("arec"), fact=auth)
+    _link_superseded_authority(record, superseded)
     ledger.authoritative_records.append(record)
     ledger.review_decisions[fact_id] = ReviewDecision.EDITED_AND_CONFIRMED
     ledger.append_change(
@@ -687,12 +762,18 @@ def resolve_for_downstream(
     auth = list_current_authoritative(ledger, revision_id=rev)
     auth_chars = [f.text for f in auth if f.entity_kind == "character"]
     auth_scenes = [f.text for f in auth if f.entity_kind == "scene"]
+    auth_profile = {
+        f.field_path.removeprefix("script_profile."): f.text
+        for f in auth
+        if f.entity_kind == "script_profile"
+    }
     raw_chars = list(fresh_extraction.character_texts()) if fresh_extraction else []
     raw_scenes = list(fresh_extraction.scene_texts()) if fresh_extraction else []
     return {
         "revision_id": rev,
         "characters": auth_chars or raw_chars,
         "scenes": auth_scenes or raw_scenes,
+        "script_profile": auth_profile,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
         "raw_extraction_characters": raw_chars,

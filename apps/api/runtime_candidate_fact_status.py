@@ -173,7 +173,7 @@ def status_may_enter_production_graph(status: CandidateStatus) -> bool:
 
 
 class CandidateFact(BaseModel):
-    """One candidate understanding claim for Character (today) fields.
+    """One candidate understanding claim for a supported script entity field.
 
     Wraps ClaimedText and adds the status machine + script-revision binding
     that yesterday's ClaimedText alone did not enforce.
@@ -184,13 +184,12 @@ class CandidateFact(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION, min_length=1, max_length=80)
 
     fact_id: str = Field(min_length=1, max_length=120)
-    # character = day-1 scope; scene added so confirmation-loop can correct scene names
-    entity_kind: Literal["character", "scene"] = "character"
+    entity_kind: Literal["character", "scene", "script_profile"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(
         min_length=1,
         max_length=160,
-        description="e.g. 'identity.display_name' — Character only today",
+        description="e.g. 'identity.display_name' or 'script_profile.theme'",
     )
 
     # Wrapped soft claim (text + confidence + evidence spans)
@@ -302,7 +301,7 @@ class AuthoritativeScriptFact(BaseModel):
     authoritative_fact_id: str = Field(min_length=1, max_length=120)
     source_candidate_fact_id: str = Field(min_length=1, max_length=120)
 
-    entity_kind: Literal["character", "scene"] = "character"
+    entity_kind: Literal["character", "scene", "script_profile"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(min_length=1, max_length=160)
 

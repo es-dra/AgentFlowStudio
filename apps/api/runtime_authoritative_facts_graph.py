@@ -2,9 +2,10 @@
 
 Gate: AFS_CANDIDATE_FACTS_FEED_PRODUCTION_GRAPH (default off).
 
-When enabled, confirmed authoritative character/scene facts can be appended as
-graph nodes via ProductionGraphStore.append. This does NOT replace the M6
-confirm → compile_film_candidate path; it is an independent side channel.
+When enabled, confirmed authoritative character/scene/script-profile facts can
+be appended as graph nodes via ProductionGraphStore.append. This does NOT
+replace the M6 confirm → compile_film_candidate path; it is an independent side
+channel.
 
 Only AuthoritativeScriptFact values are accepted — never CandidateFact /
 missing / conflicting rows.
@@ -42,6 +43,15 @@ def namespaced_revision_nodes_enabled(env: Mapping[str, str] | None = None) -> b
 def authoritative_fact_graph_node_id(fact: AuthoritativeScriptFact) -> str:
     """Stable graph node id derived from the authoritative fact identity."""
 
+    if fact.entity_kind == "script_profile":
+        facet_key = canonical_digest(
+            {
+                "entity_kind": fact.entity_kind,
+                "entity_id": fact.entity_id,
+                "field_path": fact.field_path,
+            }
+        )[:24]
+        return f"authfact-script_profile-{facet_key}"
     return f"authfact-{fact.entity_kind}-{fact.authoritative_fact_id}"
 
 
@@ -104,7 +114,11 @@ def compile_authoritative_facts_to_graph_events(
 
     for fact in facts:
         node_id = authoritative_fact_graph_node_id(fact)
-        category = "entity" if fact.entity_kind == "character" else "location"
+        category = {
+            "character": "entity",
+            "scene": "location",
+            "script_profile": "profile",
+        }[fact.entity_kind]
         metadata: dict[str, Any] = {
             "source": "authoritative_script_fact_feed",
             "authoritative_fact_id": fact.authoritative_fact_id,
@@ -120,8 +134,10 @@ def compile_authoritative_facts_to_graph_events(
         }
         if fact.entity_kind == "character":
             metadata["display_name"] = fact.text
-        else:
+        elif fact.entity_kind == "scene":
             metadata["name"] = fact.text
+        else:
+            metadata["value"] = fact.text
         if fact.human_confirmed_by:
             metadata["human_confirmed_by"] = fact.human_confirmed_by
         if fact.deterministic_check_id:

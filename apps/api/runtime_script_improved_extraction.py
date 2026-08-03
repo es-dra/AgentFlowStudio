@@ -1,11 +1,11 @@
-"""Improved Character + Scene extraction (shadow / compare path).
+"""Improved Character + Scene + ScriptProfile extraction.
 
 Promoted from docs/internal-notes/draft_improved_extraction_20260802.py.
 
-Used only as a feature-flagged *shadow* beside M6's legacy
-`_extract_named_characters` / `_extract_scenes`. It must not replace those
-results or write Production Graph. See `AFS_USE_IMPROVED_EXTRACTION` in
-`runtime_m6_script_plan_asset_bible.py`.
+Character/Scene results remain a feature-flagged shadow beside M6's legacy
+extractors. ScriptProfile facets are consumed only by the candidate confirmation
+refresh path, which requires both AFS_USE_IMPROVED_EXTRACTION and
+AFS_USE_CANDIDATE_CONFIRMATION_LOOP. Raw extraction never writes Production Graph.
 
 Hard rules
 ----------
@@ -14,6 +14,7 @@ Hard rules
 3. Verb-prefix name grab (「苏晴没说话」→「苏晴没」) is intentionally NOT used.
 4. 「在柜台前」direction fragments are rejected as scene names.
 5. Generic roles (女人/男人…) without a proper name → missing, not a fake name.
+6. ScriptProfile accepts explicit metadata label lines only; never infer from plot.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 
 SCHEMA_VERSION = "afs.script_understanding.improved_extraction.v0.1"
@@ -39,6 +41,25 @@ class ExtractedItem:
     confidence: float
     method: str
     evidence: str = ""
+
+
+ScriptProfileFacetName = Literal[
+    "theme",
+    "genre",
+    "audience",
+    "narrative_goals",
+    "style_requirements",
+]
+
+
+@dataclass(frozen=True)
+class ScriptProfileFacetExtraction:
+    """One labeled-only ScriptProfile facet for the shared candidate ledger."""
+
+    facet: ScriptProfileFacetName
+    field_path: str
+    item: ExtractedItem
+    uncertainty_note: str | None = None
 
 
 @dataclass
@@ -172,6 +193,46 @@ _TIME_OF_DAY = frozenset(
 )
 
 _INT_EXT = frozenset({"内景", "外景", "内", "外", "INT", "EXT", "int", "ext"})
+
+_SCRIPT_PROFILE_LABEL_PATTERNS: dict[ScriptProfileFacetName, re.Pattern[str]] = {
+    "theme": re.compile(
+        r"^[ \t]*(?:主题|主旨|Theme)[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "genre": re.compile(
+        r"^[ \t]*(?:类型|题材|Genres?)[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "audience": re.compile(
+        r"^[ \t]*(?:受众|目标观众|观众|分级|Audience|Rating)"
+        r"[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "narrative_goals": re.compile(
+        r"^[ \t]*(?:叙事目标|创作意图|故事目标|Narrative[ \t]*goals?)"
+        r"[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "style_requirements": re.compile(
+        r"^[ \t]*(?:风格要求|风格|视觉风格|Style(?:[ \t]*requirements?)?)"
+        r"[ \t]*[:：][ \t]*(.*?)[ \t]*$",
+        re.I | re.M,
+    ),
+}
+
+_SCRIPT_PROFILE_MISSING_NOTES: dict[ScriptProfileFacetName, str] = {
+    "theme": "no explicit 主题/主旨 label; refusing plot-level theme inference",
+    "genre": "no explicit 类型/题材 label; refusing genre classification from story vibe",
+    "audience": "no explicit 受众/分级 label; refusing audience inference",
+    "narrative_goals": "no explicit 叙事目标/创作意图 label; refusing narrative-goal inference",
+    "style_requirements": "no explicit 风格/风格要求 label; refusing visual-style inference",
+}
+
+_SCRIPT_PROFILE_FIELD_PATHS: dict[ScriptProfileFacetName, str] = {
+    facet: f"script_profile.{facet}" for facet in _SCRIPT_PROFILE_LABEL_PATTERNS
+}
+
+_EXPLICITLY_MISSING_PROFILE_VALUES = frozenset({"无", "未知", "待定", "n/a"})
 
 
 # ---------------------------------------------------------------------------
@@ -500,6 +561,55 @@ def extract_scenes(text: str) -> tuple[list[ExtractedItem], list[str]]:
 
 
 # ---------------------------------------------------------------------------
+# ScriptProfile extractor
+# ---------------------------------------------------------------------------
+
+
+def extract_script_profile_facets(text: str) -> list[ScriptProfileFacetExtraction]:
+    """Extract five ScriptProfile facets from explicit metadata label lines only."""
+
+    source = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    facets: list[ScriptProfileFacetExtraction] = []
+    for facet, pattern in _SCRIPT_PROFILE_LABEL_PATTERNS.items():
+        match = pattern.search(source)
+        value = match.group(1).strip() if match else ""
+        if value and value.lower() not in _EXPLICITLY_MISSING_PROFILE_VALUES:
+            facets.append(
+                ScriptProfileFacetExtraction(
+                    facet=facet,
+                    field_path=_SCRIPT_PROFILE_FIELD_PATHS[facet],
+                    item=ExtractedItem(
+                        text=value[:2000],
+                        status=ExtractStatus.EXTRACTED_FROM_TEXT,
+                        confidence=0.9,
+                        method=f"labeled_script_profile_{facet}",
+                        evidence=match.group(0).strip()[:1200],
+                    ),
+                )
+            )
+            continue
+        note = (
+            f"explicit {facet} label has no supported value"
+            if match
+            else _SCRIPT_PROFILE_MISSING_NOTES[facet]
+        )
+        facets.append(
+            ScriptProfileFacetExtraction(
+                facet=facet,
+                field_path=_SCRIPT_PROFILE_FIELD_PATHS[facet],
+                item=ExtractedItem(
+                    text="(missing)",
+                    status=ExtractStatus.MISSING,
+                    confidence=0.0,
+                    method="explicit_script_profile_label_missing",
+                ),
+                uncertainty_note=note,
+            )
+        )
+    return facets
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -558,9 +668,12 @@ __all__ = (
     "SCHEMA_VERSION",
     "ExtractStatus",
     "ExtractedItem",
+    "ScriptProfileFacetName",
+    "ScriptProfileFacetExtraction",
     "ExtractionResult",
     "extract_characters",
     "extract_scenes",
+    "extract_script_profile_facets",
     "extract_characters_and_scenes",
     "extracted_item_to_dict",
     "extraction_result_to_dict",
