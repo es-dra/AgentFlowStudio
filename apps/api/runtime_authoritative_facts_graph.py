@@ -13,6 +13,7 @@ missing / conflicting rows.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any, Mapping
@@ -44,7 +45,7 @@ def namespaced_revision_nodes_enabled(env: Mapping[str, str] | None = None) -> b
 def authoritative_fact_graph_node_id(fact: AuthoritativeScriptFact) -> str:
     """Stable graph node id derived from the authoritative fact identity."""
 
-    if fact.entity_kind in {"script_profile", "beat"}:
+    if fact.entity_kind in {"script_profile", "script_format_profile", "beat"}:
         facet_key = canonical_digest(
             {
                 "entity_kind": fact.entity_kind,
@@ -119,6 +120,7 @@ def compile_authoritative_facts_to_graph_events(
             "character": "entity",
             "scene": "location",
             "script_profile": "profile",
+            "script_format_profile": "profile",
             "beat": "beat",
         }[fact.entity_kind]
         metadata: dict[str, Any] = {
@@ -140,6 +142,19 @@ def compile_authoritative_facts_to_graph_events(
             metadata["name"] = fact.text
         elif fact.entity_kind == "script_profile":
             metadata["value"] = fact.text
+        elif fact.entity_kind == "script_format_profile":
+            facet = fact.field_path.removeprefix("script_format_profile.")
+            metadata["profile_facet"] = facet
+            if facet == "scene_boundary_count" and fact.text.isdecimal():
+                metadata["value"] = int(fact.text)
+            elif facet == "cleaning_notes":
+                try:
+                    parsed = json.loads(fact.text)
+                except json.JSONDecodeError:
+                    parsed = fact.text
+                metadata["value"] = parsed if isinstance(parsed, list) else fact.text
+            else:
+                metadata["value"] = fact.text
         else:
             ownership = re.fullmatch(
                 r"scene\[(?P<scene_id>.+)\]\.beats\[(?P<order_index>\d+)\]\.(?P<slot>.+)",

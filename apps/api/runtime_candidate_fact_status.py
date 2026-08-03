@@ -184,7 +184,9 @@ class CandidateFact(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION, min_length=1, max_length=80)
 
     fact_id: str = Field(min_length=1, max_length=120)
-    entity_kind: Literal["character", "scene", "script_profile", "beat"] = "character"
+    entity_kind: Literal[
+        "character", "scene", "script_profile", "script_format_profile", "beat"
+    ] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(
         min_length=1,
@@ -304,7 +306,9 @@ class AuthoritativeScriptFact(BaseModel):
     authoritative_fact_id: str = Field(min_length=1, max_length=120)
     source_candidate_fact_id: str = Field(min_length=1, max_length=120)
 
-    entity_kind: Literal["character", "scene", "script_profile", "beat"] = "character"
+    entity_kind: Literal[
+        "character", "scene", "script_profile", "script_format_profile", "beat"
+    ] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(min_length=1, max_length=160)
 

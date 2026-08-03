@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,19 @@ SCRIPT_PROFILE_FIELD_PATHS = {
     "script_profile.audience",
     "script_profile.narrative_goals",
     "script_profile.style_requirements",
+}
+SCRIPT_FORMAT_PROFILE_FIELD_PATHS = {
+    "script_format_profile.format_style",
+    "script_format_profile.cleaning_notes",
+    "script_format_profile.scene_boundary_count",
+}
+SCRIPT_FORMAT_EXPECTATIONS = {
+    "01": ("industry_heading", 2),
+    "02": ("industry_heading", 3),
+    "03": ("labeled", 2),
+    "04": ("mixed", 2),
+    "05": ("unclear", 0),
+    "06": ("industry_heading", 2),
 }
 LABELED_SCRIPT_PROFILE = """主题：等待与释然
 类型：悬疑、情感
@@ -411,6 +425,7 @@ def test_script_profile_scenario_a_labeled_control_accepts_and_feeds_graph(
         "character",
         "scene",
         "script_profile",
+        "script_format_profile",
     }
     profile_items = [item for item in items if item["entity_kind"] == "script_profile"]
     assert len(profile_items) == 5
@@ -450,6 +465,7 @@ def test_script_profile_scenario_a_labeled_control_accepts_and_feeds_graph(
         "character",
         "scene",
         "script_profile",
+        "script_format_profile",
     }
     assert any(
         fact["entity_kind"] == "script_profile" and fact["text"] == "等待与释然"
@@ -739,6 +755,348 @@ def test_six_scripts_keep_all_script_profile_facets_missing_via_api(
     assert refreshed["authoritative"] == []
 
 
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_expose_expected_script_format_profile_via_api(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_format_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    source_text = script_path.read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    format_items = [
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "script_format_profile"
+    ]
+    by_path = {item["field_path"]: item for item in format_items}
+    expected_style, expected_count = SCRIPT_FORMAT_EXPECTATIONS[script_path.stem[:2]]
+
+    assert len(format_items) == 3
+    assert len({item["entity_id"] for item in format_items}) == 1
+    assert set(by_path) == SCRIPT_FORMAT_PROFILE_FIELD_PATHS
+    assert by_path["script_format_profile.format_style"]["text"] == expected_style
+    assert by_path["script_format_profile.scene_boundary_count"]["text"] == str(
+        expected_count
+    )
+    assert json.loads(by_path["script_format_profile.cleaning_notes"]["text"]) == []
+    assert {item["status"] for item in format_items} == {"extracted_from_text"}
+    assert all(not item["is_missing_slot"] for item in format_items)
+    assert all(item["source_revision_id"] == revision["revision_id"] for item in format_items)
+    assert all(
+        item["source_revision_digest"] == revision["source_digest"]
+        for item in format_items
+    )
+    for item in format_items:
+        assert item["evidence_spans"]
+        for span in item["evidence_spans"]:
+            assert source_text[span["start"]:span["end"]] == span["quote"]
+
+    review = client.get(f"/projects/{project_id}/candidate-facts/review")
+    assert review.status_code == 200, review.text
+    persisted = [
+        item
+        for item in review.json()["bundle"]["items"]
+        if item["entity_kind"] == "script_format_profile"
+    ]
+    assert {
+        item["field_path"]: item["text"] for item in persisted
+    } == {item["field_path"]: item["text"] for item in format_items}
+
+
+def test_script_format_profile_accept_repeat_refresh_supersedes_and_upserts_graph_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_format_repeat"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, PHOTO)
+
+    first_refresh = _refresh(client, project_id, revision)
+    first = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["field_path"] == "script_format_profile.format_style"
+    )
+    first_cleaning = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["field_path"] == "script_format_profile.cleaning_notes"
+    )
+    first_count = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["field_path"] == "script_format_profile.scene_boundary_count"
+    )
+    first_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert first_accept.status_code == 200, first_accept.text
+    assert first_accept.json()["resolved"]["script_format_profile"] == {
+        "format_style": "mixed"
+    }
+    cleaning_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first_cleaning["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert cleaning_accept.status_code == 200, cleaning_accept.text
+    count_edit = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": first_count["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "003",
+            "reason": "human corrected the detected Scene count",
+        },
+    )
+    assert count_edit.status_code == 200, count_edit.text
+    assert count_edit.json()["result"]["text"] == "3"
+    assert count_edit.json()["resolved"]["script_format_profile"] == {
+        "format_style": "mixed",
+        "cleaning_notes": [],
+        "scene_boundary_count": 3,
+    }
+
+    second_refresh = _refresh(client, project_id, revision)
+    second = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["field_path"] == first["field_path"]
+    )
+    assert second["fact_id"] != first["fact_id"]
+    assert second["entity_id"] == first["entity_id"]
+    second_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": second["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert second_accept.status_code == 200, second_accept.text
+
+    records = [
+        record
+        for record in load_ledger(RuntimeStore(tmp_path), project_id).authoritative_records
+        if record.fact.entity_kind == "script_format_profile"
+        and record.fact.field_path == first["field_path"]
+    ]
+    assert len(records) == 2
+    assert [record.validity.value for record in records].count("active") == 1
+    assert [record.validity.value for record in records].count("superseded") == 1
+    active = next(record for record in records if record.validity.value == "active")
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    nodes = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "script_format_profile"
+        and node.get("metadata", {}).get("field_path") == first["field_path"]
+    ]
+    assert len(nodes) == 1
+    assert nodes[0]["category"] == "profile"
+    assert nodes[0]["metadata"]["value"] == "mixed"
+    assert nodes[0]["metadata"]["authoritative_fact_id"] == (
+        active.fact.authoritative_fact_id
+    )
+    graph_profile = {
+        node["metadata"]["profile_facet"]: node["metadata"]["value"]
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "script_format_profile"
+    }
+    assert graph_profile == {
+        "format_style": "mixed",
+        "cleaning_notes": [],
+        "scene_boundary_count": 3,
+    }
+
+
+def test_script_format_profile_new_revision_changes_identity_and_graph_node_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_format_revision"
+    _create_project(client, project_id)
+    rev1 = _create_revision(client, project_id, HOME)
+    first_refresh = _refresh(client, project_id, rev1)
+    first = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["field_path"] == "script_format_profile.format_style"
+    )
+    first_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first["fact_id"],
+            "source_revision_id": rev1["revision_id"],
+            "source_revision_digest": rev1["source_digest"],
+        },
+    )
+    assert first_accept.status_code == 200, first_accept.text
+
+    rev2 = _create_revision(
+        client,
+        project_id,
+        HOME.replace("标题：归途", "标题：归途（修订）"),
+        parent=rev1["revision_id"],
+    )
+    second_refresh = _refresh(client, project_id, rev2)
+    assert second_refresh["authoritative"] == []
+    second = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["field_path"] == first["field_path"]
+    )
+    assert second["entity_id"] != first["entity_id"]
+    second_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": second["fact_id"],
+            "source_revision_id": rev2["revision_id"],
+            "source_revision_digest": rev2["source_digest"],
+        },
+    )
+    assert second_accept.status_code == 200, second_accept.text
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    nodes = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "script_format_profile"
+        and node.get("metadata", {}).get("field_path") == first["field_path"]
+    ]
+    assert len(nodes) == 2
+    assert {node["metadata"]["source_revision_id"] for node in nodes} == {
+        rev1["revision_id"],
+        rev2["revision_id"],
+    }
+
+
+def test_script_format_profile_cleaning_notes_and_edit_evidence_are_source_backed_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_format_cleaning"
+    _create_project(client, project_id)
+    source_text = HOME + "\n异常字符：\ufffd\x00"
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    cleaning = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["field_path"] == "script_format_profile.cleaning_notes"
+    )
+    assert json.loads(cleaning["text"]) == [
+        "unicode_replacement_character_present",
+        "unexpected_control_character_U+0000",
+    ]
+    assert {span["quote"] for span in cleaning["evidence_spans"]} == {"\ufffd", "\x00"}
+    for span in cleaning["evidence_spans"]:
+        assert source_text[span["start"]:span["end"]] == span["quote"]
+
+    original_evidence = cleaning["evidence_spans"]
+    edited = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": cleaning["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": '["人工确认的清洗说明"]',
+            "reason": "human clarified cleaning diagnostics",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    authority = next(
+        fact
+        for fact in edited.json()["authoritative"]
+        if fact["source_candidate_fact_id"] == cleaning["fact_id"]
+    )
+    assert authority["evidence_spans"] == original_evidence
+    for span in authority["evidence_spans"]:
+        assert source_text[span["start"]:span["end"]] == span["quote"]
+
+
+def test_script_format_profile_rejects_invalid_typed_edits_before_authority_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_format_invalid_edits"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, PHOTO)
+    refreshed = _refresh(client, project_id, revision)
+    by_path = {
+        item["field_path"]: item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "script_format_profile"
+    }
+
+    invalid_edits = {
+        "script_format_profile.format_style": "screenplay",
+        "script_format_profile.cleaning_notes": '{"note":"not a list"}',
+        "script_format_profile.scene_boundary_count": "two",
+    }
+    for field_path, new_text in invalid_edits.items():
+        response = client.post(
+            f"/projects/{project_id}/candidate-facts/actions",
+            json={
+                "action": "edit_confirm",
+                "fact_id": by_path[field_path]["fact_id"],
+                "source_revision_id": revision["revision_id"],
+                "source_revision_digest": revision["source_digest"],
+                "new_text": new_text,
+                "reason": "typed-contract negative control",
+            },
+        )
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["error"] == "candidate_action_rejected"
+
+    review = client.get(f"/projects/{project_id}/candidate-facts/review")
+    assert review.status_code == 200, review.text
+    assert review.json()["authoritative"] == []
+    assert all(
+        item["review_decision"] == "pending"
+        for item in review.json()["bundle"]["items"]
+        if item["entity_kind"] == "script_format_profile"
+    )
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).ensure(project_id)
+    assert not any(
+        node.get("metadata", {}).get("entity_kind") == "script_format_profile"
+        for node in graph["nodes"].values()
+    )
+
+
 def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
     tmp_path,
     monkeypatch,
@@ -756,6 +1114,7 @@ def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
         "character",
         "scene",
         "script_profile",
+        "script_format_profile",
         "beat",
     }
     scenes = {item["text"]: item for item in items if item["entity_kind"] == "scene"}
@@ -832,7 +1191,8 @@ def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
     assert all(
         item["review_decision"] == "pending"
         for item in body["bundle"]["items"]
-        if item["entity_kind"] in {"character", "scene", "script_profile"}
+        if item["entity_kind"]
+        in {"character", "scene", "script_profile", "script_format_profile"}
     )
 
     graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)

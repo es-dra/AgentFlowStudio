@@ -14,6 +14,7 @@ Storage: projects/{id}/candidate_facts/ledger.json (+ .lock).
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from datetime import datetime, timezone
 from enum import Enum
@@ -49,11 +50,13 @@ from apps.api.runtime_script_improved_extraction import (
     ExtractedBeatFacet,
     ExtractedItem,
     ExtractionResult,
+    ScriptFormatProfileExtraction,
     ScriptProfileFacetExtraction,
     extract_characters_and_scenes,
     extract_explicit_beat_boundaries,
     extract_explicit_beat_facets,
     extract_scene_occurrences,
+    extract_script_format_profile,
     extract_script_profile_facets,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
@@ -117,7 +120,9 @@ class CandidateReviewItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fact_id: str
-    entity_kind: Literal["character", "scene", "script_profile", "beat"]
+    entity_kind: Literal[
+        "character", "scene", "script_profile", "script_format_profile", "beat"
+    ]
     entity_id: str
     field_path: str
     text: str
@@ -143,7 +148,9 @@ class MissingSlotItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slot_id: str
-    entity_kind: Literal["character", "scene", "script_profile", "beat"]
+    entity_kind: Literal[
+        "character", "scene", "script_profile", "script_format_profile", "beat"
+    ]
     field_path: str
     message: str
     status: Literal["missing"] = "missing"
@@ -353,6 +360,98 @@ def script_profile_facet_to_candidate_fact(
     )
 
 
+def _source_anchor_evidence(source_text: str) -> list[EvidenceSpan]:
+    """Bind whole-revision projections to a real, reviewable source anchor."""
+
+    start = next(
+        (index for index, character in enumerate(source_text) if not character.isspace()),
+        None,
+    )
+    if start is None:
+        return []
+    line_end = source_text.find("\n", start)
+    if line_end < 0:
+        line_end = len(source_text)
+    end = min(line_end, start + 1200)
+    if end <= start:
+        end = min(len(source_text), start + 1)
+    return [EvidenceSpan(start=start, end=end, quote=source_text[start:end])]
+
+
+def _script_format_profile_evidence(
+    profile: ScriptFormatProfileExtraction,
+    *,
+    facet: Literal["format_style", "cleaning_notes", "scene_boundary_count"],
+    source_text: str,
+) -> list[EvidenceSpan]:
+    spans: list[EvidenceSpan] = []
+    if facet == "cleaning_notes" and profile.cleaning_issues:
+        for issue in profile.cleaning_issues[:12]:
+            if 0 <= issue.start < issue.end <= len(source_text):
+                quote = source_text[issue.start:issue.end]
+                if quote:
+                    spans.append(
+                        EvidenceSpan(start=issue.start, end=issue.end, quote=quote)
+                    )
+    elif facet in {"format_style", "scene_boundary_count"}:
+        search_offsets: dict[str, int] = {}
+        for occurrence in profile.scene_occurrences:
+            quote = occurrence.evidence.strip()[:1200]
+            if not quote:
+                continue
+            start = source_text.find(quote, search_offsets.get(quote, 0))
+            if start < 0:
+                continue
+            search_offsets[quote] = start + len(quote)
+            spans.append(EvidenceSpan(start=start, end=start + len(quote), quote=quote))
+            if len(spans) == 12:
+                break
+    return spans or _source_anchor_evidence(source_text)
+
+
+def script_format_profile_facet_to_candidate_fact(
+    profile: ScriptFormatProfileExtraction,
+    *,
+    facet: Literal["format_style", "cleaning_notes", "scene_boundary_count"],
+    entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+    source_text: str,
+) -> CandidateFact:
+    values = {
+        "format_style": profile.format_style,
+        "cleaning_notes": json.dumps(
+            list(profile.cleaning_notes), ensure_ascii=False, separators=(",", ":")
+        ),
+        "scene_boundary_count": str(profile.scene_boundary_count),
+    }
+    when = _now()
+    return CandidateFact(
+        fact_id=_id("fact"),
+        entity_kind="script_format_profile",
+        entity_id=entity_id,
+        field_path=f"script_format_profile.{facet}",
+        claim=ClaimedText(
+            text=values[facet],
+            confidence=1.0,
+            evidence_spans=_script_format_profile_evidence(
+                profile,
+                facet=facet,
+                source_text=source_text,
+            ),
+        ),
+        status=CandidateStatus.EXTRACTED_FROM_TEXT,
+        project_id=project_id,
+        source_revision_id=source_revision_id,
+        source_revision_digest=source_revision_digest,
+        producer="deterministic_extractor",
+        produced_at=when,
+        deterministic_check_id="script_format_profile_projection_v1",
+        deterministic_check_passed_at=when,
+    )
+
+
 def beat_boundary_to_candidate_fact(
     boundary: ExtractedBeatBoundary,
     *,
@@ -471,6 +570,7 @@ def build_review_bundle_from_extraction(
     extraction: ExtractionResult,
     *,
     script_profile_facets: list[ScriptProfileFacetExtraction] | None = None,
+    script_format_profile: ScriptFormatProfileExtraction | None = None,
     source_text: str,
     project_id: str,
     source_revision_id: str,
@@ -531,6 +631,31 @@ def build_review_bundle_from_extraction(
                 decision=decisions.get(fact.fact_id),
             )
         )
+
+    format_profile_entity_id = f"script_format_profile_{profile_revision_key}"
+    if script_format_profile is not None:
+        for facet, method in (
+            ("format_style", "projected_existing_scene_signals"),
+            ("cleaning_notes", "conservative_text_cleaning_scan"),
+            ("scene_boundary_count", "projected_scene_occurrence_count"),
+        ):
+            fact = script_format_profile_facet_to_candidate_fact(
+                script_format_profile,
+                facet=facet,
+                entity_id=format_profile_entity_id,
+                project_id=project_id,
+                source_revision_id=source_revision_id,
+                source_revision_digest=digest,
+                source_text=source_text,
+            )
+            facts.append(fact)
+            items.append(
+                _fact_to_review_item(
+                    fact,
+                    producer_method=method,
+                    decision=decisions.get(fact.fact_id),
+                )
+            )
 
     beat_notes: list[str] = []
     positioned_scenes: list[tuple[int, ExtractedItem, CandidateFact]] = []
@@ -716,10 +841,12 @@ def open_ledger_from_extraction(
 ) -> tuple[FactLedger, CandidateReviewBundle]:
     extraction = extract_characters_and_scenes(source_text)
     script_profile_facets = extract_script_profile_facets(source_text)
+    script_format_profile = extract_script_format_profile(source_text)
     digest = revision_digest(source_text)
     bundle, facts = build_review_bundle_from_extraction(
         extraction,
         script_profile_facets=script_profile_facets,
+        script_format_profile=script_format_profile,
         source_text=source_text,
         project_id=project_id,
         source_revision_id=source_revision_id,
@@ -816,6 +943,37 @@ def _link_superseded_authority(
         prior.superseded_by_record_id = record.record_id
 
 
+def _normalize_script_format_profile_edit(candidate: CandidateFact, value: str) -> str:
+    facet = candidate.field_path.removeprefix("script_format_profile.")
+    if facet == "format_style":
+        allowed = {"labeled", "industry_heading", "mixed", "unclear"}
+        if value not in allowed:
+            raise LoopError(
+                "script_format_profile.format_style must be one of "
+                "labeled, industry_heading, mixed, unclear"
+            )
+        return value
+    if facet == "cleaning_notes":
+        try:
+            notes = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise LoopError(
+                "script_format_profile.cleaning_notes must be a JSON string list"
+            ) from exc
+        if not isinstance(notes, list) or any(not isinstance(note, str) for note in notes):
+            raise LoopError(
+                "script_format_profile.cleaning_notes must be a JSON string list"
+            )
+        return json.dumps(notes, ensure_ascii=False, separators=(",", ":"))
+    if facet == "scene_boundary_count":
+        if not value.isascii() or not value.isdecimal():
+            raise LoopError(
+                "script_format_profile.scene_boundary_count must be a nonnegative integer"
+            )
+        return str(int(value))
+    raise LoopError(f"unknown script_format_profile facet: {facet}")
+
+
 def accept_candidate(
     ledger: FactLedger,
     fact_id: str,
@@ -870,18 +1028,22 @@ def edit_and_confirm_candidate(
     new_text = new_text.strip()
     if not new_text:
         raise LoopError("new_text must be non-empty")
+    if cand.entity_kind == "script_format_profile":
+        new_text = _normalize_script_format_profile_edit(cand, new_text)
     when = _now()
     spans = list(cand.claim.evidence_spans)
     if source_text:
         found = (
             _exact_evidence_for(source_text, new_text)
-            if cand.entity_kind == "beat"
+            if cand.entity_kind in {"beat", "script_format_profile"}
             else _evidence_for(source_text, new_text)
         )
         if found:
             spans = found
-    if cand.entity_kind == "beat" and not spans:
-        raise LoopError("Beat edit_confirm requires source-backed marker evidence")
+    if cand.entity_kind in {"beat", "script_format_profile"} and not spans:
+        raise LoopError(
+            f"{cand.entity_kind} edit_confirm requires source-backed evidence"
+        )
     if not spans:
         spans = [EvidenceSpan(start=0, end=len(new_text), quote=new_text[:1200])]
     updated = CandidateFact.model_validate(
@@ -1029,6 +1191,21 @@ def resolve_for_downstream(
         for f in auth
         if f.entity_kind == "script_profile"
     }
+    auth_format_profile: dict[str, Any] = {}
+    for fact in auth:
+        if fact.entity_kind != "script_format_profile":
+            continue
+        facet = fact.field_path.removeprefix("script_format_profile.")
+        value: Any = fact.text
+        if facet == "scene_boundary_count" and fact.text.isdecimal():
+            value = int(fact.text)
+        elif facet == "cleaning_notes":
+            try:
+                parsed = json.loads(fact.text)
+            except json.JSONDecodeError:
+                parsed = fact.text
+            value = parsed if isinstance(parsed, list) else fact.text
+        auth_format_profile[facet] = value
     auth_beats = [
         {
             "entity_id": fact.entity_id,
@@ -1054,6 +1231,7 @@ def resolve_for_downstream(
         "characters": auth_chars or raw_chars,
         "scenes": auth_scenes or raw_scenes,
         "script_profile": auth_profile,
+        "script_format_profile": auth_format_profile,
         "beats": auth_beats,
         "beat_facets": auth_beat_facets,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",

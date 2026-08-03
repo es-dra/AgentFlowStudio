@@ -1,4 +1,4 @@
-"""Improved Character + Scene + ScriptProfile + Beat extraction.
+"""Improved Character + Scene + ScriptProfile + ScriptFormatProfile + Beat extraction.
 
 Promoted from docs/internal-notes/draft_improved_extraction_20260802.py.
 
@@ -19,6 +19,8 @@ Hard rules
 7. Beat boundaries accept explicit numbered labels only, scoped to an owning Scene.
 8. Beat facets (conflict/turn/info_release/emotion_shift) accept explicit labels
    only inside a Beat range; emotion_shift requires from+to+change together.
+9. ScriptFormatProfile only projects existing structured Scene signals and
+   conservative text-cleaning diagnostics; it does not infer story content.
 """
 
 from __future__ import annotations
@@ -64,6 +66,35 @@ class ScriptProfileFacetExtraction:
     field_path: str
     item: ExtractedItem
     uncertainty_note: str | None = None
+
+
+ScriptFormatStyle = Literal["labeled", "industry_heading", "mixed", "unclear"]
+
+
+@dataclass(frozen=True)
+class ScriptCleaningIssue:
+    """One conservative, source-bound text-cleaning diagnostic."""
+
+    note: str
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class ScriptFormatProfileExtraction:
+    """Revision-level projection of already-computed script input structure."""
+
+    format_style: ScriptFormatStyle
+    cleaning_issues: tuple[ScriptCleaningIssue, ...]
+    scene_occurrences: tuple[ExtractedItem, ...]
+
+    @property
+    def cleaning_notes(self) -> tuple[str, ...]:
+        return tuple(issue.note for issue in self.cleaning_issues)
+
+    @property
+    def scene_boundary_count(self) -> int:
+        return len(self.scene_occurrences)
 
 
 @dataclass(frozen=True)
@@ -650,6 +681,65 @@ def extract_scene_occurrences(text: str) -> list[ExtractedItem]:
 
 
 # ---------------------------------------------------------------------------
+# ScriptFormatProfile projection
+# ---------------------------------------------------------------------------
+
+
+def extract_script_format_profile(text: str) -> ScriptFormatProfileExtraction:
+    """Project existing Scene signals plus conservative cleaning diagnostics."""
+
+    source = text or ""
+    occurrences = tuple(extract_scene_occurrences(source))
+    labeled_count = sum(
+        occurrence.method == "labeled_地点_or_场景" for occurrence in occurrences
+    )
+    industry_count = sum(
+        occurrence.method == "industry_scene_heading" for occurrence in occurrences
+    )
+    if labeled_count and industry_count:
+        format_style: ScriptFormatStyle = "mixed"
+    elif labeled_count:
+        format_style = "labeled"
+    elif industry_count:
+        format_style = "industry_heading"
+    else:
+        format_style = "unclear"
+
+    issues: list[ScriptCleaningIssue] = []
+    if source.startswith("\ufeff"):
+        issues.append(ScriptCleaningIssue("leading_byte_order_mark", 0, 1))
+    replacement_index = source.find("\ufffd")
+    if replacement_index >= 0:
+        issues.append(
+            ScriptCleaningIssue(
+                "unicode_replacement_character_present",
+                replacement_index,
+                replacement_index + 1,
+            )
+        )
+    seen_controls: set[int] = set()
+    for index, character in enumerate(source):
+        codepoint = ord(character)
+        if (codepoint < 32 and character not in "\t\n\r") or codepoint == 127:
+            if codepoint in seen_controls:
+                continue
+            seen_controls.add(codepoint)
+            issues.append(
+                ScriptCleaningIssue(
+                    f"unexpected_control_character_U+{codepoint:04X}",
+                    index,
+                    index + 1,
+                )
+            )
+
+    return ScriptFormatProfileExtraction(
+        format_style=format_style,
+        cleaning_issues=tuple(issues),
+        scene_occurrences=occurrences,
+    )
+
+
+# ---------------------------------------------------------------------------
 # ScriptProfile extractor
 # ---------------------------------------------------------------------------
 
@@ -975,6 +1065,9 @@ __all__ = (
     "ExtractedItem",
     "ScriptProfileFacetName",
     "ScriptProfileFacetExtraction",
+    "ScriptFormatStyle",
+    "ScriptCleaningIssue",
+    "ScriptFormatProfileExtraction",
     "ExtractedBeatBoundary",
     "BeatFacetName",
     "ExtractedBeatFacet",
@@ -982,6 +1075,7 @@ __all__ = (
     "extract_characters",
     "extract_scenes",
     "extract_scene_occurrences",
+    "extract_script_format_profile",
     "extract_script_profile_facets",
     "extract_explicit_beat_boundaries",
     "extract_explicit_beat_facets",
