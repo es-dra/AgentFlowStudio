@@ -1,0 +1,533 @@
+{
+  "assertions": [
+    {
+      "detail": "got ['苏晴没', '从远处', '道他可能']",
+      "name": "legacy still extracts junk characters",
+      "ok": true
+    },
+    {
+      "detail": "{'verdict': 'PASS', 'P0': 0, 'P1': 0}",
+      "name": "legacy validation still PASS despite junk",
+      "ok": true
+    },
+    {
+      "detail": "shadow_extraction unexpectedly present",
+      "name": "shadow extraction absent when flag off",
+      "ok": true
+    },
+    {
+      "detail": "scrrev_18861d03750a458b",
+      "name": "script truth revision id is scrrev_*",
+      "ok": true
+    },
+    {
+      "detail": "['苏晴', '老王', '林悦']",
+      "name": "improved shadow characters are 苏晴/老王/林悦",
+      "ok": true
+    },
+    {
+      "detail": "['老式邮局', '海边礁石', '苏晴的房间']",
+      "name": "improved shadow scenes are expected",
+      "ok": true
+    },
+    {
+      "detail": "['苏晴没', '从远处', '道他可能']",
+      "name": "candidate path still legacy until confirmation (shadow-only)",
+      "ok": true
+    },
+    {
+      "detail": "scrrev_18861d03750a458b",
+      "name": "reuse flag embeds scrrev_* in M6 candidate",
+      "ok": true
+    },
+    {
+      "detail": [
+        "林悦",
+        "海边礁石",
+        "老式邮局",
+        "老王",
+        "苏晴",
+        "苏晴的房间"
+      ],
+      "name": "refresh surfaces real character candidates",
+      "ok": true
+    },
+    {
+      "detail": "[]",
+      "name": "no automatic authoritative facts yet",
+      "ok": true
+    },
+    {
+      "detail": "{\n  \"authoritative_still_empty\": true,\n  \"confidence\": 0.96,\n  \"fact_id\": \"fact_38a9503a4509\",\n  \"review_decision\": \"pending\",\n  \"status\": \"extracted_from_text\",\n  \"text\": \"苏晴没\",\n  \"uncertainty_note\": \"legacy regex fragment; not a real name\",\n  \"why_not_auto_authoritative\": \"status=extracted_from_text + high confidence is still a CandidateFact; promote_candidate_fact requires human_confirmed (or a named deterministic check). Confidence alone never promotes.\"\n}",
+      "name": "junk stays pending candidate with high confidence",
+      "ok": true
+    },
+    {
+      "detail": "['苏晴', '老王', '林悦', '老式邮局', '海边礁石', '苏晴的房间']",
+      "name": "junk never appears in authoritative",
+      "ok": true
+    },
+    {
+      "detail": "['苏晴', '老王', '林悦']",
+      "name": "downstream resolve has correct characters",
+      "ok": true
+    },
+    {
+      "detail": "['老式邮局', '海边礁石', '苏晴的房间']",
+      "name": "downstream resolve has correct scenes",
+      "ok": true
+    },
+    {
+      "detail": "['林悦', '海边礁石', '老式邮局', '老王', '苏晴', '苏晴的房间']",
+      "name": "graph contains confirmed character nodes",
+      "ok": true
+    },
+    {
+      "detail": "['林悦', '海边礁石', '老式邮局', '老王', '苏晴', '苏晴的房间']",
+      "name": "graph does not contain junk 苏晴没",
+      "ok": true
+    },
+    {
+      "detail": "['scripttruth-revision-scrrev_18861d03750a458b-02674232e5cfe7b7']",
+      "name": "revision nodes are namespaced (no silent collision key)",
+      "ok": true
+    },
+    {
+      "detail": "[\n  {\n    \"authoritative_fact_id\": \"auth_1853af9a5b3e\",\n    \"category\": \"entity\",\n    \"human_confirmed_by\": \"local-runtime-owner\",\n    \"node_id\": \"authfact-character-auth_1853af9a5b3e\",\n    \"promotion_kind\": \"human_confirmation\",\n    \"source\": \"authoritative_script_fact_feed\",\n    \"source_candidate_fact_id\": \"fact_86121af18268\",\n    \"source_revision_id\": \"scrrev_18861d03750a458b\",\n    \"text\": \"林悦\"\n  },\n  {\n    \"authoritative_fact_id\": \"auth_c016da4e5cd8\",\n    \"category\": \"entity\",\n    \"human_confirmed_by\": \"local-runtime-owner\",\n    \"node_id\": \"authfact-character-auth_c016da4e5cd8\",\n    \"promotion_kind\": \"human_confirmation\",\n    \"source\": \"authoritative_script_fact_feed\",\n    \"source_candidate_fact_id\": \"fact_0692d0c2ade5\",\n    \"source_revision_id\": \"scrrev_18861d03750\n  … (truncated)\n}",
+      "name": "every authfact node has full provenance",
+      "ok": true
+    },
+    {
+      "detail": "invalidated=6 before_active=6",
+      "name": "old authoritative facts invalidated on revision change",
+      "ok": true
+    },
+    {
+      "detail": "before=8 after=10",
+      "name": "change_log accumulates across revision refresh",
+      "ok": true
+    },
+    {
+      "detail": "[]",
+      "name": "new revision needs re-confirmation (no auto authority)",
+      "ok": true
+    }
+  ],
+  "part1_legacy": {
+    "candidate_revision_id": "m6-script-e1fff68b2c36",
+    "character_display_names": [
+      "苏晴没",
+      "从远处",
+      "道他可能"
+    ],
+    "flags": {
+      "AFS_CANDIDATE_FACTS_FEED_PRODUCTION_GRAPH": null,
+      "AFS_CANDIDATE_FACTS_USE_NAMESPACED_REVISION_NODES": null,
+      "AFS_M6_REUSE_SCRIPT_TRUTH_REVISION_ID": null,
+      "AFS_USE_CANDIDATE_CONFIRMATION_LOOP": null,
+      "AFS_USE_IMPROVED_EXTRACTION": null
+    },
+    "project_id": "demo_sea_legacy",
+    "scene_names": [
+      "柜台前",
+      "柜台上",
+      "礁石上",
+      "她身边坐下",
+      "书桌前",
+      "一叠信纸上"
+    ],
+    "shadow_extraction_present": false,
+    "source_revision_id": "scrrev_205cf8f17dc94e24",
+    "validation": {
+      "P0": 0,
+      "P1": 0,
+      "verdict": "PASS"
+    }
+  },
+  "part2_new_system": {
+    "flags": {
+      "AFS_CANDIDATE_FACTS_FEED_PRODUCTION_GRAPH": "true",
+      "AFS_CANDIDATE_FACTS_USE_NAMESPACED_REVISION_NODES": "true",
+      "AFS_M6_REUSE_SCRIPT_TRUTH_REVISION_ID": "true",
+      "AFS_USE_CANDIDATE_CONFIRMATION_LOOP": "true",
+      "AFS_USE_IMPROVED_EXTRACTION": "true"
+    },
+    "step1_script_truth": {
+      "revision_id": "scrrev_18861d03750a458b",
+      "source_digest": "02674232e5cfe7b78663b63654d4e9acc4e901a43256a08f26657de87a49e3f7"
+    },
+    "step2_shadow_extraction": {
+      "affects_production_graph": false,
+      "candidate_still_uses_legacy_characters": [
+        "苏晴没",
+        "从远处",
+        "道他可能"
+      ],
+      "diff": {
+        "characters_only_in_improved": [
+          "林悦",
+          "老王",
+          "苏晴"
+        ],
+        "characters_only_in_legacy": [
+          "从远处",
+          "苏晴没",
+          "道他可能"
+        ],
+        "scenes_only_in_improved": [
+          "海边礁石",
+          "老式邮局",
+          "苏晴的房间"
+        ],
+        "scenes_only_in_legacy": [
+          "一叠信纸上",
+          "书桌前",
+          "她身边坐下",
+          "柜台上",
+          "柜台前",
+          "礁石上"
+        ]
+      },
+      "embedded_script_revision_id": "scrrev_18861d03750a458b",
+      "improved_characters": [
+        "苏晴",
+        "老王",
+        "林悦"
+      ],
+      "improved_scenes": [
+        "老式邮局",
+        "海边礁石",
+        "苏晴的房间"
+      ],
+      "legacy_characters": [
+        "苏晴没",
+        "从远处",
+        "道他可能"
+      ],
+      "legacy_scenes": [
+        "柜台前",
+        "柜台上",
+        "礁石上",
+        "她身边坐下",
+        "书桌前",
+        "一叠信纸上"
+      ],
+      "validation_verdict": "PASS"
+    },
+    "step3_candidates_after_refresh": {
+      "authoritative_before_human": [],
+      "candidate_texts": [
+        "林悦",
+        "海边礁石",
+        "老式邮局",
+        "老王",
+        "苏晴",
+        "苏晴的房间"
+      ],
+      "sample_items": [
+        {
+          "confidence": 0.9,
+          "entity_kind": "character",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "苏晴"
+        },
+        {
+          "confidence": 0.9,
+          "entity_kind": "character",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "老王"
+        },
+        {
+          "confidence": 0.9,
+          "entity_kind": "character",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "林悦"
+        },
+        {
+          "confidence": 0.92,
+          "entity_kind": "scene",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "老式邮局"
+        },
+        {
+          "confidence": 0.92,
+          "entity_kind": "scene",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "海边礁石"
+        },
+        {
+          "confidence": 0.92,
+          "entity_kind": "scene",
+          "is_missing_slot": false,
+          "review_decision": "pending",
+          "status": "extracted_from_text",
+          "text": "苏晴的房间"
+        }
+      ]
+    },
+    "step3_junk_injected": {
+      "authoritative_still_empty": true,
+      "confidence": 0.96,
+      "fact_id": "fact_38a9503a4509",
+      "review_decision": "pending",
+      "status": "extracted_from_text",
+      "text": "苏晴没",
+      "uncertainty_note": "legacy regex fragment; not a real name",
+      "why_not_auto_authoritative": "status=extracted_from_text + high confidence is still a CandidateFact; promote_candidate_fact requires human_confirmed (or a named deterministic check). Confidence alone never promotes."
+    },
+    "step4_human_actions": {
+      "accepted_characters": [
+        "苏晴",
+        "老王",
+        "林悦"
+      ],
+      "accepted_scenes": [
+        "老式邮局",
+        "海边礁石",
+        "苏晴的房间"
+      ],
+      "authoritative_texts": [
+        "苏晴",
+        "老王",
+        "林悦",
+        "老式邮局",
+        "海边礁石",
+        "苏晴的房间"
+      ],
+      "reject_junk": {
+        "action": "reject",
+        "affects_production_graph": false,
+        "graph_feed": {
+          "fed": false,
+          "node_ids": [],
+          "reason": "no_new_authoritative_fact",
+          "skipped": true
+        },
+        "result": {
+          "rejected_fact_id": "fact_38a9503a4509"
+        }
+      },
+      "resolved_for_downstream": {
+        "authoritative_fact_ids": [
+          "auth_c016da4e5cd8",
+          "auth_c7acb18be967",
+          "auth_1853af9a5b3e",
+          "auth_2b5d1c6d983f",
+          "auth_804017471e4a",
+          "auth_12ac80242f33"
+        ],
+        "authority_source": "authoritative_ledger",
+        "characters": [
+          "苏晴",
+          "老王",
+          "林悦"
+        ],
+        "raw_extraction_characters": [],
+        "raw_extraction_scenes": [],
+        "revision_id": "scrrev_18861d03750a458b",
+        "scenes": [
+          "老式邮局",
+          "海边礁石",
+          "苏晴的房间"
+        ]
+      },
+      "sample_accept_graph_feed": {
+        "affects_production_graph": true,
+        "fed": true,
+        "graph_version": 1,
+        "idempotent_replay": false,
+        "node_ids": [
+          "authfact-character-auth_c016da4e5cd8"
+        ],
+        "reason": null,
+        "skipped": false
+      },
+      "sample_authoritative_fact": {
+        "authoritative_fact_id": "auth_c016da4e5cd8",
+        "deterministic_check_id": null,
+        "entity_id": "character_0_苏晴",
+        "entity_kind": "character",
+        "evidence_spans": [
+          {
+            "end": 50,
+            "quote": "苏晴（20多岁，安静，眼神里带着期待）",
+            "start": 31
+          }
+        ],
+        "field_path": "identity.display_name",
+        "human_confirmed_by": "local-runtime-owner",
+        "project_id": "demo_sea_closed_loop",
+        "promoted_at": "2026-08-03T05:55:32.930012Z",
+        "promotion_kind": "human_confirmation",
+        "schema_version": "afs.script_understanding.candidate_fact_status.v0.1",
+        "source_candidate_fact_id": "fact_0692d0c2ade5",
+        "source_confidence": 0.9,
+        "source_revision_digest": "02674232e5cfe7b78663b63654d4e9acc4e901a43256a08f26657de87a49e3f7",
+        "source_revision_id": "scrrev_18861d03750a458b",
+        "text": "苏晴"
+      }
+    },
+    "step5_production_graph": {
+      "authfact_node_count": 6,
+      "graph_version": 6,
+      "namespaced_revision_prefix_ok": true,
+      "provenance_rows": [
+        {
+          "authoritative_fact_id": "auth_1853af9a5b3e",
+          "category": "entity",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-character-auth_1853af9a5b3e",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_86121af18268",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "林悦"
+        },
+        {
+          "authoritative_fact_id": "auth_c016da4e5cd8",
+          "category": "entity",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-character-auth_c016da4e5cd8",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_0692d0c2ade5",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "苏晴"
+        },
+        {
+          "authoritative_fact_id": "auth_c7acb18be967",
+          "category": "entity",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-character-auth_c7acb18be967",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_5b480a0c057a",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "老王"
+        },
+        {
+          "authoritative_fact_id": "auth_12ac80242f33",
+          "category": "location",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-scene-auth_12ac80242f33",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_b48cc56ea1ba",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "苏晴的房间"
+        },
+        {
+          "authoritative_fact_id": "auth_2b5d1c6d983f",
+          "category": "location",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-scene-auth_2b5d1c6d983f",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_6a7de5d361a8",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "老式邮局"
+        },
+        {
+          "authoritative_fact_id": "auth_804017471e4a",
+          "category": "location",
+          "human_confirmed_by": "local-runtime-owner",
+          "node_id": "authfact-scene-auth_804017471e4a",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_b3f222e8b8eb",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "海边礁石"
+        }
+      ],
+      "revision_node_ids": [
+        "scripttruth-revision-scrrev_18861d03750a458b-02674232e5cfe7b7"
+      ],
+      "sample_authfact_node": {
+        "category": "entity",
+        "metadata": {
+          "authoritative_fact_id": "auth_1853af9a5b3e",
+          "display_name": "林悦",
+          "entity_id": "character_2_林悦",
+          "entity_kind": "character",
+          "field_path": "identity.display_name",
+          "human_confirmed_by": "local-runtime-owner",
+          "promotion_kind": "human_confirmation",
+          "source": "authoritative_script_fact_feed",
+          "source_candidate_fact_id": "fact_86121af18268",
+          "source_confidence": 0.9,
+          "source_revision_digest": "02674232e5cfe7b78663b63654d4e9acc4e901a43256a08f26657de87a49e3f7",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "林悦"
+        },
+        "node_id": "authfact-character-auth_1853af9a5b3e",
+        "state": "active"
+      },
+      "sample_revision_node": {
+        "category": "revision",
+        "metadata": {
+          "node_identity_kind": "script_truth_revision_for_authoritative_facts",
+          "source": "authoritative_script_fact_feed",
+          "source_revision_digest": "02674232e5cfe7b78663b63654d4e9acc4e901a43256a08f26657de87a49e3f7",
+          "source_revision_id": "scrrev_18861d03750a458b"
+        },
+        "node_id": "scripttruth-revision-scrrev_18861d03750a458b-02674232e5cfe7b7",
+        "state": "active"
+      }
+    },
+    "step6_revision_invalidation": {
+      "active_authoritative_after_refresh": [],
+      "change_log_after_count": 10,
+      "change_log_before_count": 8,
+      "has_script_revision_changed_reason": true,
+      "invalidated_count": 6,
+      "invalidated_sample": [
+        {
+          "invalidated_by_revision_id": "scrrev_8aed539e609f4a4c",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "苏晴",
+          "validity": "invalidated_by_revision"
+        },
+        {
+          "invalidated_by_revision_id": "scrrev_8aed539e609f4a4c",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "老王",
+          "validity": "invalidated_by_revision"
+        },
+        {
+          "invalidated_by_revision_id": "scrrev_8aed539e609f4a4c",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "林悦",
+          "validity": "invalidated_by_revision"
+        },
+        {
+          "invalidated_by_revision_id": "scrrev_8aed539e609f4a4c",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "老式邮局",
+          "validity": "invalidated_by_revision"
+        },
+        {
+          "invalidated_by_revision_id": "scrrev_8aed539e609f4a4c",
+          "source_revision_id": "scrrev_18861d03750a458b",
+          "text": "海边礁石",
+          "validity": "invalidated_by_revision"
+        }
+      ],
+      "new_candidate_scene_present": true,
+      "new_revision_id": "scrrev_8aed539e609f4a4c",
+      "old_revision_id": "scrrev_18861d03750a458b",
+      "prior_change_ids_retained": true
+    }
+  },
+  "script": "02_industry_standard_letter_by_the_sea.txt",
+  "title": "海边的信"
+}

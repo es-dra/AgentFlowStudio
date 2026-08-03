@@ -73,7 +73,7 @@ class CandidateReviewItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fact_id: str
-    entity_kind: Literal["character", "scene"]
+    entity_kind: Literal["character", "scene", "beat", "script_profile"]
     entity_id: str
     field_path: str
     text: str
@@ -91,7 +91,7 @@ class CandidateReviewItem(BaseModel):
             ReviewAction.REJECT,
         ]
     )
-    # missing rows are shown but cannot be "accepted" as a real name/place
+    # Missing rows are shown but cannot be accepted as concrete facts.
     is_missing_slot: bool = False
 
 
@@ -99,7 +99,7 @@ class MissingSlotItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slot_id: str
-    entity_kind: Literal["character", "scene"]
+    entity_kind: Literal["character", "scene", "beat", "script_profile"]
     field_path: str
     message: str
     status: Literal["missing"] = "missing"
@@ -296,7 +296,7 @@ def build_review_bundle_from_extraction(
             index=i,
         )
         facts.append(fact)
-        items.append(_fact_to_review_item(fact, producer_method=ch.method))
+        items.append(candidate_fact_to_review_item(fact, producer_method=ch.method))
 
     for i, sc in enumerate(extraction.scenes):
         fact = extracted_item_to_candidate_fact(
@@ -309,7 +309,7 @@ def build_review_bundle_from_extraction(
             index=i,
         )
         facts.append(fact)
-        items.append(_fact_to_review_item(fact, producer_method=sc.method))
+        items.append(candidate_fact_to_review_item(fact, producer_method=sc.method))
 
     if extraction.character_name_status == ExtractStatus.MISSING:
         missing.append(
@@ -342,7 +342,13 @@ def build_review_bundle_from_extraction(
     return bundle, facts
 
 
-def _fact_to_review_item(fact: CandidateFact, *, producer_method: str = "") -> CandidateReviewItem:
+def candidate_fact_to_review_item(
+    fact: CandidateFact,
+    *,
+    producer_method: str = "",
+) -> CandidateReviewItem:
+    """Project any supported CandidateFact kind into the shared review DTO."""
+
     is_missing = fact.status == CandidateStatus.MISSING
     actions = (
         [ReviewAction.EDIT_CONFIRM, ReviewAction.REJECT]
@@ -765,6 +771,7 @@ __all__ = (
     "LoopError",
     "revision_digest",
     "extracted_item_to_candidate_fact",
+    "candidate_fact_to_review_item",
     "build_review_bundle_from_extraction",
     "open_ledger_from_extraction",
     "accept_candidate",

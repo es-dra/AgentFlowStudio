@@ -1,15 +1,19 @@
-# Character / Scene 测试剧本集（素材阶段）
+# Character / Scene / Beat 测试剧本集（设计验证阶段）
 
-本地素材，供后续 **Character 提取 + candidate-fact 状态机** 对照用。  
-**不要**在这一步跑 M6 / 改 `apps/api`；顺序是：先备齐剧本 → 再修提取 → 再接状态机。
+本地素材，供 **Character / Scene / Beat / ScriptProfile schema + candidate-fact 状态机** 对照用。
+**不要**在设计验证阶段跑 M6 / 改 `apps/api`；先证明文本证据和状态转换，再决定生产集成。
 
 相关草稿：
 
 - `docs/internal-notes/draft_script_understanding_character_schema_20260801.py`
 - `docs/internal-notes/draft_candidate_fact_status_model_20260802.py`
+- `docs/internal-notes/draft_beat_schema_20260803.py`
+- `docs/internal-notes/draft_script_profile_schema_20260803.py`
+- `docs/internal-notes/beat-schema-findings-20260803.md`
+- `docs/internal-notes/script-profile-findings-20260803.md`
 - `docs/internal-notes/script-flow-findings-20260801.md`（昨天三份的实测证据）
 
-覆盖老板要求的 **4 类情况**（行业标准用两份：短 / 长）：
+覆盖 **5 类情况**（行业标准用两份：短 / 长，另含一份对抗格式）：
 
 | # | 文件 | 标题 | 格式类别 | 主要测什么 |
 |---|---|---|---|---|
@@ -18,6 +22,7 @@
 | 03 | `03_labeled_fields_homecoming.txt` | 《归途》 | 字段式 | `地点：` / `人物：` 标注是否正确吃进 |
 | 04 | `04_mixed_format_old_photo.txt` | 《旧照片》 | 混合格式 | 同剧本混用字段式 + 内联；不能只对一半格式有效 |
 | 05 | `05_missing_info_unknown_call.txt` | 《陌生来电》 | 信息缺失 | 应标 `missing`，禁止瞎编姓名/地点后当权威 |
+| 06 | `06_adversarial_night_shift.txt` | 《夜班》 | 对抗格式 | Scene 内空间词很多但不是新 Scene/Beat；检查不能按段落或位置词乱切 |
 
 ---
 
@@ -59,10 +64,17 @@
 - **预期场景：** 地点仅「昏暗的房间」级模糊描述 → 地点权威事实应为 `missing`（或极弱 `extracted_from_text` 候选且**不得**自动升权威）；**禁止**编造具体地址/场景名后 PASS
 - **测什么：** candidate-fact 的 **`missing` 状态**能否被正确触发；置信度/瞎编不得变成 authoritative
 
+## 06 — 对抗格式 · 《夜班》
+
+- **格式：** 两个行业 heading 场景；场景内部混入多个位置词、动作段和对白。
+- **预期 Beat：** 没有显式 Beat 标签，确定性切分应为 `missing`，输出 0 个 Beat。
+- **测什么：** `雨棚下`、`灶台边`、`闸机口`、`维修井内` 等局部空间变化不能被误当 Scene 或 Beat 边界；空行和对白轮次也不能直接作为 Beat 分隔。
+
 ---
 
 ## 使用约定
 
 1. 本目录只放剧本正文 + 本 README；不接生产路径。
 2. 后续修提取 / 跑对照时，以本表「预期人物/场景」和状态机草稿为准，而不是以「有没有抽出非空列表」为准。
-3. Scene 实体闭环是下一步；今天素材已带场景预期，方便 Character 之后复用同一套剧本。
+3. Character、Scene 和 Beat 共用候选事实状态机；不同实体只负责各自 schema 与证据投影。
+4. Beat 边界没有显式标签时必须返回 `missing` 或进入人工/模型候选确认，禁止把空行、动作句或对白轮次直接当权威边界。
