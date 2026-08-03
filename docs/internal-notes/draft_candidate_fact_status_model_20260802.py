@@ -207,7 +207,8 @@ class CandidateFact(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION, min_length=1, max_length=80)
 
     fact_id: str = Field(min_length=1, max_length=120)
-    entity_kind: Literal["character"] = "character"
+    # character = day-1 scope; scene added so confirmation-loop can correct scene names
+    entity_kind: Literal["character", "scene"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(
         min_length=1,
@@ -324,7 +325,7 @@ class AuthoritativeScriptFact(BaseModel):
     authoritative_fact_id: str = Field(min_length=1, max_length=120)
     source_candidate_fact_id: str = Field(min_length=1, max_length=120)
 
-    entity_kind: Literal["character"] = "character"
+    entity_kind: Literal["character", "scene"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(min_length=1, max_length=160)
 
