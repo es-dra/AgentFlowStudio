@@ -17,6 +17,8 @@ Hard rules
 5. Generic roles (女人/男人…) without a proper name → missing, not a fake name.
 6. ScriptProfile accepts explicit metadata label lines only; never infer from plot.
 7. Beat boundaries accept explicit numbered labels only, scoped to an owning Scene.
+8. Beat facets (conflict/turn/info_release/emotion_shift) accept explicit labels
+   only inside a Beat range; emotion_shift requires from+to+change together.
 """
 
 from __future__ import annotations
@@ -76,6 +78,21 @@ class ExtractedBeatBoundary:
     marker: str
     label: str
     method: str = "explicit_numbered_beat_label"
+
+
+BeatFacetName = Literal["conflict", "turn", "info_release", "emotion_shift"]
+
+
+@dataclass(frozen=True)
+class ExtractedBeatFacet:
+    """One labeled-only Beat facet (or emotion sub-part) inside a Beat range."""
+
+    facet: BeatFacetName
+    field_suffix: str
+    item: ExtractedItem
+    evidence_start: int | None = None
+    evidence_end: int | None = None
+    uncertainty_note: str | None = None
 
 
 @dataclass
@@ -255,6 +272,50 @@ _EXPLICIT_BEAT_MARKER = re.compile(
     r"[ \t]*(?:[-:：][ \t]*(?P<label>[^\r\n]*?))?[ \t]*\r?$",
     re.I | re.M,
 )
+
+# Facet labels are whole-line metadata inside a Beat range — never prose inference.
+_BEAT_FACET_LABEL_PATTERNS: dict[str, re.Pattern[str]] = {
+    "conflict": re.compile(
+        r"^[ \t]*(?:冲突|Contradiction|Conflict)[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "turn": re.compile(
+        r"^[ \t]*(?:转折|Turn)[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "info_release": re.compile(
+        r"^[ \t]*(?:信息释放|信息增量|信息|Info(?:rmation)?(?:[ \t]*release)?)"
+        r"[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "emotion_from": re.compile(
+        r"^[ \t]*(?:情绪从|情绪起点|From(?:[ \t]*emotion)?)[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "emotion_to": re.compile(
+        r"^[ \t]*(?:情绪到|情绪终点|To(?:[ \t]*emotion)?)[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+    "emotion_change": re.compile(
+        r"^[ \t]*(?:情绪变化|情绪转变|Emotion(?:[ \t]*change)?)[ \t]*[:：][ \t]*(.+?)[ \t]*$",
+        re.I | re.M,
+    ),
+}
+
+_BEAT_FACET_MISSING_NOTES: dict[BeatFacetName, str] = {
+    "conflict": "no explicit 冲突 label inside Beat range; refusing conflict inference",
+    "turn": "no explicit 转折 label inside Beat range; refusing turn inference",
+    "info_release": (
+        "no explicit 信息释放/信息 label inside Beat range; "
+        "info_release is especially interpretive without labels"
+    ),
+    "emotion_shift": (
+        "emotion_shift requires explicit 情绪从 + 情绪到 + 情绪变化 labels together; "
+        "partial evidence stays missing"
+    ),
+}
+
+_EXPLICITLY_MISSING_BEAT_FACET_VALUES = frozenset({"无", "未知", "待定", "n/a"})
 
 
 # ---------------------------------------------------------------------------
@@ -668,6 +729,191 @@ def extract_explicit_beat_boundaries(
     return boundaries
 
 
+def _collect_labeled_values_in_range(
+    range_text: str,
+    *,
+    pattern: re.Pattern[str],
+    source_offset: int,
+    method: str,
+) -> list[tuple[ExtractedItem, int, int]] | str:
+    """Return unique labeled values, or an ambiguity reason string."""
+
+    matches = list(pattern.finditer(range_text or ""))
+    if not matches:
+        return []
+    values: list[tuple[ExtractedItem, int, int]] = []
+    for match in matches:
+        raw = (match.group(1) or "").strip()
+        if not raw or raw.lower() in _EXPLICITLY_MISSING_BEAT_FACET_VALUES:
+            continue
+        start = source_offset + match.start(1)
+        end = source_offset + match.end(1)
+        values.append(
+            (
+                ExtractedItem(
+                    text=raw,
+                    status=ExtractStatus.EXTRACTED_FROM_TEXT,
+                    confidence=0.92,
+                    method=method,
+                    evidence=raw[:120],
+                ),
+                start,
+                end,
+            )
+        )
+    if not values:
+        return []
+    if len(values) > 1:
+        return "duplicate_explicit_labels"
+    return values
+
+
+def extract_explicit_beat_facets(
+    beat_range_text: str,
+    *,
+    source_offset: int = 0,
+) -> list[ExtractedBeatFacet]:
+    """Labeled-only Beat facets inside one Beat source range.
+
+    Hard rules:
+    - No label → missing (never invent from prose).
+    - Duplicate labels for the same facet → missing (fail closed, no silent pick).
+    - emotion_shift present only when from+to+change are all uniquely labeled;
+      any partial set → one missing emotion_shift facet (not partial presents).
+    """
+
+    facets: list[ExtractedBeatFacet] = []
+
+    for facet, pattern_key, field_suffix, method in (
+        ("conflict", "conflict", "conflict", "explicit_beat_conflict_label"),
+        ("turn", "turn", "turn", "explicit_beat_turn_label"),
+        ("info_release", "info_release", "info_release", "explicit_beat_info_release_label"),
+    ):
+        collected = _collect_labeled_values_in_range(
+            beat_range_text,
+            pattern=_BEAT_FACET_LABEL_PATTERNS[pattern_key],
+            source_offset=source_offset,
+            method=method,
+        )
+        if isinstance(collected, str):
+            facets.append(
+                ExtractedBeatFacet(
+                    facet=facet,  # type: ignore[arg-type]
+                    field_suffix=field_suffix,
+                    item=ExtractedItem(
+                        text="(missing)",
+                        status=ExtractStatus.MISSING,
+                        confidence=0.0,
+                        method="explicit_beat_facet_ambiguous",
+                    ),
+                    uncertainty_note=(
+                        f"multiple explicit {facet} labels inside Beat range; "
+                        "refusing to choose"
+                    ),
+                )
+            )
+            continue
+        if not collected:
+            facets.append(
+                ExtractedBeatFacet(
+                    facet=facet,  # type: ignore[arg-type]
+                    field_suffix=field_suffix,
+                    item=ExtractedItem(
+                        text="(missing)",
+                        status=ExtractStatus.MISSING,
+                        confidence=0.0,
+                        method="explicit_beat_facet_missing",
+                    ),
+                    uncertainty_note=_BEAT_FACET_MISSING_NOTES[facet],  # type: ignore[index]
+                )
+            )
+            continue
+        item, start, end = collected[0]
+        facets.append(
+            ExtractedBeatFacet(
+                facet=facet,  # type: ignore[arg-type]
+                field_suffix=field_suffix,
+                item=item,
+                evidence_start=start,
+                evidence_end=end,
+            )
+        )
+
+    emotion_parts: dict[str, tuple[ExtractedItem, int, int] | str | None] = {
+        "from_state": None,
+        "to_state": None,
+        "change": None,
+    }
+    part_specs = (
+        ("from_state", "emotion_from", "explicit_beat_emotion_from_label"),
+        ("to_state", "emotion_to", "explicit_beat_emotion_to_label"),
+        ("change", "emotion_change", "explicit_beat_emotion_change_label"),
+    )
+    emotion_ambiguous = False
+    emotion_partial = False
+    for part, pattern_key, method in part_specs:
+        collected = _collect_labeled_values_in_range(
+            beat_range_text,
+            pattern=_BEAT_FACET_LABEL_PATTERNS[pattern_key],
+            source_offset=source_offset,
+            method=method,
+        )
+        if isinstance(collected, str):
+            emotion_ambiguous = True
+            emotion_parts[part] = collected
+            continue
+        if not collected:
+            emotion_partial = True
+            emotion_parts[part] = None
+            continue
+        emotion_parts[part] = collected[0]
+
+    if (
+        emotion_ambiguous
+        or emotion_partial
+        or any(value is None for value in emotion_parts.values())
+    ):
+        note = _BEAT_FACET_MISSING_NOTES["emotion_shift"]
+        if emotion_ambiguous:
+            note = (
+                "multiple explicit emotion_shift labels inside Beat range; "
+                "refusing partial or ambiguous emotion_shift"
+            )
+        elif any(
+            emotion_parts[part] is not None for part in ("from_state", "to_state", "change")
+        ):
+            note = (
+                "partial emotion_shift labels found; "
+                "from_state/to_state/change must all be present uniquely"
+            )
+        facets.append(
+            ExtractedBeatFacet(
+                facet="emotion_shift",
+                field_suffix="emotion_shift",
+                item=ExtractedItem(
+                    text="(missing)",
+                    status=ExtractStatus.MISSING,
+                    confidence=0.0,
+                    method="explicit_beat_emotion_shift_missing",
+                ),
+                uncertainty_note=note,
+            )
+        )
+    else:
+        for part in ("from_state", "to_state", "change"):
+            item, start, end = emotion_parts[part]  # type: ignore[misc]
+            facets.append(
+                ExtractedBeatFacet(
+                    facet="emotion_shift",
+                    field_suffix=f"emotion_shift.{part}",
+                    item=item,
+                    evidence_start=start,
+                    evidence_end=end,
+                )
+            )
+    return facets
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -730,12 +976,15 @@ __all__ = (
     "ScriptProfileFacetName",
     "ScriptProfileFacetExtraction",
     "ExtractedBeatBoundary",
+    "BeatFacetName",
+    "ExtractedBeatFacet",
     "ExtractionResult",
     "extract_characters",
     "extract_scenes",
     "extract_scene_occurrences",
     "extract_script_profile_facets",
     "extract_explicit_beat_boundaries",
+    "extract_explicit_beat_facets",
     "extract_characters_and_scenes",
     "extracted_item_to_dict",
     "extraction_result_to_dict",

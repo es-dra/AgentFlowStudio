@@ -46,11 +46,13 @@ from apps.api.runtime_script_core_truth import current_script_revision_binding
 from apps.api.runtime_script_improved_extraction import (
     ExtractStatus,
     ExtractedBeatBoundary,
+    ExtractedBeatFacet,
     ExtractedItem,
     ExtractionResult,
     ScriptProfileFacetExtraction,
     extract_characters_and_scenes,
     extract_explicit_beat_boundaries,
+    extract_explicit_beat_facets,
     extract_scene_occurrences,
     extract_script_profile_facets,
 )
@@ -395,6 +397,66 @@ def beat_boundary_to_candidate_fact(
     )
 
 
+def beat_facet_to_candidate_fact(
+    facet: ExtractedBeatFacet,
+    *,
+    scene_entity_id: str,
+    beat_order_index: int,
+    beat_entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+    source_text: str,
+) -> CandidateFact:
+    field_path = (
+        f"scene[{scene_entity_id}].beats[{beat_order_index}].{facet.field_suffix}"
+    )
+    status = _status_from_extract(facet.item.status)
+    spans: list[EvidenceSpan] = []
+    uncertainty = facet.uncertainty_note
+    if (
+        status != CandidateStatus.MISSING
+        and facet.evidence_start is not None
+        and facet.evidence_end is not None
+        and 0 <= facet.evidence_start < facet.evidence_end <= len(source_text)
+    ):
+        quote = source_text[facet.evidence_start:facet.evidence_end]
+        if quote == facet.item.text:
+            spans = [
+                EvidenceSpan(
+                    start=facet.evidence_start,
+                    end=facet.evidence_end,
+                    quote=quote[:1200],
+                )
+            ]
+    if status == CandidateStatus.MISSING:
+        spans = []
+    elif not spans:
+        status = CandidateStatus.MISSING
+        uncertainty = (
+            facet.uncertainty_note
+            or "Beat facet label could not be bound to a source evidence span"
+        )
+    return CandidateFact(
+        fact_id=_id("fact"),
+        entity_kind="beat",
+        entity_id=beat_entity_id,
+        field_path=field_path,
+        claim=ClaimedText(
+            text=facet.item.text if status != CandidateStatus.MISSING else "(missing)",
+            confidence=0.0 if status == CandidateStatus.MISSING else facet.item.confidence,
+            evidence_spans=spans,
+            uncertainty_note=uncertainty if status == CandidateStatus.MISSING else None,
+        ),
+        status=status,
+        project_id=project_id,
+        source_revision_id=source_revision_id,
+        source_revision_digest=source_revision_digest,
+        producer="deterministic_extractor",
+        produced_at=_now(),
+    )
+
+
 def _unique_evidence_start(source_text: str, evidence: str) -> int | None:
     quote = evidence.strip()
     if not quote:
@@ -527,6 +589,29 @@ def build_review_bundle_from_extraction(
                         decision=decisions.get(fact.fact_id),
                     )
                 )
+                range_text = source_text[boundary.source_start:boundary.source_end]
+                for facet in extract_explicit_beat_facets(
+                    range_text,
+                    source_offset=boundary.source_start,
+                ):
+                    facet_fact = beat_facet_to_candidate_fact(
+                        facet,
+                        scene_entity_id=scene_fact.entity_id,
+                        beat_order_index=boundary.order_index,
+                        beat_entity_id=fact.entity_id,
+                        project_id=project_id,
+                        source_revision_id=source_revision_id,
+                        source_revision_digest=digest,
+                        source_text=source_text,
+                    )
+                    facts.append(facet_fact)
+                    items.append(
+                        _fact_to_review_item(
+                            facet_fact,
+                            producer_method=facet.item.method,
+                            decision=decisions.get(facet_fact.fact_id),
+                        )
+                    )
         global_marker_count = len(extract_explicit_beat_boundaries(source_text))
         if global_marker_count != associated_marker_count:
             beat_notes.append(
@@ -951,7 +1036,16 @@ def resolve_for_downstream(
             "text": fact.text,
         }
         for fact in auth
-        if fact.entity_kind == "beat"
+        if fact.entity_kind == "beat" and fact.field_path.endswith(".boundary")
+    ]
+    auth_beat_facets = [
+        {
+            "entity_id": fact.entity_id,
+            "field_path": fact.field_path,
+            "text": fact.text,
+        }
+        for fact in auth
+        if fact.entity_kind == "beat" and not fact.field_path.endswith(".boundary")
     ]
     raw_chars = list(fresh_extraction.character_texts()) if fresh_extraction else []
     raw_scenes = list(fresh_extraction.scene_texts()) if fresh_extraction else []
@@ -961,6 +1055,7 @@ def resolve_for_downstream(
         "scenes": auth_scenes or raw_scenes,
         "script_profile": auth_profile,
         "beats": auth_beats,
+        "beat_facets": auth_beat_facets,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
         "raw_extraction_characters": raw_chars,

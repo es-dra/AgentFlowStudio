@@ -44,6 +44,42 @@ LABELED_BEAT_CONTROL = LABELED_SCRIPT_PROFILE.replace(
     "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\n林秀站在门口",
     "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\nBEAT 1: 归家重逢\n林秀站在门口",
 )
+LABELED_BEAT_FACET_CONTROL = LABELED_SCRIPT_PROFILE.replace(
+    "人物：陈浩（40多岁，疲惫，眼神坚定）\n\n陈浩独自",
+    (
+        "人物：陈浩（40多岁，疲惫，眼神坚定）\n\n"
+        "节拍1：等待列车\n"
+        "冲突：与时间赛跑\n"
+        "转折：火车进站\n"
+        "信息释放：到站通知响起\n"
+        "情绪从：疲惫\n"
+        "情绪到：紧张\n"
+        "情绪变化：由等待转为准备登车\n"
+        "陈浩独自"
+    ),
+).replace(
+    "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\n林秀站在门口",
+    (
+        "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\n"
+        "BEAT 1: 归家重逢\n"
+        "冲突：久别后的愧疚\n"
+        "转折：母亲抱住他\n"
+        "信息释放：终于回家了\n"
+        "情绪从：克制\n"
+        "情绪到：释然\n"
+        "情绪变化：从压抑转为拥抱\n"
+        "林秀站在门口"
+    ),
+)
+BEAT_FACET_SUFFIXES = {
+    "conflict",
+    "turn",
+    "info_release",
+    "emotion_shift",
+    "emotion_shift.from_state",
+    "emotion_shift.to_state",
+    "emotion_shift.change",
+}
 
 
 def _client(tmp_path) -> TestClient:
@@ -723,13 +759,34 @@ def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
         "beat",
     }
     scenes = {item["text"]: item for item in items if item["entity_kind"] == "scene"}
-    beats = [item for item in items if item["entity_kind"] == "beat"]
+    beats = [
+        item
+        for item in items
+        if item["entity_kind"] == "beat" and item["field_path"].endswith(".boundary")
+    ]
     assert len(beats) == 2
     assert {item["text"] for item in beats} == {"等待列车", "归家重逢"}
     assert {item["status"] for item in beats} == {"extracted_from_text"}
     assert all(item["producer_method"] == "explicit_numbered_beat_label" for item in beats)
 
+    # Without facet labels, each Beat still emits fail-closed missing facet slots.
     waiting = next(item for item in beats if item["text"] == "等待列车")
+    waiting_facets = [
+        item
+        for item in items
+        if item["entity_kind"] == "beat"
+        and item["entity_id"] == waiting["entity_id"]
+        and not item["field_path"].endswith(".boundary")
+    ]
+    assert {item["field_path"].rsplit(".", 1)[-1] for item in waiting_facets} >= {
+        "conflict",
+        "turn",
+        "info_release",
+        "emotion_shift",
+    }
+    assert all(item["status"] == "missing" for item in waiting_facets)
+    assert all(item["text"] == "(missing)" for item in waiting_facets)
+
     reunion = next(item for item in beats if item["text"] == "归家重逢")
     station_id = scenes["小镇火车站"]["entity_id"]
     home_id = scenes["陈浩家中的老屋"]["entity_id"]
@@ -766,7 +823,9 @@ def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
     assert edited.status_code == 200, edited.text
     body = edited.json()
     beat_authority = [
-        fact for fact in body["authoritative"] if fact["entity_kind"] == "beat"
+        fact
+        for fact in body["authoritative"]
+        if fact["entity_kind"] == "beat" and fact["field_path"].endswith(".boundary")
     ]
     assert {fact["text"] for fact in beat_authority} == {"等待列车", "重逢"}
     assert {row["text"] for row in body["resolved"]["beats"]} == {"等待列车", "重逢"}
@@ -781,6 +840,7 @@ def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
         node
         for node in graph["nodes"].values()
         if node.get("metadata", {}).get("entity_kind") == "beat"
+        and node.get("metadata", {}).get("beat_slot") == "boundary"
     ]
     assert len(graph_beats) == 2
     graph_by_text = {
@@ -806,7 +866,9 @@ def test_beat_edit_confirm_preserves_marker_evidence_when_text_is_not_in_source_
     beat = next(
         item
         for item in refreshed["bundle"]["items"]
-        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+        if item["entity_kind"] == "beat"
+        and item["field_path"].endswith(".boundary")
+        and item["text"] == "等待列车"
     )
     original_evidence = beat["evidence_spans"]
 
@@ -944,7 +1006,7 @@ def test_beat_repeat_refresh_accept_supersedes_and_upserts_graph_via_api(
     first = next(
         item
         for item in first_refresh["bundle"]["items"]
-        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+        if item["entity_kind"] == "beat" and item["field_path"].endswith(".boundary") and item["text"] == "等待列车"
     )
     first_accept = client.post(
         f"/projects/{project_id}/candidate-facts/actions",
@@ -1012,7 +1074,7 @@ def test_beat_new_revision_invalidates_authority_and_changes_identity_via_api(
     first = next(
         item
         for item in first_refresh["bundle"]["items"]
-        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+        if item["entity_kind"] == "beat" and item["field_path"].endswith(".boundary") and item["text"] == "等待列车"
     )
     first_accept = client.post(
         f"/projects/{project_id}/candidate-facts/actions",
@@ -1032,7 +1094,7 @@ def test_beat_new_revision_invalidates_authority_and_changes_identity_via_api(
     second = next(
         item
         for item in second_refresh["bundle"]["items"]
-        if item["entity_kind"] == "beat" and item["text"] == "决定登车"
+        if item["entity_kind"] == "beat" and item["field_path"].endswith(".boundary") and item["text"] == "决定登车"
     )
     assert second["field_path"] == first["field_path"]
     assert second["entity_id"] != first["entity_id"]
@@ -1045,3 +1107,265 @@ def test_beat_new_revision_invalidates_authority_and_changes_identity_via_api(
     ]
     assert len(invalidated) == 1
     assert invalidated[0].invalidated_by_revision_id == rev2["revision_id"]
+
+
+def test_beat_facets_labeled_control_confirm_and_feed_graph_via_api(tmp_path, monkeypatch) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_beat_facets_control"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_FACET_CONTROL)
+    refreshed = _refresh(client, project_id, revision)
+    items = refreshed["bundle"]["items"]
+
+    waiting = next(
+        item
+        for item in items
+        if item["entity_kind"] == "beat"
+        and item["field_path"].endswith(".boundary")
+        and item["text"] == "等待列车"
+    )
+    facets = {
+        item["field_path"].split("].", 1)[1]: item
+        for item in items
+        if item["entity_kind"] == "beat" and item["entity_id"] == waiting["entity_id"]
+        and not item["field_path"].endswith(".boundary")
+    }
+    assert facets["beats[0].conflict"]["text"] == "与时间赛跑"
+    assert facets["beats[0].turn"]["text"] == "火车进站"
+    assert facets["beats[0].info_release"]["text"] == "到站通知响起"
+    assert facets["beats[0].emotion_shift.from_state"]["text"] == "疲惫"
+    assert facets["beats[0].emotion_shift.to_state"]["text"] == "紧张"
+    assert facets["beats[0].emotion_shift.change"]["text"] == "由等待转为准备登车"
+    assert "beats[0].emotion_shift" not in facets
+    assert all(item["status"] == "extracted_from_text" for item in facets.values())
+    for item in facets.values():
+        span = item["evidence_spans"][0]
+        assert LABELED_BEAT_FACET_CONTROL[span["start"]:span["end"]] == span["quote"] == item["text"]
+
+    accepted_paths = []
+    for item in facets.values():
+        response = client.post(
+            f"/projects/{project_id}/candidate-facts/actions",
+            json={
+                "action": "accept",
+                "fact_id": item["fact_id"],
+                "source_revision_id": revision["revision_id"],
+                "source_revision_digest": revision["source_digest"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        accepted_paths.append(item["field_path"])
+        body = response.json()
+
+    assert {row["text"] for row in body["resolved"]["beat_facets"]} >= {
+        "与时间赛跑",
+        "火车进站",
+        "到站通知响起",
+        "疲惫",
+        "紧张",
+        "由等待转为准备登车",
+    }
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    graph_facets = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "beat"
+        and node.get("metadata", {}).get("beat_slot") not in {None, "boundary"}
+    ]
+    assert len(graph_facets) == 6
+    assert {node["metadata"]["value"] for node in graph_facets} >= {
+        "与时间赛跑",
+        "火车进站",
+        "到站通知响起",
+        "疲惫",
+        "紧张",
+        "由等待转为准备登车",
+    }
+
+
+def test_beat_emotion_partial_labels_fail_closed_as_missing_via_api(tmp_path, monkeypatch) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_emotion_partial"
+    text = LABELED_BEAT_CONTROL.replace(
+        "节拍1：等待列车\n陈浩独自",
+        "节拍1：等待列车\n情绪从：疲惫\n冲突：与时间赛跑\n陈浩独自",
+    )
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, text)
+    refreshed = _refresh(client, project_id, revision)
+    waiting = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "beat"
+        and item["field_path"].endswith(".boundary")
+        and item["text"] == "等待列车"
+    )
+    facets = [
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_id"] == waiting["entity_id"] and not item["field_path"].endswith(".boundary")
+    ]
+    by_suffix = {item["field_path"].rsplit("].", 1)[-1]: item for item in facets}
+    assert by_suffix["conflict"]["status"] == "extracted_from_text"
+    assert by_suffix["conflict"]["text"] == "与时间赛跑"
+    assert by_suffix["emotion_shift"]["status"] == "missing"
+    assert by_suffix["emotion_shift"]["text"] == "(missing)"
+    assert not any(key.startswith("emotion_shift.") for key in by_suffix)
+    assert "partial emotion_shift" in (by_suffix["emotion_shift"]["uncertainty_note"] or "")
+
+
+def test_beat_missing_facet_edit_confirm_requires_source_evidence_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Missing facet edit must bind an exact source span — never fabricate one."""
+
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_facet_edit_evidence"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_CONTROL)
+    refreshed = _refresh(client, project_id, revision)
+    waiting = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "beat"
+        and item["field_path"].endswith(".boundary")
+        and item["text"] == "等待列车"
+    )
+    conflict = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_id"] == waiting["entity_id"] and item["field_path"].endswith(".conflict")
+    )
+    assert conflict["status"] == "missing"
+    assert conflict["evidence_spans"] == []
+
+    fabricated = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": conflict["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "原文完全不存在的冲突表述",
+            "reason": "must fail closed without source span",
+        },
+    )
+    assert fabricated.status_code == 409, fabricated.text
+    assert "source-backed" in fabricated.json()["detail"]["message"]
+
+    # Reuse an exact quote already present in the Beat range prose.
+    source_quote = "陈浩独自坐在长椅上"
+    assert source_quote in LABELED_BEAT_CONTROL
+    edited = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": conflict["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": source_quote,
+            "reason": "human supplies labeled conflict from source",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    authority = next(
+        fact
+        for fact in edited.json()["authoritative"]
+        if fact["source_candidate_fact_id"] == conflict["fact_id"]
+    )
+    assert authority["text"] == source_quote
+    span = authority["evidence_spans"][0]
+    assert LABELED_BEAT_CONTROL[span["start"]:span["end"]] == span["quote"] == source_quote
+
+
+def test_beat_duplicate_conflict_labels_fail_closed_via_api(tmp_path, monkeypatch) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_dup_conflict"
+    text = LABELED_BEAT_CONTROL.replace(
+        "节拍1：等待列车\n陈浩独自",
+        "节拍1：等待列车\n冲突：与时间赛跑\n冲突：另一冲突\n陈浩独自",
+    )
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, text)
+    refreshed = _refresh(client, project_id, revision)
+    waiting = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "beat"
+        and item["field_path"].endswith(".boundary")
+        and item["text"] == "等待列车"
+    )
+    conflict = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_id"] == waiting["entity_id"] and item["field_path"].endswith(".conflict")
+    )
+    assert conflict["status"] == "missing"
+    assert "multiple explicit conflict labels" in (conflict["uncertainty_note"] or "")
+
+
+def test_beat_facet_repeat_refresh_accept_supersedes_via_api(tmp_path, monkeypatch) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_beat_facet_repeat"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_FACET_CONTROL)
+
+    first_refresh = _refresh(client, project_id, revision)
+    first = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["field_path"].endswith(".conflict")
+        and item["text"] == "与时间赛跑"
+    )
+    first_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert first_accept.status_code == 200, first_accept.text
+
+    second_refresh = _refresh(client, project_id, revision)
+    second = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["field_path"] == first["field_path"]
+    )
+    second_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": second["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert second_accept.status_code == 200, second_accept.text
+
+    records = [
+        record
+        for record in load_ledger(RuntimeStore(tmp_path), project_id).authoritative_records
+        if record.fact.field_path == first["field_path"]
+    ]
+    assert [record.validity.value for record in records].count("active") == 1
+    assert [record.validity.value for record in records].count("superseded") == 1
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    nodes = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("field_path") == first["field_path"]
+    ]
+    assert len(nodes) == 1

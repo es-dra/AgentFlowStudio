@@ -141,14 +141,18 @@ def compile_authoritative_facts_to_graph_events(
         elif fact.entity_kind == "script_profile":
             metadata["value"] = fact.text
         else:
-            metadata["boundary_label"] = fact.text
             ownership = re.fullmatch(
-                r"scene\[(?P<scene_id>.+)\]\.beats\[(?P<order_index>\d+)\]\.boundary",
+                r"scene\[(?P<scene_id>.+)\]\.beats\[(?P<order_index>\d+)\]\.(?P<slot>.+)",
                 fact.field_path,
             )
             if ownership:
                 metadata["parent_scene_id"] = ownership.group("scene_id")
                 metadata["order_index"] = int(ownership.group("order_index"))
+                metadata["beat_slot"] = ownership.group("slot")
+            if fact.field_path.endswith(".boundary"):
+                metadata["boundary_label"] = fact.text
+            else:
+                metadata["value"] = fact.text
         if fact.human_confirmed_by:
             metadata["human_confirmed_by"] = fact.human_confirmed_by
         if fact.deterministic_check_id:
