@@ -208,7 +208,13 @@ class CandidateFact(BaseModel):
 
     fact_id: str = Field(min_length=1, max_length=120)
     # Beat / script_profile join the same candidate state machine in local drafts.
-    entity_kind: Literal["character", "scene", "beat", "script_profile"] = "character"
+    entity_kind: Literal[
+        "character",
+        "scene",
+        "beat",
+        "script_profile",
+        "continuity_flag",
+    ] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(
         min_length=1,
@@ -325,7 +331,13 @@ class AuthoritativeScriptFact(BaseModel):
     authoritative_fact_id: str = Field(min_length=1, max_length=120)
     source_candidate_fact_id: str = Field(min_length=1, max_length=120)
 
-    entity_kind: Literal["character", "scene", "beat", "script_profile"] = "character"
+    entity_kind: Literal[
+        "character",
+        "scene",
+        "beat",
+        "script_profile",
+        "continuity_flag",
+    ] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(min_length=1, max_length=160)
 
