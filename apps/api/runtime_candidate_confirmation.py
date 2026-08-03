@@ -45,10 +45,13 @@ from apps.api.runtime_production_graph import ProductionGraphError, ProductionGr
 from apps.api.runtime_script_core_truth import current_script_revision_binding
 from apps.api.runtime_script_improved_extraction import (
     ExtractStatus,
+    ExtractedBeatBoundary,
     ExtractedItem,
     ExtractionResult,
     ScriptProfileFacetExtraction,
     extract_characters_and_scenes,
+    extract_explicit_beat_boundaries,
+    extract_scene_occurrences,
     extract_script_profile_facets,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
@@ -57,7 +60,7 @@ from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payloa
 CONFIRMATION_LOOP_ENV = "AFS_USE_CANDIDATE_CONFIRMATION_LOOP"
 RECOVERABLE_GRAPH_FEED_ENV = "AFS_CANDIDATE_FACTS_RECOVERABLE_GRAPH_FEED"
 CONFIRMATION_LOOP_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
-LEDGER_SCHEMA_VERSION = "afs.candidate_fact_ledger.v0.2"
+LEDGER_SCHEMA_VERSION = "afs.candidate_fact_ledger.v0.3"
 LOOP_SCHEMA_VERSION = "afs.script_understanding.confirmation_loop.v0.1"
 ARTIFACT_TYPE = "afs_candidate_fact_ledger"
 
@@ -112,7 +115,7 @@ class CandidateReviewItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     fact_id: str
-    entity_kind: Literal["character", "scene", "script_profile"]
+    entity_kind: Literal["character", "scene", "script_profile", "beat"]
     entity_id: str
     field_path: str
     text: str
@@ -138,7 +141,7 @@ class MissingSlotItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slot_id: str
-    entity_kind: Literal["character", "scene", "script_profile"]
+    entity_kind: Literal["character", "scene", "script_profile", "beat"]
     field_path: str
     message: str
     status: Literal["missing"] = "missing"
@@ -204,6 +207,9 @@ class FactLedger(BaseModel):
     current_revision_digest: str = ""
     candidates: dict[str, CandidateFact] = Field(default_factory=dict)
     review_decisions: dict[str, ReviewDecision] = Field(default_factory=dict)
+    missing_slots: list[MissingSlotItem] = Field(default_factory=list)
+    extraction_notes: list[str] = Field(default_factory=list)
+    title_hint: str | None = Field(default=None, max_length=200)
     authoritative_records: list[AuthoritativeFactRecord] = Field(default_factory=list)
     change_log: list[ChangeRecord] = Field(default_factory=list)
 
@@ -239,6 +245,18 @@ def _evidence_for(source_text: str, quote: str) -> list[EvidenceSpan]:
     idx = source_text.find(q)
     if idx < 0:
         return [EvidenceSpan(start=0, end=max(len(q), 1), quote=q[:1200])]
+    return [EvidenceSpan(start=idx, end=idx + len(q), quote=q[:1200])]
+
+
+def _exact_evidence_for(source_text: str, quote: str) -> list[EvidenceSpan]:
+    """Return source-backed evidence only; never synthesize a span."""
+
+    q = (quote or "").strip()
+    if not q:
+        return []
+    idx = source_text.find(q)
+    if idx < 0:
+        return []
     return [EvidenceSpan(start=idx, end=idx + len(q), quote=q[:1200])]
 
 
@@ -333,6 +351,60 @@ def script_profile_facet_to_candidate_fact(
     )
 
 
+def beat_boundary_to_candidate_fact(
+    boundary: ExtractedBeatBoundary,
+    *,
+    scene_entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+) -> CandidateFact:
+    revision_key = hashlib.sha256(source_revision_id.encode("utf-8")).hexdigest()[:12]
+    raw_entity_id = f"{scene_entity_id}.beat_{boundary.order_index:04d}.{revision_key}"
+    if len(raw_entity_id) <= 120:
+        entity_id = raw_entity_id
+    else:
+        identity_key = hashlib.sha256(raw_entity_id.encode("utf-8")).hexdigest()[:24]
+        entity_id = f"beat_{identity_key}_{boundary.order_index:04d}.{revision_key}"
+    field_path = (
+        f"scene[{scene_entity_id}].beats[{boundary.order_index}].boundary"
+    )
+    claim_text = boundary.label or boundary.marker
+    return CandidateFact(
+        fact_id=_id("fact"),
+        entity_kind="beat",
+        entity_id=entity_id,
+        field_path=field_path,
+        claim=ClaimedText(
+            text=claim_text,
+            confidence=0.95,
+            evidence_spans=[
+                EvidenceSpan(
+                    start=boundary.evidence_start,
+                    end=boundary.evidence_end,
+                    quote=boundary.marker,
+                )
+            ],
+        ),
+        status=CandidateStatus.EXTRACTED_FROM_TEXT,
+        project_id=project_id,
+        source_revision_id=source_revision_id,
+        source_revision_digest=source_revision_digest,
+        producer="deterministic_extractor",
+        produced_at=_now(),
+    )
+
+
+def _unique_evidence_start(source_text: str, evidence: str) -> int | None:
+    quote = evidence.strip()
+    if not quote:
+        return None
+    first = source_text.find(quote)
+    if first < 0 or source_text.find(quote, first + 1) >= 0:
+        return None
+    return first
+
+
 def build_review_bundle_from_extraction(
     extraction: ExtractionResult,
     *,
@@ -349,6 +421,7 @@ def build_review_bundle_from_extraction(
     facts: list[CandidateFact] = []
     items: list[CandidateReviewItem] = []
     missing: list[MissingSlotItem] = []
+    scene_rows: list[tuple[ExtractedItem, CandidateFact]] = []
 
     for i, ch in enumerate(extraction.characters):
         fact = extracted_item_to_candidate_fact(
@@ -374,6 +447,7 @@ def build_review_bundle_from_extraction(
             index=i,
         )
         facts.append(fact)
+        scene_rows.append((sc, fact))
         items.append(_fact_to_review_item(fact, producer_method=sc.method, decision=decisions.get(fact.fact_id)))
 
     profile_revision_key = hashlib.sha256(source_revision_id.encode("utf-8")).hexdigest()[:24]
@@ -395,6 +469,94 @@ def build_review_bundle_from_extraction(
                 decision=decisions.get(fact.fact_id),
             )
         )
+
+    beat_notes: list[str] = []
+    positioned_scenes: list[tuple[int, ExtractedItem, CandidateFact]] = []
+    scene_positions_are_unique = bool(scene_rows)
+    occurrence_counts: dict[str, int] = {}
+    for occurrence in extract_scene_occurrences(source_text):
+        occurrence_counts[occurrence.text] = occurrence_counts.get(occurrence.text, 0) + 1
+    if any(occurrence_counts.get(scene_item.text, 0) != 1 for scene_item, _ in scene_rows):
+        scene_positions_are_unique = False
+    for scene_item, scene_fact in scene_rows:
+        position = _unique_evidence_start(source_text, scene_item.evidence)
+        if position is None:
+            scene_positions_are_unique = False
+            break
+        positioned_scenes.append((position, scene_item, scene_fact))
+    if len({row[0] for row in positioned_scenes}) != len(positioned_scenes):
+        scene_positions_are_unique = False
+
+    if scene_positions_are_unique:
+        positioned_scenes.sort(key=lambda row: row[0])
+        associated_marker_count = 0
+        for scene_index, (scene_start, _, scene_fact) in enumerate(positioned_scenes):
+            scene_end = (
+                positioned_scenes[scene_index + 1][0]
+                if scene_index + 1 < len(positioned_scenes)
+                else len(source_text)
+            )
+            boundaries = extract_explicit_beat_boundaries(
+                source_text[scene_start:scene_end],
+                source_offset=scene_start,
+            )
+            associated_marker_count += len(boundaries)
+            if not boundaries:
+                missing.append(
+                    MissingSlotItem(
+                        slot_id=_id("miss_beat"),
+                        entity_kind="beat",
+                        field_path=f"scene[{scene_fact.entity_id}].beats",
+                        message="No explicit numbered Beat labels in this Scene; no Beat candidate emitted.",
+                    )
+                )
+                continue
+            for boundary in boundaries:
+                fact = beat_boundary_to_candidate_fact(
+                    boundary,
+                    scene_entity_id=scene_fact.entity_id,
+                    project_id=project_id,
+                    source_revision_id=source_revision_id,
+                    source_revision_digest=digest,
+                )
+                facts.append(fact)
+                items.append(
+                    _fact_to_review_item(
+                        fact,
+                        producer_method=boundary.method,
+                        decision=decisions.get(fact.fact_id),
+                    )
+                )
+        global_marker_count = len(extract_explicit_beat_boundaries(source_text))
+        if global_marker_count != associated_marker_count:
+            beat_notes.append(
+                "explicit_beat_labels_outside_resolved_scene_ranges_ignored"
+            )
+    else:
+        if scene_rows:
+            beat_notes.append("beat_scene_ownership_ambiguous; no Beat candidate emitted")
+            for _, scene_fact in scene_rows:
+                missing.append(
+                    MissingSlotItem(
+                        slot_id=_id("miss_beat"),
+                        entity_kind="beat",
+                        field_path=f"scene[{scene_fact.entity_id}].beats",
+                        message="Owning Scene source range is ambiguous; no Beat candidate emitted.",
+                    )
+                )
+        else:
+            if extract_explicit_beat_boundaries(source_text):
+                beat_notes.append(
+                    "explicit_beat_labels_without_resolved_scene_ignored"
+                )
+            missing.append(
+                MissingSlotItem(
+                    slot_id=_id("miss_beat"),
+                    entity_kind="beat",
+                    field_path="scene[(missing)].beats",
+                    message="No resolved Scene is available to own a Beat candidate.",
+                )
+            )
 
     if extraction.character_name_status == ExtractStatus.MISSING:
         missing.append(
@@ -422,7 +584,7 @@ def build_review_bundle_from_extraction(
         title_hint=title_hint,
         items=items,
         missing_slots=missing,
-        extraction_notes=list(extraction.notes),
+        extraction_notes=[*extraction.notes, *beat_notes],
     )
     return bundle, facts
 
@@ -485,6 +647,9 @@ def open_ledger_from_extraction(
         current_revision_digest=digest,
         candidates={f.fact_id: f for f in facts},
         review_decisions={f.fact_id: ReviewDecision.PENDING for f in facts},
+        missing_slots=list(bundle.missing_slots),
+        extraction_notes=list(bundle.extraction_notes),
+        title_hint=title_hint,
     )
     ledger.append_change(
         ChangeRecord(
@@ -514,7 +679,10 @@ def bundle_from_ledger(ledger: FactLedger) -> CandidateReviewBundle:
         project_id=ledger.project_id,
         source_revision_id=ledger.current_revision_id,
         source_revision_digest=ledger.current_revision_digest,
+        title_hint=ledger.title_hint,
         items=items,
+        missing_slots=list(ledger.missing_slots),
+        extraction_notes=list(ledger.extraction_notes),
     )
 
 
@@ -620,9 +788,15 @@ def edit_and_confirm_candidate(
     when = _now()
     spans = list(cand.claim.evidence_spans)
     if source_text:
-        found = _evidence_for(source_text, new_text)
+        found = (
+            _exact_evidence_for(source_text, new_text)
+            if cand.entity_kind == "beat"
+            else _evidence_for(source_text, new_text)
+        )
         if found:
             spans = found
+    if cand.entity_kind == "beat" and not spans:
+        raise LoopError("Beat edit_confirm requires source-backed marker evidence")
     if not spans:
         spans = [EvidenceSpan(start=0, end=len(new_text), quote=new_text[:1200])]
     updated = CandidateFact.model_validate(
@@ -715,6 +889,9 @@ def on_script_revision_changed(
     ledger.current_revision_digest = new_digest
     ledger.candidates.clear()
     ledger.review_decisions.clear()
+    ledger.missing_slots.clear()
+    ledger.extraction_notes.clear()
+    ledger.title_hint = None
     ledger.append_change(
         ChangeRecord(
             change_id=_id("chg"),
@@ -767,6 +944,15 @@ def resolve_for_downstream(
         for f in auth
         if f.entity_kind == "script_profile"
     }
+    auth_beats = [
+        {
+            "entity_id": fact.entity_id,
+            "field_path": fact.field_path,
+            "text": fact.text,
+        }
+        for fact in auth
+        if fact.entity_kind == "beat"
+    ]
     raw_chars = list(fresh_extraction.character_texts()) if fresh_extraction else []
     raw_scenes = list(fresh_extraction.scene_texts()) if fresh_extraction else []
     return {
@@ -774,6 +960,7 @@ def resolve_for_downstream(
         "characters": auth_chars or raw_chars,
         "scenes": auth_scenes or raw_scenes,
         "script_profile": auth_profile,
+        "beats": auth_beats,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
         "raw_extraction_characters": raw_chars,
@@ -838,6 +1025,9 @@ def _empty_ledger_state(project_id: str) -> dict[str, Any]:
         "current_revision_digest": "",
         "candidates": {},
         "review_decisions": {},
+        "missing_slots": [],
+        "extraction_notes": [],
+        "title_hint": None,
         "authoritative_records": [],
         "change_log": [],
         "updated_at": _now().isoformat(),
@@ -853,6 +1043,9 @@ def ledger_to_state(ledger: FactLedger) -> dict[str, Any]:
         "current_revision_digest": ledger.current_revision_digest,
         "candidates": {k: v.model_dump(mode="json") for k, v in ledger.candidates.items()},
         "review_decisions": {k: (v.value if isinstance(v, ReviewDecision) else str(v)) for k, v in ledger.review_decisions.items()},
+        "missing_slots": [slot.model_dump(mode="json") for slot in ledger.missing_slots],
+        "extraction_notes": list(ledger.extraction_notes),
+        "title_hint": ledger.title_hint,
         "authoritative_records": [r.model_dump(mode="json") for r in ledger.authoritative_records],
         "change_log": [c.model_dump(mode="json") for c in ledger.change_log],
         "updated_at": _now().isoformat(),
@@ -878,12 +1071,18 @@ def ledger_from_state(state: Mapping[str, Any], project_id: str) -> FactLedger:
         for item in (state.get("authoritative_records") or [])
     ]
     changes = [ChangeRecord.model_validate(item) for item in (state.get("change_log") or [])]
+    missing_slots = [
+        MissingSlotItem.model_validate(item) for item in (state.get("missing_slots") or [])
+    ]
     return FactLedger(
         project_id=project_id,
         current_revision_id=str(state.get("current_revision_id") or ""),
         current_revision_digest=str(state.get("current_revision_digest") or ""),
         candidates=candidates,
         review_decisions=decisions,
+        missing_slots=missing_slots,
+        extraction_notes=[str(note) for note in (state.get("extraction_notes") or [])],
+        title_hint=str(state.get("title_hint") or "") or None,
         authoritative_records=records,
         change_log=changes,
     )

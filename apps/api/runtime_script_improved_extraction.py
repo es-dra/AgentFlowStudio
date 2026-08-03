@@ -1,11 +1,12 @@
-"""Improved Character + Scene + ScriptProfile extraction.
+"""Improved Character + Scene + ScriptProfile + Beat extraction.
 
 Promoted from docs/internal-notes/draft_improved_extraction_20260802.py.
 
 Character/Scene results remain a feature-flagged shadow beside M6's legacy
 extractors. ScriptProfile facets are consumed only by the candidate confirmation
-refresh path, which requires both AFS_USE_IMPROVED_EXTRACTION and
-AFS_USE_CANDIDATE_CONFIRMATION_LOOP. Raw extraction never writes Production Graph.
+refresh path, as are explicit Beat boundaries. Both require
+AFS_USE_IMPROVED_EXTRACTION and AFS_USE_CANDIDATE_CONFIRMATION_LOOP. Raw
+extraction never writes Production Graph.
 
 Hard rules
 ----------
@@ -15,6 +16,7 @@ Hard rules
 4. 「在柜台前」direction fragments are rejected as scene names.
 5. Generic roles (女人/男人…) without a proper name → missing, not a fake name.
 6. ScriptProfile accepts explicit metadata label lines only; never infer from plot.
+7. Beat boundaries accept explicit numbered labels only, scoped to an owning Scene.
 """
 
 from __future__ import annotations
@@ -60,6 +62,20 @@ class ScriptProfileFacetExtraction:
     field_path: str
     item: ExtractedItem
     uncertainty_note: str | None = None
+
+
+@dataclass(frozen=True)
+class ExtractedBeatBoundary:
+    """One explicit numbered Beat label and its reviewed Scene-local source range."""
+
+    order_index: int
+    source_start: int
+    source_end: int
+    evidence_start: int
+    evidence_end: int
+    marker: str
+    label: str
+    method: str = "explicit_numbered_beat_label"
 
 
 @dataclass
@@ -233,6 +249,12 @@ _SCRIPT_PROFILE_FIELD_PATHS: dict[ScriptProfileFacetName, str] = {
 }
 
 _EXPLICITLY_MISSING_PROFILE_VALUES = frozenset({"无", "未知", "待定", "n/a"})
+
+_EXPLICIT_BEAT_MARKER = re.compile(
+    r"^[ \t]*(?P<token>节拍[ \t]*[一二三四五六七八九十百零\d]+|BEAT[ \t]+\d+)"
+    r"[ \t]*(?:[-:：][ \t]*(?P<label>[^\r\n]*?))?[ \t]*\r?$",
+    re.I | re.M,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -541,7 +563,7 @@ def _scenes_from_industry_headings(text: str) -> list[ExtractedItem]:
 
 def extract_scenes(text: str) -> tuple[list[ExtractedItem], list[str]]:
     notes: list[str] = []
-    items = _dedupe_items(_scenes_from_labels(text) + _scenes_from_industry_headings(text))
+    items = _dedupe_items(extract_scene_occurrences(text))
 
     # Intentionally do NOT run the old 在/进入/回到 capture.
     # If only vague room language exists, mark missing later.
@@ -558,6 +580,12 @@ def extract_scenes(text: str) -> tuple[list[ExtractedItem], list[str]]:
             notes.append("no_structured_location_source")
 
     return items, notes
+
+
+def extract_scene_occurrences(text: str) -> list[ExtractedItem]:
+    """Return structured Scene occurrences before name-based deduplication."""
+
+    return _scenes_from_labels(text) + _scenes_from_industry_headings(text)
 
 
 # ---------------------------------------------------------------------------
@@ -607,6 +635,37 @@ def extract_script_profile_facets(text: str) -> list[ScriptProfileFacetExtractio
             )
         )
     return facets
+
+
+def extract_explicit_beat_boundaries(
+    scene_text: str,
+    *,
+    source_offset: int = 0,
+) -> list[ExtractedBeatBoundary]:
+    """Return explicit numbered Beat ranges inside one already-resolved Scene."""
+
+    markers = list(_EXPLICIT_BEAT_MARKER.finditer(scene_text or ""))
+    boundaries: list[ExtractedBeatBoundary] = []
+    for index, marker in enumerate(markers):
+        local_end = markers[index + 1].start() if index + 1 < len(markers) else len(scene_text)
+        if local_end <= marker.start():
+            continue
+        raw_marker = marker.group(0)
+        marker_text = raw_marker.strip()
+        leading = len(raw_marker) - len(raw_marker.lstrip())
+        label = (marker.group("label") or "").strip()
+        boundaries.append(
+            ExtractedBeatBoundary(
+                order_index=index,
+                source_start=source_offset + marker.start(),
+                source_end=source_offset + local_end,
+                evidence_start=source_offset + marker.start() + leading,
+                evidence_end=source_offset + marker.start() + leading + len(marker_text),
+                marker=marker_text,
+                label=label,
+            )
+        )
+    return boundaries
 
 
 # ---------------------------------------------------------------------------
@@ -670,10 +729,13 @@ __all__ = (
     "ExtractedItem",
     "ScriptProfileFacetName",
     "ScriptProfileFacetExtraction",
+    "ExtractedBeatBoundary",
     "ExtractionResult",
     "extract_characters",
     "extract_scenes",
+    "extract_scene_occurrences",
     "extract_script_profile_facets",
+    "extract_explicit_beat_boundaries",
     "extract_characters_and_scenes",
     "extracted_item_to_dict",
     "extraction_result_to_dict",

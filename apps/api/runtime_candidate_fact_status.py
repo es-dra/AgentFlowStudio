@@ -184,12 +184,15 @@ class CandidateFact(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION, min_length=1, max_length=80)
 
     fact_id: str = Field(min_length=1, max_length=120)
-    entity_kind: Literal["character", "scene", "script_profile"] = "character"
+    entity_kind: Literal["character", "scene", "script_profile", "beat"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(
         min_length=1,
         max_length=160,
-        description="e.g. 'identity.display_name' or 'script_profile.theme'",
+        description=(
+            "e.g. 'identity.display_name', 'script_profile.theme', or "
+            "'scene[scene_1].beats[0].boundary'"
+        ),
     )
 
     # Wrapped soft claim (text + confidence + evidence spans)
@@ -301,7 +304,7 @@ class AuthoritativeScriptFact(BaseModel):
     authoritative_fact_id: str = Field(min_length=1, max_length=120)
     source_candidate_fact_id: str = Field(min_length=1, max_length=120)
 
-    entity_kind: Literal["character", "scene", "script_profile"] = "character"
+    entity_kind: Literal["character", "scene", "script_profile", "beat"] = "character"
     entity_id: str = Field(min_length=1, max_length=120)
     field_path: str = Field(min_length=1, max_length=160)
 

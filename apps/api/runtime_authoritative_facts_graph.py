@@ -2,8 +2,8 @@
 
 Gate: AFS_CANDIDATE_FACTS_FEED_PRODUCTION_GRAPH (default off).
 
-When enabled, confirmed authoritative character/scene/script-profile facts can
-be appended as graph nodes via ProductionGraphStore.append. This does NOT
+When enabled, confirmed authoritative character/scene/script-profile/beat facts
+can be appended as graph nodes via ProductionGraphStore.append. This does NOT
 replace the M6 confirm → compile_film_candidate path; it is an independent side
 channel.
 
@@ -14,6 +14,7 @@ missing / conflicting rows.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Mapping
 
 from apps.api.runtime_candidate_fact_status import AuthoritativeScriptFact
@@ -43,7 +44,7 @@ def namespaced_revision_nodes_enabled(env: Mapping[str, str] | None = None) -> b
 def authoritative_fact_graph_node_id(fact: AuthoritativeScriptFact) -> str:
     """Stable graph node id derived from the authoritative fact identity."""
 
-    if fact.entity_kind == "script_profile":
+    if fact.entity_kind in {"script_profile", "beat"}:
         facet_key = canonical_digest(
             {
                 "entity_kind": fact.entity_kind,
@@ -51,7 +52,7 @@ def authoritative_fact_graph_node_id(fact: AuthoritativeScriptFact) -> str:
                 "field_path": fact.field_path,
             }
         )[:24]
-        return f"authfact-script_profile-{facet_key}"
+        return f"authfact-{fact.entity_kind}-{facet_key}"
     return f"authfact-{fact.entity_kind}-{fact.authoritative_fact_id}"
 
 
@@ -118,6 +119,7 @@ def compile_authoritative_facts_to_graph_events(
             "character": "entity",
             "scene": "location",
             "script_profile": "profile",
+            "beat": "beat",
         }[fact.entity_kind]
         metadata: dict[str, Any] = {
             "source": "authoritative_script_fact_feed",
@@ -136,8 +138,17 @@ def compile_authoritative_facts_to_graph_events(
             metadata["display_name"] = fact.text
         elif fact.entity_kind == "scene":
             metadata["name"] = fact.text
-        else:
+        elif fact.entity_kind == "script_profile":
             metadata["value"] = fact.text
+        else:
+            metadata["boundary_label"] = fact.text
+            ownership = re.fullmatch(
+                r"scene\[(?P<scene_id>.+)\]\.beats\[(?P<order_index>\d+)\]\.boundary",
+                fact.field_path,
+            )
+            if ownership:
+                metadata["parent_scene_id"] = ownership.group("scene_id")
+                metadata["order_index"] = int(ownership.group("order_index"))
         if fact.human_confirmed_by:
             metadata["human_confirmed_by"] = fact.human_confirmed_by
         if fact.deterministic_check_id:

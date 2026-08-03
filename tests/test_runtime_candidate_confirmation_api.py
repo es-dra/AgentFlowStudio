@@ -37,6 +37,13 @@ LABELED_SCRIPT_PROFILE = """主题：等待与释然
 风格：克制对白，冷暖光对比
 
 """ + HOME
+LABELED_BEAT_CONTROL = LABELED_SCRIPT_PROFILE.replace(
+    "人物：陈浩（40多岁，疲惫，眼神坚定）\n\n陈浩独自",
+    "人物：陈浩（40多岁，疲惫，眼神坚定）\n\n节拍1：等待列车\n陈浩独自",
+).replace(
+    "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\n林秀站在门口",
+    "人物：陈浩、林秀（60多岁，陈浩的母亲）\n\nBEAT 1: 归家重逢\n林秀站在门口",
+)
 
 
 def _client(tmp_path) -> TestClient:
@@ -694,3 +701,347 @@ def test_six_scripts_keep_all_script_profile_facets_missing_via_api(
     assert all(item["evidence_spans"] == [] for item in profile_items)
     assert all("accept" not in item["allowed_actions"] for item in profile_items)
     assert refreshed["authoritative"] == []
+
+
+def test_beat_labeled_control_coexists_confirms_and_feeds_graph_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_beat_control"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_CONTROL)
+    refreshed = _refresh(client, project_id, revision)
+    items = refreshed["bundle"]["items"]
+
+    assert {item["entity_kind"] for item in items} == {
+        "character",
+        "scene",
+        "script_profile",
+        "beat",
+    }
+    scenes = {item["text"]: item for item in items if item["entity_kind"] == "scene"}
+    beats = [item for item in items if item["entity_kind"] == "beat"]
+    assert len(beats) == 2
+    assert {item["text"] for item in beats} == {"等待列车", "归家重逢"}
+    assert {item["status"] for item in beats} == {"extracted_from_text"}
+    assert all(item["producer_method"] == "explicit_numbered_beat_label" for item in beats)
+
+    waiting = next(item for item in beats if item["text"] == "等待列车")
+    reunion = next(item for item in beats if item["text"] == "归家重逢")
+    station_id = scenes["小镇火车站"]["entity_id"]
+    home_id = scenes["陈浩家中的老屋"]["entity_id"]
+    assert waiting["entity_id"].startswith(f"{station_id}.beat_0000.")
+    assert waiting["field_path"] == f"scene[{station_id}].beats[0].boundary"
+    assert reunion["entity_id"].startswith(f"{home_id}.beat_0000.")
+    assert reunion["field_path"] == f"scene[{home_id}].beats[0].boundary"
+    assert waiting["entity_id"] != reunion["entity_id"]
+    for beat in beats:
+        span = beat["evidence_spans"][0]
+        assert LABELED_BEAT_CONTROL[span["start"]:span["end"]] == span["quote"]
+
+    accepted = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": waiting["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    edited = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": reunion["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "重逢",
+            "reason": "confirm concise Beat boundary label",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    body = edited.json()
+    beat_authority = [
+        fact for fact in body["authoritative"] if fact["entity_kind"] == "beat"
+    ]
+    assert {fact["text"] for fact in beat_authority} == {"等待列车", "重逢"}
+    assert {row["text"] for row in body["resolved"]["beats"]} == {"等待列车", "重逢"}
+    assert all(
+        item["review_decision"] == "pending"
+        for item in body["bundle"]["items"]
+        if item["entity_kind"] in {"character", "scene", "script_profile"}
+    )
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    graph_beats = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "beat"
+    ]
+    assert len(graph_beats) == 2
+    graph_by_text = {
+        node["metadata"]["boundary_label"]: node for node in graph_beats
+    }
+    assert set(graph_by_text) == {"等待列车", "重逢"}
+    assert graph_by_text["等待列车"]["category"] == "beat"
+    assert graph_by_text["等待列车"]["metadata"]["parent_scene_id"] == station_id
+    assert graph_by_text["等待列车"]["metadata"]["order_index"] == 0
+    assert graph_by_text["重逢"]["metadata"]["parent_scene_id"] == home_id
+
+
+def test_beat_edit_confirm_preserves_marker_evidence_when_text_is_not_in_source_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_edit_evidence"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_CONTROL)
+    refreshed = _refresh(client, project_id, revision)
+    beat = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+    )
+    original_evidence = beat["evidence_spans"]
+
+    edited = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": beat["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "人工改写且原文不存在",
+            "reason": "human clarification outside the literal marker",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    authority = next(
+        fact
+        for fact in edited.json()["authoritative"]
+        if fact["source_candidate_fact_id"] == beat["fact_id"]
+    )
+    assert authority["text"] == "人工改写且原文不存在"
+    assert authority["evidence_spans"] == original_evidence
+    for span in authority["evidence_spans"]:
+        assert LABELED_BEAT_CONTROL[span["start"]:span["end"]] == span["quote"]
+
+
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_keep_beat_segmentation_missing_via_api(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_beat_missing_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, script_path.read_text(encoding="utf-8"))
+    refreshed = _refresh(client, project_id, revision)
+
+    assert [
+        item for item in refreshed["bundle"]["items"] if item["entity_kind"] == "beat"
+    ] == []
+    beat_missing = [
+        slot
+        for slot in refreshed["bundle"]["missing_slots"]
+        if slot["entity_kind"] == "beat"
+    ]
+    assert beat_missing
+    assert all(slot["status"] == "missing" for slot in beat_missing)
+    assert all(slot["field_path"].startswith("scene[") for slot in beat_missing)
+    assert refreshed["authoritative"] == []
+
+    review = client.get(f"/projects/{project_id}/candidate-facts/review")
+    assert review.status_code == 200, review.text
+    persisted = [
+        slot
+        for slot in review.json()["bundle"]["missing_slots"]
+        if slot["entity_kind"] == "beat"
+    ]
+    assert [slot["field_path"] for slot in persisted] == [
+        slot["field_path"] for slot in beat_missing
+    ]
+
+
+def test_beat_label_without_resolved_scene_fails_closed_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_no_scene"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, "标题：孤立节拍\n\n节拍1：不能悬空\n动作继续。")
+    refreshed = _refresh(client, project_id, revision)
+
+    assert not any(
+        item["entity_kind"] == "beat" for item in refreshed["bundle"]["items"]
+    )
+    assert "explicit_beat_labels_without_resolved_scene_ignored" in (
+        refreshed["bundle"]["extraction_notes"]
+    )
+    assert any(
+        slot["entity_kind"] == "beat"
+        and slot["field_path"] == "scene[(missing)].beats"
+        for slot in refreshed["bundle"]["missing_slots"]
+    )
+
+
+def test_beat_labels_in_duplicate_scene_names_fail_closed_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_duplicate_scene_name"
+    _create_project(client, project_id)
+    source = """标题：同名场景
+
+第一场 - 内景 - 厨房 - 夜
+节拍1：第一次进入
+她推开门。
+
+第二场 - 内景 - 厨房 - 清晨
+节拍1：再次进入
+她重新推开门。
+"""
+    revision = _create_revision(client, project_id, source)
+    refreshed = _refresh(client, project_id, revision)
+
+    assert not any(
+        item["entity_kind"] == "beat" for item in refreshed["bundle"]["items"]
+    )
+    assert "beat_scene_ownership_ambiguous; no Beat candidate emitted" in (
+        refreshed["bundle"]["extraction_notes"]
+    )
+    assert any(
+        slot["entity_kind"] == "beat"
+        and slot["field_path"].endswith(".beats")
+        for slot in refreshed["bundle"]["missing_slots"]
+    )
+
+
+def test_beat_repeat_refresh_accept_supersedes_and_upserts_graph_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_beat_repeat"
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, LABELED_BEAT_CONTROL)
+
+    first_refresh = _refresh(client, project_id, revision)
+    first = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+    )
+    first_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert first_accept.status_code == 200, first_accept.text
+
+    second_refresh = _refresh(client, project_id, revision)
+    second = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["field_path"] == first["field_path"]
+    )
+    assert second["fact_id"] != first["fact_id"]
+    assert second["entity_id"] == first["entity_id"]
+    second_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": second["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert second_accept.status_code == 200, second_accept.text
+
+    records = [
+        record
+        for record in load_ledger(RuntimeStore(tmp_path), project_id).authoritative_records
+        if record.fact.entity_kind == "beat" and record.fact.field_path == first["field_path"]
+    ]
+    assert len(records) == 2
+    assert [record.validity.value for record in records].count("active") == 1
+    assert [record.validity.value for record in records].count("superseded") == 1
+    active = next(record for record in records if record.validity.value == "active")
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    graph_beats = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("entity_kind") == "beat"
+        and node.get("metadata", {}).get("field_path") == first["field_path"]
+    ]
+    assert len(graph_beats) == 1
+    assert graph_beats[0]["metadata"]["authoritative_fact_id"] == (
+        active.fact.authoritative_fact_id
+    )
+
+
+def test_beat_new_revision_invalidates_authority_and_changes_identity_via_api(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_beat_revision"
+    _create_project(client, project_id)
+    rev1 = _create_revision(client, project_id, LABELED_BEAT_CONTROL)
+    first_refresh = _refresh(client, project_id, rev1)
+    first = next(
+        item
+        for item in first_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["text"] == "等待列车"
+    )
+    first_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": first["fact_id"],
+            "source_revision_id": rev1["revision_id"],
+            "source_revision_digest": rev1["source_digest"],
+        },
+    )
+    assert first_accept.status_code == 200, first_accept.text
+
+    text_v2 = LABELED_BEAT_CONTROL.replace("节拍1：等待列车", "节拍1：决定登车")
+    rev2 = _create_revision(client, project_id, text_v2, parent=rev1["revision_id"])
+    second_refresh = _refresh(client, project_id, rev2)
+    assert second_refresh["authoritative"] == []
+    second = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["entity_kind"] == "beat" and item["text"] == "决定登车"
+    )
+    assert second["field_path"] == first["field_path"]
+    assert second["entity_id"] != first["entity_id"]
+
+    invalidated = [
+        record
+        for record in load_ledger(RuntimeStore(tmp_path), project_id).authoritative_records
+        if record.fact.entity_kind == "beat"
+        and record.validity.value == "invalidated_by_revision"
+    ]
+    assert len(invalidated) == 1
+    assert invalidated[0].invalidated_by_revision_id == rev2["revision_id"]
