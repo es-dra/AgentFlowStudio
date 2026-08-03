@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import logging
+import os
 import re
 from difflib import SequenceMatcher
 from typing import Any, Literal, Mapping
@@ -28,10 +30,24 @@ from apps.api.runtime_production_graph import (
     graph_path,
 )
 from apps.api.runtime_script_core_truth import current_script_revision_binding
+from apps.api.runtime_script_improved_extraction import (
+    extract_characters_and_scenes,
+    extraction_result_to_dict,
+)
 from apps.api.runtime_store import RuntimeStore
 
 
 M6_SCHEMA_VERSION = "afs.m6.script_plan_asset_bible.v0.1"
+# Shadow-only gate: when true, attach improved extraction for compare; never
+# replaces legacy `_extract_*` results or writes Production Graph.
+IMPROVED_EXTRACTION_ENV = "AFS_USE_IMPROVED_EXTRACTION"
+IMPROVED_EXTRACTION_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+SHADOW_EXTRACTION_SCHEMA_VERSION = "afs.m6.shadow_extraction.v0.1"
+# When true, M6 candidate script_revision.revision_id reuses Script Truth
+# source_revision_id (scrrev_*) instead of inventing m6-script-*.
+# Default off preserves legacy dual-id behavior.
+M6_REUSE_SCRIPT_TRUTH_REVISION_ENV = "AFS_M6_REUSE_SCRIPT_TRUTH_REVISION_ID"
+_LOGGER = logging.getLogger(__name__)
 FILM_SCHEMA_VERSION = "afs.film_domain_pack.v0.1"
 M6_SCOPE_REVIEW_SCHEMA_VERSION = "afs.m6.canonical_scope_review.v0.1"
 REVIEW_ROLES = (
@@ -326,7 +342,10 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
         raise M6PlanningError("M6 preview requires at least two story beats for dynamic sequence planning.")
     project_key = _safe_token(project_id)
     candidate_key = source_digest[:12]
-    revision_id = f"m6-script-{candidate_key}"
+    revision_id = resolve_m6_script_revision_id(
+        body,
+        candidate_key=candidate_key,
+    )
     brief_id = f"m6-brief-{candidate_key}"
     sequence_id = f"m6-sequence-{candidate_key}"
     character_rows = [_character_row(project_key, candidate_key, index, name, source_text) for index, name in enumerate(cast, start=1)]
@@ -419,7 +438,7 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
         "rights_refs": ["rights:project-original-or-user-supplied-pending-confirmation"],
     }
     validation = validate_m6_candidate(candidate)
-    return {
+    payload: dict[str, Any] = {
         "artifact_type": "afs_m6_script_plan_asset_bible_preview",
         "schema_version": M6_SCHEMA_VERSION,
         "project_id": project_id,
@@ -436,6 +455,23 @@ def build_m6_script_plan_asset_bible(project_id: str, body: Mapping[str, Any]) -
             "not_business_validation",
         ],
     }
+    # Shadow compare only — must not alter candidate / validation / graph path.
+    shadow = build_m6_shadow_extraction(
+        source_text,
+        legacy_characters=list(cast),
+        legacy_scenes=list(scenes),
+    )
+    if shadow is not None:
+        payload["shadow_extraction"] = shadow
+        _LOGGER.info(
+            "m6_shadow_extraction_recorded project_id=%s characters_legacy=%s characters_improved=%s scenes_legacy=%s scenes_improved=%s",
+            project_id,
+            len(cast),
+            len((shadow.get("improved") or {}).get("characters") or []),
+            len(scenes),
+            len((shadow.get("improved") or {}).get("scenes") or []),
+        )
+    return payload
 
 
 def validate_m6_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
@@ -695,6 +731,112 @@ def m6_source_canonical_scope(source_text: str) -> dict[str, list[str]]:
         "closeups": _extract_list_after_labels(text, ("特写", "closeups", "closeup")),
         "styles": _extract_list_after_labels(text, ("风格", "视觉风格", "style")),
     }
+
+
+def improved_extraction_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Return True only when AFS_USE_IMPROVED_EXTRACTION is explicitly truthy.
+
+    Default (unset / empty / false) keeps legacy extraction as the sole path.
+    """
+
+    values = env if env is not None else os.environ
+    return str(values.get(IMPROVED_EXTRACTION_ENV, "")).strip().lower() in IMPROVED_EXTRACTION_TRUE_VALUES
+
+
+def m6_reuse_script_truth_revision_id_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """When true, M6 reuses Script Truth scrrev_* as script_revision.revision_id."""
+
+    values = env if env is not None else os.environ
+    return (
+        str(values.get(M6_REUSE_SCRIPT_TRUTH_REVISION_ENV, "")).strip().lower()
+        in IMPROVED_EXTRACTION_TRUE_VALUES
+    )
+
+
+def _raw_source_revision_id(body: Mapping[str, Any]) -> str:
+    """Preserve Script Truth revision id characters; do not invent a token."""
+
+    return str(body.get("source_revision_id") or "").strip()
+
+
+def resolve_m6_script_revision_id(
+    body: Mapping[str, Any],
+    *,
+    candidate_key: str,
+    invented: str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    """Choose the embedded revision id without changing the default path.
+
+    ``invented`` lets alternate planners (e.g. Server Codex) keep their own
+    default id format when the reuse gate is off. Deterministic M6 keeps
+    ``m6-script-{candidate_key}``.
+    """
+
+    default_invented = invented if invented is not None else f"m6-script-{candidate_key}"
+    if not m6_reuse_script_truth_revision_id_enabled(env):
+        return default_invented
+    raw = _raw_source_revision_id(body)
+    if not raw:
+        raise M6PlanningError(
+            f"{M6_REUSE_SCRIPT_TRUTH_REVISION_ENV} requires source_revision_id from Script Truth."
+        )
+    return raw
+
+
+def build_m6_shadow_extraction(
+    source_text: str,
+    *,
+    legacy_characters: list[str],
+    legacy_scenes: list[str],
+) -> dict[str, Any] | None:
+    """Run improved extraction for compare only. Never feeds candidate rows.
+
+    Returns None when the feature flag is off so callers omit the field entirely.
+    Failures are captured inside the shadow payload — they must not fail M6 build.
+    """
+
+    if not improved_extraction_enabled():
+        return None
+
+    payload: dict[str, Any] = {
+        "schema_version": SHADOW_EXTRACTION_SCHEMA_VERSION,
+        "enabled": True,
+        "gate_env": IMPROVED_EXTRACTION_ENV,
+        "affects_candidate": False,
+        "affects_production_graph": False,
+        "legacy": {
+            "characters": list(legacy_characters),
+            "scenes": list(legacy_scenes),
+        },
+    }
+    try:
+        improved = extract_characters_and_scenes(source_text)
+        improved_dict = extraction_result_to_dict(improved)
+        legacy_char_set = {item for item in legacy_characters if item}
+        legacy_scene_set = {item for item in legacy_scenes if item}
+        improved_char_set = {item.text for item in improved.characters if item.text}
+        improved_scene_set = {item.text for item in improved.scenes if item.text}
+        payload["improved"] = improved_dict
+        payload["diff"] = {
+            "characters_only_in_legacy": sorted(legacy_char_set - improved_char_set),
+            "characters_only_in_improved": sorted(improved_char_set - legacy_char_set),
+            "scenes_only_in_legacy": sorted(legacy_scene_set - improved_scene_set),
+            "scenes_only_in_improved": sorted(improved_scene_set - legacy_scene_set),
+        }
+    except Exception as exc:  # noqa: BLE001 — shadow must never break preview
+        payload["improved"] = None
+        payload["diff"] = None
+        payload["error"] = {
+            "type": type(exc).__name__,
+            "message": str(exc)[:400],
+        }
+        _LOGGER.warning(
+            "m6_shadow_extraction_failed gate=%s error_type=%s",
+            IMPROVED_EXTRACTION_ENV,
+            type(exc).__name__,
+        )
+    return payload
 
 
 def build_m6_scope_review(
@@ -1329,8 +1471,15 @@ def _contract_error(error: str, message: str, *, project_id: str, stage: str, st
 
 __all__ = (
     "M6_SCHEMA_VERSION",
+    "IMPROVED_EXTRACTION_ENV",
+    "M6_REUSE_SCRIPT_TRUTH_REVISION_ENV",
+    "SHADOW_EXTRACTION_SCHEMA_VERSION",
     "REVIEW_ROLES",
     "build_m6_script_plan_asset_bible",
+    "build_m6_shadow_extraction",
+    "improved_extraction_enabled",
+    "m6_reuse_script_truth_revision_id_enabled",
+    "resolve_m6_script_revision_id",
     "register_runtime_m6_script_plan_asset_bible_routes",
     "validate_m6_candidate",
 )

@@ -23,6 +23,7 @@ from apps.api.runtime_m6_script_plan_asset_bible import (
     _safe_token,
     m6_asset_scope_fields,
     m6_source_canonical_scope,
+    resolve_m6_script_revision_id,
     validate_m6_candidate,
 )
 from apps.api.runtime_production_graph import canonical_digest
@@ -334,7 +335,11 @@ def _candidate_from_provider_payload(
     project_key = _safe_token(project_id)
     candidate_key = source_digest[:12]
     revision_number = 2 if parent_candidate_digest else 1
-    revision_id = f"{project_key}-m6-codex-revision-{revision_number}-{candidate_key}"
+    revision_id = resolve_m6_script_revision_id(
+        body,
+        candidate_key=candidate_key,
+        invented=f"{project_key}-m6-codex-revision-{revision_number}-{candidate_key}",
+    )
     characters = [
         {
             "character_id": f"{project_key}-m6-character-{index}-{candidate_key}",
