@@ -1756,6 +1756,27 @@ SCENE_CAST_EXPECTATIONS = {
     },
 }
 
+SCENE_PROP_EXPECTATIONS = {
+    "01": {
+        "废弃灯塔": {"手电筒", "灯塔灯", "开关"},
+    },
+    "02": {
+        "老式邮局": {"信", "挂钟"},
+        "苏晴的房间": {"台灯", "信纸", "笔", "信"},
+    },
+    "03": {
+        "小镇火车站": {"照片"},
+    },
+    "04": {
+        "阁楼": {"相册", "照片"},
+        "厨房": {"照片", "刀", "相册"},
+    },
+    "05": {},
+    "06": {
+        "地下通道": {"钥匙"},
+    },
+}
+
 
 def _scene_name_to_entity_id(items: list[dict]) -> dict[str, str]:
     return {
@@ -1812,6 +1833,241 @@ def test_six_scripts_emit_scene_cast_appearances_via_api(
         assert item["entity_id"] == identity["entity_id"]
 
     assert by_scene == expected
+
+
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_emit_only_explicit_scene_props_via_api(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_props_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    source_text = script_path.read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    bundle = refreshed["bundle"]
+    items = bundle["items"]
+    expected = SCENE_PROP_EXPECTATIONS[script_path.stem[:2]]
+    scene_ids = _scene_name_to_entity_id(items)
+    scene_names = {entity_id: name for name, entity_id in scene_ids.items()}
+
+    prop_names = [
+        item
+        for item in items
+        if item["entity_kind"] == "scene"
+        and ".props[" in item["field_path"]
+        and item["field_path"].endswith(".name")
+    ]
+    by_scene: dict[str, set[str]] = {}
+    for item in prop_names:
+        assert item["status"] == "extracted_from_text"
+        assert item["evidence_spans"]
+        span = item["evidence_spans"][0]
+        assert source_text[span["start"] : span["end"]] == span["quote"] == item["text"]
+        scene_id = item["field_path"].split("scene[", 1)[1].split("]", 1)[0]
+        assert item["entity_id"] == scene_id
+        by_scene.setdefault(scene_names[scene_id], set()).add(item["text"])
+
+    assert by_scene == expected
+    assert not ({"外套", "铁门", "小渔船", "长椅", "柜台", "书桌"} & {item["text"] for item in prop_names})
+    assert sum(
+        slot["field_path"].endswith(".importance")
+        for slot in bundle["missing_slots"]
+    ) == len(prop_names)
+    if not scene_ids:
+        assert any(
+            slot["field_path"] == "scene[(missing)].props"
+            for slot in bundle["missing_slots"]
+        )
+
+
+def test_scene_props_fail_closed_when_repeated_scene_name_has_ambiguous_range(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_props_repeated_scene"
+    _create_project(client, project_id)
+    source_text = """第一场
+地点：仓库
+道具：钥匙
+
+第二场
+地点：仓库
+道具：照片
+"""
+    revision = _create_revision(client, project_id, source_text)
+    bundle = _refresh(client, project_id, revision)["bundle"]
+
+    assert not any(".props[" in item["field_path"] for item in bundle["items"])
+    assert "scene_prop_ownership_ambiguous; no SceneProp candidate emitted" in bundle["extraction_notes"]
+    assert any(
+        slot["field_path"].endswith(".props")
+        and "ambiguous" in slot["message"]
+        for slot in bundle["missing_slots"]
+    )
+
+
+def test_explicit_important_prop_emits_name_and_importance_with_exact_evidence(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_props_importance"
+    _create_project(client, project_id)
+    source_text = "第一场\n地点：暗房\n关键道具：泛黄照片\n"
+    revision = _create_revision(client, project_id, source_text)
+    bundle = _refresh(client, project_id, revision)["bundle"]
+    prop_items = [item for item in bundle["items"] if ".props[" in item["field_path"]]
+
+    assert {(item["field_path"].rsplit(".", 1)[-1], item["text"]) for item in prop_items} == {
+        ("name", "泛黄照片"),
+        ("importance", "关键"),
+    }
+    for item in prop_items:
+        span = item["evidence_spans"][0]
+        assert source_text[span["start"] : span["end"]] == span["quote"] == item["text"]
+    assert not any(
+        slot["field_path"].endswith(".importance")
+        for slot in bundle["missing_slots"]
+    )
+
+
+def test_scene_prop_edit_confirm_requires_exact_evidence_and_projects_importance(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_props_edit_evidence"
+    _create_project(client, project_id)
+    source_text = "第一场\n地点：暗房\n关键道具：泛黄照片\n"
+    revision = _create_revision(client, project_id, source_text)
+    items = _refresh(client, project_id, revision)["bundle"]["items"]
+    prop_name = next(
+        item
+        for item in items
+        if ".props[" in item["field_path"] and item["field_path"].endswith(".name")
+    )
+    importance = next(
+        item
+        for item in items
+        if ".props[" in item["field_path"]
+        and item["field_path"].endswith(".importance")
+    )
+
+    fabricated = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": prop_name["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "怀表",
+            "reason": "must fail closed when the prop is absent from source",
+        },
+    )
+    assert fabricated.status_code == 409, fabricated.text
+    assert "exact source-backed evidence" in fabricated.json()["detail"]["message"]
+
+    accepted_name = _accept_item(
+        client,
+        project_id,
+        revision,
+        prop_name["fact_id"],
+    )
+    prop_row = next(
+        row
+        for row in accepted_name["resolved"]["asset_requirements"]
+        if row["asset_kind"] == "prop"
+    )
+    assert prop_row["importance"] is None
+    assert prop_row["source_importance_authoritative_fact_id"] is None
+
+    accepted_importance = _accept_item(
+        client,
+        project_id,
+        revision,
+        importance["fact_id"],
+    )
+    prop_row = next(
+        row
+        for row in accepted_importance["resolved"]["asset_requirements"]
+        if row["asset_kind"] == "prop"
+    )
+    assert prop_row["importance"] == "关键"
+    assert prop_row["source_importance_authoritative_fact_id"] == (
+        accepted_importance["result"]["authoritative_fact_id"]
+    )
+
+
+def test_scene_prop_edit_confirm_cannot_take_evidence_from_another_scene(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_props_cross_scene_evidence"
+    _create_project(client, project_id)
+    source_text = """第一场
+地点：暗房
+道具：照片
+
+第二场
+地点：仓库
+道具：钥匙
+"""
+    revision = _create_revision(client, project_id, source_text)
+    items = _refresh(client, project_id, revision)["bundle"]["items"]
+    photo = next(
+        item
+        for item in items
+        if ".props[" in item["field_path"] and item["text"] == "照片"
+    )
+    key = next(
+        item
+        for item in items
+        if ".props[" in item["field_path"] and item["text"] == "钥匙"
+    )
+
+    cross_scene = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": photo["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "钥匙",
+            "reason": "must not borrow evidence from the next Scene",
+        },
+    )
+    assert cross_scene.status_code == 409, cross_scene.text
+
+    same_scene = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": key["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "钥匙",
+            "reason": "same-Scene exact evidence remains valid",
+        },
+    )
+    assert same_scene.status_code == 200, same_scene.text
+    authority = next(
+        fact
+        for fact in same_scene.json()["authoritative"]
+        if fact["source_candidate_fact_id"] == key["fact_id"]
+    )
+    span = authority["evidence_spans"][0]
+    assert span["start"] == source_text.rindex("钥匙")
+    assert source_text[span["start"] : span["end"]] == span["quote"] == "钥匙"
 
 
 def test_scene_cast_accept_feeds_graph_and_resolved_via_api(tmp_path, monkeypatch) -> None:
@@ -2120,8 +2376,8 @@ def test_six_scripts_project_character_asset_requirements_from_confirmed_cast(
     empty = client.get(f"/projects/{project_id}/asset-requirements")
     assert empty.status_code == 200, empty.text
     assert empty.json()["requirements"] == []
-    assert empty.json()["asset_kinds_included"] == ["character"]
-    assert empty.json()["asset_kinds_omitted"][0]["asset_kind"] == "prop"
+    assert empty.json()["asset_kinds_included"] == ["character", "prop"]
+    assert empty.json()["asset_kinds_omitted"] == []
 
     appearances = [
         item
@@ -2163,6 +2419,58 @@ def test_six_scripts_project_character_asset_requirements_from_confirmed_cast(
 
     assert last is not None
     assert last["resolved"]["asset_requirements"] == requirements
+
+
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_project_prop_asset_requirements_from_confirmed_scene_props(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_prop_areq_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    source_text = script_path.read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    expected = SCENE_PROP_EXPECTATIONS[script_path.stem[:2]]
+    items = refreshed["bundle"]["items"]
+
+    for item in items:
+        if item["entity_kind"] == "scene" and item["field_path"] == "scene.name":
+            _accept_item(client, project_id, revision, item["fact_id"])
+    last = None
+    for item in items:
+        if (
+            item["entity_kind"] == "scene"
+            and ".props[" in item["field_path"]
+            and item["field_path"].endswith(".name")
+        ):
+            last = _accept_item(client, project_id, revision, item["fact_id"])
+
+    projected = client.get(f"/projects/{project_id}/asset-requirements")
+    assert projected.status_code == 200, projected.text
+    prop_rows = [
+        row for row in projected.json()["requirements"] if row["asset_kind"] == "prop"
+    ]
+    by_scene: dict[str, set[str]] = {}
+    for row in prop_rows:
+        assert row["kind"] == "asset_requirement"
+        assert row["scope_kind"] == "scene"
+        assert row["core_asset_binding_status"] == "unbound"
+        assert row["core_asset_id"] is None
+        assert row["core_asset_binding_note"] == "暂无 Core asset 绑定"
+        assert row["source_revision_id"] == revision["revision_id"]
+        assert row["source_prop_field_path"].endswith(".name")
+        assert row["importance"] is None
+        by_scene.setdefault(row["scope_display_name"], set()).add(row["display_name"])
+    assert by_scene == expected
+    if expected:
+        assert last is not None
+        assert last["resolved"]["asset_requirements"] == projected.json()["requirements"]
+    else:
+        assert prop_rows == []
 
 
 def test_asset_requirements_bind_when_identity_bound_and_refresh_on_supersede(
@@ -2285,3 +2593,154 @@ def test_asset_requirements_bind_when_identity_bound_and_refresh_on_supersede(
     )
     assert after.status_code == 200, after.text
     assert after.json()["requirements"] == []
+
+
+def test_confirmed_scene_prop_projects_graph_and_binds_to_manual_core_prop(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from apps.api.runtime_script_core_truth import CORE_ASSET_COMMAND_SCHEMA_VERSION
+
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_prop_core_binding"
+    _create_project(client, project_id)
+    source_text = PHOTO
+    revision = _create_revision(client, project_id, source_text)
+
+    manual = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_prop",
+            "patch": {"display_name": "照片"},
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert manual.status_code == 200, manual.text
+    core_prop = next(
+        asset
+        for asset in manual.json()["projection"]["assets"]
+        if asset["asset_type"] == "prop" and asset["display_name"] == "照片"
+    )
+
+    refreshed = _refresh(client, project_id, revision)
+    items = refreshed["bundle"]["items"]
+    scene_ids = _scene_name_to_entity_id(items)
+    attic_id = scene_ids["阁楼"]
+    scene = next(
+        item
+        for item in items
+        if item["entity_id"] == attic_id and item["field_path"] == "scene.name"
+    )
+    photo = next(
+        item
+        for item in items
+        if item["field_path"].startswith(f"scene[{attic_id}].props[")
+        and item["field_path"].endswith(".name")
+        and item["text"] == "照片"
+    )
+    _accept_item(client, project_id, revision, scene["fact_id"])
+    accepted = _accept_item(client, project_id, revision, photo["fact_id"])
+
+    binding = accepted["entity_asset_binding"]
+    assert binding["entity_kind"] == "scene"
+    assert binding["entity_id"] == attic_id
+    assert binding["field_path"] == photo["field_path"]
+    assert binding["core_asset_id"] == core_prop["asset_id"]
+    assert "照片" not in accepted["resolved"]["scenes"]
+    assert any(
+        row["field_path"] == photo["field_path"] and row["text"] == "照片"
+        for row in accepted["resolved"]["scene_props"]
+    )
+
+    requirements = client.get(f"/projects/{project_id}/asset-requirements")
+    assert requirements.status_code == 200, requirements.text
+    prop_row = next(
+        row
+        for row in requirements.json()["requirements"]
+        if row["asset_kind"] == "prop"
+        and row["scope_entity_id"] == attic_id
+        and row["display_name"] == "照片"
+    )
+    assert prop_row["core_asset_binding_status"] == "bound"
+    assert prop_row["core_asset_id"] == core_prop["asset_id"]
+    assert prop_row["source_prop_authoritative_fact_id"] == accepted["result"]["authoritative_fact_id"]
+    assert prop_row["importance"] is None
+
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    prop_nodes = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("prop_slot") == "name"
+        and node.get("metadata", {}).get("parent_scene_id") == attic_id
+        and node.get("metadata", {}).get("display_name") == "照片"
+    ]
+    assert len(prop_nodes) == 1
+    assert prop_nodes[0]["category"] == "entity"
+    assert prop_nodes[0]["metadata"]["asset_kind"] == "prop"
+
+    # Same revision / same Scene slot supersedes authority, binding and Graph
+    # in place instead of accumulating duplicate prop nodes.
+    refreshed_again = _refresh(client, project_id, revision)
+    photo_again = next(
+        item
+        for item in refreshed_again["bundle"]["items"]
+        if item["field_path"] == photo["field_path"] and item["text"] == "照片"
+    )
+    accepted_again = _accept_item(
+        client,
+        project_id,
+        revision,
+        photo_again["fact_id"],
+    )
+    assert accepted_again["result"]["authoritative_fact_id"] != accepted["result"]["authoritative_fact_id"]
+    graph_again = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    assert len(
+        [
+            node
+            for node in graph_again["nodes"].values()
+            if node.get("metadata", {}).get("field_path") == photo["field_path"]
+        ]
+    ) == 1
+
+    # Superseding the bound slot with a different, source-backed prop that has
+    # no unique Core asset must stale the old photo binding.
+    refreshed_for_edit = _refresh(client, project_id, revision)
+    photo_for_edit = next(
+        item
+        for item in refreshed_for_edit["bundle"]["items"]
+        if item["field_path"] == photo["field_path"] and item["text"] == "照片"
+    )
+    changed = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "edit_confirm",
+            "fact_id": photo_for_edit["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+            "new_text": "相册",
+            "reason": "same-Scene source-backed correction without a Core match",
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    changed_row = next(
+        row
+        for row in changed.json()["resolved"]["asset_requirements"]
+        if row["source_prop_field_path"] == photo["field_path"]
+    )
+    assert changed_row["display_name"] == "相册"
+    assert changed_row["core_asset_binding_status"] == "unbound"
+    assert changed_row["core_asset_id"] is None
+
+    active_bindings = client.get(
+        f"/projects/{project_id}/entity-asset-bindings",
+        params={"entity_id": attic_id, "revision_id": revision["revision_id"]},
+    )
+    assert active_bindings.status_code == 200, active_bindings.text
+    assert active_bindings.json()["bindings"] == []

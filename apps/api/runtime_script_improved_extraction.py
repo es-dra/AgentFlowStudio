@@ -23,6 +23,9 @@ Hard rules
    conservative text-cleaning diagnostics; it does not infer story content.
 10. Scene cast appearance accepts speaker cues / in-scene 人物： labels only
     inside a uniquely resolved Scene range; never cross-scene inference.
+11. Scene props accept explicit prop labels or a conservative physical-object
+    vocabulary with a same-clause possession/manipulation/state signal. They
+    never infer set dressing from the location or plot.
 """
 
 from __future__ import annotations
@@ -1017,6 +1020,194 @@ class ExtractedCharacterAppearance:
     method: str
 
 
+@dataclass(frozen=True)
+class ExtractedSceneProp:
+    """One source-backed prop mention inside a resolved Scene source range."""
+
+    name: str
+    order_index: int
+    evidence_start: int
+    evidence_end: int
+    method: str
+    confidence: float
+    importance: str | None = None
+    importance_evidence_start: int | None = None
+    importance_evidence_end: int | None = None
+
+
+# Closed on purpose: these are unambiguous production objects in the current
+# screenplay corpus. Unknown prose nouns stay missing until a stronger parser
+# can classify them without turning location context into invented props.
+_NARRATIVE_PROP_NAMES: tuple[str, ...] = (
+    "手电筒",
+    "灯塔灯",
+    "挂钟",
+    "台灯",
+    "信纸",
+    "相册",
+    "照片",
+    "手机",
+    "钥匙",
+    "开关",
+    "信",
+    "笔",
+    "刀",
+)
+
+_PROP_ACTION_BEFORE = re.compile(
+    r"(?:拿着|拿起|拿出|掏出|握着|紧握着|紧握|攥着|紧攥着|紧攥|抓着|"
+    r"捧着|抱着|提着|接过|翻出|打开|合上|举起|转动|按下|抽出|拔出|"
+    r"找到|找到了|盯着|看着|写|切|停在|放在|洒在)[^，,。！？!?；;\n]{0,24}$"
+)
+_PROP_ACTION_AFTER = re.compile(
+    r"^[^，,。！？!?；;\n]{0,16}(?:递给|递过去|塞给|放在|放下|亮起|熄灭|"
+    r"停住|打开|合上|转动|按下|挂断|响起)"
+)
+_PROP_PHYSICAL_OUTPUT_AFTER = re.compile(
+    r"^(?:屏幕)?的(?:光|声音|滴答声)|^屏幕(?:的光|上)"
+)
+_PROP_LABEL = re.compile(
+    r"(?m)^[ \t]*(?P<importance>关键|重要)?道具[ \t]*[:：][ \t]*"
+    r"(?P<values>[^\n。；;]+)"
+)
+
+
+def _clause_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    separators = "，,。！？!?；;\n"
+    left = max((text.rfind(mark, 0, start) for mark in separators), default=-1) + 1
+    right_hits = [text.find(mark, end) for mark in separators]
+    right = min((hit for hit in right_hits if hit >= 0), default=len(text))
+    return left, right
+
+
+def _is_standalone_prop_mention(text: str, start: int, name: str) -> bool:
+    """Reject short aliases embedded in a different word (回信/信纸/信息)."""
+
+    if name != "信":
+        return True
+    previous = text[start - 1] if start > 0 else ""
+    following_index = start + len(name)
+    following = text[following_index] if following_index < len(text) else ""
+    return previous not in "来回书短微通相" and following not in "纸息箱号"
+
+
+def _has_physical_prop_signal(text: str, start: int, end: int) -> bool:
+    clause_start, clause_end = _clause_bounds(text, start, end)
+    before = text[clause_start:start]
+    after = text[end:clause_end]
+    return bool(
+        _PROP_ACTION_BEFORE.search(before)
+        or _PROP_ACTION_AFTER.search(after)
+        or _PROP_PHYSICAL_OUTPUT_AFTER.search(after)
+    )
+
+
+def _explicit_prop_label_hits(
+    range_text: str,
+    *,
+    source_offset: int,
+) -> list[tuple[int, int, str, str, float, str | None, int | None, int | None]]:
+    hits: list[tuple[int, int, str, str, float, str | None, int | None, int | None]] = []
+    for match in _PROP_LABEL.finditer(range_text):
+        raw = _strip_paren(match.group("values"))
+        for part in re.split(r"[、,，/]|(?:\s*(?:和|与|and)\s*)", raw, flags=re.I):
+            name = part.strip(" 、,，/;；")
+            if not name or len(name) > 40 or name.lower() in {"无", "未知", "待定", "n/a"}:
+                continue
+            local = range_text.find(name, match.start("values"), match.end("values"))
+            if local < 0:
+                continue
+            importance = match.group("importance")
+            importance_start = match.start("importance") if importance else None
+            importance_end = match.end("importance") if importance else None
+            hits.append(
+                (
+                    source_offset + local,
+                    source_offset + local + len(name),
+                    name,
+                    "explicit_scene_prop_label",
+                    0.98,
+                    importance,
+                    source_offset + importance_start if importance_start is not None else None,
+                    source_offset + importance_end if importance_end is not None else None,
+                )
+            )
+    return hits
+
+
+def extract_scene_props_in_range(
+    range_text: str,
+    *,
+    source_offset: int = 0,
+) -> list[ExtractedSceneProp]:
+    """Extract only explicit, physical Scene props from one owned source range.
+
+    Narrative extraction is intentionally recall-limited. A known object noun
+    must be present verbatim and participate in a same-clause physical signal.
+    This excludes location-derived guesses and leaves unsupported objects missing.
+    """
+
+    source = range_text or ""
+    if not source.strip():
+        return []
+
+    hits = _explicit_prop_label_hits(source, source_offset=source_offset)
+    labeled_spans = {(start, end) for start, end, *_ in hits}
+    for name in _NARRATIVE_PROP_NAMES:
+        cursor = 0
+        while True:
+            local = source.find(name, cursor)
+            if local < 0:
+                break
+            end = local + len(name)
+            cursor = end
+            absolute = (source_offset + local, source_offset + end)
+            if absolute in labeled_spans:
+                continue
+            if not _is_standalone_prop_mention(source, local, name):
+                continue
+            if not _has_physical_prop_signal(source, local, end):
+                continue
+            hits.append(
+                (
+                    absolute[0],
+                    absolute[1],
+                    name,
+                    "explicit_physical_prop_mention",
+                    0.88,
+                    None,
+                    None,
+                    None,
+                )
+            )
+
+    # One requirement per canonical name per Scene. Repeated mentions retain
+    # the first evidence span; an explicit importance label wins if present.
+    by_name: dict[
+        str,
+        tuple[int, int, str, str, float, str | None, int | None, int | None],
+    ] = {}
+    for hit in sorted(hits, key=lambda row: (row[0], row[2])):
+        previous = by_name.get(hit[2])
+        if previous is None or (hit[5] is not None and previous[5] is None):
+            by_name[hit[2]] = hit
+    ordered = sorted(by_name.values(), key=lambda row: (row[0], row[2]))
+    return [
+        ExtractedSceneProp(
+            name=hit[2],
+            order_index=index,
+            evidence_start=hit[0],
+            evidence_end=hit[1],
+            method=hit[3],
+            confidence=hit[4],
+            importance=hit[5],
+            importance_evidence_start=hit[6],
+            importance_evidence_end=hit[7],
+        )
+        for index, hit in enumerate(ordered)
+    ]
+
+
 def extract_character_appearances_in_range(
     range_text: str,
     *,
@@ -1175,11 +1366,13 @@ __all__ = (
     "BeatFacetName",
     "ExtractedBeatFacet",
     "ExtractedCharacterAppearance",
+    "ExtractedSceneProp",
     "ExtractionResult",
     "extract_characters",
     "extract_scenes",
     "extract_scene_occurrences",
     "extract_character_appearances_in_range",
+    "extract_scene_props_in_range",
     "extract_script_format_profile",
     "extract_script_profile_facets",
     "extract_explicit_beat_boundaries",

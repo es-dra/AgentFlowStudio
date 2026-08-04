@@ -45,12 +45,21 @@ def namespaced_revision_nodes_enabled(env: Mapping[str, str] | None = None) -> b
 def authoritative_fact_graph_node_id(fact: AuthoritativeScriptFact) -> str:
     """Stable graph node id derived from the authoritative fact identity."""
 
-    if fact.entity_kind in {"script_profile", "script_format_profile", "beat"}:
+    is_scene_prop = fact.entity_kind == "scene" and re.fullmatch(
+        r"scene\[.+\]\.props\[\d+\]\.(?:name|importance)",
+        fact.field_path,
+    )
+    if fact.entity_kind in {"script_profile", "script_format_profile", "beat"} or is_scene_prop:
         facet_key = canonical_digest(
             {
                 "entity_kind": fact.entity_kind,
                 "entity_id": fact.entity_id,
                 "field_path": fact.field_path,
+                **(
+                    {"source_revision_id": fact.source_revision_id}
+                    if is_scene_prop
+                    else {}
+                ),
             }
         )[:24]
         return f"authfact-{fact.entity_kind}-{facet_key}"
@@ -116,9 +125,16 @@ def compile_authoritative_facts_to_graph_events(
 
     for fact in facts:
         node_id = authoritative_fact_graph_node_id(fact)
+        prop_ownership = None
+        if fact.entity_kind == "scene":
+            prop_ownership = re.fullmatch(
+                r"scene\[(?P<scene_id>.+)\]\.props\[(?P<order_index>\d+)\]\."
+                r"(?P<slot>name|importance)",
+                fact.field_path,
+            )
         category = {
             "character": "entity",
-            "scene": "location",
+            "scene": "entity" if prop_ownership else "location",
             "script_profile": "profile",
             "script_format_profile": "profile",
             "beat": "beat",
@@ -147,7 +163,19 @@ def compile_authoritative_facts_to_graph_events(
                 metadata["order_index"] = int(cast_ownership.group("order_index"))
                 metadata["cast_slot"] = "appearance"
         elif fact.entity_kind == "scene":
-            metadata["name"] = fact.text
+            if prop_ownership:
+                slot = prop_ownership.group("slot")
+                metadata["parent_scene_id"] = prop_ownership.group("scene_id")
+                metadata["order_index"] = int(prop_ownership.group("order_index"))
+                metadata["prop_slot"] = slot
+                metadata["asset_kind"] = "prop"
+                if slot == "name":
+                    metadata["display_name"] = fact.text
+                    metadata["name"] = fact.text
+                else:
+                    metadata["value"] = fact.text
+            else:
+                metadata["name"] = fact.text
         elif fact.entity_kind == "script_profile":
             metadata["value"] = fact.text
         elif fact.entity_kind == "script_format_profile":

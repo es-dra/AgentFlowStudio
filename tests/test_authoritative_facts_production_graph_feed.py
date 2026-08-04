@@ -18,6 +18,7 @@ from apps.api.runtime_authoritative_facts_graph import (
     feed_authoritative_facts_to_production_graph,
     namespaced_revision_nodes_enabled,
 )
+from apps.api.runtime_asset_requirements import project_scene_asset_requirements
 from apps.api.runtime_candidate_confirmation import (
     CONFIRMATION_LOOP_ENV,
     RECOVERABLE_GRAPH_FEED_ENV,
@@ -169,6 +170,83 @@ def test_compile_emits_provenance_and_categories() -> None:
     assert char_node["metadata"]["source_candidate_fact_id"] == "cf_1"
     assert char_node["metadata"]["source_revision_id"] == "scrrev_abc"
     assert scene_node["metadata"]["authoritative_fact_id"] == "af_scene_1"
+
+
+def test_scene_prop_graph_identity_is_stable_within_revision_and_isolated_across_revisions(
+) -> None:
+    prop = _auth_fact(
+        authoritative_fact_id="af_prop_1",
+        source_candidate_fact_id="cf_prop_1",
+        entity_kind="scene",
+        entity_id="scene_1",
+        field_path="scene[scene_1].props[0].name",
+        text="照片",
+    )
+    superseding = prop.model_copy(
+        update={
+            "authoritative_fact_id": "af_prop_2",
+            "source_candidate_fact_id": "cf_prop_2",
+        }
+    )
+    next_revision = superseding.model_copy(
+        update={
+            "source_revision_id": "scrrev_next",
+            "source_revision_digest": "b" * 64,
+        }
+    )
+
+    assert authoritative_fact_graph_node_id(prop) == authoritative_fact_graph_node_id(superseding)
+    assert authoritative_fact_graph_node_id(prop) != authoritative_fact_graph_node_id(next_revision)
+
+
+def test_scene_prop_requirement_uses_target_revision_scene_name_and_matching_ownership() -> None:
+    current_scene = _auth_fact(
+        authoritative_fact_id="af_scene_current",
+        source_candidate_fact_id="cf_scene_current",
+        entity_kind="scene",
+        entity_id="scene_1",
+        field_path="scene.name",
+        text="当前暗房",
+        source_revision_id="scrrev_current",
+    )
+    stale_scene = current_scene.model_copy(
+        update={
+            "authoritative_fact_id": "af_scene_stale",
+            "source_candidate_fact_id": "cf_scene_stale",
+            "text": "旧暗房",
+            "source_revision_id": "scrrev_old",
+        }
+    )
+    prop = _auth_fact(
+        authoritative_fact_id="af_prop_current",
+        source_candidate_fact_id="cf_prop_current",
+        entity_kind="scene",
+        entity_id="scene_1",
+        field_path="scene[scene_1].props[0].name",
+        text="照片",
+        source_revision_id="scrrev_current",
+    )
+    mismatched_importance = _auth_fact(
+        authoritative_fact_id="af_importance_wrong_owner",
+        source_candidate_fact_id="cf_importance_wrong_owner",
+        entity_kind="scene",
+        entity_id="scene_other",
+        field_path="scene[scene_1].props[0].importance",
+        text="关键",
+        source_revision_id="scrrev_current",
+    )
+
+    rows = project_scene_asset_requirements(
+        None,
+        project_id="proj_unit",
+        authoritative_facts=[current_scene, stale_scene, prop, mismatched_importance],
+        revision_id="scrrev_current",
+    )
+
+    assert len(rows) == 1
+    assert rows[0].asset_kind == "prop"
+    assert rows[0].scope_display_name == "当前暗房"
+    assert rows[0].importance is None
 
 
 def test_namespaced_revision_node_prevents_m6_semantic_collision(tmp_path, monkeypatch) -> None:

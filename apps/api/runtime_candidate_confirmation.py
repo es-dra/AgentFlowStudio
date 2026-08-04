@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -50,6 +51,7 @@ from apps.api.runtime_script_improved_extraction import (
     ExtractedBeatFacet,
     ExtractedCharacterAppearance,
     ExtractedItem,
+    ExtractedSceneProp,
     ExtractionResult,
     ScriptFormatProfileExtraction,
     ScriptProfileFacetExtraction,
@@ -58,12 +60,13 @@ from apps.api.runtime_script_improved_extraction import (
     extract_explicit_beat_boundaries,
     extract_explicit_beat_facets,
     extract_scene_occurrences,
+    extract_scene_props_in_range,
     extract_script_format_profile,
     extract_script_profile_facets,
 )
 from apps.api.runtime_asset_requirements import (
     asset_requirements_payload,
-    project_scene_character_asset_requirements,
+    project_scene_asset_requirements,
 )
 from apps.api.runtime_entity_asset_bindings import (
     bind_authoritative_fact_to_core_asset,
@@ -73,6 +76,7 @@ from apps.api.runtime_entity_asset_bindings import (
     mark_bindings_stale_for_revision_change,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
+from apps.api.runtime_scene_props import ScenePropItem, SceneProps
 
 
 CONFIRMATION_LOOP_ENV = "AFS_USE_CANDIDATE_CONFIRMATION_LOOP"
@@ -280,6 +284,62 @@ def _exact_evidence_for(source_text: str, quote: str) -> list[EvidenceSpan]:
     if idx < 0:
         return []
     return [EvidenceSpan(start=idx, end=idx + len(q), quote=q[:1200])]
+
+
+def _scene_prop_source_range(
+    candidate: CandidateFact,
+    source_text: str,
+) -> tuple[int, int] | None:
+    """Recover the owning Scene range from the prop's original exact evidence."""
+
+    if not _is_scene_prop_field(candidate.field_path):
+        return None
+    exact_prop_spans = [
+        span
+        for span in candidate.claim.evidence_spans
+        if 0 <= span.start < span.end <= len(source_text)
+        and source_text[span.start : span.end] == span.quote
+    ]
+    if not exact_prop_spans:
+        return None
+
+    scene_starts: list[int] = []
+    for occurrence in extract_scene_occurrences(source_text):
+        start = _unique_evidence_start(source_text, occurrence.evidence)
+        if start is None:
+            return None
+        scene_starts.append(start)
+    scene_starts = sorted(set(scene_starts))
+    if not scene_starts:
+        return None
+
+    evidence_start = exact_prop_spans[0].start
+    owning_starts = [start for start in scene_starts if start <= evidence_start]
+    if not owning_starts:
+        return None
+    scene_start = owning_starts[-1]
+    scene_end = next(
+        (start for start in scene_starts if start > evidence_start),
+        len(source_text),
+    )
+    return scene_start, scene_end
+
+
+def _exact_evidence_in_range(
+    source_text: str,
+    quote: str,
+    bounds: tuple[int, int] | None,
+) -> list[EvidenceSpan]:
+    if bounds is None:
+        return []
+    q = (quote or "").strip()
+    if not q:
+        return []
+    start, end = bounds
+    local = source_text.find(q, start, end)
+    if local < 0 or local + len(q) > end:
+        return []
+    return [EvidenceSpan(start=local, end=local + len(q), quote=q[:1200])]
 
 
 def _status_from_extract(status: ExtractStatus) -> CandidateStatus:
@@ -623,8 +683,106 @@ def character_appearance_to_candidate_fact(
     )
 
 
+def scene_prop_to_candidate_facts(
+    prop: ExtractedSceneProp,
+    *,
+    scene_entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+    source_text: str,
+) -> tuple[ScenePropItem | None, list[CandidateFact]]:
+    """Flatten one ScenePropItem into reviewable Scene-owned candidate facts."""
+
+    if not (
+        0 <= prop.evidence_start < prop.evidence_end <= len(source_text)
+        and source_text[prop.evidence_start:prop.evidence_end] == prop.name
+    ):
+        return None, []
+
+    name_claim = ClaimedText(
+        text=prop.name,
+        confidence=prop.confidence,
+        evidence_spans=[
+            EvidenceSpan(
+                start=prop.evidence_start,
+                end=prop.evidence_end,
+                quote=prop.name,
+            )
+        ],
+    )
+    importance_claim: ClaimedText | None = None
+    if prop.importance is not None:
+        start = prop.importance_evidence_start
+        end = prop.importance_evidence_end
+        if (
+            start is not None
+            and end is not None
+            and 0 <= start < end <= len(source_text)
+            and source_text[start:end] == prop.importance
+        ):
+            importance_claim = ClaimedText(
+                text=prop.importance,
+                confidence=0.98,
+                evidence_spans=[
+                    EvidenceSpan(start=start, end=end, quote=prop.importance)
+                ],
+            )
+
+    prop_key = hashlib.sha256(
+        f"{scene_entity_id}|{prop.order_index}|{prop.name}".encode("utf-8")
+    ).hexdigest()[:20]
+    prop_item = ScenePropItem(
+        prop_id=f"prop_{prop_key}",
+        name=name_claim,
+        importance=importance_claim,
+    )
+    prefix = f"scene[{scene_entity_id}].props[{prop.order_index}]"
+    facts = [
+        CandidateFact(
+            fact_id=_id("fact"),
+            entity_kind="scene",
+            entity_id=scene_entity_id,
+            field_path=f"{prefix}.name",
+            claim=prop_item.name,
+            status=CandidateStatus.EXTRACTED_FROM_TEXT,
+            project_id=project_id,
+            source_revision_id=source_revision_id,
+            source_revision_digest=source_revision_digest,
+            producer="deterministic_extractor",
+            produced_at=_now(),
+        )
+    ]
+    if prop_item.importance is not None:
+        facts.append(
+            CandidateFact(
+                fact_id=_id("fact"),
+                entity_kind="scene",
+                entity_id=scene_entity_id,
+                field_path=f"{prefix}.importance",
+                claim=prop_item.importance,
+                status=CandidateStatus.EXTRACTED_FROM_TEXT,
+                project_id=project_id,
+                source_revision_id=source_revision_id,
+                source_revision_digest=source_revision_digest,
+                producer="deterministic_extractor",
+                produced_at=_now(),
+            )
+        )
+    return prop_item, facts
+
+
 def _is_scene_cast_appearance(field_path: str) -> bool:
     return ".cast[" in field_path and field_path.endswith(".appearance")
+
+
+def _is_scene_prop_field(field_path: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"scene\[.+\]\.props\[\d+\]\.(?:name|importance)",
+            field_path,
+        )
+    )
 
 
 def _unique_evidence_start(source_text: str, evidence: str) -> int | None:
@@ -729,6 +887,7 @@ def build_review_bundle_from_extraction(
             )
 
     beat_notes: list[str] = []
+    prop_notes: list[str] = []
     positioned_scenes: list[tuple[int, ExtractedItem, CandidateFact]] = []
     scene_positions_are_unique = bool(scene_rows)
     occurrence_counts: dict[str, int] = {}
@@ -761,6 +920,60 @@ def build_review_bundle_from_extraction(
                 else len(source_text)
             )
             range_text = source_text[scene_start:scene_end]
+            extracted_props = extract_scene_props_in_range(
+                range_text,
+                source_offset=scene_start,
+            )
+            prop_items: list[ScenePropItem] = []
+            for prop in extracted_props:
+                prop_item, prop_facts = scene_prop_to_candidate_facts(
+                    prop,
+                    scene_entity_id=scene_fact.entity_id,
+                    project_id=project_id,
+                    source_revision_id=source_revision_id,
+                    source_revision_digest=digest,
+                    source_text=source_text,
+                )
+                if prop_item is None or not prop_facts:
+                    prop_notes.append(
+                        "scene_prop_evidence_mismatch_ignored; no SceneProp candidate emitted"
+                    )
+                    continue
+                prop_items.append(prop_item)
+                for prop_fact in prop_facts:
+                    facts.append(prop_fact)
+                    items.append(
+                        _fact_to_review_item(
+                            prop_fact,
+                            producer_method=prop.method,
+                            decision=decisions.get(prop_fact.fact_id),
+                        )
+                    )
+                if prop_item.importance is None:
+                    missing.append(
+                        MissingSlotItem(
+                            slot_id=_id("miss_prop_importance"),
+                            entity_kind="scene",
+                            field_path=(
+                                f"scene[{scene_fact.entity_id}].props[{prop.order_index}].importance"
+                            ),
+                            message=(
+                                "No explicit prop importance signal; importance remains missing."
+                            ),
+                        )
+                    )
+            SceneProps(scene_entity_id=scene_fact.entity_id, items=prop_items)
+            if not prop_items:
+                missing.append(
+                    MissingSlotItem(
+                        slot_id=_id("miss_props"),
+                        entity_kind="scene",
+                        field_path=f"scene[{scene_fact.entity_id}].props",
+                        message=(
+                            "No explicit physical prop signal in this Scene; no prop candidate emitted."
+                        ),
+                    )
+                )
             for appearance in extract_character_appearances_in_range(
                 range_text,
                 known_character_names=known_character_names,
@@ -848,7 +1061,20 @@ def build_review_bundle_from_extraction(
     else:
         if scene_rows:
             beat_notes.append("beat_scene_ownership_ambiguous; no Beat candidate emitted")
+            prop_notes.append(
+                "scene_prop_ownership_ambiguous; no SceneProp candidate emitted"
+            )
             for _, scene_fact in scene_rows:
+                missing.append(
+                    MissingSlotItem(
+                        slot_id=_id("miss_props"),
+                        entity_kind="scene",
+                        field_path=f"scene[{scene_fact.entity_id}].props",
+                        message=(
+                            "Owning Scene source range is ambiguous; no prop candidate emitted."
+                        ),
+                    )
+                )
                 missing.append(
                     MissingSlotItem(
                         slot_id=_id("miss_beat"),
@@ -868,6 +1094,14 @@ def build_review_bundle_from_extraction(
                     entity_kind="beat",
                     field_path="scene[(missing)].beats",
                     message="No resolved Scene is available to own a Beat candidate.",
+                )
+            )
+            missing.append(
+                MissingSlotItem(
+                    slot_id=_id("miss_props"),
+                    entity_kind="scene",
+                    field_path="scene[(missing)].props",
+                    message="No resolved Scene is available to own a prop candidate.",
                 )
             )
 
@@ -897,7 +1131,7 @@ def build_review_bundle_from_extraction(
         title_hint=title_hint,
         items=items,
         missing_slots=missing,
-        extraction_notes=[*extraction.notes, *beat_notes],
+        extraction_notes=[*extraction.notes, *beat_notes, *prop_notes],
     )
     return bundle, facts
 
@@ -1135,23 +1369,36 @@ def edit_and_confirm_candidate(
         new_text = _normalize_script_format_profile_edit(cand, new_text)
     when = _now()
     spans = list(cand.claim.evidence_spans)
+    require_exact = (
+        cand.entity_kind in {"beat", "script_format_profile"}
+        or _is_scene_cast_appearance(cand.field_path)
+    )
+    prop_requires_exact = _is_scene_prop_field(cand.field_path)
     if source_text:
-        require_exact = cand.entity_kind in {"beat", "script_format_profile"} or _is_scene_cast_appearance(
-            cand.field_path
-        )
-        found = (
-            _exact_evidence_for(source_text, new_text)
-            if require_exact
-            else _evidence_for(source_text, new_text)
-        )
-        if found:
+        if prop_requires_exact:
+            found = _exact_evidence_in_range(
+                source_text,
+                new_text,
+                _scene_prop_source_range(cand, source_text),
+            )
+        else:
+            found = (
+                _exact_evidence_for(source_text, new_text)
+                if require_exact
+                else _evidence_for(source_text, new_text)
+            )
+        if prop_requires_exact or found:
             spans = found
+    elif prop_requires_exact and new_text != cand.claim.text:
+        spans = []
     if cand.entity_kind in {"beat", "script_format_profile"} and not spans:
         raise LoopError(
             f"{cand.entity_kind} edit_confirm requires source-backed evidence"
         )
     if _is_scene_cast_appearance(cand.field_path) and not spans:
         raise LoopError("Scene cast appearance edit_confirm requires source-backed evidence")
+    if prop_requires_exact and not spans:
+        raise LoopError("Scene prop edit_confirm requires exact source-backed evidence")
     if not spans:
         spans = [EvidenceSpan(start=0, end=len(new_text), quote=new_text[:1200])]
     updated = CandidateFact.model_validate(
@@ -1298,7 +1545,11 @@ def resolve_for_downstream(
         for f in auth
         if f.entity_kind == "character" and f.field_path == "identity.display_name"
     ]
-    auth_scenes = [f.text for f in auth if f.entity_kind == "scene"]
+    auth_scenes = [
+        f.text
+        for f in auth
+        if f.entity_kind == "scene" and f.field_path == "scene.name"
+    ]
     auth_cast = [
         {
             "entity_id": fact.entity_id,
@@ -1307,6 +1558,15 @@ def resolve_for_downstream(
         }
         for fact in auth
         if fact.entity_kind == "character" and _is_scene_cast_appearance(fact.field_path)
+    ]
+    auth_props = [
+        {
+            "entity_id": fact.entity_id,
+            "field_path": fact.field_path,
+            "text": fact.text,
+        }
+        for fact in auth
+        if fact.entity_kind == "scene" and _is_scene_prop_field(fact.field_path)
     ]
     auth_profile = {
         f.field_path.removeprefix("script_profile."): f.text
@@ -1349,7 +1609,7 @@ def resolve_for_downstream(
     raw_chars = list(fresh_extraction.character_texts()) if fresh_extraction else []
     raw_scenes = list(fresh_extraction.scene_texts()) if fresh_extraction else []
     asset_requirements = asset_requirements_payload(
-        project_scene_character_asset_requirements(
+        project_scene_asset_requirements(
             store,
             project_id=ledger.project_id,
             authoritative_facts=auth,
@@ -1365,6 +1625,7 @@ def resolve_for_downstream(
         "beats": auth_beats,
         "beat_facets": auth_beat_facets,
         "scene_cast": auth_cast,
+        "scene_props": auth_props,
         "asset_requirements": asset_requirements,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
@@ -2183,7 +2444,7 @@ def register_runtime_candidate_confirmation_routes(
         source_revision_id: str | None = None,
         scope_entity_id: str | None = None,
     ) -> dict[str, Any]:
-        """Read-only Scene character asset needs derived from confirmed cast."""
+        """Read-only Scene asset needs derived from confirmed cast/prop ownership."""
 
         _enforce_project_access(auth, request, project_id)
         _require_loop_enabled()
@@ -2191,7 +2452,7 @@ def register_runtime_candidate_confirmation_routes(
         ledger = load_ledger(store, project_id)
         rev = source_revision_id or ledger.current_revision_id
         authoritative = list_current_authoritative(ledger, revision_id=rev)
-        rows = project_scene_character_asset_requirements(
+        rows = project_scene_asset_requirements(
             store,
             project_id=project_id,
             authoritative_facts=authoritative,
@@ -2203,14 +2464,9 @@ def register_runtime_candidate_confirmation_routes(
             "enabled": True,
             "project_id": project_id,
             "revision_id": rev,
-            "projection": "derived_from_confirmed_scene_cast",
-            "asset_kinds_included": ["character"],
-            "asset_kinds_omitted": [
-                {
-                    "asset_kind": "prop",
-                    "reason": "SceneProps is draft-only; not in production candidate loop",
-                }
-            ],
+            "projection": "derived_from_confirmed_scene_cast_and_props",
+            "asset_kinds_included": ["character", "prop"],
+            "asset_kinds_omitted": [],
             "requirements": asset_requirements_payload(rows),
         }
 

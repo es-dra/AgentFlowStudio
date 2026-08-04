@@ -8,8 +8,8 @@ and supersede semantics (see docs/internal-notes/scene-cast-and-id-bridge-202608
 
 Rules
 -----
-1. Bind only after human confirmation of Character ``identity.display_name`` or
-   Scene ``scene.name``.
+1. Bind only after human confirmation of Character ``identity.display_name``,
+   Scene ``scene.name``, or Scene-owned ``scene[...].props[N].name``.
 2. Match Script Core assets on the same revision by exact display_name + type;
    if none, leave unbound (never invent an asset).
 3. Bidirectional lookup over *active* bindings only.
@@ -20,6 +20,7 @@ Rules
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -110,6 +111,11 @@ def _bindable_asset_type(fact: AuthoritativeScriptFact) -> str | None:
         return "character"
     if fact.entity_kind == "scene" and fact.field_path == "scene.name":
         return "main_scene"
+    if fact.entity_kind == "scene" and re.fullmatch(
+        r"scene\[.+\]\.props\[\d+\]\.name",
+        fact.field_path,
+    ):
+        return "prop"
     return None
 
 
@@ -153,6 +159,15 @@ def bind_authoritative_fact_to_core_asset(
     asset_type = _bindable_asset_type(fact)
     if asset_type is None:
         return None
+    bindings = load_bindings(store, fact.project_id)
+    active_slot_bindings = [
+        row
+        for row in bindings.bindings
+        if row.status == "active"
+        and row.revision_id == fact.source_revision_id
+        and row.entity_id == fact.entity_id
+        and row.field_path == fact.field_path
+    ]
     asset = find_matching_core_asset(
         store,
         project_id=fact.project_id,
@@ -161,22 +176,17 @@ def bind_authoritative_fact_to_core_asset(
         display_name=fact.text,
     )
     if asset is None:
+        if active_slot_bindings:
+            for row in active_slot_bindings:
+                row.status = "stale"
+            save_bindings(store, bindings)
         return None
 
-    bindings = load_bindings(store, fact.project_id)
     when = _now()
-    existing = next(
-        (
-            row
-            for row in bindings.bindings
-            if row.status == "active"
-            and row.revision_id == fact.source_revision_id
-            and row.entity_id == fact.entity_id
-            and row.field_path == fact.field_path
-        ),
-        None,
-    )
+    existing = active_slot_bindings[-1] if active_slot_bindings else None
     if existing is not None:
+        for duplicate in active_slot_bindings[:-1]:
+            duplicate.status = "stale"
         existing.authoritative_fact_id = fact.authoritative_fact_id
         existing.core_asset_id = str(asset["asset_id"])
         existing.display_name = fact.text
