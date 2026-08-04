@@ -17,6 +17,9 @@ export function applyScriptCoreTruthProjection(state, projection) {
   }
   const revisionId = cleanToken(safeProjection.current_revision_id || revision?.revision_id, 140);
   const previousRevisionNode = state.nodes?.[`script_truth_revision_${revisionId}`] || null;
+  const previousSelectedNodeIds = Array.isArray(state.selection?.nodeIds)
+    ? [...state.selection.nodeIds]
+    : [];
   removePreviousProjection(state);
   const sourceDigest = cleanDigest(revision?.source_digest || "");
   state.production = state.production || {};
@@ -53,9 +56,12 @@ export function applyScriptCoreTruthProjection(state, projection) {
       relation_type: "script_core_truth",
     };
   });
-  state.selection = state.selection?.nodeIds?.some((id) => state.nodes[id])
-    ? state.selection
-    : { nodeIds: [revisionNode.id], edgeId: null };
+  const restoredNodeIds = previousSelectedNodeIds.filter((id) => state.nodes[id]);
+  state.selection = restoredNodeIds.length
+    ? { nodeIds: restoredNodeIds, edgeId: null }
+    : state.selection?.nodeIds?.some((id) => state.nodes[id])
+      ? state.selection
+      : { nodeIds: [revisionNode.id], edgeId: null };
   return state.production.script_core_truth_projection;
 }
 
@@ -167,6 +173,13 @@ function assetNodeFor(projectId, revisionNode, asset, index) {
         asset_type: assetType,
         source_mode: sourceMode,
         status,
+        candidate_id: cleanToken(asset.candidate_id || "", 160),
+        version: Math.max(1, Number(asset.version || 1)),
+        version_id: cleanToken(asset.version_id || "", 160),
+        parent_version_id: cleanToken(asset.parent_version_id || "", 160),
+        review_decision_id: cleanToken(asset.review_decision_id || "", 160),
+        display_name: label,
+        evidence_spans: safeEvidenceSpans(asset.evidence_spans),
       },
       provider_dispatch_count: 0,
       remote_dispatch_count: 0,
@@ -177,6 +190,9 @@ function assetNodeFor(projectId, revisionNode, asset, index) {
       sourceMode ? `来源：${sourceModeLabel(sourceMode)}` : "",
       Array.isArray(asset.aliases) && asset.aliases.length ? `别名：${asset.aliases.join(", ")}` : "",
       Number(asset.confidence || 0) ? `置信度：${Number(asset.confidence).toFixed(2)}` : "",
+      safeEvidenceSpans(asset.evidence_spans).length
+        ? `依据：${safeEvidenceSpans(asset.evidence_spans).map((item) => item.quote).join(" / ")}`
+        : "",
     ].filter(Boolean).join("\n"),
     status: status === "confirmed" ? "complete" : "draft",
     result: null,
@@ -219,6 +235,14 @@ function cleanSourceText(value) {
   return String(value || "").replace(/\r\n?/g, "\n").trim().slice(0, 200000);
 }
 
+function safeEvidenceSpans(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 12).map((item) => ({
+    start: Math.max(0, Number(item?.start || 0)),
+    end: Math.max(0, Number(item?.end || 0)),
+    quote: String(item?.quote || "").replace(/\s+/g, " ").trim().slice(0, 1200),
+  })).filter((item) => item.quote && item.end > item.start);
+}
+
 function sourceExcerpt(value, limit = 520) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
@@ -253,6 +277,8 @@ function analysisStateLabel(value) {
   if (state === "low_confidence_pending") return "低置信待确认";
   if (state === "pending_confirmation") return "待确认";
   if (state === "confirmed") return "已确认";
+  if (state === "rejected") return "已拒绝";
+  if (state === "expired") return "已过期";
   return state.replace(/_/g, " ");
 }
 
@@ -267,6 +293,10 @@ function assetTypeLabel(value) {
 function assetStatusLabel(value) {
   const status = String(value || "").trim();
   if (status === "confirmed") return "已确认";
+  if (status === "candidate") return "待审阅";
+  if (status === "modified") return "已修改，待审阅";
+  if (status === "rejected") return "已拒绝";
+  if (status === "expired") return "已过期";
   if (status === "pending_confirmation") return "待确认";
   if (status === "retired") return "已停用";
   if (status === "low_confidence_pending") return "低置信待确认";
