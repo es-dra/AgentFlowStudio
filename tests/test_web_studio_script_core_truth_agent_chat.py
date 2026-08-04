@@ -34,6 +34,8 @@ def test_script_core_truth_frontend_contract_has_no_production_pollution() -> No
     assert "agent-script-candidate-review" in combined
     assert "agent-script-candidate-extraction" in combined
     assert "agent-script-candidate-evidence-kind" in combined
+    assert "human_edited" in combined
+    assert "人工修正，原文证据仅作上下文" in combined
     assert "handleScriptCandidateReview" in combined
     assert "auto_props: 0" in combined
 

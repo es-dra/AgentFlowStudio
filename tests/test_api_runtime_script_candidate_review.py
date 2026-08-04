@@ -46,6 +46,8 @@ def _seed_candidate(client: TestClient, project_id: str = "script-review") -> tu
                     "evidence_spans": [_span(source_text, "Mira")],
                     "confidence": 0.99,
                     "status": "candidate",
+                    "evidence_status": "extracted_from_text",
+                    "extraction_method": "fixture_exact_span",
                 }
             ],
             "main_scenes": [
@@ -54,6 +56,8 @@ def _seed_candidate(client: TestClient, project_id: str = "script-review") -> tu
                     "evidence_spans": [_span(source_text, "Archive Hall")],
                     "confidence": 0.99,
                     "status": "candidate",
+                    "evidence_status": "extracted_from_text",
+                    "extraction_method": "fixture_exact_span",
                 }
             ],
             "provider_dispatch_count": 0,
@@ -121,6 +125,9 @@ def test_candidate_edit_review_graph_write_and_restart_recovery(tmp_path) -> Non
     assert edited_character["status"] == "modified"
     assert edited_character["version"] == 2
     assert edited_character["parent_version_id"] == character["version_id"]
+    assert edited_character["evidence_status"] == "human_edited"
+    assert edited_character["extraction_method"] == "human_edit"
+    assert edited_character["evidence_spans"] == character["evidence_spans"]
 
     confirmed = client.post(
         f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
@@ -143,6 +150,8 @@ def test_candidate_edit_review_graph_write_and_restart_recovery(tmp_path) -> Non
     graph_metadata = confirmed_payload["graph"]["nodes"][character["asset_id"]]["metadata"]
     assert graph_metadata["source_digest"] == revision["source_digest"]
     assert graph_metadata["asset_version_id"] == confirmed_payload["asset"]["version_id"]
+    assert graph_metadata["lineage"]["evidence_status"] == "human_edited"
+    assert graph_metadata["lineage"]["extraction_method"] == "human_edit"
     assert {
         (item["from_id"], item["to_id"], item["relation_type"])
         for item in confirmed_payload["graph"]["relations"]

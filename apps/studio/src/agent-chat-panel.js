@@ -218,6 +218,7 @@ function scriptCandidateEvidenceStatusLabel(value) {
     extracted_from_text: "原文直接提取",
     model_inferred: "模型推断，需人工核对",
     conflicting: "证据冲突，需人工处理",
+    human_edited: "人工修正，原文证据仅作上下文",
   }[String(value || "")] || "来源待核对";
 }
 

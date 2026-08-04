@@ -1113,6 +1113,21 @@ def _apply_structured_analysis_candidate(
     )
     _validate_evidence_spans(body, revision)
     candidate = _analysis_candidate_record(project_id, revision, body)
+    existing_candidate = dict(
+        (state.get("analysis_candidates") or {}).get(candidate["candidate_id"]) or {}
+    )
+    if (
+        existing_candidate
+        and str(revision.get("analysis_candidate_id") or "") == candidate["candidate_id"]
+    ):
+        existing_assets = _analysis_assets_for_revision(state, revision_id)
+        return (
+            revision,
+            existing_candidate,
+            existing_assets,
+            [],
+            [str(asset["asset_id"]) for asset in existing_assets],
+        )
     previous_assets = dict(state.get("assets") or {})
     assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
     for asset in assets:
@@ -1535,11 +1550,27 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
     after = dict(before)
     after["updated_at"] = now
     if body.command_type == "edit_asset":
+        previous_label = _clean_label(before.get("display_name") or before.get("name"))
         label = _clean_label(body.patch.get("display_name") or body.patch.get("name") or after.get("display_name"))
         if not label:
             raise ValueError("edited asset label cannot be empty")
         after["display_name"] = label
         after["name"] = label
+        evidence_quotes = {
+            _clean_label(span.get("quote"))
+            for span in (before.get("evidence_spans") or [])
+            if isinstance(span, dict) and _clean_label(span.get("quote"))
+        }
+        if label != previous_label and label not in evidence_quotes:
+            after["evidence_status"] = "human_edited"
+            after["extraction_method"] = "human_edit"
+            after["uncertainty_note"] = (
+                "Human-edited label is not an exact source quote; retained spans are contextual evidence."
+            )
+            lineage = dict(after.get("lineage") or {})
+            lineage["evidence_status"] = "human_edited"
+            lineage["extraction_method"] = "human_edit"
+            after["lineage"] = lineage
         if "aliases" in body.patch:
             after["aliases"] = _clean_text_list(list(body.patch.get("aliases") or []))
     elif body.command_type == "retire_asset" or body.command_type == "retire_manual_prop":

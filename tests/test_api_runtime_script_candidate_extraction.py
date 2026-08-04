@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_script_core_truth import ANALYSIS_REVIEW_SCHEMA_VERSION
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -92,6 +93,73 @@ def test_deterministic_extraction_enters_the_existing_review_loop(tmp_path) -> N
     assert replay.status_code == 200, replay.text
     assert replay.json()["candidate"]["candidate_id"] == payload["candidate"]["candidate_id"]
     assert replay.json()["preserved_asset_ids"]
+
+
+def test_reextraction_preserves_final_human_decisions_and_graph_authority(tmp_path) -> None:
+    project_id = "candidate-reextraction-authority"
+    source_text = "Characters: Mira\nScenes: Archive Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    extracted = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert extracted.status_code == 200, extracted.text
+    initial = extracted.json()
+    character = next(item for item in initial["projection"]["assets"] if item["asset_type"] == "character")
+    scene = next(item for item in initial["projection"]["assets"] if item["asset_type"] == "main_scene")
+
+    confirmed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": initial["candidate"]["candidate_id"],
+            "asset_version_id": character["version_id"],
+            "expected_asset_version": character["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "confirm-mira-before-reextract",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    rejected = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{scene['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": initial["candidate"]["candidate_id"],
+            "asset_version_id": scene["version_id"],
+            "expected_asset_version": scene["version"],
+            "expected_graph_version": 1,
+            "idempotency_key": "reject-scene-before-reextract",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "reject",
+        },
+    )
+    assert rejected.status_code == 200, rejected.text
+    final_versions = {
+        character["asset_id"]: confirmed.json()["asset"]["version_id"],
+        scene["asset_id"]: rejected.json()["asset"]["version_id"],
+    }
+
+    replay = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert replay.status_code == 200, replay.text
+    replay_assets = {item["asset_id"]: item for item in replay.json()["projection"]["assets"]}
+    assert replay_assets[character["asset_id"]]["status"] == "confirmed"
+    assert replay_assets[scene["asset_id"]]["status"] == "rejected"
+    assert {
+        asset_id: item["version_id"] for asset_id, item in replay_assets.items()
+    } == final_versions
+    assert set(replay.json()["preserved_asset_ids"]) == {character["asset_id"], scene["asset_id"]}
+    graph = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert character["asset_id"] in graph["nodes"]
+    assert scene["asset_id"] not in graph["nodes"]
 
 
 def test_deterministic_extraction_records_missing_without_inventing_facts(tmp_path) -> None:
