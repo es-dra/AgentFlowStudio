@@ -190,6 +190,34 @@ const shotPlan = {
   }],
 };
 const runtime = {
+  createScriptRevision: async (payload) => ({
+    revision: {
+      project_id: 'm6_6_probe',
+      revision_id: 'scrrev_m6_6_probe',
+      source_kind: 'script',
+      source_text: payload.source_text,
+      source_digest: 'b'.repeat(64),
+      source_length: payload.source_text.length,
+      analysis_state: 'analysis_required',
+    },
+    projection: {
+      schema_version: 'afs.script_core_truth.v0.1',
+      project_id: 'm6_6_probe',
+      current_revision_id: 'scrrev_m6_6_probe',
+      current_revision: {
+        project_id: 'm6_6_probe',
+        revision_id: 'scrrev_m6_6_probe',
+        source_kind: 'script',
+        source_text: payload.source_text,
+        source_digest: 'b'.repeat(64),
+        source_length: payload.source_text.length,
+        analysis_state: 'analysis_required',
+      },
+      assets: [],
+      asset_counts: { characters: 0, main_scenes: 0, manual_props: 0 },
+      analysis_state: 'analysis_required',
+    },
+  }),
   previewEmbeddedCreativeAction: async (payload) => ({
     mode: 'llm',
     provider_calls_started: true,
@@ -276,6 +304,9 @@ await startEmbeddedCreativeAction(store, runtime, state.nodes.n1, 'shot_breakdow
     tolerance_seconds: 1,
   },
 });
+assert(state.nodes.n1.params.scriptRevision?.revision_id === 'scrrev_m6_6_probe', 'source node must retain canonical revision binding');
+assert(state.nodes.n1.params.embeddedCreativeAction?.status === 'preview', 'shot preview must remain on source node');
+assert(state.nodes.n1.params.embeddedCreativeAction?.production_brief?.source_revision_id === 'scrrev_m6_6_probe', 'shot brief must bind current revision');
 const beforeShotNodeCount = state.order.length;
 applyEmbeddedCreativeAction(store, 'n1');
 const roles = Object.values(state.nodes).map((node) => node.params?.nodeRole).filter(Boolean);

@@ -44,7 +44,8 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
   let actionNode = node;
   if (actionType === "shot_breakdown") {
     try {
-      actionNode = await ensureCurrentScriptRevision(store, runtime, node, sourceText);
+      const revisionNode = await ensureCurrentScriptRevision(store, runtime, node, sourceText);
+      actionNode = bindScriptRevisionToSourceNode(store, node.id, revisionNode);
     } catch (error) {
       markEmbeddedCreativeUnavailable(store, node.id, preparedActionId, {
         category: "script_revision_save_failed",
@@ -1123,6 +1124,31 @@ async function createCurrentScriptRevision(store, runtime, node, sourceText, cur
   }
   await store.flushRuntimeSave?.();
   return projected;
+}
+
+function bindScriptRevisionToSourceNode(store, nodeId, revisionNode) {
+  const binding = revisionNode?.params?.scriptRevision;
+  if (!scriptRevisionMatchesSource(revisionNode, normalizeSourceText(binding?.source_text))) {
+    throw new Error("script revision projection did not expose a valid source binding");
+  }
+  const currentSourceNode = store.get()?.nodes?.[nodeId] || null;
+  if (!currentSourceNode || currentSourceNode.params?.scriptCoreProjection) return revisionNode;
+  store.set((state) => {
+    const sourceNode = state.nodes?.[nodeId];
+    if (!sourceNode) return;
+    sourceNode.params = sourceNode.params || {};
+    sourceNode.params.scriptRevision = { ...binding };
+  }, { history: false });
+  const sourceNode = store.get()?.nodes?.[nodeId] || null;
+  if (!scriptRevisionMatchesSource(
+    sourceNode,
+    normalizeSourceText(binding.source_text),
+    cleanToken(binding.revision_id, 140),
+    cleanDigest(binding.source_digest),
+  )) {
+    throw new Error("source node did not retain the current script revision binding");
+  }
+  return sourceNode;
 }
 
 function scriptRevisionMatchesSource(node, sourceText, expectedRevisionId = "", expectedDigest = "") {

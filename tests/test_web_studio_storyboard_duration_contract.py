@@ -309,9 +309,10 @@ assert.equal(calls[1].payload.production_brief.source_digest, digest);
 
 const canonical = state.nodes["script_truth_revision_scrrev-seaside-1"];
 assert.ok(canonical);
-assert.equal(state.selection.nodeIds[0], canonical.id);
-assert.equal(canonical.params.embeddedCreativeAction.status, "preview");
-assert.equal(state.nodes.pasted.params.embeddedCreativeAction, undefined);
+assert.equal(state.selection.nodeIds[0], "pasted");
+assert.equal(state.nodes.pasted.params.scriptRevision.revision_id, "scrrev-seaside-1");
+assert.equal(state.nodes.pasted.params.embeddedCreativeAction.status, "preview");
+assert.equal(canonical.params.embeddedCreativeAction, undefined);
 
 prepareEmbeddedShotBreakdown(store, canonical);
 const secondBrief = updateEmbeddedStoryboardBrief(store, canonical.id, 60);
@@ -410,8 +411,9 @@ await startEmbeddedCreativeAction(offlineStore, offlineRuntime, offlineState.nod
   productionBrief: offlineBrief,
 });
 const offlineCanonical = offlineState.nodes["script_truth_revision_scrrev-seaside-1"];
-assert.equal(offlineCanonical.params.embeddedCreativeAction.status, "unavailable");
-assert.equal(offlineState.nodes.offline.params.embeddedCreativeAction, undefined);
+assert.equal(offlineCanonical.params.embeddedCreativeAction, undefined);
+assert.equal(offlineState.nodes.offline.params.scriptRevision.revision_id, "scrrev-seaside-1");
+assert.equal(offlineState.nodes.offline.params.embeddedCreativeAction.status, "unavailable");
 
 function corruptedProjectionState(nodeId, bindingDigest = digest, projectionSource = source) {
   return {
