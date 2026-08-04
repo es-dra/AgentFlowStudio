@@ -1,6 +1,6 @@
 # Scene 归属与 ID 映射地基调查（2026-08-04）
 
-状态：调查完成；生产接线已落地（Scene→Cast appearance + 窄 entity↔asset sidecar）；资产需求候选类型仍未做。
+状态：调查完成；生产接线已落地（Scene→Cast appearance + 窄 entity↔asset sidecar）；人物资产需求派生视图已落地（见 `asset-requirement-derived-view-20260804.md`）。
 
 ## 背景（两个前置缺口）
 
