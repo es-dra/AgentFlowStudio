@@ -1214,6 +1214,28 @@
 .agent-current-task-kv dd { margin: 0; color: var(--product-muted); font-size: 11px; line-height: 1.45; }
 .agent-current-task-kv dd { color: var(--product-text); overflow-wrap: anywhere; }
 .agent-current-task-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-script-candidate-review { border-color: rgba(73, 224, 235, .46); }
+.agent-script-candidate-evidence { overflow-wrap: anywhere; }
+.agent-script-candidate-label {
+  display: grid;
+  gap: 6px;
+  color: var(--product-text);
+  font-size: 12px;
+}
+.agent-script-candidate-label input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 9px 10px;
+  border: 1px solid var(--product-line);
+  border-radius: 6px;
+  background: var(--product-surface-2);
+  color: var(--product-text);
+  font: inherit;
+  letter-spacing: 0;
+}
+.agent-script-candidate-status { margin: 0; color: var(--product-muted); font-size: 11px; }
+.agent-script-candidate-status.error { color: #ffb4a8; }
 .agent-receipt { display: grid; gap: 5px; border: 1px solid var(--product-line-soft); border-radius: 6px; padding: 8px; background: #07131b; }
 .agent-receipt strong { font-size: 12px; }
 .agent-receipt.undone { opacity: .82; }

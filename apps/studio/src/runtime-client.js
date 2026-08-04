@@ -408,7 +408,10 @@ function inferUserAction(route, method) {
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
   if (/\/script-revisions$/.test(route) && method === "POST") return "create_script_revision";
   if (/\/script-revisions\/[^/]+\/select$/.test(route) && method === "POST") return "select_script_revision";
+  if (/\/analysis-candidates\/extract$/.test(route) && method === "POST") return "extract_structured_analysis_candidate";
   if (/\/analysis-candidates$/.test(route) && method === "POST") return "submit_structured_analysis_candidate";
+  if (/\/analysis-candidates$/.test(route) && method === "GET") return "load_structured_analysis_candidates";
+  if (/\/analysis-assets\/[^/]+\/review$/.test(route) && method === "POST") return "review_analysis_asset";
   if (/\/core-assets\/commands\/preview$/.test(route) && method === "POST") return "preview_core_asset_command";
   if (/\/core-assets\/commands\/confirm$/.test(route) && method === "POST") return "confirm_core_asset_command";
   if (/\/core-assets\/commands\/undo$/.test(route) && method === "POST") return "undo_core_asset_command";
@@ -775,6 +778,23 @@ export function createRuntimeClient(projectId = "") {
         method: "POST",
         payload,
       });
+    },
+    extractStructuredAnalysisCandidate(revisionId) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates/extract`, {
+        method: "POST",
+      });
+    },
+    loadStructuredAnalysisCandidates(revisionId) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates`);
+    },
+    loadProductionGraph() {
+      return requestJson(`/projects/${encoded}/m4/production-graph`);
+    },
+    reviewAnalysisAsset(revisionId, assetId, payload) {
+      return requestJson(
+        `/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-assets/${encodeURIComponent(assetId)}/review`,
+        { method: "POST", payload },
+      );
     },
     previewCoreAssetCommand(payload) {
       return requestJson(`/projects/${encoded}/core-assets/commands/preview`, { method: "POST", payload });

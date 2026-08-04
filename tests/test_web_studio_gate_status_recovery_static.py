@@ -865,7 +865,7 @@ def test_job_center_keeps_blocked_reason_and_next_action_together() -> None:
         assert marker in styles
 
 
-def test_narrow_studio_workflow_has_canvas_lane_and_collapsed_inspector() -> None:
+def test_narrow_studio_workflow_has_canvas_lane_and_expandable_inspector() -> None:
     styles = _styles()
 
     for marker in (
@@ -873,7 +873,9 @@ def test_narrow_studio_workflow_has_canvas_lane_and_collapsed_inspector() -> Non
         "width: calc(100vw - var(--mobile-drawer-w));",
         "#drawer:not(.collapsed) ~ #canvas-root .node",
         "width: calc(100vw - var(--mobile-drawer-w, var(--drawer-w)) - 24px) !important;",
-        "#inspector > :not(.inspector-collapse-toggle)",
+        "width: min(324px, calc(100vw - 16px));",
+        "max-height: calc(100vh - var(--topbar-h) - 16px);",
+        "#inspector.is-collapsed",
         ".generation-status-row,\n  .generation-gate-row",
     ):
         assert marker in styles

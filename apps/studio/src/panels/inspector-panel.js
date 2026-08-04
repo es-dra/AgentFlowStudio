@@ -5,6 +5,7 @@ import { assetsFromNode } from "../asset-reference-summary.js";
 import { blockedReasonForNode, nextActionForNode, statusLineForNode } from "../generation-status-view.js";
 import { keyframeSourceEvidenceTraceSummaryText } from "../keyframe-source-evidence-trace.js";
 import { studioStatusLabel } from "../studio-entity-status-vocabulary.js";
+import { SCRIPT_CANDIDATE_EXTRACTION_EVENT, SCRIPT_CANDIDATE_REVIEW_EVENT } from "../script-candidate-review.js";
 import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
 import {
   nodeAssetDecisionText,
@@ -46,6 +47,7 @@ function renderNodeInspector(panel, node, store) {
   panel.appendChild(panelHead(def.icon, node.title, def.label));
   panel.appendChild(section("下一步行动", nodeActionBrief(node), "primary"));
   panel.appendChild(inspectorActions(nodeActions(node, store)));
+  if (node.params?.coreAssetTruth) panel.appendChild(analysisAssetReviewPanel(node));
   panel.appendChild(section("本次参考摘要", nodeContextSummaryText(node)));
   panel.appendChild(drawerLinks(store));
   panel.appendChild(detailsSection("资产确认状态", nodeAssetDecisionText(node), "资产"));
@@ -88,6 +90,26 @@ function emptyGuide(state) {
 }
 
 function nodeActionBrief(node) {
+  const truth = node.params?.coreAssetTruth;
+  if (truth) {
+    const evidenceCount = Array.isArray(truth.evidence_spans) ? truth.evidence_spans.length : 0;
+    return [
+      `候选状态：${coreAssetStatusLabel(truth.status)}`,
+      `证据性质：${evidenceStatusLabel(truth.evidence_status)}`,
+      `来源证据：${evidenceCount} 处`,
+      ["candidate", "modified"].includes(truth.status)
+        ? "核对名称和来源后确认或拒绝；只有确认结果会进入 Production Graph。"
+        : truth.status === "expired"
+          ? "源剧本已更新，此候选不能继续审阅。"
+          : "该候选的审阅决定已保存。",
+    ].join("\n");
+  }
+  if (node.params?.scriptRevision && node.params?.scriptCoreProjection) {
+    const extraction = node.params?.scriptCandidateExtraction || {};
+    return extraction.error
+      ? `候选提取未完成：${extraction.error}\n原始剧本未改变，可以重试。`
+      : extraction.message || "从当前剧本提取有原文依据的人物和场景，再逐项人工确认。";
+  }
   const model = node.params?.model || "未选择模型";
   const assetCount = assetsFromNode(node).length;
   const blockedReason = blockedReasonForNode(node);
@@ -107,10 +129,11 @@ function metaPill(label, value) {
 
 function inspectorActions(actions) {
   const row = el("div", "inspector-actions");
-  for (const [label, iconName, onClick, tone = ""] of actions) {
+  for (const [label, iconName, onClick, tone = "", disabled = false] of actions) {
     const button = el("button", `inspector-action${tone ? ` ${tone}` : ""}`);
     button.type = "button";
     button.innerHTML = `${icon(iconName, 13)}<span>${escapeHtml(label)}</span>`;
+    button.disabled = disabled;
     button.addEventListener("click", onClick);
     row.appendChild(button);
   }
@@ -118,6 +141,19 @@ function inspectorActions(actions) {
 }
 
 function nodeActions(node, store) {
+  const truth = node.params?.coreAssetTruth;
+  if (truth) {
+    if (!["candidate", "modified"].includes(truth.status)) return [];
+    const busy = Boolean(node.params?.coreAssetReview?.busy);
+    return [
+      ["确认", "check", () => dispatchScriptReview(node, "confirm"), "primary", busy],
+      ["拒绝", "x", () => dispatchScriptReview(node, "reject"), "", busy],
+    ];
+  }
+  if (node.params?.scriptRevision && node.params?.scriptCoreProjection) {
+    const busy = Boolean(node.params?.scriptCandidateExtraction?.busy);
+    return [["提取候选", "sparkles", () => dispatchScriptExtraction(node), "primary", busy]];
+  }
   const retry = ["error", "partial"].includes(node.status)
     ? [["Retry failed items", "retry", () => dispatchNodeEvent("afs:studio-open-generation-panel", node), "primary"]]
     : [];
@@ -131,6 +167,71 @@ function nodeActions(node, store) {
     base.push(["整理卡片", "frames", () => dispatchNodeEvent("afs:video-asset-card-draft", node)]);
   }
   return base;
+}
+
+function analysisAssetReviewPanel(node) {
+  const truth = node.params.coreAssetTruth;
+  const review = node.params?.coreAssetReview || {};
+  const wrap = el("section", "inspector-section analysis-asset-review");
+  wrap.appendChild(el("h3", "", "候选审阅"));
+  const evidence = (Array.isArray(truth.evidence_spans) ? truth.evidence_spans : [])
+    .map((item) => String(item?.quote || "").trim())
+    .filter(Boolean);
+  wrap.appendChild(el("p", "analysis-asset-evidence", evidence.length ? `来源：${evidence.join(" / ")}` : "没有可核对的来源证据。"));
+  wrap.appendChild(el("p", "analysis-asset-evidence-kind", `证据性质：${evidenceStatusLabel(truth.evidence_status)}`));
+  const editable = ["candidate", "modified"].includes(truth.status);
+  const label = el("label", "analysis-asset-label", "名称");
+  const input = el("input", "analysis-asset-input");
+  input.type = "text";
+  input.maxLength = 120;
+  input.value = String(truth.display_name || node.title || "");
+  input.disabled = !editable || Boolean(review.busy);
+  label.appendChild(input);
+  wrap.appendChild(label);
+  if (editable) {
+    const save = el("button", "inspector-action analysis-asset-save");
+    save.type = "button";
+    save.disabled = Boolean(review.busy);
+    save.innerHTML = `${icon("pencil", 13)}<span>保存修改</span>`;
+    save.addEventListener("click", () => dispatchScriptReview(node, "edit", input.value));
+    wrap.appendChild(save);
+  }
+  const status = el("p", "analysis-asset-review-status", review.error || review.message || coreAssetStatusLabel(truth.status));
+  status.setAttribute("aria-live", "polite");
+  if (review.error) status.dataset.state = "error";
+  wrap.appendChild(status);
+  return wrap;
+}
+
+function dispatchScriptReview(node, action, label = "") {
+  window.dispatchEvent(new CustomEvent(SCRIPT_CANDIDATE_REVIEW_EVENT, {
+    detail: { action, label, node_id: node.id, node },
+  }));
+}
+
+function dispatchScriptExtraction(node) {
+  window.dispatchEvent(new CustomEvent(SCRIPT_CANDIDATE_EXTRACTION_EVENT, {
+    detail: { node_id: node.id, node },
+  }));
+}
+
+function coreAssetStatusLabel(value) {
+  return {
+    candidate: "待审阅",
+    modified: "已修改，待审阅",
+    confirmed: "已确认",
+    rejected: "已拒绝",
+    expired: "已过期",
+  }[String(value || "")] || "待审阅";
+}
+
+function evidenceStatusLabel(value) {
+  return {
+    extracted_from_text: "原文直接提取",
+    model_inferred: "模型推断，需人工核对",
+    conflicting: "证据冲突，需人工处理",
+    human_edited: "人工修正，原文证据仅作上下文",
+  }[String(value || "")] || "来源待核对";
 }
 
 function dispatchNodeEvent(eventName, node) {
@@ -259,6 +360,9 @@ function inspectorSignature(state, node) {
     JSON.stringify(node?.params?.keyframeLayer || {}),
     JSON.stringify(node?.params?.lastSafeManifest || node?.params?.lastGenerationManifest || {}),
     JSON.stringify(node?.params?.jobProgress || {}),
+    JSON.stringify(node?.params?.coreAssetTruth || {}),
+    JSON.stringify(node?.params?.coreAssetReview || {}),
+    JSON.stringify(node?.params?.scriptCandidateExtraction || {}),
     node?.params?.lastOptimizedPromptPlain || "",
     node?.params?.lastVideoAssetCardDraftStatus || "",
   ].join("|");

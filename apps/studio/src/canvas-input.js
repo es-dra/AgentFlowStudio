@@ -220,14 +220,18 @@ function beginNodeDrag(e, { store, rootEl, nodeEl }) {
   const state = store.get();
   const additive = e.shiftKey || e.ctrlKey || e.metaKey;
   const alreadySelected = state.selection.nodeIds.includes(nodeId);
+  const opensCandidateReview = !additive && Boolean(state.nodes[nodeId]?.params?.coreAssetTruth);
   let selected = alreadySelected ? [...state.selection.nodeIds] : [nodeId];
   if (additive) {
     selected = alreadySelected
       ? state.selection.nodeIds.filter((id) => id !== nodeId)
       : [...state.selection.nodeIds, nodeId];
   }
-  if (additive || !alreadySelected) {
-    store.set((s) => { s.selection = { nodeIds: selected, edgeId: null }; }, { history: false, persist: false });
+  if (additive || !alreadySelected || (opensCandidateReview && state.ui.inspectorOpen === false)) {
+    store.set((s) => {
+      s.selection = { nodeIds: selected, edgeId: null };
+      if (opensCandidateReview) s.ui.inspectorOpen = true;
+    }, { history: false, persist: false });
   }
   if (!selected.includes(nodeId)) return null;
   const session = e.altKey ? cloneDragSession(store, nodeId, e) : dragSession(store, selected, e, { primaryId: nodeId, additive });

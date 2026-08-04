@@ -14,15 +14,27 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from agentflow.harness.json_io import exclusive_file_lock, write_json
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_errors import safe_error_detail
+from apps.api.runtime_production_graph import (
+    GraphIdempotencyConflict,
+    GraphVersionConflict,
+    ProductionGraphError,
+    ProductionGraphStore,
+    canonical_digest,
+)
+from apps.api.runtime_script_candidate_extraction import (
+    DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
+    build_deterministic_analysis_candidate,
+)
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
 SCRIPT_TRUTH_SCHEMA_VERSION = "afs.script_core_truth.v0.1"
 SCRIPT_REVISION_SCHEMA_VERSION = "afs.script_revision.v0.1"
 ANALYSIS_CANDIDATE_SCHEMA_VERSION = "afs.structured_analysis_candidate.v0.1"
+ANALYSIS_REVIEW_SCHEMA_VERSION = "afs.analysis_asset_review.v0.1"
 CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1"
 AUTO_CONFIRM_CONFIDENCE = 0.82
-ACTIVE_STATUSES = {"confirmed", "pending_confirmation", "analysis_required", "low_confidence_pending"}
+ACTIVE_STATUSES = {"candidate", "modified", "confirmed", "pending_confirmation", "analysis_required", "low_confidence_pending"}
 
 
 class EvidenceSpan(BaseModel):
@@ -48,6 +60,9 @@ class CandidateCharacter(BaseModel):
     evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
     confidence: float = Field(ge=0.0, le=1.0)
     status: Literal["candidate", "confirmed", "pending_confirmation"] = "candidate"
+    evidence_status: Literal["extracted_from_text", "model_inferred", "conflicting"] = "model_inferred"
+    extraction_method: str = Field(default="unspecified_structured_analysis", min_length=1, max_length=120)
+    uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
 class CandidateMainScene(BaseModel):
@@ -57,6 +72,9 @@ class CandidateMainScene(BaseModel):
     evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
     confidence: float = Field(ge=0.0, le=1.0)
     status: Literal["candidate", "confirmed", "pending_confirmation"] = "candidate"
+    evidence_status: Literal["extracted_from_text", "model_inferred", "conflicting"] = "model_inferred"
+    extraction_method: str = Field(default="unspecified_structured_analysis", min_length=1, max_length=120)
+    uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
 class ScriptRevisionCreateRequest(BaseModel):
@@ -84,6 +102,8 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     actions: list[str] = Field(default_factory=list, max_length=120)
     events: list[str] = Field(default_factory=list, max_length=120)
     beats: list[dict[str, Any]] = Field(default_factory=list, max_length=120)
+    missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
+    extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
     provider_dispatch_count: int = Field(default=0, ge=0, le=0)
     remote_dispatch_count: int = Field(default=0, ge=0, le=0)
@@ -107,6 +127,8 @@ class CoreAssetCommandRequest(BaseModel):
     target_asset_id: str | None = Field(default=None, max_length=140)
     patch: dict[str, Any] = Field(default_factory=dict)
     reason: str | None = Field(default=None, max_length=400)
+    expected_asset_version: int | None = Field(default=None, ge=1)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=160)
     generated_at: str | None = Field(default=None, max_length=80)
     provider_dispatch_count: int = Field(default=0, ge=0, le=0)
     remote_dispatch_count: int = Field(default=0, ge=0, le=0)
@@ -122,7 +144,26 @@ class CoreAssetUndoRequest(BaseModel):
     schema_version: str = Field(min_length=1, max_length=80)
 
 
+class AnalysisAssetReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1, max_length=128)
+    revision_id: str = Field(min_length=1, max_length=120)
+    source_digest: str = Field(min_length=64, max_length=64)
+    candidate_id: str = Field(min_length=1, max_length=160)
+    asset_version_id: str = Field(min_length=1, max_length=160)
+    expected_asset_version: int = Field(ge=1)
+    expected_graph_version: int = Field(ge=0)
+    idempotency_key: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    decision: Literal["confirm", "reject"]
+    reason: str | None = Field(default=None, max_length=600)
+    decided_at: str | None = Field(default=None, max_length=80)
+
+
 def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
+    graph_store = ProductionGraphStore(store)
+
     @app.post("/projects/{project_id}/script-revisions")
     def create_script_revision(
         project_id: str,
@@ -143,6 +184,7 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     status_code=409,
                 )
             revision = _new_revision(project_id, body, parent_revision_id)
+            _expire_open_analysis(state, superseded_by_revision_id=revision["revision_id"])
             state["revisions"][revision["revision_id"]] = revision
             state["current_revision_id"] = revision["revision_id"]
             _append_audit(
@@ -213,35 +255,11 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
         _enforce_project_access(auth, request, project_id)
         with exclusive_file_lock(_lock_path(store, project_id)):
             state = _load_state(store, project_id)
-            revision = _require_revision_contract(
+            revision, candidate, assets, affected, preserved = _apply_structured_analysis_candidate(
                 state,
                 project_id=project_id,
                 revision_id=revision_id,
-                body_project_id=body.project_id,
-                source_digest=body.source_digest,
-                schema_version=body.schema_version,
-                stage="analysis_candidate_submit",
-                expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
-            )
-            _validate_evidence_spans(body, revision)
-            candidate = _analysis_candidate_record(project_id, revision, body)
-            previous_assets = dict(state.get("assets") or {})
-            assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
-            for asset in assets:
-                state["assets"][asset["asset_id"]] = asset
-            state.setdefault("analysis_candidates", {})[candidate["candidate_id"]] = candidate
-            revision["analysis_state"] = _analysis_state_for_assets(assets)
-            revision["analysis_candidate_id"] = candidate["candidate_id"]
-            state["current_revision_id"] = revision_id
-            _append_audit(
-                state,
-                {
-                    "event_type": "structured_analysis_candidate_submitted",
-                    "revision_id": revision_id,
-                    "candidate_id": candidate["candidate_id"],
-                    "affected_asset_ids": affected,
-                    "preserved_asset_ids": preserved,
-                },
+                body=body,
             )
             _write_state(store, project_id, state)
         return {
@@ -254,6 +272,249 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
             "provider_dispatch_count": 0,
             "remote_dispatch_count": 0,
         }
+
+    @app.post("/projects/{project_id}/script-revisions/{revision_id}/analysis-candidates/extract")
+    def extract_deterministic_analysis_candidate(
+        project_id: str,
+        revision_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        with exclusive_file_lock(_lock_path(store, project_id)):
+            state = _load_state(store, project_id)
+            revision = _require_current_revision_for_extraction(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+            )
+            body = StructuredAnalysisCandidateRequest.model_validate(
+                build_deterministic_analysis_candidate(
+                    project_id=project_id,
+                    revision_id=revision_id,
+                    source_digest=str(revision["source_digest"]),
+                    source_text=str(revision["source_text"]),
+                    candidate_schema_version=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+                )
+            )
+            revision, candidate, assets, affected, preserved = _apply_structured_analysis_candidate(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+                body=body,
+            )
+            _write_state(store, project_id, state)
+        return {
+            "project_id": project_id,
+            "candidate": public_candidate(candidate),
+            "analysis_state": revision["analysis_state"],
+            "projection": public_projection(state),
+            "affected_asset_ids": affected,
+            "preserved_asset_ids": preserved,
+            "extraction": {
+                "schema_version": DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
+                "missing_slots": list(body.missing_slots),
+                "notes": list(body.extraction_notes),
+            },
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+
+    @app.get("/projects/{project_id}/script-revisions/{revision_id}/analysis-candidates")
+    def list_analysis_candidates(project_id: str, revision_id: str, request: Request) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        state = _load_state(store, project_id)
+        revision = dict((state.get("revisions") or {}).get(revision_id) or {})
+        if not revision:
+            raise _contract_error(
+                "script_revision_not_found",
+                "Script revision does not exist in this project truth store.",
+                project_id=project_id,
+                stage="analysis_candidate_query",
+                status_code=404,
+            )
+        candidates = [
+            public_candidate(item)
+            for item in (state.get("analysis_candidates") or {}).values()
+            if str(item.get("revision_id") or "") == revision_id
+        ]
+        assets = [public_asset(item) for item in _analysis_assets_for_revision(state, revision_id)]
+        decisions = [
+            public_review_decision(item)
+            for item in (state.get("review_decisions") or {}).values()
+            if str(item.get("revision_id") or "") == revision_id
+        ]
+        return {
+            "project_id": project_id,
+            "revision": public_revision(revision, include_source=False),
+            "candidates": sorted(candidates, key=lambda item: str(item.get("created_at") or "")),
+            "assets": assets,
+            "review_decisions": sorted(decisions, key=lambda item: str(item.get("decided_at") or "")),
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+
+    @app.post(
+        "/projects/{project_id}/script-revisions/{revision_id}/analysis-assets/{asset_id}/review"
+    )
+    def review_analysis_asset(
+        project_id: str,
+        revision_id: str,
+        asset_id: str,
+        body: AnalysisAssetReviewRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        semantic_digest = _analysis_review_digest(body, revision_id=revision_id, asset_id=asset_id)
+        with exclusive_file_lock(_lock_path(store, project_id)):
+            state = _load_state(store, project_id)
+            existing = _review_receipt_for_key(state, body.idempotency_key)
+            if existing:
+                if existing.get("semantic_digest") != semantic_digest:
+                    raise _contract_error(
+                        "analysis_review_idempotency_conflict",
+                        "Idempotency key was already used for a different review decision.",
+                        project_id=project_id,
+                        stage="analysis_asset_review",
+                        status_code=409,
+                    )
+                graph = graph_store.ensure(project_id)
+                reviewed_asset = _asset_version_by_id(state, asset_id, str(existing.get("asset_version_id") or ""))
+                decision = dict((state.get("review_decisions") or {}).get(existing.get("review_decision_id")) or {})
+                return _analysis_review_response(
+                    project_id,
+                    reviewed_asset,
+                    decision,
+                    existing,
+                    graph,
+                    idempotent_replay=True,
+                    graph_idempotent_replay=bool(existing.get("graph_idempotent_replay")),
+                )
+
+            revision = _require_revision_contract(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+                body_project_id=body.project_id,
+                source_digest=body.source_digest,
+                schema_version=body.schema_version,
+                stage="analysis_asset_review",
+                expected_schema=ANALYSIS_REVIEW_SCHEMA_VERSION,
+            )
+            if body.revision_id != revision_id:
+                raise _contract_error(
+                    "revision_identity_mismatch",
+                    "Request revision id does not match the URL revision scope.",
+                    project_id=project_id,
+                    stage="analysis_asset_review",
+                    status_code=409,
+                )
+            candidate = dict((state.get("analysis_candidates") or {}).get(body.candidate_id) or {})
+            if (
+                not candidate
+                or candidate.get("project_id") != project_id
+                or candidate.get("revision_id") != revision_id
+                or candidate.get("source_digest") != body.source_digest
+            ):
+                raise _contract_error(
+                    "analysis_candidate_not_found",
+                    "Review candidate does not belong to this exact script revision.",
+                    project_id=project_id,
+                    stage="analysis_asset_review",
+                    status_code=404,
+                )
+            asset = dict((state.get("assets") or {}).get(asset_id) or {})
+            _require_reviewable_asset(asset, body, project_id=project_id, asset_id=asset_id)
+            decided_at = _safe_time(body.decided_at)
+            reviewed_asset = _reviewed_asset_version(
+                asset,
+                body=body,
+                semantic_digest=semantic_digest,
+                decided_at=decided_at,
+            )
+
+            graph = graph_store.ensure(project_id)
+            graph_replay = False
+            if body.decision == "confirm":
+                try:
+                    graph = graph_store.append(
+                        project_id,
+                        expected_version=body.expected_graph_version,
+                        idempotency_key=body.idempotency_key,
+                        semantic_digest=semantic_digest,
+                        events=_analysis_confirmation_events(revision, candidate, reviewed_asset, semantic_digest),
+                    )
+                    graph_replay = bool(graph.get("idempotent_replay"))
+                except GraphIdempotencyConflict as exc:
+                    raise _contract_error(
+                        "analysis_review_idempotency_conflict",
+                        "Idempotency key was already used for a different graph mutation.",
+                        project_id=project_id,
+                        stage="analysis_asset_review",
+                        status_code=409,
+                    ) from exc
+                except GraphVersionConflict as exc:
+                    raise _contract_error(
+                        "production_graph_version_conflict",
+                        "Production Graph changed before this review decision was committed.",
+                        project_id=project_id,
+                        stage="analysis_asset_review",
+                        status_code=409,
+                        details={"expected_graph_version": body.expected_graph_version},
+                    ) from exc
+                except ProductionGraphError as exc:
+                    raise _contract_error(
+                        "production_graph_write_rejected",
+                        "Confirmed analysis asset could not be written to Production Graph.",
+                        project_id=project_id,
+                        stage="analysis_asset_review",
+                        status_code=409,
+                    ) from exc
+            elif graph.get("version") != body.expected_graph_version:
+                raise _contract_error(
+                    "production_graph_version_conflict",
+                    "Production Graph changed before this review decision was committed.",
+                    project_id=project_id,
+                    stage="analysis_asset_review",
+                    status_code=409,
+                    details={"expected_graph_version": body.expected_graph_version},
+                )
+
+            decision, reviewed_asset, receipt = _apply_analysis_review(
+                state,
+                project_id=project_id,
+                revision=revision,
+                candidate=candidate,
+                asset=asset,
+                body=body,
+                semantic_digest=semantic_digest,
+                graph=graph,
+                graph_idempotent_replay=graph_replay,
+                reviewed_asset=reviewed_asset,
+                decided_at=decided_at,
+            )
+            _append_audit(
+                state,
+                {
+                    "event_type": "analysis_asset_reviewed",
+                    "revision_id": revision_id,
+                    "candidate_id": candidate["candidate_id"],
+                    "asset_id": asset_id,
+                    "asset_version_id": reviewed_asset["version_id"],
+                    "review_decision_id": decision["review_decision_id"],
+                    "decision": decision["decision"],
+                    "production_graph_node_id": receipt.get("production_graph_node_id", ""),
+                },
+            )
+            _write_state(store, project_id, state)
+        return _analysis_review_response(
+            project_id,
+            reviewed_asset,
+            decision,
+            receipt,
+            graph,
+            idempotent_replay=False,
+            graph_idempotent_replay=graph_replay,
+        )
 
     @app.post("/projects/{project_id}/core-assets/commands/preview")
     def preview_core_asset_command(
@@ -281,6 +542,16 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
         _enforce_project_access(auth, request, project_id)
         with exclusive_file_lock(_lock_path(store, project_id)):
             state = _load_state(store, project_id)
+            existing = _core_command_receipt(state, body)
+            if existing:
+                return {
+                    "project_id": project_id,
+                    "receipt": public_receipt(existing),
+                    "projection": public_projection(state),
+                    "idempotent_replay": True,
+                    "provider_dispatch_count": 0,
+                    "remote_dispatch_count": 0,
+                }
             preview = _preview_core_asset_command(state, project_id, body)
             receipt = _apply_core_asset_command(state, project_id, body, preview)
             _append_audit(
@@ -357,11 +628,7 @@ def get_script_truth_route(app: FastAPI):
 def public_projection(state: dict[str, Any]) -> dict[str, Any]:
     revision = _current_revision(state)
     revision_id = str(revision.get("revision_id") or "")
-    assets = [
-        public_asset(asset)
-        for asset in sorted((state.get("assets") or {}).values(), key=lambda item: str(item.get("created_at") or ""))
-        if _asset_belongs_to_revision(asset, revision_id)
-    ]
+    assets = [public_asset(asset) for asset in _analysis_assets_for_revision(state, revision_id)]
     candidate = _current_candidate(state, revision)
     counts = {
         "characters": sum(1 for item in assets if item["asset_type"] == "character" and item["status"] != "retired"),
@@ -458,6 +725,10 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "project_id": str(candidate.get("project_id") or ""),
         "revision_id": str(candidate.get("revision_id") or ""),
         "source_digest": str(candidate.get("source_digest") or ""),
+        "status": str(candidate.get("status") or "candidate"),
+        "created_at": str(candidate.get("created_at") or ""),
+        "expired_at": str(candidate.get("expired_at") or ""),
+        "superseded_by_revision_id": str(candidate.get("superseded_by_revision_id") or ""),
         "named_character_count": len(candidate.get("named_characters") or []),
         "main_scene_count": len(candidate.get("main_scenes") or []),
         "style": str(candidate.get("style") or ""),
@@ -466,6 +737,8 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "actions": [str(item)[:240] for item in candidate.get("actions", [])[:20]],
         "events": [str(item)[:240] for item in candidate.get("events", [])[:20]],
         "beats_count": len(candidate.get("beats") or []),
+        "missing_slots": [str(item) for item in candidate.get("missing_slots", [])[:10]],
+        "extraction_notes": [str(item)[:600] for item in candidate.get("extraction_notes", [])[:20]],
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -486,9 +759,17 @@ def public_asset(asset: dict[str, Any]) -> dict[str, Any]:
         "pronoun_links": list(asset.get("pronoun_links") or []),
         "evidence_spans": list(asset.get("evidence_spans") or []),
         "confidence": float(asset.get("confidence") or 0.0),
+        "evidence_status": str(asset.get("evidence_status") or "model_inferred"),
+        "extraction_method": str(asset.get("extraction_method") or "unspecified_structured_analysis"),
+        "uncertainty_note": str(asset.get("uncertainty_note") or ""),
         "lineage": dict(asset.get("lineage") or {}),
         "created_at": str(asset.get("created_at") or ""),
         "updated_at": str(asset.get("updated_at") or ""),
+        "candidate_id": str(asset.get("candidate_id") or ""),
+        "version": int(asset.get("version") or 1),
+        "version_id": str(asset.get("version_id") or ""),
+        "parent_version_id": str(asset.get("parent_version_id") or ""),
+        "review_decision_id": str(asset.get("review_decision_id") or ""),
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -508,9 +789,267 @@ def public_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         "affected_asset_ids": list(receipt.get("affected_asset_ids") or []),
         "undo_available": bool(receipt.get("undo_available")),
         "storyboard_write": False,
+        "review_decision_id": str(receipt.get("review_decision_id") or ""),
+        "asset_version_id": str(receipt.get("asset_version_id") or ""),
+        "production_graph_node_id": str(receipt.get("production_graph_node_id") or ""),
+        "production_graph_version": int(receipt.get("production_graph_version") or 0),
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+
+
+def public_review_decision(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "review_decision_id": str(decision.get("review_decision_id") or ""),
+        "project_id": str(decision.get("project_id") or ""),
+        "revision_id": str(decision.get("revision_id") or ""),
+        "source_digest": str(decision.get("source_digest") or ""),
+        "candidate_id": str(decision.get("candidate_id") or ""),
+        "asset_id": str(decision.get("asset_id") or ""),
+        "target_asset_version_id": str(decision.get("target_asset_version_id") or ""),
+        "result_asset_version_id": str(decision.get("result_asset_version_id") or ""),
+        "decision": str(decision.get("decision") or ""),
+        "reason": str(decision.get("reason") or ""),
+        "decided_at": str(decision.get("decided_at") or ""),
+        "production_graph_node_id": str(decision.get("production_graph_node_id") or ""),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def _analysis_review_response(
+    project_id: str,
+    asset: dict[str, Any],
+    decision: dict[str, Any],
+    receipt: dict[str, Any],
+    graph: dict[str, Any],
+    *,
+    idempotent_replay: bool,
+    graph_idempotent_replay: bool,
+) -> dict[str, Any]:
+    return {
+        "project_id": project_id,
+        "asset": public_asset(asset),
+        "review_decision": public_review_decision(decision),
+        "receipt": public_receipt(receipt),
+        "graph": graph,
+        "idempotent_replay": idempotent_replay,
+        "graph_idempotent_replay": graph_idempotent_replay,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def _analysis_review_digest(
+    body: AnalysisAssetReviewRequest,
+    *,
+    revision_id: str,
+    asset_id: str,
+) -> str:
+    payload = body.model_dump(mode="json", exclude={"expected_graph_version"})
+    payload["route_revision_id"] = revision_id
+    payload["asset_id"] = asset_id
+    return canonical_digest(payload)
+
+
+def _review_receipt_for_key(state: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
+    for receipt in (state.get("review_receipts") or {}).values():
+        if receipt.get("idempotency_key") == idempotency_key:
+            return dict(receipt)
+    return {}
+
+
+def _require_reviewable_asset(
+    asset: dict[str, Any],
+    body: AnalysisAssetReviewRequest,
+    *,
+    project_id: str,
+    asset_id: str,
+) -> None:
+    if (
+        not asset
+        or asset.get("asset_id") != asset_id
+        or asset.get("project_id") != project_id
+        or asset.get("revision_id") != body.revision_id
+        or asset.get("source_digest") != body.source_digest
+        or asset.get("candidate_id") != body.candidate_id
+        or asset.get("source_mode") != "analysis_candidate"
+    ):
+        raise _contract_error(
+            "analysis_asset_not_found",
+            "Analysis asset does not belong to this exact candidate and script revision.",
+            project_id=project_id,
+            stage="analysis_asset_review",
+            status_code=404,
+        )
+    if asset.get("status") == "expired":
+        raise _contract_error(
+            "analysis_asset_expired",
+            "Expired analysis assets cannot be reviewed.",
+            project_id=project_id,
+            stage="analysis_asset_review",
+            status_code=409,
+        )
+    if asset.get("status") not in {"candidate", "modified"}:
+        raise _contract_error(
+            "analysis_asset_already_reviewed",
+            "Analysis asset has already reached a final review state.",
+            project_id=project_id,
+            stage="analysis_asset_review",
+            status_code=409,
+        )
+    if (
+        int(asset.get("version") or 1) != body.expected_asset_version
+        or str(asset.get("version_id") or "") != body.asset_version_id
+    ):
+        raise _contract_error(
+            "analysis_asset_version_conflict",
+            "Analysis asset changed before this review decision was committed.",
+            project_id=project_id,
+            stage="analysis_asset_review",
+            status_code=409,
+            details={"expected_asset_version": body.expected_asset_version},
+        )
+
+
+def _analysis_confirmation_events(
+    revision: dict[str, Any],
+    candidate: dict[str, Any],
+    asset: dict[str, Any],
+    semantic_digest: str,
+) -> list[dict[str, Any]]:
+    revision_node_id = f"script-revision:{revision['revision_id']}"
+    asset_node_id = str(asset["asset_id"])
+    return [
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": revision_node_id,
+                "category": "script_revision",
+                "metadata": {
+                    "source_kind": revision["source_kind"],
+                    "source_digest": revision["source_digest"],
+                    "source_length": revision["source_length"],
+                    "revision_id": revision["revision_id"],
+                },
+            },
+        },
+        {
+            "type": "node_upserted",
+            "node": {
+                "node_id": asset_node_id,
+                "category": "character" if asset.get("asset_type") == "character" else "scene",
+                "metadata": {
+                    "kind": "script_core_asset",
+                    "asset_type": asset["asset_type"],
+                    "display_name": asset.get("display_name") or asset.get("name") or "",
+                    "source_revision_id": revision["revision_id"],
+                    "source_digest": revision["source_digest"],
+                    "candidate_id": candidate["candidate_id"],
+                    "asset_version_id": asset["version_id"],
+                    "evidence_span_count": len(asset.get("evidence_spans") or []),
+                    "review_semantic_digest": semantic_digest,
+                    "lineage": dict(asset.get("lineage") or {}),
+                },
+            },
+        },
+        {
+            "type": "relation_upserted",
+            "from_id": revision_node_id,
+            "to_id": asset_node_id,
+            "relation_type": "analysis_confirmed",
+        },
+    ]
+
+
+def _apply_analysis_review(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision: dict[str, Any],
+    candidate: dict[str, Any],
+    asset: dict[str, Any],
+    body: AnalysisAssetReviewRequest,
+    semantic_digest: str,
+    graph: dict[str, Any],
+    graph_idempotent_replay: bool,
+    reviewed_asset: dict[str, Any],
+    decided_at: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    decision_id = f"review_{semantic_digest[:20]}"
+    result_status = "confirmed" if body.decision == "confirm" else "rejected"
+    production_graph_node_id = str(asset["asset_id"]) if body.decision == "confirm" else ""
+    decision = {
+        "review_decision_id": decision_id,
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "candidate_id": candidate["candidate_id"],
+        "asset_id": asset["asset_id"],
+        "target_asset_version_id": asset["version_id"],
+        "result_asset_version_id": reviewed_asset["version_id"],
+        "decision": result_status,
+        "reason": str(body.reason or ""),
+        "decided_at": decided_at,
+        "production_graph_node_id": production_graph_node_id,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    receipt_id = f"receipt_{_sha256_json({'project_id': project_id, 'key': body.idempotency_key, 'semantic': semantic_digest})[:20]}"
+    receipt = {
+        "receipt_id": receipt_id,
+        "command_id": f"reviewcmd_{semantic_digest[:20]}",
+        "command_type": f"analysis_asset.{body.decision}",
+        "status": "executed",
+        "summary": f"Analysis asset review recorded as {result_status}.",
+        "executed_at": decided_at,
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "semantic_digest": semantic_digest,
+        "idempotency_key": body.idempotency_key,
+        "review_decision_id": decision_id,
+        "asset_version_id": reviewed_asset["version_id"],
+        "affected_asset_ids": [asset["asset_id"]],
+        "production_graph_node_id": production_graph_node_id,
+        "production_graph_version": int(graph.get("version") or 0),
+        "production_graph_digest": str(graph.get("graph_digest") or ""),
+        "graph_idempotent_replay": graph_idempotent_replay,
+        "undo_available": False,
+        "storyboard_write": False,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    state.setdefault("assets", {})[asset["asset_id"]] = reviewed_asset
+    _record_asset_version(state, reviewed_asset)
+    state.setdefault("review_decisions", {})[decision_id] = decision
+    state.setdefault("review_receipts", {})[receipt_id] = receipt
+    candidate_state = _candidate_review_state(state, candidate["candidate_id"])
+    state["analysis_candidates"][candidate["candidate_id"]]["status"] = candidate_state
+    revision_assets = _analysis_assets_for_revision(state, revision["revision_id"])
+    state["revisions"][revision["revision_id"]]["analysis_state"] = _analysis_state_for_assets(revision_assets)
+    reject_unsafe_payload(decision)
+    reject_unsafe_payload(receipt)
+    return decision, reviewed_asset, receipt
+
+
+def _reviewed_asset_version(
+    asset: dict[str, Any],
+    *,
+    body: AnalysisAssetReviewRequest,
+    semantic_digest: str,
+    decided_at: str,
+) -> dict[str, Any]:
+    result_status = "confirmed" if body.decision == "confirm" else "rejected"
+    return _new_asset_version(
+        {
+            **asset,
+            "status": result_status,
+            "review_decision_id": f"review_{semantic_digest[:20]}",
+            "updated_at": decided_at,
+        },
+        parent=asset,
+    )
 
 
 def _new_revision(project_id: str, body: ScriptRevisionCreateRequest, parent_revision_id: str) -> dict[str, Any]:
@@ -547,11 +1086,95 @@ def _analysis_candidate_record(
     payload["artifact_type"] = "afs_structured_analysis_candidate"
     payload["candidate_id"] = f"candidate_{_sha256_json(payload)[:16]}"
     payload["created_at"] = _safe_time(body.generated_at)
+    payload["status"] = "candidate"
     payload["project_id"] = project_id
     payload["revision_id"] = revision["revision_id"]
     payload["source_digest"] = revision["source_digest"]
     reject_unsafe_payload(payload)
     return payload
+
+
+def _apply_structured_analysis_candidate(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+    body: StructuredAnalysisCandidateRequest,
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[str], list[str]]:
+    revision = _require_revision_contract(
+        state,
+        project_id=project_id,
+        revision_id=revision_id,
+        body_project_id=body.project_id,
+        source_digest=body.source_digest,
+        schema_version=body.schema_version,
+        stage="analysis_candidate_submit",
+        expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+    )
+    _validate_evidence_spans(body, revision)
+    candidate = _analysis_candidate_record(project_id, revision, body)
+    existing_candidate = dict(
+        (state.get("analysis_candidates") or {}).get(candidate["candidate_id"]) or {}
+    )
+    if (
+        existing_candidate
+        and str(revision.get("analysis_candidate_id") or "") == candidate["candidate_id"]
+    ):
+        existing_assets = _analysis_assets_for_revision(state, revision_id)
+        return (
+            revision,
+            existing_candidate,
+            existing_assets,
+            [],
+            [str(asset["asset_id"]) for asset in existing_assets],
+        )
+    previous_assets = dict(state.get("assets") or {})
+    assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
+    for asset in assets:
+        state["assets"][asset["asset_id"]] = asset
+        _record_asset_version(state, asset)
+    state.setdefault("analysis_candidates", {})[candidate["candidate_id"]] = candidate
+    revision["analysis_state"] = _analysis_state_for_assets(assets)
+    revision["analysis_candidate_id"] = candidate["candidate_id"]
+    state["current_revision_id"] = revision_id
+    _append_audit(
+        state,
+        {
+            "event_type": "structured_analysis_candidate_submitted",
+            "revision_id": revision_id,
+            "candidate_id": candidate["candidate_id"],
+            "affected_asset_ids": affected,
+            "preserved_asset_ids": preserved,
+            "missing_slots": list(body.missing_slots),
+        },
+    )
+    return revision, candidate, assets, affected, preserved
+
+
+def _require_current_revision_for_extraction(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+) -> dict[str, Any]:
+    revision = dict((state.get("revisions") or {}).get(revision_id) or {})
+    if not revision:
+        raise _contract_error(
+            "script_revision_not_found",
+            "Script revision does not exist in this project truth store.",
+            project_id=project_id,
+            stage="analysis_candidate_extract",
+            status_code=404,
+        )
+    if str(state.get("current_revision_id") or "") != revision_id:
+        raise _contract_error(
+            "current_revision_mismatch",
+            "Only the selected current script revision can be extracted.",
+            project_id=project_id,
+            stage="analysis_candidate_extract",
+            status_code=409,
+        )
+    return revision
 
 
 def _assets_from_candidate(
@@ -577,6 +1200,7 @@ def _assets_from_candidate(
             revision_id=revision_id,
             source_digest=source_digest,
             source_mode="analysis_candidate",
+            candidate_id=str(candidate["candidate_id"]),
             asset_type="character",
             label=str(item["display_name"]),
             aliases=[str(value) for value in item.get("aliases", [])],
@@ -584,6 +1208,9 @@ def _assets_from_candidate(
             evidence_spans=item.get("evidence_spans") or [],
             confidence=float(item.get("confidence") or 0.0),
             requested_status=str(item.get("status") or "candidate"),
+            evidence_status=str(item.get("evidence_status") or "model_inferred"),
+            extraction_method=str(item.get("extraction_method") or "unspecified_structured_analysis"),
+            uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
         asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
@@ -594,6 +1221,7 @@ def _assets_from_candidate(
             revision_id=revision_id,
             source_digest=source_digest,
             source_mode="analysis_candidate",
+            candidate_id=str(candidate["candidate_id"]),
             asset_type="main_scene",
             label=str(item["name"]),
             aliases=[],
@@ -601,6 +1229,9 @@ def _assets_from_candidate(
             evidence_spans=item.get("evidence_spans") or [],
             confidence=float(item.get("confidence") or 0.0),
             requested_status=str(item.get("status") or "candidate"),
+            evidence_status=str(item.get("evidence_status") or "model_inferred"),
+            extraction_method=str(item.get("extraction_method") or "unspecified_structured_analysis"),
+            uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
         asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
@@ -625,6 +1256,7 @@ def _candidate_asset(
     revision_id: str,
     source_digest: str,
     source_mode: str,
+    candidate_id: str,
     asset_type: str,
     label: str,
     aliases: list[str],
@@ -632,9 +1264,12 @@ def _candidate_asset(
     evidence_spans: list[dict[str, Any]],
     confidence: float,
     requested_status: str,
+    evidence_status: str,
+    extraction_method: str,
+    uncertainty_note: str,
     created_at: str,
 ) -> dict[str, Any]:
-    status = "confirmed" if confidence >= AUTO_CONFIRM_CONFIDENCE and requested_status != "pending_confirmation" else "pending_confirmation"
+    status = "candidate"
     quote_digest = _sha256_json([span.get("quote", "") for span in evidence_spans])
     key = _normal_key(f"{asset_type}:{label}:{quote_digest}")
     asset_id = f"{'char' if asset_type == 'character' else 'scene'}_{hashlib.sha256(key.encode('utf-8')).hexdigest()[:16]}"
@@ -643,6 +1278,7 @@ def _candidate_asset(
         "asset_type": asset_type,
         "source_mode": source_mode,
         "status": status,
+        "candidate_id": candidate_id,
         "project_id": project_id,
         "revision_id": revision_id,
         "source_digest": source_digest,
@@ -652,18 +1288,24 @@ def _candidate_asset(
         "pronoun_links": _clean_text_list(pronoun_links),
         "evidence_spans": evidence_spans,
         "confidence": confidence,
+        "evidence_status": evidence_status,
+        "extraction_method": extraction_method,
+        "uncertainty_note": uncertainty_note,
         "lineage": {
             "source_revision_id": revision_id,
             "source_digest": source_digest,
             "candidate_quote_digest": quote_digest,
             "preservation_key": key,
             "auto_asset_scope": "character_or_main_scene_only",
+            "evidence_status": evidence_status,
+            "extraction_method": extraction_method,
         },
         "created_at": created_at,
         "updated_at": created_at,
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+    asset = _new_asset_version(asset)
     reject_unsafe_payload(asset)
     return asset
 
@@ -678,12 +1320,54 @@ def _preserve_asset_identity(
     if not previous:
         affected.append(str(asset["asset_id"]))
         return asset
-    merged = {**asset, "asset_id": previous["asset_id"], "created_at": previous.get("created_at") or asset["created_at"]}
-    if previous.get("status") in {"confirmed", "pending_confirmation"} and asset.get("status") == previous.get("status"):
+    if (
+        previous.get("revision_id") == asset.get("revision_id")
+        and previous.get("candidate_id") == asset.get("candidate_id")
+        and _asset_review_content(previous) == _asset_review_content(asset)
+    ):
+        preserved.append(str(previous["asset_id"]))
+        return dict(previous)
+    merged = _new_asset_version(
+        {
+            **asset,
+            "asset_id": previous["asset_id"],
+            "created_at": previous.get("created_at") or asset["created_at"],
+        },
+        parent=previous,
+    )
+    if previous.get("status") == asset.get("status") and previous.get("revision_id") == asset.get("revision_id"):
         preserved.append(str(previous["asset_id"]))
     else:
         affected.append(str(previous["asset_id"]))
     return merged
+
+
+def _core_command_digest(body: CoreAssetCommandRequest) -> str:
+    return _sha256_json(body.model_dump(mode="json"))
+
+
+def _core_command_id(body: CoreAssetCommandRequest) -> str:
+    return f"cmd_{_core_command_digest(body)[:16]}"
+
+
+def _core_command_receipt(state: dict[str, Any], body: CoreAssetCommandRequest) -> dict[str, Any]:
+    semantic_digest = _core_command_digest(body)
+    command_id = _core_command_id(body)
+    for raw in (state.get("receipts") or {}).values():
+        receipt = dict(raw or {})
+        if body.idempotency_key and receipt.get("idempotency_key") == body.idempotency_key:
+            if receipt.get("semantic_digest") != semantic_digest:
+                raise _contract_error(
+                    "core_asset_idempotency_conflict",
+                    "Idempotency key was already used for a different core asset command.",
+                    project_id=str(body.project_id),
+                    stage="core_asset_command_confirm",
+                    status_code=409,
+                )
+            return receipt
+        if receipt.get("command_id") == command_id:
+            return receipt
+    return {}
 
 
 def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: CoreAssetCommandRequest) -> dict[str, Any]:
@@ -717,6 +1401,7 @@ def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: Co
             "asset_type": "prop",
             "source_mode": "manual",
             "status": "confirmed",
+            "candidate_id": "",
             "project_id": project_id,
             "revision_id": body.revision_id,
             "source_digest": body.source_digest,
@@ -736,13 +1421,23 @@ def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: Co
             "provider_dispatch_count": 0,
             "remote_dispatch_count": 0,
         }
+        after = _new_asset_version(after)
     else:
         before = _require_asset_for_command(assets, project_id, body.revision_id, target_id, body.command_type)
+        if body.expected_asset_version is not None and int(before.get("version") or 1) != body.expected_asset_version:
+            raise _contract_error(
+                "core_asset_version_conflict",
+                "Core asset changed before this command was committed.",
+                project_id=project_id,
+                stage="core_asset_command_preview",
+                status_code=409,
+                details={"expected_asset_version": body.expected_asset_version},
+            )
         after = _mutated_asset_snapshot(before, body, now)
     affected = [str(after["asset_id"])]
     return {
         "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
-        "command_id": f"cmd_{_sha256_json(body.model_dump(mode='json'))[:16]}",
+        "command_id": _core_command_id(body),
         "command_type": body.command_type,
         "status": "preview",
         "project_id": project_id,
@@ -777,6 +1472,7 @@ def _apply_core_asset_command(
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+    _record_asset_version(state, assets[after["asset_id"]])
     receipt = {
         "receipt_id": f"receipt_{uuid4().hex[:16]}",
         "command_id": preview["command_id"],
@@ -787,9 +1483,12 @@ def _apply_core_asset_command(
         "project_id": project_id,
         "revision_id": body.revision_id,
         "source_digest": body.source_digest,
+        "semantic_digest": _core_command_digest(body),
+        "idempotency_key": str(body.idempotency_key or ""),
         "before": preview.get("before"),
         "after": preview.get("after"),
         "affected_asset_ids": preview["affected_asset_ids"],
+        "asset_version_id": str(after.get("version_id") or ""),
         "undo_available": True,
         "undone": False,
         "storyboard_write": False,
@@ -804,13 +1503,24 @@ def _apply_undo(state: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any
     asset_id = str((receipt.get("after") or {}).get("asset_id") or "")
     before = receipt.get("before")
     assets = state.setdefault("assets", {})
+    current = dict(assets.get(asset_id) or receipt.get("after") or {})
     if before:
-        assets[asset_id] = dict(before)
+        restored = _new_asset_version(
+            {
+                **dict(before),
+                "asset_id": asset_id,
+                "updated_at": _server_now(),
+            },
+            parent=current,
+        )
+        assets[asset_id] = restored
     elif asset_id:
         after = dict(receipt.get("after") or {})
         after["status"] = "undone"
         after["updated_at"] = _server_now()
-        assets[asset_id] = after
+        assets[asset_id] = _new_asset_version(after, parent=current)
+    if asset_id:
+        _record_asset_version(state, assets[asset_id])
     receipt["undone"] = True
     receipt["undo_available"] = False
     undo_receipt = {
@@ -824,7 +1534,7 @@ def _apply_undo(state: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any
         "revision_id": receipt.get("revision_id", ""),
         "source_digest": receipt.get("source_digest", ""),
         "before": receipt.get("after"),
-        "after": before,
+        "after": public_asset(assets[asset_id]) if asset_id else before,
         "affected_asset_ids": [asset_id] if asset_id else [],
         "undo_available": False,
         "undone": True,
@@ -840,11 +1550,27 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
     after = dict(before)
     after["updated_at"] = now
     if body.command_type == "edit_asset":
+        previous_label = _clean_label(before.get("display_name") or before.get("name"))
         label = _clean_label(body.patch.get("display_name") or body.patch.get("name") or after.get("display_name"))
         if not label:
             raise ValueError("edited asset label cannot be empty")
         after["display_name"] = label
         after["name"] = label
+        evidence_quotes = {
+            _clean_label(span.get("quote"))
+            for span in (before.get("evidence_spans") or [])
+            if isinstance(span, dict) and _clean_label(span.get("quote"))
+        }
+        if label != previous_label and label not in evidence_quotes:
+            after["evidence_status"] = "human_edited"
+            after["extraction_method"] = "human_edit"
+            after["uncertainty_note"] = (
+                "Human-edited label is not an exact source quote; retained spans are contextual evidence."
+            )
+            lineage = dict(after.get("lineage") or {})
+            lineage["evidence_status"] = "human_edited"
+            lineage["extraction_method"] = "human_edit"
+            after["lineage"] = lineage
         if "aliases" in body.patch:
             after["aliases"] = _clean_text_list(list(body.patch.get("aliases") or []))
     elif body.command_type == "retire_asset" or body.command_type == "retire_manual_prop":
@@ -874,10 +1600,14 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
         after["aliases"] = aliases
     else:
         raise ValueError("unsupported command type")
+    if body.command_type == "edit_asset" and before.get("source_mode") == "analysis_candidate":
+        after["status"] = "modified"
+        after.pop("review_decision_id", None)
     after["provider_dispatch_count"] = 0
     after["remote_dispatch_count"] = 0
     if before.get("status") in ACTIVE_STATUSES:
         after["last_active_status"] = before.get("status")
+    after = _new_asset_version(after, parent=before)
     reject_unsafe_payload(after)
     return after
 
@@ -1007,9 +1737,33 @@ def _analysis_state_for_assets(assets: list[dict[str, Any]]) -> str:
     active = [item for item in assets if item.get("status") != "retired"]
     if not active:
         return "low_confidence_pending"
-    if any(item.get("status") == "pending_confirmation" for item in active):
+    if any(item.get("status") in {"candidate", "modified", "pending_confirmation"} for item in active):
         return "pending_confirmation"
-    return "confirmed"
+    if all(item.get("status") == "rejected" for item in active):
+        return "rejected"
+    if all(item.get("status") in {"confirmed", "rejected"} for item in active):
+        return "confirmed"
+    if all(item.get("status") == "expired" for item in active):
+        return "expired"
+    return "pending_confirmation"
+
+
+def _candidate_review_state(state: dict[str, Any], candidate_id: str) -> str:
+    assets = [
+        item
+        for item in (state.get("assets") or {}).values()
+        if item.get("candidate_id") == candidate_id and item.get("status") != "undone"
+    ]
+    if not assets:
+        return "candidate"
+    statuses = {str(item.get("status") or "") for item in assets}
+    if statuses == {"expired"}:
+        return "expired"
+    if statuses <= {"confirmed", "rejected"}:
+        return "reviewed"
+    if statuses & {"confirmed", "rejected"}:
+        return "partially_reviewed"
+    return "candidate"
 
 
 def _current_revision(state: dict[str, Any]) -> dict[str, Any]:
@@ -1024,6 +1778,117 @@ def _current_candidate(state: dict[str, Any], revision: dict[str, Any]) -> dict[
 
 def _asset_belongs_to_revision(asset: dict[str, Any], revision_id: str) -> bool:
     return str(asset.get("revision_id") or "") == revision_id and str(asset.get("status") or "") != "undone"
+
+
+def _analysis_assets_for_revision(state: dict[str, Any], revision_id: str) -> list[dict[str, Any]]:
+    selected: dict[str, dict[str, Any]] = {}
+    for history in (state.get("asset_versions") or {}).values():
+        if not isinstance(history, list):
+            continue
+        for raw in history:
+            item = dict(raw or {})
+            if not _asset_belongs_to_revision(item, revision_id):
+                continue
+            asset_id = str(item.get("asset_id") or "")
+            current = selected.get(asset_id)
+            if asset_id and (not current or int(item.get("version") or 1) > int(current.get("version") or 1)):
+                selected[asset_id] = item
+    for raw in (state.get("assets") or {}).values():
+        item = dict(raw or {})
+        if not _asset_belongs_to_revision(item, revision_id):
+            continue
+        asset_id = str(item.get("asset_id") or "")
+        current = selected.get(asset_id)
+        if asset_id and (not current or int(item.get("version") or 1) >= int(current.get("version") or 1)):
+            selected[asset_id] = item
+    return sorted(selected.values(), key=lambda item: (str(item.get("created_at") or ""), str(item.get("asset_id") or "")))
+
+
+def _asset_version_by_id(state: dict[str, Any], asset_id: str, version_id: str) -> dict[str, Any]:
+    for item in (state.get("asset_versions") or {}).get(asset_id, []):
+        if str(item.get("version_id") or "") == version_id:
+            return dict(item)
+    current = dict((state.get("assets") or {}).get(asset_id) or {})
+    return current if str(current.get("version_id") or "") == version_id else {}
+
+
+def _record_asset_version(state: dict[str, Any], asset: dict[str, Any]) -> None:
+    asset_id = str(asset.get("asset_id") or "")
+    version_id = str(asset.get("version_id") or "")
+    if not asset_id or not version_id:
+        return
+    history = state.setdefault("asset_versions", {}).setdefault(asset_id, [])
+    if not any(str(item.get("version_id") or "") == version_id for item in history):
+        history.append(dict(asset))
+
+
+def _new_asset_version(asset: dict[str, Any], *, parent: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = dict(asset)
+    payload.pop("version", None)
+    payload.pop("version_id", None)
+    payload.pop("parent_version_id", None)
+    version = int((parent or {}).get("version") or 0) + 1
+    parent_version_id = str((parent or {}).get("version_id") or "")
+    identity = {
+        "asset_id": payload.get("asset_id"),
+        "revision_id": payload.get("revision_id"),
+        "source_digest": payload.get("source_digest"),
+        "candidate_id": payload.get("candidate_id"),
+        "version": version,
+        "parent_version_id": parent_version_id,
+        "content": _asset_review_content(payload),
+    }
+    payload["version"] = version
+    payload["parent_version_id"] = parent_version_id
+    payload["version_id"] = f"assetver_{_sha256_json(identity)[:20]}"
+    return payload
+
+
+def _asset_review_content(asset: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "asset_type": str(asset.get("asset_type") or ""),
+        "display_name": str(asset.get("display_name") or asset.get("name") or ""),
+        "aliases": list(asset.get("aliases") or []),
+        "pronoun_links": list(asset.get("pronoun_links") or []),
+        "evidence_spans": list(asset.get("evidence_spans") or []),
+        "confidence": float(asset.get("confidence") or 0.0),
+        "evidence_status": str(asset.get("evidence_status") or "model_inferred"),
+        "extraction_method": str(asset.get("extraction_method") or "unspecified_structured_analysis"),
+        "uncertainty_note": str(asset.get("uncertainty_note") or ""),
+        "status": str(asset.get("status") or ""),
+    }
+
+
+def _expire_open_analysis(state: dict[str, Any], *, superseded_by_revision_id: str) -> None:
+    now = _server_now()
+    for candidate in (state.get("analysis_candidates") or {}).values():
+        if candidate.get("status") != "expired":
+            candidate["status"] = "expired"
+            candidate["expired_at"] = now
+            candidate["superseded_by_revision_id"] = superseded_by_revision_id
+    for asset_id, raw in list((state.get("assets") or {}).items()):
+        asset = dict(raw or {})
+        if asset.get("source_mode") != "analysis_candidate" or asset.get("status") not in {
+            "candidate",
+            "modified",
+            "pending_confirmation",
+        }:
+            continue
+        expired = _new_asset_version(
+            {
+                **asset,
+                "status": "expired",
+                "expired_at": now,
+                "superseded_by_revision_id": superseded_by_revision_id,
+                "updated_at": now,
+            },
+            parent=asset,
+        )
+        state["assets"][asset_id] = expired
+        _record_asset_version(state, expired)
+        revision_id = str(asset.get("revision_id") or "")
+        if revision_id in (state.get("revisions") or {}):
+            state["revisions"][revision_id]["analysis_state"] = "expired"
 
 
 def _asset_preservation_key(asset: dict[str, Any]) -> str:
@@ -1062,6 +1927,9 @@ def _empty_state(project_id: str) -> dict[str, Any]:
         "revisions": {},
         "analysis_candidates": {},
         "assets": {},
+        "asset_versions": {},
+        "review_decisions": {},
+        "review_receipts": {},
         "receipts": {},
         "audit_history": [],
         "created_at": now,
@@ -1074,7 +1942,15 @@ def _empty_state(project_id: str) -> dict[str, Any]:
 def _normalized_state(state: dict[str, Any], project_id: str) -> dict[str, Any]:
     payload = {**_empty_state(project_id), **state}
     payload["project_id"] = project_id
-    for key in ("revisions", "analysis_candidates", "assets", "receipts"):
+    for key in (
+        "revisions",
+        "analysis_candidates",
+        "assets",
+        "asset_versions",
+        "review_decisions",
+        "review_receipts",
+        "receipts",
+    ):
         if not isinstance(payload.get(key), dict):
             payload[key] = {}
     if not isinstance(payload.get("audit_history"), list):
@@ -1225,6 +2101,7 @@ def _lock_path(store: RuntimeStore, project_id: str) -> Path:
 
 __all__ = (
     "ANALYSIS_CANDIDATE_SCHEMA_VERSION",
+    "ANALYSIS_REVIEW_SCHEMA_VERSION",
     "CORE_ASSET_COMMAND_SCHEMA_VERSION",
     "SCRIPT_REVISION_SCHEMA_VERSION",
     "SCRIPT_TRUTH_SCHEMA_VERSION",
