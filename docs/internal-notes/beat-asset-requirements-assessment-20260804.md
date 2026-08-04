@@ -6,14 +6,14 @@
 
 **现在不要做 Beat 级别资产需求。**
 
-- Scene→Beat「继承整场 cast/prop」= 换包装，没有新信息，还会误导下游  
+- Scene→Beat「继承整场 cast/prop」= 换包装，没有新信息，还会误导下游
 - 真正的 Beat 归属需要新的候选事实 + 确认闭环，成本接近再做一层 Scene cast/prop，而六剧本几乎没有 Beat 标记可验
 
 ## Beat 现在记了什么
 
 生产链路（`runtime_script_improved_extraction.py` → `runtime_candidate_confirmation.py`）里 Beat 只有：
 
-- `scene[X].beats[N].boundary` — 显式 `节拍N` / `BEAT N`  
+- `scene[X].beats[N].boundary` — 显式 `节拍N` / `BEAT N`
 - 标签 facets：`conflict` / `turn` / `info_release` / `emotion_shift.*`
 
 **没有** Beat 范围的人物/道具归属事实。facet 文本是叙述摘要，不是结构化「本拍用了哪些资产」；文中偶尔出现人名/道具名也不能当归属证据。
@@ -45,24 +45,24 @@ Scene range
 
 不是只读再聚合，而是：
 
-1. 在已确认/已切出的 Beat source range 内，用现有封闭规则重跑 cast / prop 提取  
-2. 产出新候选事实，例如 `scene[X].beats[N].cast[M].appearance`、`scene[X].beats[N].props[M].name`，走确认闭环（不能从 Scene 事实自动晋升）  
-3. 派生视图增加 `scope_kind="beat"`，只读上述权威事实  
+1. 在已确认/已切出的 Beat source range 内，用现有封闭规则重跑 cast / prop 提取
+2. 产出新候选事实，例如 `scene[X].beats[N].cast[M].appearance`、`scene[X].beats[N].props[M].name`，走确认闭环（不能从 Scene 事实自动晋升）
+3. 派生视图增加 `scope_kind="beat"`，只读上述权威事实
 
 工作量≈再做一层归属（确认 UX、Graph metadata、绑定/supersede、**带显式 Beat 的测试语料**）。六剧本验不了。召回会低于 Scene（Beat 标记稀少；道具提取本就偏保守；纯叙述出场继续 fail-closed——合成「离开」为空是规则正确，不是该用继承去「修」）。
 
 ## 为何暂缓
 
-- 主评测六剧本无 Beat → 功能会「测过但永远空」  
-- 真需求依赖剧本普遍带显式 Beat，或下游明确要求「经确认的逐拍资产清单」并接受新候选类型成本（见 `beat-schema-findings-20260803.md`）  
-- Scene 级资产需求已回答当前问题：确认后「这场需要哪些已知人物/道具」  
-- 继承有害；完整 Beat 归属当前性价比不足  
+- 主评测六剧本无 Beat → 功能会「测过但永远空」
+- 真需求依赖剧本普遍带显式 Beat，或下游明确要求「经确认的逐拍资产清单」并接受新候选类型成本（见 `beat-schema-findings-20260803.md`）
+- Scene 级资产需求已回答当前问题：确认后「这场需要哪些已知人物/道具」
+- 继承有害；完整 Beat 归属当前性价比不足
 
 ## 何时再开
 
 满足至少一条再议：
 
-1. 生产剧本常规带显式 Beat 标签，或  
-2. 下游（如镜头规划）明确要经确认的逐拍资产列表，并接受新归属候选 + 确认成本  
+1. 生产剧本常规带显式 Beat 标签，或
+2. 下游（如镜头规划）明确要经确认的逐拍资产列表，并接受新归属候选 + 确认成本
 
 本次：**仅本笔记，不改 `apps/api` 生产代码。**

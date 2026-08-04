@@ -564,4 +564,3 @@ cd /path/to/repo
 2. 走真实 FastAPI TestClient 路由（与 Scenario A/B/C 同模式）
 3. 重写本报告与 `before-after-demo-20260803.evidence.json`
 4. 断言失败则以非零退出码退出
-

@@ -1,6 +1,6 @@
 # Script Flow — Codex Session Run (2026-08-01)
 
-Source: separate Codex session on the same local worktree / temp Runtime.  
+Source: separate Codex session on the same local worktree / temp Runtime.
 Saved for evidence continuity with `script-flow-findings-20260801.md`.
 
 ```text
@@ -20,10 +20,10 @@ Session note: dirty worktree already present (`.gitignore`, `docs/internal-notes
 
 1. Startup scan (`pwd`, `git status`, `AGENTS.md` / docs read, health check).
 2. Confirmed temp Runtime ready; provider gates closed.
-3. Submitted a new Script Truth revision via  
+3. Submitted a new Script Truth revision via
    `POST /projects/proj_last_light_20260801/script-revisions`.
-4. Ran deterministic M6 preview via  
-   `POST /projects/{project_id}/m6/script-plan-asset-bible/preview`  
+4. Ran deterministic M6 preview via
+   `POST /projects/{project_id}/m6/script-plan-asset-bible/preview`
    with header `X-Client-Request-ID`.
 5. Polled preview run until terminal state.
 

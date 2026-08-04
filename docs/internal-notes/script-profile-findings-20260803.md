@@ -123,4 +123,3 @@ labeled-only extract (or all-missing profile)
 
 只有确认 Runtime 集成时，才应同步扩展生产 `CandidateFact.entity_kind`、
 confirmation API 与（可选）Production Graph feed；在此之前保持草稿隔离。
-

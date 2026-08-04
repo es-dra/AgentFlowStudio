@@ -1,7 +1,7 @@
 # Creative Intent Control Agent — Working Mode Baseline
 
-Date: 2026-07-29  
-Branch: `codex/agent-working-mode-20260729`  
+Date: 2026-07-29
+Branch: `codex/agent-working-mode-20260729`
 Scope: provider-free Runtime verification only.
 
 ## Baseline test result

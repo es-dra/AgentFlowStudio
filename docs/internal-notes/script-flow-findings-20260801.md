@@ -3,7 +3,7 @@
 Local working note from the agent-kernel trace work in
 `/home/afs-ops/worktrees/afs-agent-working-mode-20260729`.
 
-Focus: **Chinese-language script flow only** (the product’s real input language).  
+Focus: **Chinese-language script flow only** (the product’s real input language).
 Related notes:
 
 - `docs/internal-notes/script-flow-trace-20260801.md`
