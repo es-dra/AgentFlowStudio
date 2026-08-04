@@ -62,12 +62,10 @@ export function buildAgentChatPanel({
   body.appendChild(contextStrip(context));
   const candidateReview = scriptCandidateReview({ store, runtime, onRender });
   const candidateExtraction = scriptCandidateExtraction({ store, runtime, onRender });
-  const candidateAction = candidateReview || candidateExtraction;
-  if (copilot && !session?.pendingCommand && !candidateAction) body.appendChild(productionCopilot(copilot, onNextAction));
+  if (copilot && !session?.pendingCommand && !candidateReview) body.appendChild(productionCopilot(copilot, onNextAction));
+  if (candidateExtraction) body.appendChild(candidateExtraction);
   if (candidateReview) {
     body.appendChild(candidateReview);
-  } else if (candidateExtraction) {
-    body.appendChild(candidateExtraction);
   } else {
     syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
     const taskReview = currentTaskReview({ store, runtime, onRender });
@@ -86,7 +84,14 @@ function scriptCandidateExtraction({ store, runtime, onRender }) {
   const state = store?.get?.() || {};
   const node = selectedCanvasNode(state);
   const revision = node?.params?.scriptRevision;
-  if (!node || !revision || !node.params?.scriptCoreProjection) return null;
+  const creativeAction = node?.params?.embeddedCreativeAction;
+  if (
+    !node
+    || !revision
+    || revision.source_kind === "idea"
+    || !node.params?.scriptCoreProjection
+    || ["preview", "running", "applying"].includes(creativeAction?.status)
+  ) return null;
   const extraction = node.params?.scriptCandidateExtraction || {};
   const counts = node.params?.coreAssetCounts || {};
   const hasCandidates = Number(counts.characters || 0) + Number(counts.main_scenes || 0) > 0;
