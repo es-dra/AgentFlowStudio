@@ -138,6 +138,14 @@ def compile_authoritative_facts_to_graph_events(
         }
         if fact.entity_kind == "character":
             metadata["display_name"] = fact.text
+            cast_ownership = re.fullmatch(
+                r"scene\[(?P<scene_id>.+)\]\.cast\[(?P<order_index>\d+)\]\.appearance",
+                fact.field_path,
+            )
+            if cast_ownership:
+                metadata["parent_scene_id"] = cast_ownership.group("scene_id")
+                metadata["order_index"] = int(cast_ownership.group("order_index"))
+                metadata["cast_slot"] = "appearance"
         elif fact.entity_kind == "scene":
             metadata["name"] = fact.text
         elif fact.entity_kind == "script_profile":

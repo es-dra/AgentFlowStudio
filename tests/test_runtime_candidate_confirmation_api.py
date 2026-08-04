@@ -1729,3 +1729,360 @@ def test_beat_facet_repeat_refresh_accept_supersedes_via_api(tmp_path, monkeypat
         if node.get("metadata", {}).get("field_path") == first["field_path"]
     ]
     assert len(nodes) == 1
+
+
+SCENE_CAST_EXPECTATIONS = {
+    "01": {
+        "废弃灯塔": {"玛雅"},
+        "灯塔阳台": {"玛雅"},
+    },
+    "02": {
+        "老式邮局": {"苏晴", "老王"},
+        "海边礁石": {"苏晴", "林悦"},
+        "苏晴的房间": {"苏晴"},
+    },
+    "03": {
+        "小镇火车站": {"陈浩"},
+        "陈浩家中的老屋": {"陈浩", "林秀"},
+    },
+    "04": {
+        "阁楼": {"周明"},
+        "厨房": {"周明", "母亲"},
+    },
+    "05": {},
+    "06": {
+        "地下通道": {"沈岚", "阿拓"},
+        "货运站台": {"阿拓"},
+    },
+}
+
+
+def _scene_name_to_entity_id(items: list[dict]) -> dict[str, str]:
+    return {
+        item["text"]: item["entity_id"]
+        for item in items
+        if item["entity_kind"] == "scene" and item["field_path"] == "scene.name"
+    }
+
+
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_emit_scene_cast_appearances_via_api(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_cast_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    source_text = script_path.read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    items = refreshed["bundle"]["items"]
+    expected = SCENE_CAST_EXPECTATIONS[script_path.stem[:2]]
+    scene_ids = _scene_name_to_entity_id(items)
+
+    appearances = [
+        item
+        for item in items
+        if item["entity_kind"] == "character"
+        and ".cast[" in item["field_path"]
+        and item["field_path"].endswith(".appearance")
+    ]
+    if not expected:
+        assert appearances == []
+        return
+
+    by_scene: dict[str, set[str]] = {}
+    for item in appearances:
+        assert item["status"] == "extracted_from_text"
+        assert item["evidence_spans"]
+        span = item["evidence_spans"][0]
+        assert source_text[span["start"]:span["end"]] == span["quote"] == item["text"]
+        scene_id = item["field_path"].split("scene[", 1)[1].split("]", 1)[0]
+        scene_name = next(name for name, eid in scene_ids.items() if eid == scene_id)
+        by_scene.setdefault(scene_name, set()).add(item["text"])
+        identity = next(
+            row
+            for row in items
+            if row["entity_kind"] == "character"
+            and row["field_path"] == "identity.display_name"
+            and row["text"] == item["text"]
+        )
+        assert item["entity_id"] == identity["entity_id"]
+
+    assert by_scene == expected
+
+
+def test_scene_cast_accept_feeds_graph_and_resolved_via_api(tmp_path, monkeypatch) -> None:
+    _enable_both(monkeypatch)
+    monkeypatch.setenv(FEED_PRODUCTION_GRAPH_ENV, "true")
+    client = _client(tmp_path)
+    project_id = "proj_cast_graph"
+    _create_project(client, project_id)
+    home = (SCRIPTS / "03_labeled_fields_homecoming.txt").read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, home)
+    refreshed = _refresh(client, project_id, revision)
+    scene_ids = _scene_name_to_entity_id(refreshed["bundle"]["items"])
+    station_id = scene_ids["小镇火车站"]
+    appearance = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["field_path"].startswith(f"scene[{station_id}].cast[")
+        and item["text"] == "陈浩"
+    )
+    response = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": appearance["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert any(
+        row["text"] == "陈浩" and row["field_path"] == appearance["field_path"]
+        for row in body["resolved"]["scene_cast"]
+    )
+    graph = ProductionGraphStore(RuntimeStore(tmp_path)).load(project_id)
+    cast_nodes = [
+        node
+        for node in graph["nodes"].values()
+        if node.get("metadata", {}).get("cast_slot") == "appearance"
+    ]
+    assert len(cast_nodes) == 1
+    assert cast_nodes[0]["metadata"]["parent_scene_id"] == station_id
+    assert cast_nodes[0]["metadata"]["display_name"] == "陈浩"
+
+
+def test_entity_asset_binding_bidirectional_and_supersede_via_api(tmp_path, monkeypatch) -> None:
+    from apps.api.runtime_script_core_truth import ANALYSIS_CANDIDATE_SCHEMA_VERSION
+
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_entity_asset_bind"
+    _create_project(client, project_id)
+    home = (SCRIPTS / "03_labeled_fields_homecoming.txt").read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, home)
+
+    def _span(quote: str) -> dict:
+        start = home.index(quote)
+        return {"start": start, "end": start + len(quote), "quote": quote}
+
+    analysis = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+            "named_characters": [
+                {
+                    "display_name": "陈浩",
+                    "aliases": [],
+                    "pronoun_links": [],
+                    "evidence_spans": [_span("陈浩")],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                }
+            ],
+            "main_scenes": [
+                {
+                    "name": "小镇火车站",
+                    "evidence_spans": [_span("小镇火车站")],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                }
+            ],
+            "style": "x",
+            "genre": "y",
+            "tone": "z",
+            "actions": ["a"],
+            "events": ["b"],
+            "beats": [{"summary": "c"}],
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert analysis.status_code == 200, analysis.text
+    core_assets = analysis.json()["projection"]["assets"]
+    char_asset = next(asset for asset in core_assets if asset["display_name"] == "陈浩")
+    scene_asset = next(asset for asset in core_assets if asset["display_name"] == "小镇火车站")
+
+    refreshed = _refresh(client, project_id, revision)
+    identity = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "character"
+        and item["field_path"] == "identity.display_name"
+        and item["text"] == "陈浩"
+    )
+    scene = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "scene" and item["text"] == "小镇火车站"
+    )
+
+    first = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": identity["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert first.status_code == 200, first.text
+    binding = first.json()["entity_asset_binding"]
+    assert binding is not None
+    assert binding["core_asset_id"] == char_asset["asset_id"]
+    assert binding["entity_id"] == identity["entity_id"]
+    assert binding["authoritative_fact_id"] == first.json()["result"]["authoritative_fact_id"]
+
+    by_entity = client.get(
+        f"/projects/{project_id}/entity-asset-bindings",
+        params={"entity_id": identity["entity_id"]},
+    )
+    assert by_entity.status_code == 200, by_entity.text
+    assert by_entity.json()["bindings"][0]["core_asset_id"] == char_asset["asset_id"]
+
+    by_asset = client.get(
+        f"/projects/{project_id}/entity-asset-bindings",
+        params={"core_asset_id": char_asset["asset_id"]},
+    )
+    assert by_asset.status_code == 200, by_asset.text
+    assert by_asset.json()["bindings"][0]["entity_id"] == identity["entity_id"]
+
+    scene_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": scene["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert scene_accept.status_code == 200, scene_accept.text
+    assert scene_accept.json()["entity_asset_binding"]["core_asset_id"] == scene_asset["asset_id"]
+
+    second_refresh = _refresh(client, project_id, revision)
+    identity2 = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["field_path"] == "identity.display_name" and item["text"] == "陈浩"
+    )
+    second = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": identity2["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert second.status_code == 200, second.text
+    binding2 = second.json()["entity_asset_binding"]
+    assert binding2["core_asset_id"] == char_asset["asset_id"]
+    assert binding2["authoritative_fact_id"] == second.json()["result"]["authoritative_fact_id"]
+    assert binding2["authoritative_fact_id"] != binding["authoritative_fact_id"]
+
+    station_id = scene["entity_id"]
+    appearance = next(
+        item
+        for item in second_refresh["bundle"]["items"]
+        if item["field_path"].startswith(f"scene[{station_id}].cast[") and item["text"] == "陈浩"
+    )
+    appearance_accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": appearance["fact_id"],
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert appearance_accept.status_code == 200, appearance_accept.text
+    assert appearance_accept.json()["entity_asset_binding"] is None
+
+
+def test_entity_asset_binding_stale_on_revision_change_via_api(tmp_path, monkeypatch) -> None:
+    from apps.api.runtime_entity_asset_bindings import load_bindings
+    from apps.api.runtime_script_core_truth import ANALYSIS_CANDIDATE_SCHEMA_VERSION
+
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_entity_asset_stale"
+    _create_project(client, project_id)
+    home = (SCRIPTS / "03_labeled_fields_homecoming.txt").read_text(encoding="utf-8")
+    rev1 = _create_revision(client, project_id, home)
+
+    def _span(quote: str) -> dict:
+        start = home.index(quote)
+        return {"start": start, "end": start + len(quote), "quote": quote}
+
+    analysis = client.post(
+        f"/projects/{project_id}/script-revisions/{rev1['revision_id']}/analysis-candidates",
+        json={
+            "project_id": project_id,
+            "revision_id": rev1["revision_id"],
+            "source_digest": rev1["source_digest"],
+            "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+            "named_characters": [
+                {
+                    "display_name": "陈浩",
+                    "aliases": [],
+                    "pronoun_links": [],
+                    "evidence_spans": [_span("陈浩")],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                }
+            ],
+            "main_scenes": [],
+            "style": "x",
+            "genre": "y",
+            "tone": "z",
+            "actions": ["a"],
+            "events": ["b"],
+            "beats": [{"summary": "c"}],
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert analysis.status_code == 200, analysis.text
+
+    refreshed = _refresh(client, project_id, rev1)
+    identity = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["field_path"] == "identity.display_name" and item["text"] == "陈浩"
+    )
+    accept = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": identity["fact_id"],
+            "source_revision_id": rev1["revision_id"],
+            "source_revision_digest": rev1["source_digest"],
+        },
+    )
+    assert accept.status_code == 200, accept.text
+    assert accept.json()["entity_asset_binding"] is not None
+
+    text_v2 = home.replace("小镇火车站", "北方小镇火车站")
+    rev2 = _create_revision(client, project_id, text_v2, parent=rev1["revision_id"])
+    _refresh(client, project_id, rev2)
+
+    active = client.get(
+        f"/projects/{project_id}/entity-asset-bindings",
+        params={"entity_id": identity["entity_id"]},
+    )
+    assert active.status_code == 200, active.text
+    assert active.json()["bindings"] == []
+
+    store = RuntimeStore(tmp_path)
+    rows = load_bindings(store, project_id).bindings
+    assert rows
+    assert all(row.status == "stale" for row in rows)
+    assert all(row.revision_id == rev1["revision_id"] for row in rows)

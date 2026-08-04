@@ -21,6 +21,8 @@ Hard rules
    only inside a Beat range; emotion_shift requires from+to+change together.
 9. ScriptFormatProfile only projects existing structured Scene signals and
    conservative text-cleaning diagnostics; it does not infer story content.
+10. Scene cast appearance accepts speaker cues / in-scene 人物： labels only
+    inside a uniquely resolved Scene range; never cross-scene inference.
 """
 
 from __future__ import annotations
@@ -1004,6 +1006,107 @@ def extract_explicit_beat_facets(
     return facets
 
 
+@dataclass(frozen=True)
+class ExtractedCharacterAppearance:
+    """One character presence claim inside a resolved Scene source range."""
+
+    character_name: str
+    order_index: int
+    evidence_start: int
+    evidence_end: int
+    method: str
+
+
+def extract_character_appearances_in_range(
+    range_text: str,
+    *,
+    known_character_names: set[str] | frozenset[str],
+    source_offset: int = 0,
+) -> list[ExtractedCharacterAppearance]:
+    """Labeled/cue-only cast presence inside one Scene range.
+
+    Accepts:
+      - dialogue speaker cues whose name is already a known Character candidate
+      - in-range ``人物：`` / ``角色：`` list entries matching known Characters
+
+    Does not infer presence from prose alone. Same character twice in one range
+    collapses to a single appearance (first evidence span).
+    """
+
+    known = {name.strip() for name in known_character_names if name and name.strip()}
+    if not known or not (range_text or "").strip():
+        return []
+
+    first_hit: dict[str, tuple[int, int, str]] = {}
+
+    # In-scene cast labels (e.g. 《归途》 per-scene 人物： lines).
+    for match in re.finditer(
+        r"(?m)^[ \t]*(?:人物|角色|characters|cast)[ \t]*[:：][ \t]*([^\n。；;]+)",
+        range_text,
+        re.I,
+    ):
+        raw = _strip_paren(match.group(1))
+        for part in re.split(r"[、,，/]|(?:\s*(?:和|与|and)\s*)", raw, flags=re.I):
+            name = part.strip(" 、,，/;；")
+            if name not in known or name in first_hit:
+                continue
+            # Prefer binding evidence to the exact name token inside the label line.
+            local = range_text.find(name, match.start(1), match.end(1))
+            if local < 0:
+                local = match.start(1)
+                end = match.end(1)
+            else:
+                end = local + len(name)
+            first_hit[name] = (
+                source_offset + local,
+                source_offset + end,
+                "scene_cast_label",
+            )
+
+    lines = range_text.splitlines(keepends=True)
+    cursor = 0
+    for i, line in enumerate(lines):
+        line_start = cursor
+        cursor += len(line)
+        cue = line.strip()
+        if not cue or len(cue) > 8 or cue not in known or cue in first_hit:
+            continue
+        if not (
+            re.fullmatch(r"[\u4e00-\u9fff]{2,4}", cue)
+            or re.fullmatch(r"[A-Z][a-z]{1,18}", cue)
+        ):
+            continue
+        nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        if not (
+            nxt.startswith("（")
+            or nxt.startswith("(")
+            or (nxt and not nxt.startswith("第"))
+        ):
+            continue
+        if re.match(r"^第[一二三四五六七八九十百零\d]+场", nxt):
+            continue
+        leading = len(line) - len(line.lstrip(" \t"))
+        name_start = line_start + leading
+        name_end = name_start + len(cue)
+        first_hit[cue] = (
+            source_offset + name_start,
+            source_offset + name_end,
+            "dialogue_speaker_cue_in_scene",
+        )
+
+    ordered = sorted(first_hit.items(), key=lambda row: (row[1][0], row[0]))
+    return [
+        ExtractedCharacterAppearance(
+            character_name=name,
+            order_index=index,
+            evidence_start=start,
+            evidence_end=end,
+            method=method,
+        )
+        for index, (name, (start, end, method)) in enumerate(ordered)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -1071,10 +1174,12 @@ __all__ = (
     "ExtractedBeatBoundary",
     "BeatFacetName",
     "ExtractedBeatFacet",
+    "ExtractedCharacterAppearance",
     "ExtractionResult",
     "extract_characters",
     "extract_scenes",
     "extract_scene_occurrences",
+    "extract_character_appearances_in_range",
     "extract_script_format_profile",
     "extract_script_profile_facets",
     "extract_explicit_beat_boundaries",

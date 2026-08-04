@@ -48,16 +48,25 @@ from apps.api.runtime_script_improved_extraction import (
     ExtractStatus,
     ExtractedBeatBoundary,
     ExtractedBeatFacet,
+    ExtractedCharacterAppearance,
     ExtractedItem,
     ExtractionResult,
     ScriptFormatProfileExtraction,
     ScriptProfileFacetExtraction,
+    extract_character_appearances_in_range,
     extract_characters_and_scenes,
     extract_explicit_beat_boundaries,
     extract_explicit_beat_facets,
     extract_scene_occurrences,
     extract_script_format_profile,
     extract_script_profile_facets,
+)
+from apps.api.runtime_entity_asset_bindings import (
+    bind_authoritative_fact_to_core_asset,
+    load_bindings,
+    lookup_asset_id_for_entity,
+    lookup_entity_for_asset_id,
+    mark_bindings_stale_for_revision_change,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -556,6 +565,64 @@ def beat_facet_to_candidate_fact(
     )
 
 
+def character_appearance_to_candidate_fact(
+    appearance: ExtractedCharacterAppearance,
+    *,
+    scene_entity_id: str,
+    character_entity_id: str,
+    project_id: str,
+    source_revision_id: str,
+    source_revision_digest: str,
+    source_text: str,
+) -> CandidateFact:
+    field_path = (
+        f"scene[{scene_entity_id}].cast[{appearance.order_index}].appearance"
+    )
+    spans: list[EvidenceSpan] = []
+    status = CandidateStatus.EXTRACTED_FROM_TEXT
+    uncertainty: str | None = None
+    if (
+        0 <= appearance.evidence_start < appearance.evidence_end <= len(source_text)
+        and source_text[appearance.evidence_start:appearance.evidence_end]
+        == appearance.character_name
+    ):
+        spans = [
+            EvidenceSpan(
+                start=appearance.evidence_start,
+                end=appearance.evidence_end,
+                quote=appearance.character_name[:1200],
+            )
+        ]
+    else:
+        status = CandidateStatus.MISSING
+        uncertainty = (
+            "Scene cast appearance could not be bound to a source evidence span"
+        )
+        spans = []
+    return CandidateFact(
+        fact_id=_id("fact"),
+        entity_kind="character",
+        entity_id=character_entity_id,
+        field_path=field_path,
+        claim=ClaimedText(
+            text=appearance.character_name if status != CandidateStatus.MISSING else "(missing)",
+            confidence=0.0 if status == CandidateStatus.MISSING else 0.9,
+            evidence_spans=spans,
+            uncertainty_note=uncertainty,
+        ),
+        status=status,
+        project_id=project_id,
+        source_revision_id=source_revision_id,
+        source_revision_digest=source_revision_digest,
+        producer="deterministic_extractor",
+        produced_at=_now(),
+    )
+
+
+def _is_scene_cast_appearance(field_path: str) -> bool:
+    return ".cast[" in field_path and field_path.endswith(".appearance")
+
+
 def _unique_evidence_start(source_text: str, evidence: str) -> int | None:
     quote = evidence.strip()
     if not quote:
@@ -677,14 +744,46 @@ def build_review_bundle_from_extraction(
     if scene_positions_are_unique:
         positioned_scenes.sort(key=lambda row: row[0])
         associated_marker_count = 0
+        character_entity_by_name = {
+            fact.claim.text: fact.entity_id
+            for fact in facts
+            if fact.entity_kind == "character" and fact.field_path == "identity.display_name"
+        }
+        known_character_names = set(character_entity_by_name)
         for scene_index, (scene_start, _, scene_fact) in enumerate(positioned_scenes):
             scene_end = (
                 positioned_scenes[scene_index + 1][0]
                 if scene_index + 1 < len(positioned_scenes)
                 else len(source_text)
             )
+            range_text = source_text[scene_start:scene_end]
+            for appearance in extract_character_appearances_in_range(
+                range_text,
+                known_character_names=known_character_names,
+                source_offset=scene_start,
+            ):
+                character_entity_id = character_entity_by_name.get(appearance.character_name)
+                if not character_entity_id:
+                    continue
+                appearance_fact = character_appearance_to_candidate_fact(
+                    appearance,
+                    scene_entity_id=scene_fact.entity_id,
+                    character_entity_id=character_entity_id,
+                    project_id=project_id,
+                    source_revision_id=source_revision_id,
+                    source_revision_digest=digest,
+                    source_text=source_text,
+                )
+                facts.append(appearance_fact)
+                items.append(
+                    _fact_to_review_item(
+                        appearance_fact,
+                        producer_method=appearance.method,
+                        decision=decisions.get(appearance_fact.fact_id),
+                    )
+                )
             boundaries = extract_explicit_beat_boundaries(
-                source_text[scene_start:scene_end],
+                range_text,
                 source_offset=scene_start,
             )
             associated_marker_count += len(boundaries)
@@ -714,9 +813,9 @@ def build_review_bundle_from_extraction(
                         decision=decisions.get(fact.fact_id),
                     )
                 )
-                range_text = source_text[boundary.source_start:boundary.source_end]
+                beat_range_text = source_text[boundary.source_start:boundary.source_end]
                 for facet in extract_explicit_beat_facets(
-                    range_text,
+                    beat_range_text,
                     source_offset=boundary.source_start,
                 ):
                     facet_fact = beat_facet_to_candidate_fact(
@@ -1033,9 +1132,12 @@ def edit_and_confirm_candidate(
     when = _now()
     spans = list(cand.claim.evidence_spans)
     if source_text:
+        require_exact = cand.entity_kind in {"beat", "script_format_profile"} or _is_scene_cast_appearance(
+            cand.field_path
+        )
         found = (
             _exact_evidence_for(source_text, new_text)
-            if cand.entity_kind in {"beat", "script_format_profile"}
+            if require_exact
             else _evidence_for(source_text, new_text)
         )
         if found:
@@ -1044,6 +1146,8 @@ def edit_and_confirm_candidate(
         raise LoopError(
             f"{cand.entity_kind} edit_confirm requires source-backed evidence"
         )
+    if _is_scene_cast_appearance(cand.field_path) and not spans:
+        raise LoopError("Scene cast appearance edit_confirm requires source-backed evidence")
     if not spans:
         spans = [EvidenceSpan(start=0, end=len(new_text), quote=new_text[:1200])]
     updated = CandidateFact.model_validate(
@@ -1184,8 +1288,21 @@ def resolve_for_downstream(
 ) -> dict[str, Any]:
     rev = revision_id or ledger.current_revision_id
     auth = list_current_authoritative(ledger, revision_id=rev)
-    auth_chars = [f.text for f in auth if f.entity_kind == "character"]
+    auth_chars = [
+        f.text
+        for f in auth
+        if f.entity_kind == "character" and f.field_path == "identity.display_name"
+    ]
     auth_scenes = [f.text for f in auth if f.entity_kind == "scene"]
+    auth_cast = [
+        {
+            "entity_id": fact.entity_id,
+            "field_path": fact.field_path,
+            "text": fact.text,
+        }
+        for fact in auth
+        if fact.entity_kind == "character" and _is_scene_cast_appearance(fact.field_path)
+    ]
     auth_profile = {
         f.field_path.removeprefix("script_profile."): f.text
         for f in auth
@@ -1234,6 +1351,7 @@ def resolve_for_downstream(
         "script_format_profile": auth_format_profile,
         "beats": auth_beats,
         "beat_facets": auth_beat_facets,
+        "scene_cast": auth_cast,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
         "raw_extraction_characters": raw_chars,
@@ -1693,6 +1811,11 @@ def register_runtime_candidate_confirmation_routes(
                     new_source_text=source_text,
                     actor_id=_human_id(auth, request),
                 )
+                mark_bindings_stale_for_revision_change(
+                    store,
+                    project_id=project_id,
+                    new_revision_id=body.source_revision_id,
+                )
             # Preserve prior authoritative + change_log audit rows; replace candidates.
             new_ledger, bundle = open_ledger_from_extraction(
                 source_text,
@@ -1835,7 +1958,11 @@ def register_runtime_candidate_confirmation_routes(
             "reason": "no_new_authoritative_fact",
             "node_ids": [],
         }
+        entity_asset_binding: dict[str, Any] | None = None
         if newly_authoritative:
+            binding = bind_authoritative_fact_to_core_asset(store, newly_authoritative[0])
+            if binding is not None:
+                entity_asset_binding = binding.model_dump(mode="json")
             if (
                 recoverable_graph_feed_enabled()
                 and candidate_facts_feed_production_graph_enabled()
@@ -1873,6 +2000,7 @@ def register_runtime_candidate_confirmation_routes(
             ],
             "resolved": resolve_for_downstream(ledger),
             "graph_feed": graph_feed,
+            "entity_asset_binding": entity_asset_binding,
             "affects_production_graph": bool(graph_feed.get("fed")),
             "production_graph_feed_enabled": candidate_facts_feed_production_graph_enabled(),
         }
@@ -1983,6 +2111,56 @@ def register_runtime_candidate_confirmation_routes(
             ],
         }
         return _with_graph_feed_status(payload, ledger)
+
+    @app.get("/projects/{project_id}/entity-asset-bindings")
+    def get_entity_asset_bindings(
+        project_id: str,
+        request: Request,
+        entity_id: str | None = None,
+        core_asset_id: str | None = None,
+        revision_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Bidirectional lookup over active entity↔core-asset bindings."""
+
+        _enforce_project_access(auth, request, project_id)
+        _require_loop_enabled()
+        store.ensure_project_manifest(project_id)
+        if entity_id and core_asset_id:
+            raise HTTPException(
+                status_code=400,
+                detail=safe_error_detail(
+                    "invalid_binding_query",
+                    message="pass entity_id or core_asset_id, not both",
+                    project_id=project_id,
+                    stage="entity_asset_bindings",
+                ),
+            )
+        if entity_id:
+            rows = lookup_asset_id_for_entity(
+                store,
+                project_id=project_id,
+                entity_id=entity_id,
+                revision_id=revision_id,
+            )
+        elif core_asset_id:
+            rows = lookup_entity_for_asset_id(
+                store,
+                project_id=project_id,
+                core_asset_id=core_asset_id,
+                revision_id=revision_id,
+            )
+        else:
+            rows = [
+                row
+                for row in load_bindings(store, project_id).bindings
+                if row.status == "active"
+                and (revision_id is None or row.revision_id == revision_id)
+            ]
+        return {
+            "enabled": True,
+            "project_id": project_id,
+            "bindings": [row.model_dump(mode="json") for row in rows],
+        }
 
 
 __all__ = (
