@@ -32,6 +32,8 @@ def test_script_core_truth_frontend_contract_has_no_production_pollution() -> No
     assert "opensCandidateReview" in combined
     assert "s.ui.inspectorOpen = true" in combined
     assert "agent-script-candidate-review" in combined
+    assert "agent-script-candidate-extraction" in combined
+    assert "agent-script-candidate-evidence-kind" in combined
     assert "handleScriptCandidateReview" in combined
     assert "auto_props: 0" in combined
 

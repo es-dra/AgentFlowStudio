@@ -21,6 +21,10 @@ from apps.api.runtime_production_graph import (
     ProductionGraphStore,
     canonical_digest,
 )
+from apps.api.runtime_script_candidate_extraction import (
+    DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
+    build_deterministic_analysis_candidate,
+)
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -56,6 +60,9 @@ class CandidateCharacter(BaseModel):
     evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
     confidence: float = Field(ge=0.0, le=1.0)
     status: Literal["candidate", "confirmed", "pending_confirmation"] = "candidate"
+    evidence_status: Literal["extracted_from_text", "model_inferred", "conflicting"] = "model_inferred"
+    extraction_method: str = Field(default="unspecified_structured_analysis", min_length=1, max_length=120)
+    uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
 class CandidateMainScene(BaseModel):
@@ -65,6 +72,9 @@ class CandidateMainScene(BaseModel):
     evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
     confidence: float = Field(ge=0.0, le=1.0)
     status: Literal["candidate", "confirmed", "pending_confirmation"] = "candidate"
+    evidence_status: Literal["extracted_from_text", "model_inferred", "conflicting"] = "model_inferred"
+    extraction_method: str = Field(default="unspecified_structured_analysis", min_length=1, max_length=120)
+    uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
 class ScriptRevisionCreateRequest(BaseModel):
@@ -92,6 +102,8 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     actions: list[str] = Field(default_factory=list, max_length=120)
     events: list[str] = Field(default_factory=list, max_length=120)
     beats: list[dict[str, Any]] = Field(default_factory=list, max_length=120)
+    missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
+    extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
     provider_dispatch_count: int = Field(default=0, ge=0, le=0)
     remote_dispatch_count: int = Field(default=0, ge=0, le=0)
@@ -243,36 +255,11 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
         _enforce_project_access(auth, request, project_id)
         with exclusive_file_lock(_lock_path(store, project_id)):
             state = _load_state(store, project_id)
-            revision = _require_revision_contract(
+            revision, candidate, assets, affected, preserved = _apply_structured_analysis_candidate(
                 state,
                 project_id=project_id,
                 revision_id=revision_id,
-                body_project_id=body.project_id,
-                source_digest=body.source_digest,
-                schema_version=body.schema_version,
-                stage="analysis_candidate_submit",
-                expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
-            )
-            _validate_evidence_spans(body, revision)
-            candidate = _analysis_candidate_record(project_id, revision, body)
-            previous_assets = dict(state.get("assets") or {})
-            assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
-            for asset in assets:
-                state["assets"][asset["asset_id"]] = asset
-                _record_asset_version(state, asset)
-            state.setdefault("analysis_candidates", {})[candidate["candidate_id"]] = candidate
-            revision["analysis_state"] = _analysis_state_for_assets(assets)
-            revision["analysis_candidate_id"] = candidate["candidate_id"]
-            state["current_revision_id"] = revision_id
-            _append_audit(
-                state,
-                {
-                    "event_type": "structured_analysis_candidate_submitted",
-                    "revision_id": revision_id,
-                    "candidate_id": candidate["candidate_id"],
-                    "affected_asset_ids": affected,
-                    "preserved_asset_ids": preserved,
-                },
+                body=body,
             )
             _write_state(store, project_id, state)
         return {
@@ -282,6 +269,52 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
             "projection": public_projection(state),
             "affected_asset_ids": affected,
             "preserved_asset_ids": preserved,
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+
+    @app.post("/projects/{project_id}/script-revisions/{revision_id}/analysis-candidates/extract")
+    def extract_deterministic_analysis_candidate(
+        project_id: str,
+        revision_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        with exclusive_file_lock(_lock_path(store, project_id)):
+            state = _load_state(store, project_id)
+            revision = _require_current_revision_for_extraction(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+            )
+            body = StructuredAnalysisCandidateRequest.model_validate(
+                build_deterministic_analysis_candidate(
+                    project_id=project_id,
+                    revision_id=revision_id,
+                    source_digest=str(revision["source_digest"]),
+                    source_text=str(revision["source_text"]),
+                    candidate_schema_version=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+                )
+            )
+            revision, candidate, assets, affected, preserved = _apply_structured_analysis_candidate(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+                body=body,
+            )
+            _write_state(store, project_id, state)
+        return {
+            "project_id": project_id,
+            "candidate": public_candidate(candidate),
+            "analysis_state": revision["analysis_state"],
+            "projection": public_projection(state),
+            "affected_asset_ids": affected,
+            "preserved_asset_ids": preserved,
+            "extraction": {
+                "schema_version": DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
+                "missing_slots": list(body.missing_slots),
+                "notes": list(body.extraction_notes),
+            },
             "provider_dispatch_count": 0,
             "remote_dispatch_count": 0,
         }
@@ -704,6 +737,8 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "actions": [str(item)[:240] for item in candidate.get("actions", [])[:20]],
         "events": [str(item)[:240] for item in candidate.get("events", [])[:20]],
         "beats_count": len(candidate.get("beats") or []),
+        "missing_slots": [str(item) for item in candidate.get("missing_slots", [])[:10]],
+        "extraction_notes": [str(item)[:600] for item in candidate.get("extraction_notes", [])[:20]],
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -724,6 +759,9 @@ def public_asset(asset: dict[str, Any]) -> dict[str, Any]:
         "pronoun_links": list(asset.get("pronoun_links") or []),
         "evidence_spans": list(asset.get("evidence_spans") or []),
         "confidence": float(asset.get("confidence") or 0.0),
+        "evidence_status": str(asset.get("evidence_status") or "model_inferred"),
+        "extraction_method": str(asset.get("extraction_method") or "unspecified_structured_analysis"),
+        "uncertainty_note": str(asset.get("uncertainty_note") or ""),
         "lineage": dict(asset.get("lineage") or {}),
         "created_at": str(asset.get("created_at") or ""),
         "updated_at": str(asset.get("updated_at") or ""),
@@ -1056,6 +1094,74 @@ def _analysis_candidate_record(
     return payload
 
 
+def _apply_structured_analysis_candidate(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+    body: StructuredAnalysisCandidateRequest,
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[str], list[str]]:
+    revision = _require_revision_contract(
+        state,
+        project_id=project_id,
+        revision_id=revision_id,
+        body_project_id=body.project_id,
+        source_digest=body.source_digest,
+        schema_version=body.schema_version,
+        stage="analysis_candidate_submit",
+        expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+    )
+    _validate_evidence_spans(body, revision)
+    candidate = _analysis_candidate_record(project_id, revision, body)
+    previous_assets = dict(state.get("assets") or {})
+    assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
+    for asset in assets:
+        state["assets"][asset["asset_id"]] = asset
+        _record_asset_version(state, asset)
+    state.setdefault("analysis_candidates", {})[candidate["candidate_id"]] = candidate
+    revision["analysis_state"] = _analysis_state_for_assets(assets)
+    revision["analysis_candidate_id"] = candidate["candidate_id"]
+    state["current_revision_id"] = revision_id
+    _append_audit(
+        state,
+        {
+            "event_type": "structured_analysis_candidate_submitted",
+            "revision_id": revision_id,
+            "candidate_id": candidate["candidate_id"],
+            "affected_asset_ids": affected,
+            "preserved_asset_ids": preserved,
+            "missing_slots": list(body.missing_slots),
+        },
+    )
+    return revision, candidate, assets, affected, preserved
+
+
+def _require_current_revision_for_extraction(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+) -> dict[str, Any]:
+    revision = dict((state.get("revisions") or {}).get(revision_id) or {})
+    if not revision:
+        raise _contract_error(
+            "script_revision_not_found",
+            "Script revision does not exist in this project truth store.",
+            project_id=project_id,
+            stage="analysis_candidate_extract",
+            status_code=404,
+        )
+    if str(state.get("current_revision_id") or "") != revision_id:
+        raise _contract_error(
+            "current_revision_mismatch",
+            "Only the selected current script revision can be extracted.",
+            project_id=project_id,
+            stage="analysis_candidate_extract",
+            status_code=409,
+        )
+    return revision
+
+
 def _assets_from_candidate(
     project_id: str,
     revision: dict[str, Any],
@@ -1087,6 +1193,9 @@ def _assets_from_candidate(
             evidence_spans=item.get("evidence_spans") or [],
             confidence=float(item.get("confidence") or 0.0),
             requested_status=str(item.get("status") or "candidate"),
+            evidence_status=str(item.get("evidence_status") or "model_inferred"),
+            extraction_method=str(item.get("extraction_method") or "unspecified_structured_analysis"),
+            uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
         asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
@@ -1105,6 +1214,9 @@ def _assets_from_candidate(
             evidence_spans=item.get("evidence_spans") or [],
             confidence=float(item.get("confidence") or 0.0),
             requested_status=str(item.get("status") or "candidate"),
+            evidence_status=str(item.get("evidence_status") or "model_inferred"),
+            extraction_method=str(item.get("extraction_method") or "unspecified_structured_analysis"),
+            uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
         asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
@@ -1137,6 +1249,9 @@ def _candidate_asset(
     evidence_spans: list[dict[str, Any]],
     confidence: float,
     requested_status: str,
+    evidence_status: str,
+    extraction_method: str,
+    uncertainty_note: str,
     created_at: str,
 ) -> dict[str, Any]:
     status = "candidate"
@@ -1158,12 +1273,17 @@ def _candidate_asset(
         "pronoun_links": _clean_text_list(pronoun_links),
         "evidence_spans": evidence_spans,
         "confidence": confidence,
+        "evidence_status": evidence_status,
+        "extraction_method": extraction_method,
+        "uncertainty_note": uncertainty_note,
         "lineage": {
             "source_revision_id": revision_id,
             "source_digest": source_digest,
             "candidate_quote_digest": quote_digest,
             "preservation_key": key,
             "auto_asset_scope": "character_or_main_scene_only",
+            "evidence_status": evidence_status,
+            "extraction_method": extraction_method,
         },
         "created_at": created_at,
         "updated_at": created_at,
@@ -1701,6 +1821,9 @@ def _asset_review_content(asset: dict[str, Any]) -> dict[str, Any]:
         "pronoun_links": list(asset.get("pronoun_links") or []),
         "evidence_spans": list(asset.get("evidence_spans") or []),
         "confidence": float(asset.get("confidence") or 0.0),
+        "evidence_status": str(asset.get("evidence_status") or "model_inferred"),
+        "extraction_method": str(asset.get("extraction_method") or "unspecified_structured_analysis"),
+        "uncertainty_note": str(asset.get("uncertainty_note") or ""),
         "status": str(asset.get("status") or ""),
     }
 

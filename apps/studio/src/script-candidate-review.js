@@ -1,6 +1,7 @@
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
 
 export const SCRIPT_CANDIDATE_REVIEW_EVENT = "afs:studio-script-candidate-review";
+export const SCRIPT_CANDIDATE_EXTRACTION_EVENT = "afs:studio-script-candidate-extraction";
 const REVIEW_SCHEMA_VERSION = "afs.analysis_asset_review.v0.1";
 const CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1";
 
@@ -15,6 +16,38 @@ export function bindScriptCandidateReviewEvents({ getRuntime, store, formatError
       formatError,
     });
   });
+  window.addEventListener(SCRIPT_CANDIDATE_EXTRACTION_EVENT, (event) => {
+    void handleScriptCandidateExtraction({
+      node: event.detail?.node,
+      runtime: getRuntime?.(),
+      store,
+      formatError,
+    });
+  });
+}
+
+export async function handleScriptCandidateExtraction({ node, runtime, store, formatError }) {
+  const revision = node?.params?.scriptRevision || {};
+  const revisionId = cleanToken(revision.revision_id, 140);
+  if (!runtime?.extractStructuredAnalysisCandidate || !store || !revisionId) {
+    return { ok: false, error: "script_revision_extraction_unavailable" };
+  }
+  setExtractionState(store, node.id, { busy: true, error: "", message: "正在从当前剧本提取可核对候选…" });
+  try {
+    const response = await runtime.extractStructuredAnalysisCandidate(revisionId);
+    store.set((state) => applyScriptCoreTruthProjection(state, response?.projection || {}), {
+      history: false,
+      persist: false,
+    });
+    const counts = response?.projection?.asset_counts || {};
+    const message = `已提取 ${Number(counts.characters || 0)} 个人物、${Number(counts.main_scenes || 0)} 个场景；请逐项审阅。`;
+    setExtractionState(store, node.id, { busy: false, error: "", message });
+    return { ok: true, response };
+  } catch (error) {
+    const message = typeof formatError === "function" ? formatError(error) : String(error?.message || error || "提取失败");
+    setExtractionState(store, node.id, { busy: false, error: message, message: "提取失败，原始剧本未改变，可重试。" });
+    return { ok: false, error: message };
+  }
 }
 
 export async function handleScriptCandidateReview({ action, label, node, runtime, store, formatError }) {
@@ -102,6 +135,14 @@ function setReviewState(store, nodeId, value) {
     const target = state.nodes?.[nodeId];
     if (!target?.params?.coreAssetTruth) return;
     target.params.coreAssetReview = { ...(target.params.coreAssetReview || {}), ...value };
+  }, { history: false, persist: false });
+}
+
+function setExtractionState(store, nodeId, value) {
+  store.set((state) => {
+    const target = state.nodes?.[nodeId];
+    if (!target?.params?.scriptRevision) return;
+    target.params.scriptCandidateExtraction = { ...(target.params.scriptCandidateExtraction || {}), ...value };
   }, { history: false, persist: false });
 }
 

@@ -45,6 +45,7 @@ def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile() 
 
                 inspector = page.locator("#inspector")
                 assert inspector.get_by_text("来源：Mira", exact=True).is_visible()
+                assert inspector.get_by_text("证据性质：原文直接提取", exact=True).is_visible()
                 name_input = inspector.get_by_label("名称", exact=True)
                 assert name_input.input_value() == "Mira"
                 assert_review_geometry(page)
@@ -64,6 +65,12 @@ def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile() 
                 inspector.get_by_role("button", name="拒绝", exact=True).click()
                 inspector.get_by_text("已拒绝", exact=True).wait_for()
                 assert page.evaluate("window.__calls.reviewDecision") == "reject"
+
+                page.evaluate("window.__selectRevision()")
+                inspector.get_by_role("button", name="提取候选", exact=True).click()
+                inspector.get_by_text("已提取 1 个人物、0 个场景；请逐项审阅。", exact=True).wait_for()
+                assert page.evaluate("window.__calls.extractions") == 1
+                assert page.evaluate("Boolean(window.__state.nodes.script_truth_asset_char1)")
 
                 page.evaluate("window.__resetCandidate()")
                 page.set_viewport_size({"width": 390, "height": 844})
@@ -174,7 +181,7 @@ def candidate_review_html() -> str:
       window.__pageErrors = [];
       window.addEventListener("error", (event) => window.__pageErrors.push(String(event.message || event.error)));
       window.addEventListener("unhandledrejection", (event) => window.__pageErrors.push(String(event.reason)));
-      window.__calls = { edits: 0, reviews: 0, reviewDecision: "" };
+      window.__calls = { edits: 0, reviews: 0, reviewDecision: "", extractions: 0 };
       window.__state = {
         meta: { projectId: "p1", projectName: "候选审阅" },
         nodes: {}, edges: {}, groups: {}, order: [], assets: [], production: {},
@@ -198,6 +205,7 @@ def candidate_review_html() -> str:
             project_id: "p1", revision_id: "rev1", source_digest: digest, candidate_id: "candidate1",
             version, version_id: versionId, parent_version_id: version > 1 ? `v${version - 1}` : "",
             display_name: label, name: label, aliases: [], pronoun_links: [], confidence: 0.99,
+            evidence_status: "extracted_from_text", extraction_method: "dialogue_speaker_cue",
             evidence_spans: [{ start: 0, end: 4, quote: "Mira" }], lineage: {},
           }],
         };
@@ -226,6 +234,14 @@ def candidate_review_html() -> str:
           return {};
         },
         loadScriptTruth: async () => ({ projection: currentProjection }),
+        extractStructuredAnalysisCandidate: async () => {
+          window.__calls.extractions += 1;
+          currentProjection = projection();
+          return {
+            candidate: { asset_counts: { characters: 1, main_scenes: 0 }, missing_slots: { named_characters: [], main_scenes: ["main_scenes"] } },
+            projection: currentProjection,
+          };
+        },
       };
 
       function resetCandidate() {
@@ -237,6 +253,15 @@ def candidate_review_html() -> str:
         renderInspectorPanel(window.__state, store);
       }
       window.__resetCandidate = resetCandidate;
+      window.__selectRevision = () => {
+        currentProjection = projection("candidate");
+        currentProjection.assets = [];
+        currentProjection.asset_counts = { characters: 0, main_scenes: 0, manual_props: 0 };
+        applyScriptCoreTruthProjection(window.__state, currentProjection);
+        window.__state.selection = { nodeIds: ["script_truth_revision_rev1"], edgeId: null };
+        document.querySelector("#inspector").dataset.signature = "";
+        renderInspectorPanel(window.__state, store);
+      };
       bindScriptCandidateReviewEvents({ getRuntime: () => runtime, store, formatError: (error) => String(error.message || error) });
       resetCandidate();
       window.__candidateReviewReady = true;

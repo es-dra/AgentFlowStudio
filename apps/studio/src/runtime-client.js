@@ -408,6 +408,7 @@ function inferUserAction(route, method) {
   if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
   if (/\/script-revisions$/.test(route) && method === "POST") return "create_script_revision";
   if (/\/script-revisions\/[^/]+\/select$/.test(route) && method === "POST") return "select_script_revision";
+  if (/\/analysis-candidates\/extract$/.test(route) && method === "POST") return "extract_structured_analysis_candidate";
   if (/\/analysis-candidates$/.test(route) && method === "POST") return "submit_structured_analysis_candidate";
   if (/\/analysis-candidates$/.test(route) && method === "GET") return "load_structured_analysis_candidates";
   if (/\/analysis-assets\/[^/]+\/review$/.test(route) && method === "POST") return "review_analysis_asset";
@@ -776,6 +777,11 @@ export function createRuntimeClient(projectId = "") {
       return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates`, {
         method: "POST",
         payload,
+      });
+    },
+    extractStructuredAnalysisCandidate(revisionId) {
+      return requestJson(`/projects/${encoded}/script-revisions/${encodeURIComponent(revisionId)}/analysis-candidates/extract`, {
+        method: "POST",
       });
     },
     loadStructuredAnalysisCandidates(revisionId) {

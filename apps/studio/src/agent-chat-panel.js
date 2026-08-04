@@ -35,7 +35,7 @@ import {
   productionBriefLabel,
   shotPlanDurationAssessment,
 } from "./storyboard-duration-contract.js";
-import { handleScriptCandidateReview } from "./script-candidate-review.js";
+import { handleScriptCandidateExtraction, handleScriptCandidateReview } from "./script-candidate-review.js";
 
 export function buildAgentChatPanel({
   session,
@@ -61,9 +61,13 @@ export function buildAgentChatPanel({
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
   const candidateReview = scriptCandidateReview({ store, runtime, onRender });
-  if (copilot && !session?.pendingCommand && !candidateReview) body.appendChild(productionCopilot(copilot, onNextAction));
+  const candidateExtraction = scriptCandidateExtraction({ store, runtime, onRender });
+  const candidateAction = candidateReview || candidateExtraction;
+  if (copilot && !session?.pendingCommand && !candidateAction) body.appendChild(productionCopilot(copilot, onNextAction));
   if (candidateReview) {
     body.appendChild(candidateReview);
+  } else if (candidateExtraction) {
+    body.appendChild(candidateExtraction);
   } else {
     syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
     const taskReview = currentTaskReview({ store, runtime, onRender });
@@ -76,6 +80,47 @@ export function buildAgentChatPanel({
   body.appendChild(composer({ session, context, runtime, onOpen, onRender }));
   aside.appendChild(body);
   return aside;
+}
+
+function scriptCandidateExtraction({ store, runtime, onRender }) {
+  const state = store?.get?.() || {};
+  const node = selectedCanvasNode(state);
+  const revision = node?.params?.scriptRevision;
+  if (!node || !revision || !node.params?.scriptCoreProjection) return null;
+  const extraction = node.params?.scriptCandidateExtraction || {};
+  const counts = node.params?.coreAssetCounts || {};
+  const hasCandidates = Number(counts.characters || 0) + Number(counts.main_scenes || 0) > 0;
+  const wrap = el("section", "agent-current-task-review agent-script-candidate-extraction");
+  wrap.dataset.nodeId = node.id;
+  wrap.setAttribute("aria-label", "剧本候选提取");
+  const header = el("header", "agent-current-task-head");
+  header.append(
+    el("span", "eyebrow", "当前任务"),
+    el("strong", "", "剧本理解"),
+    el("small", "", hasCandidates ? "可重新核对" : "等待提取"),
+  );
+  wrap.appendChild(header);
+  wrap.appendChild(el(
+    "p",
+    "agent-current-task-copy",
+    "先提取有原文证据的人物和场景；结果仍需逐项确认，缺失内容不会由系统编造。",
+  ));
+  const actions = el("div", "agent-current-task-actions");
+  const button = taskButton(hasCandidates ? "重新提取候选" : "提取候选", "studio-primary-button", () => {
+    void handleScriptCandidateExtraction({ node, runtime, store }).finally(() => onRender?.());
+    onRender?.();
+  });
+  button.disabled = Boolean(extraction.busy);
+  actions.appendChild(button);
+  wrap.appendChild(actions);
+  const status = el(
+    "p",
+    `agent-script-candidate-status${extraction.error ? " error" : ""}`,
+    extraction.error || extraction.message || "不会调用远程 Provider。",
+  );
+  status.setAttribute("aria-live", "polite");
+  wrap.appendChild(status);
+  return wrap;
 }
 
 function scriptCandidateReview({ store, runtime, onRender }) {
@@ -102,6 +147,11 @@ function scriptCandidateReview({ store, runtime, onRender }) {
     "p",
     "agent-current-task-copy agent-script-candidate-evidence",
     evidence.length ? `来源证据：${evidence.join(" / ")}` : "没有可核对的来源证据。",
+  ));
+  wrap.appendChild(el(
+    "p",
+    "agent-current-task-copy agent-script-candidate-evidence-kind",
+    `证据性质：${scriptCandidateEvidenceStatusLabel(truth.evidence_status)}`,
   ));
   const label = document.createElement("label");
   label.className = "agent-script-candidate-label";
@@ -156,6 +206,14 @@ function scriptCandidateStatusLabel(value) {
     rejected: "已拒绝",
     expired: "已过期",
   }[String(value || "")] || "待审阅";
+}
+
+function scriptCandidateEvidenceStatusLabel(value) {
+  return {
+    extracted_from_text: "原文直接提取",
+    model_inferred: "模型推断，需人工核对",
+    conflicting: "证据冲突，需人工处理",
+  }[String(value || "")] || "来源待核对";
 }
 
 function panelHeader({ context, collapsed, onToggleCollapse }) {

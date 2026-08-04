@@ -126,6 +126,9 @@ function revisionNodeFor(projectId, revision, projection, previousNode = null) {
         : {}),
       ...(Array.isArray(previousParams.revisions) ? { revisions: previousParams.revisions } : {}),
       ...(previousParams.currentRevisionId ? { currentRevisionId: previousParams.currentRevisionId } : {}),
+      ...(previousParams.scriptCandidateExtraction
+        ? { scriptCandidateExtraction: { ...previousParams.scriptCandidateExtraction } }
+        : {}),
     },
     content: [
       sourceText ? `${sourceKind === "idea" ? "创作想法" : "剧本文本"}：${sourceExcerpt(sourceText)}` : "创作内容：待补充",
@@ -179,6 +182,9 @@ function assetNodeFor(projectId, revisionNode, asset, index) {
         parent_version_id: cleanToken(asset.parent_version_id || "", 160),
         review_decision_id: cleanToken(asset.review_decision_id || "", 160),
         display_name: label,
+        evidence_status: cleanToken(asset.evidence_status || "", 80),
+        extraction_method: cleanToken(asset.extraction_method || "", 120),
+        uncertainty_note: String(asset.uncertainty_note || "").trim().slice(0, 600),
         evidence_spans: safeEvidenceSpans(asset.evidence_spans),
       },
       provider_dispatch_count: 0,
