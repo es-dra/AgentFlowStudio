@@ -32,6 +32,8 @@ SCRIPT_TRUTH_SCHEMA_VERSION = "afs.script_core_truth.v0.1"
 SCRIPT_REVISION_SCHEMA_VERSION = "afs.script_revision.v0.1"
 ANALYSIS_CANDIDATE_SCHEMA_VERSION = "afs.structured_analysis_candidate.v0.1"
 ANALYSIS_REVIEW_SCHEMA_VERSION = "afs.analysis_asset_review.v0.1"
+SCENE_OWNERSHIP_SCHEMA_VERSION = "afs.scene_ownership_relationship.v0.1"
+SCENE_OWNERSHIP_REVIEW_SCHEMA_VERSION = "afs.scene_ownership_review.v0.1"
 CORE_ASSET_COMMAND_SCHEMA_VERSION = "afs.core_asset_command.v0.1"
 AUTO_CONFIRM_CONFIDENCE = 0.82
 ACTIVE_STATUSES = {"candidate", "modified", "confirmed", "pending_confirmation", "analysis_required", "low_confidence_pending"}
@@ -161,6 +163,22 @@ class AnalysisAssetReviewRequest(BaseModel):
     decided_at: str | None = Field(default=None, max_length=80)
 
 
+class SceneOwnershipReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1, max_length=128)
+    revision_id: str = Field(min_length=1, max_length=120)
+    source_digest: str = Field(min_length=64, max_length=64)
+    relationship_version_id: str = Field(min_length=1, max_length=160)
+    expected_relationship_version: int = Field(ge=1)
+    expected_graph_version: int = Field(ge=0)
+    idempotency_key: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    decision: Literal["confirm", "reject"]
+    reason: str | None = Field(default=None, max_length=600)
+    decided_at: str | None = Field(default=None, max_length=80)
+
+
 def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore, auth: RuntimeAuthStore) -> None:
     graph_store = ProductionGraphStore(store)
 
@@ -184,6 +202,17 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     status_code=409,
                 )
             revision = _new_revision(project_id, body, parent_revision_id)
+            _remove_confirmed_relationships_from_graph(
+                graph_store,
+                state,
+                project_id=project_id,
+                relationships=_confirmed_relationships(state),
+                idempotency_key=(
+                    f"scene-ownership-revision-expire:{state.get('current_revision_id', '')}:"
+                    f"{revision['source_digest']}"
+                ),
+                stage="script_revision_create",
+            )
             _expire_open_analysis(state, superseded_by_revision_id=revision["revision_id"])
             state["revisions"][revision["revision_id"]] = revision
             state["current_revision_id"] = revision["revision_id"]
@@ -221,6 +250,22 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     project_id=project_id,
                     stage="script_revision_select",
                     status_code=404,
+                )
+            current_revision_id = str(state.get("current_revision_id") or "")
+            if current_revision_id != revision_id:
+                active_relationships = _active_relationships(state)
+                _remove_confirmed_relationships_from_graph(
+                    graph_store,
+                    state,
+                    project_id=project_id,
+                    relationships=[item for item in active_relationships if item.get("status") == "confirmed"],
+                    idempotency_key=f"scene-ownership-revision-select:{current_revision_id}:{revision_id}",
+                    stage="script_revision_select",
+                )
+                _expire_relationships(
+                    state,
+                    active_relationships,
+                    reason="current_revision_selected",
                 )
             state["current_revision_id"] = revision_id
             _append_audit(state, {"event_type": "script_revision_selected", "revision_id": revision_id})
@@ -260,6 +305,13 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 project_id=project_id,
                 revision_id=revision_id,
                 body=body,
+            )
+            _invalidate_stale_relationships_after_asset_change(
+                graph_store,
+                state,
+                project_id=project_id,
+                idempotency_key=f"scene-ownership-candidate-refresh:{candidate['candidate_id']}",
+                stage="analysis_candidate_submit",
             )
             _write_state(store, project_id, state)
         return {
@@ -302,6 +354,13 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 revision_id=revision_id,
                 body=body,
             )
+            _invalidate_stale_relationships_after_asset_change(
+                graph_store,
+                state,
+                project_id=project_id,
+                idempotency_key=f"scene-ownership-candidate-refresh:{candidate['candidate_id']}",
+                stage="analysis_candidate_extract",
+            )
             _write_state(store, project_id, state)
         return {
             "project_id": project_id,
@@ -315,6 +374,42 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 "missing_slots": list(body.missing_slots),
                 "notes": list(body.extraction_notes),
             },
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+
+    @app.post("/projects/{project_id}/script-revisions/{revision_id}/analysis-relationships/extract")
+    def extract_scene_ownership_relationships(
+        project_id: str,
+        revision_id: str,
+        request: Request,
+    ) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        with exclusive_file_lock(_lock_path(store, project_id)):
+            state = _load_state(store, project_id)
+            revision = _require_current_revision_for_extraction(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+            )
+            relationships, affected, preserved = _extract_scene_ownership(state, revision)
+            _append_audit(
+                state,
+                {
+                    "event_type": "scene_ownership_relationships_extracted",
+                    "revision_id": revision_id,
+                    "affected_relationship_ids": affected,
+                    "preserved_relationship_ids": preserved,
+                },
+            )
+            _write_state(store, project_id, state)
+        return {
+            "project_id": project_id,
+            "revision_id": revision_id,
+            "source_digest": revision["source_digest"],
+            "relationships": [public_relationship(item) for item in relationships],
+            "affected_relationship_ids": affected,
+            "preserved_relationship_ids": preserved,
             "provider_dispatch_count": 0,
             "remote_dispatch_count": 0,
         }
@@ -343,15 +438,186 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
             for item in (state.get("review_decisions") or {}).values()
             if str(item.get("revision_id") or "") == revision_id
         ]
+        relationships = _relationships_for_revision(state, revision_id)
+        relationship_decisions = [
+            public_relationship_review_decision(item)
+            for item in (state.get("relationship_review_decisions") or {}).values()
+            if str(item.get("revision_id") or "") == revision_id
+        ]
         return {
             "project_id": project_id,
             "revision": public_revision(revision, include_source=False),
             "candidates": sorted(candidates, key=lambda item: str(item.get("created_at") or "")),
             "assets": assets,
             "review_decisions": sorted(decisions, key=lambda item: str(item.get("decided_at") or "")),
+            "relationships": [public_relationship(item) for item in relationships],
+            "relationship_review_decisions": sorted(
+                relationship_decisions,
+                key=lambda item: str(item.get("decided_at") or ""),
+            ),
             "provider_dispatch_count": 0,
             "remote_dispatch_count": 0,
         }
+
+    @app.post(
+        "/projects/{project_id}/script-revisions/{revision_id}/analysis-relationships/{relationship_id}/review"
+    )
+    def review_scene_ownership_relationship(
+        project_id: str,
+        revision_id: str,
+        relationship_id: str,
+        body: SceneOwnershipReviewRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        _enforce_project_access(auth, request, project_id)
+        semantic_digest = _scene_ownership_review_digest(body, revision_id, relationship_id)
+        with exclusive_file_lock(_lock_path(store, project_id)):
+            state = _load_state(store, project_id)
+            existing = _relationship_review_receipt_for_key(state, body.idempotency_key)
+            if existing:
+                if existing.get("semantic_digest") != semantic_digest:
+                    raise _contract_error(
+                        "scene_ownership_review_idempotency_conflict",
+                        "Idempotency key was already used for a different relationship decision.",
+                        project_id=project_id,
+                        stage="scene_ownership_review",
+                        status_code=409,
+                    )
+                relationship = _relationship_version_by_id(
+                    state,
+                    relationship_id,
+                    str(existing.get("relationship_version_id") or ""),
+                )
+                decision = dict(
+                    (state.get("relationship_review_decisions") or {}).get(existing.get("review_decision_id")) or {}
+                )
+                return _scene_ownership_review_response(
+                    project_id,
+                    relationship,
+                    decision,
+                    existing,
+                    graph_store.ensure(project_id),
+                    idempotent_replay=True,
+                    graph_idempotent_replay=bool(existing.get("graph_idempotent_replay")),
+                )
+
+            revision = _require_revision_contract(
+                state,
+                project_id=project_id,
+                revision_id=revision_id,
+                body_project_id=body.project_id,
+                source_digest=body.source_digest,
+                schema_version=body.schema_version,
+                stage="scene_ownership_review",
+                expected_schema=SCENE_OWNERSHIP_REVIEW_SCHEMA_VERSION,
+            )
+            if body.revision_id != revision_id:
+                raise _contract_error(
+                    "revision_identity_mismatch",
+                    "Request revision id does not match the URL revision scope.",
+                    project_id=project_id,
+                    stage="scene_ownership_review",
+                    status_code=409,
+                )
+            relationship = dict((state.get("relationships") or {}).get(relationship_id) or {})
+            scene, member = _require_reviewable_relationship(
+                state,
+                relationship,
+                relationship_id=relationship_id,
+                body=body,
+                project_id=project_id,
+            )
+            decided_at = _safe_time(body.decided_at)
+            reviewed_relationship = _reviewed_relationship_version(
+                relationship,
+                body=body,
+                semantic_digest=semantic_digest,
+                decided_at=decided_at,
+            )
+            graph = graph_store.ensure(project_id)
+            graph_replay = False
+            if body.decision == "confirm":
+                try:
+                    graph = graph_store.append(
+                        project_id,
+                        expected_version=body.expected_graph_version,
+                        idempotency_key=body.idempotency_key,
+                        semantic_digest=semantic_digest,
+                        events=_scene_ownership_confirmation_events(
+                            graph,
+                            revision,
+                            scene,
+                            member,
+                            reviewed_relationship,
+                            project_id=project_id,
+                        ),
+                    )
+                    graph_replay = bool(graph.get("idempotent_replay"))
+                except GraphIdempotencyConflict as exc:
+                    raise _contract_error(
+                        "scene_ownership_review_idempotency_conflict",
+                        "Idempotency key was already used for a different graph mutation.",
+                        project_id=project_id,
+                        stage="scene_ownership_review",
+                        status_code=409,
+                    ) from exc
+                except GraphVersionConflict as exc:
+                    raise _contract_error(
+                        "production_graph_version_conflict",
+                        "Production Graph changed before this relationship decision was committed.",
+                        project_id=project_id,
+                        stage="scene_ownership_review",
+                        status_code=409,
+                    ) from exc
+                except ProductionGraphError as exc:
+                    raise _contract_error(
+                        "production_graph_write_rejected",
+                        "Confirmed scene ownership could not be written to Production Graph.",
+                        project_id=project_id,
+                        stage="scene_ownership_review",
+                        status_code=409,
+                    ) from exc
+            elif graph.get("version") != body.expected_graph_version:
+                raise _contract_error(
+                    "production_graph_version_conflict",
+                    "Production Graph changed before this relationship decision was committed.",
+                    project_id=project_id,
+                    stage="scene_ownership_review",
+                    status_code=409,
+                )
+
+            decision, receipt = _apply_scene_ownership_review(
+                state,
+                project_id=project_id,
+                relationship=relationship,
+                reviewed_relationship=reviewed_relationship,
+                body=body,
+                semantic_digest=semantic_digest,
+                graph=graph,
+                graph_idempotent_replay=graph_replay,
+                decided_at=decided_at,
+            )
+            _append_audit(
+                state,
+                {
+                    "event_type": "scene_ownership_relationship_reviewed",
+                    "revision_id": revision_id,
+                    "relationship_id": relationship_id,
+                    "relationship_version_id": reviewed_relationship["version_id"],
+                    "review_decision_id": decision["review_decision_id"],
+                    "decision": decision["decision"],
+                },
+            )
+            _write_state(store, project_id, state)
+        return _scene_ownership_review_response(
+            project_id,
+            reviewed_relationship,
+            decision,
+            receipt,
+            graph,
+            idempotent_replay=False,
+            graph_idempotent_replay=graph_replay,
+        )
 
     @app.post(
         "/projects/{project_id}/script-revisions/{revision_id}/analysis-assets/{asset_id}/review"
@@ -492,6 +758,11 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 reviewed_asset=reviewed_asset,
                 decided_at=decided_at,
             )
+            _expire_relationships(
+                state,
+                _active_relationships(state, asset_id=asset_id),
+                reason=f"endpoint_asset_{decision['decision']}",
+            )
             _append_audit(
                 state,
                 {
@@ -553,7 +824,24 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     "remote_dispatch_count": 0,
                 }
             preview = _preview_core_asset_command(state, project_id, body)
+            target_relationships = _active_relationships(
+                state,
+                asset_id=str((preview.get("after") or {}).get("asset_id") or ""),
+            )
+            _remove_confirmed_relationships_from_graph(
+                graph_store,
+                state,
+                project_id=project_id,
+                relationships=[item for item in target_relationships if item.get("status") == "confirmed"],
+                idempotency_key=f"scene-ownership-asset-change:{preview['command_id']}",
+                stage="core_asset_command_confirm",
+            )
             receipt = _apply_core_asset_command(state, project_id, body, preview)
+            _expire_relationships(
+                state,
+                target_relationships,
+                reason="endpoint_asset_changed",
+            )
             _append_audit(
                 state,
                 {
@@ -601,7 +889,22 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     stage="core_asset_command_undo",
                     status_code=409,
                 )
+            asset_id = str((receipt.get("after") or {}).get("asset_id") or "")
+            active_relationships = _active_relationships(state, asset_id=asset_id)
+            _remove_confirmed_relationships_from_graph(
+                graph_store,
+                state,
+                project_id=project_id,
+                relationships=[item for item in active_relationships if item.get("status") == "confirmed"],
+                idempotency_key=f"scene-ownership-asset-undo:{body.receipt_id}",
+                stage="core_asset_command_undo",
+            )
             undo_receipt = _apply_undo(state, receipt)
+            _expire_relationships(
+                state,
+                active_relationships,
+                reason="endpoint_asset_command_undone",
+            )
             _append_audit(
                 state,
                 {
@@ -630,6 +933,7 @@ def public_projection(state: dict[str, Any]) -> dict[str, Any]:
     revision_id = str(revision.get("revision_id") or "")
     assets = [public_asset(asset) for asset in _analysis_assets_for_revision(state, revision_id)]
     candidate = _current_candidate(state, revision)
+    relationships = _relationships_for_revision(state, revision_id)
     counts = {
         "characters": sum(1 for item in assets if item["asset_type"] == "character" and item["status"] != "retired"),
         "main_scenes": sum(1 for item in assets if item["asset_type"] == "main_scene" and item["status"] != "retired"),
@@ -655,6 +959,7 @@ def public_projection(state: dict[str, Any]) -> dict[str, Any]:
         "asset_counts": counts,
         "analysis_state": str(revision.get("analysis_state") or "analysis_required") if revision else "analysis_required",
         "analysis_candidate": public_candidate(candidate) if candidate else None,
+        "scene_ownership_relationships": [public_relationship(item) for item in relationships],
         "narrative_fields": {
             "style": str(candidate.get("style") or "") if candidate else "",
             "genre": str(candidate.get("genre") or "") if candidate else "",
@@ -791,6 +1096,7 @@ def public_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         "storyboard_write": False,
         "review_decision_id": str(receipt.get("review_decision_id") or ""),
         "asset_version_id": str(receipt.get("asset_version_id") or ""),
+        "relationship_version_id": str(receipt.get("relationship_version_id") or ""),
         "production_graph_node_id": str(receipt.get("production_graph_node_id") or ""),
         "production_graph_version": int(receipt.get("production_graph_version") or 0),
         "provider_dispatch_count": 0,
@@ -812,6 +1118,78 @@ def public_review_decision(decision: dict[str, Any]) -> dict[str, Any]:
         "reason": str(decision.get("reason") or ""),
         "decided_at": str(decision.get("decided_at") or ""),
         "production_graph_node_id": str(decision.get("production_graph_node_id") or ""),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def public_relationship(relationship: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "artifact_type": str(relationship.get("artifact_type") or "afs_scene_ownership_relationship"),
+        "schema_version": str(relationship.get("schema_version") or SCENE_OWNERSHIP_SCHEMA_VERSION),
+        "relationship_id": str(relationship.get("relationship_id") or ""),
+        "relation_type": str(relationship.get("relation_type") or ""),
+        "project_id": str(relationship.get("project_id") or ""),
+        "revision_id": str(relationship.get("revision_id") or ""),
+        "source_digest": str(relationship.get("source_digest") or ""),
+        "source_candidate_id": str(relationship.get("source_candidate_id") or ""),
+        "scene_asset_id": str(relationship.get("scene_asset_id") or ""),
+        "member_asset_id": str(relationship.get("member_asset_id") or ""),
+        "scene_asset_version_id": str(relationship.get("scene_asset_version_id") or ""),
+        "member_asset_version_id": str(relationship.get("member_asset_version_id") or ""),
+        "status": str(relationship.get("status") or "missing"),
+        "evidence_status": str(relationship.get("evidence_status") or "missing"),
+        "evidence_spans": list(relationship.get("evidence_spans") or []),
+        "extraction_method": str(relationship.get("extraction_method") or "exact_scene_block_match"),
+        "lineage": dict(relationship.get("lineage") or {}),
+        "version": int(relationship.get("version") or 1),
+        "version_id": str(relationship.get("version_id") or ""),
+        "parent_version_id": str(relationship.get("parent_version_id") or ""),
+        "review_decision_id": str(relationship.get("review_decision_id") or ""),
+        "created_at": str(relationship.get("created_at") or ""),
+        "updated_at": str(relationship.get("updated_at") or ""),
+        "expired_at": str(relationship.get("expired_at") or ""),
+        "superseded_by_revision_id": str(relationship.get("superseded_by_revision_id") or ""),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def public_relationship_review_decision(decision: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "review_decision_id": str(decision.get("review_decision_id") or ""),
+        "project_id": str(decision.get("project_id") or ""),
+        "revision_id": str(decision.get("revision_id") or ""),
+        "source_digest": str(decision.get("source_digest") or ""),
+        "relationship_id": str(decision.get("relationship_id") or ""),
+        "target_relationship_version_id": str(decision.get("target_relationship_version_id") or ""),
+        "result_relationship_version_id": str(decision.get("result_relationship_version_id") or ""),
+        "decision": str(decision.get("decision") or ""),
+        "reason": str(decision.get("reason") or ""),
+        "decided_at": str(decision.get("decided_at") or ""),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def _scene_ownership_review_response(
+    project_id: str,
+    relationship: dict[str, Any],
+    decision: dict[str, Any],
+    receipt: dict[str, Any],
+    graph: dict[str, Any],
+    *,
+    idempotent_replay: bool,
+    graph_idempotent_replay: bool,
+) -> dict[str, Any]:
+    return {
+        "project_id": project_id,
+        "relationship": public_relationship(relationship),
+        "review_decision": public_relationship_review_decision(decision),
+        "receipt": public_receipt(receipt),
+        "graph": graph,
+        "idempotent_replay": idempotent_replay,
+        "graph_idempotent_replay": graph_idempotent_replay,
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -850,6 +1228,244 @@ def _analysis_review_digest(
     payload["route_revision_id"] = revision_id
     payload["asset_id"] = asset_id
     return canonical_digest(payload)
+
+
+def _scene_ownership_review_digest(
+    body: SceneOwnershipReviewRequest,
+    revision_id: str,
+    relationship_id: str,
+) -> str:
+    payload = body.model_dump(mode="json", exclude={"expected_graph_version"})
+    payload["route_revision_id"] = revision_id
+    payload["relationship_id"] = relationship_id
+    return canonical_digest(payload)
+
+
+def _relationship_review_receipt_for_key(state: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
+    for receipt in (state.get("relationship_review_receipts") or {}).values():
+        if receipt.get("idempotency_key") == idempotency_key:
+            return dict(receipt)
+    return {}
+
+
+def _require_reviewable_relationship(
+    state: dict[str, Any],
+    relationship: dict[str, Any],
+    *,
+    relationship_id: str,
+    body: SceneOwnershipReviewRequest,
+    project_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if (
+        not relationship
+        or relationship.get("relationship_id") != relationship_id
+        or relationship.get("project_id") != project_id
+        or relationship.get("revision_id") != body.revision_id
+        or relationship.get("source_digest") != body.source_digest
+    ):
+        raise _contract_error(
+            "scene_ownership_relationship_not_found",
+            "Relationship does not belong to this exact project and script revision.",
+            project_id=project_id,
+            stage="scene_ownership_review",
+            status_code=404,
+        )
+    if relationship.get("status") == "missing" or relationship.get("evidence_status") != "extracted_from_text":
+        if body.decision == "confirm":
+            raise _contract_error(
+                "scene_ownership_evidence_missing",
+                "A scene relationship cannot be confirmed without exact source-text evidence.",
+                project_id=project_id,
+                stage="scene_ownership_review",
+                status_code=409,
+            )
+    if relationship.get("status") not in {"candidate", "missing"}:
+        raise _contract_error(
+            "scene_ownership_relationship_already_reviewed",
+            "Relationship has already reached a final or expired review state.",
+            project_id=project_id,
+            stage="scene_ownership_review",
+            status_code=409,
+        )
+    if (
+        int(relationship.get("version") or 1) != body.expected_relationship_version
+        or str(relationship.get("version_id") or "") != body.relationship_version_id
+    ):
+        raise _contract_error(
+            "scene_ownership_relationship_version_conflict",
+            "Relationship changed before this review decision was committed.",
+            project_id=project_id,
+            stage="scene_ownership_review",
+            status_code=409,
+        )
+    scene = dict((state.get("assets") or {}).get(relationship.get("scene_asset_id")) or {})
+    member = dict((state.get("assets") or {}).get(relationship.get("member_asset_id")) or {})
+    for endpoint, expected_type, version_field in (
+        (scene, "main_scene", "scene_asset_version_id"),
+        (member, None, "member_asset_version_id"),
+    ):
+        if (
+            not endpoint
+            or endpoint.get("project_id") != project_id
+            or endpoint.get("revision_id") != body.revision_id
+            or endpoint.get("source_digest") != body.source_digest
+            or endpoint.get("status") != "confirmed"
+            or endpoint.get("version_id") != relationship.get(version_field)
+            or (expected_type and endpoint.get("asset_type") != expected_type)
+        ):
+            raise _contract_error(
+                "scene_ownership_endpoint_not_authoritative",
+                "Both relationship endpoints must be current confirmed assets for the exact revision.",
+                project_id=project_id,
+                stage="scene_ownership_review",
+                status_code=409,
+            )
+    if member.get("asset_type") not in {"character", "prop"}:
+        raise _contract_error(
+            "scene_ownership_endpoint_type_invalid",
+            "Scene ownership members must be character or prop assets.",
+            project_id=project_id,
+            stage="scene_ownership_review",
+            status_code=409,
+        )
+    return scene, member
+
+
+def _graph_node_for_authoritative_asset(asset: dict[str, Any], revision: dict[str, Any]) -> dict[str, Any]:
+    asset_type = str(asset.get("asset_type") or "")
+    category = "scene" if asset_type == "main_scene" else asset_type
+    return {
+        "type": "node_upserted",
+        "node": {
+            "node_id": str(asset["asset_id"]),
+            "category": category,
+            "metadata": {
+                "kind": "script_core_asset",
+                "asset_type": asset_type,
+                "display_name": asset.get("display_name") or asset.get("name") or "",
+                "source_revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+                "asset_version_id": asset["version_id"],
+                "lineage": dict(asset.get("lineage") or {}),
+            },
+        },
+    }
+
+
+def _scene_ownership_confirmation_events(
+    graph: dict[str, Any],
+    revision: dict[str, Any],
+    scene: dict[str, Any],
+    member: dict[str, Any],
+    relationship: dict[str, Any],
+    *,
+    project_id: str,
+) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for endpoint in (scene, member):
+        node_id = str(endpoint["asset_id"])
+        node = dict((graph.get("nodes") or {}).get(node_id) or {})
+        if not node:
+            events.append(_graph_node_for_authoritative_asset(endpoint, revision))
+            continue
+        metadata = dict(node.get("metadata") or {})
+        if node.get("state") != "active" or metadata.get("asset_version_id") != endpoint.get("version_id"):
+            raise _contract_error(
+                "scene_ownership_endpoint_graph_mismatch",
+                "Confirmed relationship endpoint is not the current active Production Graph asset node.",
+                project_id=project_id,
+                stage="scene_ownership_review",
+                status_code=409,
+            )
+    events.append(
+        {
+            "type": "relation_upserted",
+            "from_id": scene["asset_id"],
+            "to_id": member["asset_id"],
+            "relation_type": relationship["relation_type"],
+        }
+    )
+    return events
+
+
+def _reviewed_relationship_version(
+    relationship: dict[str, Any],
+    *,
+    body: SceneOwnershipReviewRequest,
+    semantic_digest: str,
+    decided_at: str,
+) -> dict[str, Any]:
+    return _new_relationship_version(
+        {
+            **relationship,
+            "status": "confirmed" if body.decision == "confirm" else "rejected",
+            "review_decision_id": f"relreview_{semantic_digest[:20]}",
+            "updated_at": decided_at,
+        },
+        parent=relationship,
+    )
+
+
+def _apply_scene_ownership_review(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    relationship: dict[str, Any],
+    reviewed_relationship: dict[str, Any],
+    body: SceneOwnershipReviewRequest,
+    semantic_digest: str,
+    graph: dict[str, Any],
+    graph_idempotent_replay: bool,
+    decided_at: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    decision_id = f"relreview_{semantic_digest[:20]}"
+    result_status = "confirmed" if body.decision == "confirm" else "rejected"
+    decision = {
+        "review_decision_id": decision_id,
+        "project_id": project_id,
+        "revision_id": body.revision_id,
+        "source_digest": body.source_digest,
+        "relationship_id": relationship["relationship_id"],
+        "target_relationship_version_id": relationship["version_id"],
+        "result_relationship_version_id": reviewed_relationship["version_id"],
+        "decision": result_status,
+        "reason": str(body.reason or ""),
+        "decided_at": decided_at,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    receipt_id = f"receipt_{_sha256_json({'project_id': project_id, 'key': body.idempotency_key, 'semantic': semantic_digest})[:20]}"
+    receipt = {
+        "receipt_id": receipt_id,
+        "command_id": f"relreviewcmd_{semantic_digest[:20]}",
+        "command_type": f"scene_ownership.{body.decision}",
+        "status": "executed",
+        "summary": f"Scene ownership review recorded as {result_status}.",
+        "executed_at": decided_at,
+        "project_id": project_id,
+        "revision_id": body.revision_id,
+        "source_digest": body.source_digest,
+        "semantic_digest": semantic_digest,
+        "idempotency_key": body.idempotency_key,
+        "review_decision_id": decision_id,
+        "relationship_version_id": reviewed_relationship["version_id"],
+        "affected_asset_ids": [relationship["scene_asset_id"], relationship["member_asset_id"]],
+        "production_graph_node_id": relationship["scene_asset_id"] if body.decision == "confirm" else "",
+        "production_graph_version": int(graph.get("version") or 0),
+        "production_graph_digest": str(graph.get("graph_digest") or ""),
+        "graph_idempotent_replay": graph_idempotent_replay,
+        "undo_available": False,
+        "storyboard_write": False,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    state.setdefault("relationships", {})[relationship["relationship_id"]] = reviewed_relationship
+    _record_relationship_version(state, reviewed_relationship)
+    state.setdefault("relationship_review_decisions", {})[decision_id] = decision
+    state.setdefault("relationship_review_receipts", {})[receipt_id] = receipt
+    reject_unsafe_payload(decision)
+    reject_unsafe_payload(receipt)
+    return decision, receipt
 
 
 def _review_receipt_for_key(state: dict[str, Any], idempotency_key: str) -> dict[str, Any]:
@@ -1340,6 +1956,225 @@ def _preserve_asset_identity(
     else:
         affected.append(str(previous["asset_id"]))
     return merged
+
+
+def _extract_scene_ownership(
+    state: dict[str, Any],
+    revision: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    revision_id = str(revision["revision_id"])
+    source_text = str(revision.get("source_text") or "")
+    assets = [
+        item
+        for item in _analysis_assets_for_revision(state, revision_id)
+        if item.get("status") in {"candidate", "modified", "confirmed", "pending_confirmation"}
+    ]
+    scenes = sorted(
+        (item for item in assets if item.get("asset_type") == "main_scene"),
+        key=_scene_start,
+    )
+    members = [item for item in assets if item.get("asset_type") in {"character", "prop"}]
+    existing = dict(state.get("relationships") or {})
+    relationships: list[dict[str, Any]] = []
+    affected: list[str] = []
+    preserved: list[str] = []
+    now = _server_now()
+    for index, scene in enumerate(scenes):
+        scene_start = _scene_start(scene)
+        end = _scene_start(scenes[index + 1]) if index + 1 < len(scenes) else len(source_text)
+        start = _scene_content_start(source_text, scene, end)
+        if scene_start < 0 or end <= start:
+            continue
+        for member in members:
+            evidence_spans = _member_spans_in_scene_block(source_text, start, end, member)
+            relation_type = "scene_cast" if member.get("asset_type") == "character" else "scene_core_prop"
+            identity = {
+                "project_id": revision["project_id"],
+                "revision_id": revision_id,
+                "relation_type": relation_type,
+                "scene_asset_id": scene["asset_id"],
+                "member_asset_id": member["asset_id"],
+            }
+            relationship_id = f"rel_{_sha256_json(identity)[:20]}"
+            status = "candidate" if evidence_spans else "missing"
+            relationship = {
+                "artifact_type": "afs_scene_ownership_relationship",
+                "schema_version": SCENE_OWNERSHIP_SCHEMA_VERSION,
+                "relationship_id": relationship_id,
+                "relation_type": relation_type,
+                "project_id": revision["project_id"],
+                "revision_id": revision_id,
+                "source_digest": revision["source_digest"],
+                "source_candidate_id": str(revision.get("analysis_candidate_id") or ""),
+                "scene_asset_id": scene["asset_id"],
+                "member_asset_id": member["asset_id"],
+                "scene_asset_version_id": scene["version_id"],
+                "member_asset_version_id": member["version_id"],
+                "status": status,
+                "evidence_status": "extracted_from_text" if evidence_spans else "missing",
+                "evidence_spans": evidence_spans,
+                "extraction_method": "exact_scene_block_match",
+                "lineage": {
+                    "source_revision_id": revision_id,
+                    "source_digest": revision["source_digest"],
+                    "source_candidate_id": str(revision.get("analysis_candidate_id") or ""),
+                    "scene_asset_id": scene["asset_id"],
+                    "scene_asset_version_id": scene["version_id"],
+                    "member_asset_id": member["asset_id"],
+                    "member_asset_version_id": member["version_id"],
+                    "evidence_policy": "exact_member_label_or_alias_within_confirmed_scene_span",
+                    "extraction_method": "exact_scene_block_match",
+                },
+                "created_at": now,
+                "updated_at": now,
+                "provider_dispatch_count": 0,
+                "remote_dispatch_count": 0,
+            }
+            prior = dict(existing.get(relationship_id) or {})
+            if prior and _relationship_extraction_content(prior) == _relationship_extraction_content(relationship):
+                relationship = prior
+                preserved.append(relationship_id)
+            else:
+                relationship = _new_relationship_version(relationship, parent=prior or None)
+                affected.append(relationship_id)
+            state.setdefault("relationships", {})[relationship_id] = relationship
+            _record_relationship_version(state, relationship)
+            relationships.append(relationship)
+    return relationships, _unique(affected), _unique(preserved)
+
+
+def _scene_start(scene: dict[str, Any]) -> int:
+    starts = [
+        int(span.get("start"))
+        for span in (scene.get("evidence_spans") or [])
+        if isinstance(span, dict) and isinstance(span.get("start"), int)
+    ]
+    return min(starts) if starts else -1
+
+
+def _scene_content_start(source_text: str, scene: dict[str, Any], scene_end: int) -> int:
+    evidence_ends = [
+        int(span.get("end"))
+        for span in (scene.get("evidence_spans") or [])
+        if isinstance(span, dict) and isinstance(span.get("end"), int)
+    ]
+    if not evidence_ends:
+        return scene_end
+    heading_evidence_end = max(evidence_ends)
+    line_end = source_text.find("\n", heading_evidence_end, scene_end)
+    return scene_end if line_end < 0 else line_end + 1
+
+
+def _member_spans_in_scene_block(
+    source_text: str,
+    start: int,
+    end: int,
+    member: dict[str, Any],
+) -> list[dict[str, Any]]:
+    labels = _clean_text_list(
+        [
+            str(member.get("display_name") or member.get("name") or ""),
+            *[str(item) for item in (member.get("aliases") or [])],
+        ]
+    )
+    spans: list[dict[str, Any]] = []
+    block = source_text[start:end]
+    seen: set[tuple[int, int]] = set()
+    for label in labels:
+        pattern = re.compile(rf"(?<!\w){re.escape(label)}(?!\w)", re.IGNORECASE)
+        for match in pattern.finditer(block):
+            absolute_start = start + match.start()
+            absolute_end = start + match.end()
+            identity = (absolute_start, absolute_end)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            spans.append(
+                {
+                    "start": absolute_start,
+                    "end": absolute_end,
+                    "quote": source_text[absolute_start:absolute_end],
+                }
+            )
+    return sorted(spans, key=lambda item: (item["start"], item["end"]))[:12]
+
+
+def _relationship_extraction_content(relationship: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "relation_type": relationship.get("relation_type"),
+        "project_id": relationship.get("project_id"),
+        "revision_id": relationship.get("revision_id"),
+        "source_digest": relationship.get("source_digest"),
+        "source_candidate_id": relationship.get("source_candidate_id"),
+        "scene_asset_id": relationship.get("scene_asset_id"),
+        "member_asset_id": relationship.get("member_asset_id"),
+        "scene_asset_version_id": relationship.get("scene_asset_version_id"),
+        "member_asset_version_id": relationship.get("member_asset_version_id"),
+        "evidence_status": relationship.get("evidence_status"),
+        "evidence_spans": list(relationship.get("evidence_spans") or []),
+        "extraction_method": relationship.get("extraction_method"),
+    }
+
+
+def _new_relationship_version(
+    relationship: dict[str, Any],
+    *,
+    parent: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = dict(relationship)
+    payload.pop("version", None)
+    payload.pop("version_id", None)
+    payload.pop("parent_version_id", None)
+    version = int((parent or {}).get("version") or 0) + 1
+    parent_version_id = str((parent or {}).get("version_id") or "")
+    identity = {
+        "relationship_id": payload.get("relationship_id"),
+        "version": version,
+        "parent_version_id": parent_version_id,
+        "content": {
+            **_relationship_extraction_content(payload),
+            "status": payload.get("status"),
+            "review_decision_id": payload.get("review_decision_id", ""),
+        },
+    }
+    payload["version"] = version
+    payload["parent_version_id"] = parent_version_id
+    payload["version_id"] = f"relver_{_sha256_json(identity)[:20]}"
+    reject_unsafe_payload(payload)
+    return payload
+
+
+def _record_relationship_version(state: dict[str, Any], relationship: dict[str, Any]) -> None:
+    relationship_id = str(relationship.get("relationship_id") or "")
+    version_id = str(relationship.get("version_id") or "")
+    if not relationship_id or not version_id:
+        return
+    history = state.setdefault("relationship_versions", {}).setdefault(relationship_id, [])
+    if not any(str(item.get("version_id") or "") == version_id for item in history):
+        history.append(dict(relationship))
+
+
+def _relationship_version_by_id(
+    state: dict[str, Any],
+    relationship_id: str,
+    version_id: str,
+) -> dict[str, Any]:
+    for item in (state.get("relationship_versions") or {}).get(relationship_id, []):
+        if str(item.get("version_id") or "") == version_id:
+            return dict(item)
+    current = dict((state.get("relationships") or {}).get(relationship_id) or {})
+    return current if str(current.get("version_id") or "") == version_id else {}
+
+
+def _relationships_for_revision(state: dict[str, Any], revision_id: str) -> list[dict[str, Any]]:
+    return sorted(
+        (
+            dict(item)
+            for item in (state.get("relationships") or {}).values()
+            if str(item.get("revision_id") or "") == revision_id
+        ),
+        key=lambda item: (str(item.get("created_at") or ""), str(item.get("relationship_id") or "")),
+    )
 
 
 def _core_command_digest(body: CoreAssetCommandRequest) -> str:
@@ -1889,6 +2724,181 @@ def _expire_open_analysis(state: dict[str, Any], *, superseded_by_revision_id: s
         revision_id = str(asset.get("revision_id") or "")
         if revision_id in (state.get("revisions") or {}):
             state["revisions"][revision_id]["analysis_state"] = "expired"
+    for relationship_id, raw in list((state.get("relationships") or {}).items()):
+        relationship = dict(raw or {})
+        if relationship.get("status") == "expired":
+            continue
+        expired = _new_relationship_version(
+            {
+                **relationship,
+                "status": "expired",
+                "expired_at": now,
+                "superseded_by_revision_id": superseded_by_revision_id,
+                "updated_at": now,
+            },
+            parent=relationship,
+        )
+        state["relationships"][relationship_id] = expired
+        _record_relationship_version(state, expired)
+
+
+def _confirmed_relationships(
+    state: dict[str, Any],
+    *,
+    asset_id: str = "",
+) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in (state.get("relationships") or {}).values()
+        if item.get("status") == "confirmed"
+        and (
+            not asset_id
+            or asset_id in {str(item.get("scene_asset_id") or ""), str(item.get("member_asset_id") or "")}
+        )
+    ]
+
+
+def _active_relationships(
+    state: dict[str, Any],
+    *,
+    asset_id: str = "",
+) -> list[dict[str, Any]]:
+    return [
+        dict(item)
+        for item in (state.get("relationships") or {}).values()
+        if item.get("status") != "expired"
+        and (
+            not asset_id
+            or asset_id in {str(item.get("scene_asset_id") or ""), str(item.get("member_asset_id") or "")}
+        )
+    ]
+
+
+def _remove_confirmed_relationships_from_graph(
+    graph_store: ProductionGraphStore,
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    relationships: list[dict[str, Any]],
+    idempotency_key: str,
+    stage: str,
+) -> None:
+    if not relationships:
+        return
+    ordered = sorted(relationships, key=lambda item: str(item.get("relationship_id") or ""))
+    events = [
+        {
+            "type": "relation_removed",
+            "from_id": item["scene_asset_id"],
+            "to_id": item["member_asset_id"],
+            "relation_type": item["relation_type"],
+        }
+        for item in ordered
+    ]
+    semantic_digest = canonical_digest(
+        {
+            "operation": "expire_scene_ownership",
+            "relationships": [
+                {
+                    "relationship_id": item["relationship_id"],
+                    "version_id": item["version_id"],
+                    "relation_type": item["relation_type"],
+                    "scene_asset_id": item["scene_asset_id"],
+                    "member_asset_id": item["member_asset_id"],
+                }
+                for item in ordered
+            ],
+        }
+    )
+    graph = graph_store.ensure(project_id)
+    try:
+        graph_store.append(
+            project_id,
+            expected_version=int(graph.get("version") or 0),
+            idempotency_key=idempotency_key,
+            semantic_digest=semantic_digest,
+            events=events,
+        )
+    except GraphIdempotencyConflict as exc:
+        raise _contract_error(
+            "scene_ownership_invalidation_idempotency_conflict",
+            "Relationship invalidation key was already used for different endpoints.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
+    except GraphVersionConflict as exc:
+        raise _contract_error(
+            "production_graph_version_conflict",
+            "Production Graph changed before relationship invalidation committed.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
+    except ProductionGraphError as exc:
+        raise _contract_error(
+            "production_graph_write_rejected",
+            "Stale scene ownership could not be removed from Production Graph.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
+
+
+def _expire_relationships(
+    state: dict[str, Any],
+    relationships: list[dict[str, Any]],
+    *,
+    reason: str,
+) -> None:
+    now = _server_now()
+    for relationship in relationships:
+        relationship_id = str(relationship.get("relationship_id") or "")
+        current = dict((state.get("relationships") or {}).get(relationship_id) or {})
+        if not current or current.get("status") == "expired":
+            continue
+        expired = _new_relationship_version(
+            {
+                **current,
+                "status": "expired",
+                "expired_at": now,
+                "expiration_reason": reason,
+                "updated_at": now,
+            },
+            parent=current,
+        )
+        state["relationships"][relationship_id] = expired
+        _record_relationship_version(state, expired)
+
+
+def _invalidate_stale_relationships_after_asset_change(
+    graph_store: ProductionGraphStore,
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    idempotency_key: str,
+    stage: str,
+) -> None:
+    stale: list[dict[str, Any]] = []
+    for relationship in _active_relationships(state):
+        scene = dict((state.get("assets") or {}).get(relationship.get("scene_asset_id")) or {})
+        member = dict((state.get("assets") or {}).get(relationship.get("member_asset_id")) or {})
+        if (
+            scene.get("status") != "confirmed"
+            or member.get("status") != "confirmed"
+            or scene.get("version_id") != relationship.get("scene_asset_version_id")
+            or member.get("version_id") != relationship.get("member_asset_version_id")
+        ):
+            stale.append(relationship)
+    _remove_confirmed_relationships_from_graph(
+        graph_store,
+        state,
+        project_id=project_id,
+        relationships=[item for item in stale if item.get("status") == "confirmed"],
+        idempotency_key=idempotency_key,
+        stage=stage,
+    )
+    _expire_relationships(state, stale, reason="endpoint_asset_reextracted")
 
 
 def _asset_preservation_key(asset: dict[str, Any]) -> str:
@@ -1930,6 +2940,10 @@ def _empty_state(project_id: str) -> dict[str, Any]:
         "asset_versions": {},
         "review_decisions": {},
         "review_receipts": {},
+        "relationships": {},
+        "relationship_versions": {},
+        "relationship_review_decisions": {},
+        "relationship_review_receipts": {},
         "receipts": {},
         "audit_history": [],
         "created_at": now,
@@ -1949,6 +2963,10 @@ def _normalized_state(state: dict[str, Any], project_id: str) -> dict[str, Any]:
         "asset_versions",
         "review_decisions",
         "review_receipts",
+        "relationships",
+        "relationship_versions",
+        "relationship_review_decisions",
+        "relationship_review_receipts",
         "receipts",
     ):
         if not isinstance(payload.get(key), dict):
@@ -2103,6 +3121,8 @@ __all__ = (
     "ANALYSIS_CANDIDATE_SCHEMA_VERSION",
     "ANALYSIS_REVIEW_SCHEMA_VERSION",
     "CORE_ASSET_COMMAND_SCHEMA_VERSION",
+    "SCENE_OWNERSHIP_REVIEW_SCHEMA_VERSION",
+    "SCENE_OWNERSHIP_SCHEMA_VERSION",
     "SCRIPT_REVISION_SCHEMA_VERSION",
     "SCRIPT_TRUTH_SCHEMA_VERSION",
     "public_projection",
