@@ -46,6 +46,11 @@ import {
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
 import { prepareEmbeddedShotBreakdown, startEmbeddedCreativeAction } from "./embedded-creative-actions.js";
 import { applyScriptCoreTruthProjection } from "./script-core-truth-projection.js";
+import {
+  buildCandidateFactsReviewPanel,
+  candidateReviewBinding,
+  probeCandidateReviewAvailable,
+} from "./panels/candidate-facts-review.js";
 
 export function createProductShell(options = {}) {
   let locale = currentLocale();
@@ -99,6 +104,11 @@ export function createProductShell(options = {}) {
   let videoAdmissionPendingCommand = "";
   let videoAdmissionMediaState = "idle";
   let videoAdmissionSetup = null;
+  let candidateReviewAvailable = false;
+  let candidateReview = null;
+  let candidateReviewError = "";
+  let candidateReviewBusy = false;
+  let candidateReviewProbedProjectId = "";
   const agentChatContexts = createAgentChatContextStore();
   let snapshot = {
     loading: true,
@@ -1276,6 +1286,15 @@ export function createProductShell(options = {}) {
     header.append(title, headerActions);
     main.appendChild(header);
     main.appendChild(assetBibleStatusBar(view, source));
+    if (candidateReviewAvailable) {
+      main.appendChild(buildCandidateFactsReviewPanel({
+        review: candidateReview,
+        busy: candidateReviewBusy,
+        error: candidateReviewError,
+        onRefresh: () => void refreshCandidateFactReview(),
+        onAction: (action, item, extras = {}) => void applyCandidateFactReviewAction(action, item, extras),
+      }));
+    }
     if (view.counts.total) main.appendChild(assetBibleQualityGate(view));
     if (view.counts.total) main.appendChild(assetBibleArtDirection(view));
     if (imageAdmissionOpen || imageAdmissionView().status !== "empty") {
@@ -4773,14 +4792,103 @@ export function createProductShell(options = {}) {
 
   function currentScriptTruthBinding() {
     const projection = snapshot.studioState?.production?.script_core_truth_projection || {};
+    const projected = currentScriptTruthNode();
+    const nodeBinding = projected?.params?.scriptRevision || {};
     return {
-      revision_id: String(projection.current_revision_id || ""),
+      revision_id: String(
+        projection.current_revision_id
+        || nodeBinding.revision_id
+        || "",
+      ),
       source_digest: String(
         projection.source_digest
         || projection.current_revision?.source_digest
+        || nodeBinding.source_digest
         || "",
       ),
     };
+  }
+
+  function resolveCandidateReviewBinding() {
+    return candidateReviewBinding(candidateReview, currentScriptTruthBinding());
+  }
+
+  async function refreshCandidateFactReview() {
+    const runtime = options.getRuntime?.();
+    if (!runtime?.refreshCandidateFactReview || candidateReviewBusy) return;
+    const binding = resolveCandidateReviewBinding();
+    if (!binding.revision_id || binding.source_digest.length < 64) {
+      candidateReviewError = "请先在画布保存剧本修订，再刷新候选。";
+      render();
+      return;
+    }
+    candidateReviewBusy = true;
+    candidateReviewError = "";
+    render();
+    try {
+      const response = await runtime.refreshCandidateFactReview({
+        source_revision_id: binding.revision_id,
+        source_revision_digest: binding.source_digest,
+        ...(snapshot.project?.name || snapshot.project?.title
+          ? { title_hint: String(snapshot.project?.name || snapshot.project?.title).slice(0, 200) }
+          : {}),
+      });
+      candidateReview = response;
+      candidateReviewAvailable = true;
+      candidateReviewError = "";
+    } catch (error) {
+      candidateReviewError = options.formatError?.(error) || error?.message || "刷新候选失败";
+    } finally {
+      candidateReviewBusy = false;
+      render();
+    }
+  }
+
+  async function applyCandidateFactReviewAction(action, item, extras = {}) {
+    const runtime = options.getRuntime?.();
+    if (!runtime?.applyCandidateFactAction || candidateReviewBusy || !item?.fact_id) return;
+    const binding = resolveCandidateReviewBinding();
+    const revisionId = String(item.source_revision_id || binding.revision_id || "").trim();
+    const digest = String(item.source_revision_digest || binding.source_digest || "").trim();
+    if (!revisionId || digest.length < 64) {
+      candidateReviewError = "缺少剧本修订绑定，无法确认或拒绝。";
+      render();
+      return;
+    }
+    if (action === "edit_confirm" && !String(extras.new_text || "").trim()) {
+      candidateReviewError = "改写确认需要填写新文本。";
+      render();
+      return;
+    }
+    candidateReviewBusy = true;
+    candidateReviewError = "";
+    render();
+    try {
+      const payload = {
+        action,
+        fact_id: String(item.fact_id),
+        source_revision_id: revisionId,
+        source_revision_digest: digest,
+      };
+      if (action === "edit_confirm") payload.new_text = String(extras.new_text || "").trim();
+      const response = await runtime.applyCandidateFactAction(payload);
+      if (response?.bundle) {
+        candidateReview = {
+          ...(candidateReview || {}),
+          enabled: true,
+          bundle: response.bundle,
+          authoritative: response.authoritative || [],
+        };
+      } else {
+        candidateReview = await runtime.getCandidateFactReview({ source_revision_id: revisionId });
+      }
+      candidateReviewError = "";
+    } catch (error) {
+      candidateReviewError = options.formatError?.(error) || error?.message || "候选操作失败";
+    } finally {
+      candidateReviewBusy = false;
+      render();
+    }
   }
 
   function currentScriptTruthSourceText() {
@@ -5220,6 +5328,23 @@ export function createProductShell(options = {}) {
         if (stopIfStale(activeProjectId)) return;
         try { mediaGates = (await projectRuntime?.health?.())?.["pro" + "vider_gates"] || {}; } catch { mediaGates = {}; }
         if (stopIfStale(activeProjectId)) return;
+        try {
+          const probed = await probeCandidateReviewAvailable(projectRuntime);
+          if (stopIfStale(activeProjectId)) return;
+          candidateReviewProbedProjectId = activeProjectId;
+          candidateReviewAvailable = probed.available === true;
+          candidateReview = probed.available ? probed.review : null;
+          candidateReviewError = "";
+        } catch {
+          candidateReviewProbedProjectId = activeProjectId;
+          candidateReviewAvailable = false;
+          candidateReview = null;
+        }
+      } else {
+        candidateReviewProbedProjectId = "";
+        candidateReviewAvailable = false;
+        candidateReview = null;
+        candidateReviewError = "";
       }
       if (stopIfStale(activeProjectId)) return;
       snapshot = {

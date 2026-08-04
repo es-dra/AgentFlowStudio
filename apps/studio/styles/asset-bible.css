@@ -814,3 +814,107 @@
   .asset-bible-row-main,
   .asset-bible-row { transition: none !important; }
 }
+
+.candidate-review-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  border: 1px solid var(--product-line);
+  padding: 12px;
+  background: var(--product-panel, #14171c);
+}
+
+.candidate-review-head {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+}
+
+.candidate-review-head strong { font-size: 15px; }
+.candidate-review-head p,
+.candidate-review-empty p,
+.candidate-review-error p {
+  margin: 0;
+  color: var(--product-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  grid-column: 1 / -1;
+}
+
+.candidate-review-head .studio-secondary-button { grid-column: 2; grid-row: 1; }
+
+.candidate-review-error {
+  border-left: 3px solid #b26d5c;
+  padding: 8px 10px;
+  background: #21191b;
+}
+
+.candidate-review-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.candidate-review-row {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--product-line-soft);
+  padding: 8px 10px;
+}
+
+.candidate-review-row.decision-accepted,
+.candidate-review-row.decision-edited_and_confirmed {
+  border-color: #2e936b;
+}
+
+.candidate-review-row.decision-rejected {
+  border-color: #8a5a52;
+  opacity: 0.85;
+}
+
+.candidate-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 10px;
+  color: var(--product-muted);
+}
+
+.candidate-review-kind,
+.candidate-review-decision {
+  color: var(--product-text, #e8eaed);
+  font-weight: 600;
+}
+
+.candidate-review-text {
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.candidate-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.candidate-review-edit {
+  display: flex;
+  flex: 1 1 220px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.candidate-review-edit-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--product-line);
+  background: #0f1216;
+  color: inherit;
+  padding: 6px 8px;
+  font: inherit;
+}
+

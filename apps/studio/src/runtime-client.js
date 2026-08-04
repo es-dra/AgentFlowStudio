@@ -613,6 +613,17 @@ export function createRuntimeClient(projectId = "") {
     confirmAssetBibleCommand(payload) {
       return requestJson(`/projects/${encoded}/m6/asset-bible/commands/confirm`, { method: "POST", payload });
     },
+    getCandidateFactReview(query = {}) {
+      const revisionId = String(query?.source_revision_id || "").trim();
+      const suffix = revisionId ? `?source_revision_id=${encodeURIComponent(revisionId)}` : "";
+      return requestJson(`/projects/${encoded}/candidate-facts/review${suffix}`);
+    },
+    refreshCandidateFactReview(payload) {
+      return requestJson(`/projects/${encoded}/candidate-facts/review/refresh`, { method: "POST", payload });
+    },
+    applyCandidateFactAction(payload) {
+      return requestJson(`/projects/${encoded}/candidate-facts/actions`, { method: "POST", payload });
+    },
     loadImageAdmission() {
       return requestJson(`/projects/${encoded}/m6/image-admission`);
     },
