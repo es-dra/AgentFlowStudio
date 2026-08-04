@@ -28,7 +28,7 @@ class CandidateReviewHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
 
-def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile(tmp_path: Path) -> None:
+def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile() -> None:
     handler = partial(CandidateReviewHandler, directory=str(REPO_ROOT))
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -48,7 +48,6 @@ def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile(tm
                 name_input = inspector.get_by_label("名称", exact=True)
                 assert name_input.input_value() == "Mira"
                 assert_review_geometry(page)
-                page.screenshot(path=str(tmp_path / "candidate-review-desktop.png"), full_page=True)
 
                 name_input.fill("Mira Vale")
                 inspector.get_by_role("button", name="保存修改", exact=True).click()
@@ -74,7 +73,6 @@ def test_candidate_review_inspector_survives_edit_and_fits_desktop_and_mobile(tm
                 inspector.get_by_title("展开右侧状态栏").click()
                 inspector.get_by_text("候选审阅", exact=True).wait_for()
                 assert_review_geometry(page)
-                page.screenshot(path=str(tmp_path / "candidate-review-mobile.png"), full_page=True)
                 assert not page.evaluate("window.__pageErrors")
             finally:
                 browser.close()
