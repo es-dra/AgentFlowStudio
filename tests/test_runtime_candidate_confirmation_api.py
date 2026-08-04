@@ -2086,3 +2086,202 @@ def test_entity_asset_binding_stale_on_revision_change_via_api(tmp_path, monkeyp
     assert rows
     assert all(row.status == "stale" for row in rows)
     assert all(row.revision_id == rev1["revision_id"] for row in rows)
+
+
+def _accept_item(client: TestClient, project_id: str, revision: dict, fact_id: str) -> dict:
+    response = client.post(
+        f"/projects/{project_id}/candidate-facts/actions",
+        json={
+            "action": "accept",
+            "fact_id": fact_id,
+            "source_revision_id": revision["revision_id"],
+            "source_revision_digest": revision["source_digest"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.parametrize("script_path", SIX_SCRIPT_PATHS, ids=lambda path: path.stem)
+def test_six_scripts_project_character_asset_requirements_from_confirmed_cast(
+    script_path: Path,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = f"proj_areq_{script_path.stem[:2]}"
+    _create_project(client, project_id)
+    source_text = script_path.read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, source_text)
+    refreshed = _refresh(client, project_id, revision)
+    expected = SCENE_CAST_EXPECTATIONS[script_path.stem[:2]]
+
+    empty = client.get(f"/projects/{project_id}/asset-requirements")
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["requirements"] == []
+    assert empty.json()["asset_kinds_included"] == ["character"]
+    assert empty.json()["asset_kinds_omitted"][0]["asset_kind"] == "prop"
+
+    appearances = [
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "character"
+        and ".cast[" in item["field_path"]
+        and item["field_path"].endswith(".appearance")
+    ]
+    scenes = [
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_kind"] == "scene" and item["field_path"] == "scene.name"
+    ]
+    for item in scenes:
+        _accept_item(client, project_id, revision, item["fact_id"])
+    last = None
+    for item in appearances:
+        last = _accept_item(client, project_id, revision, item["fact_id"])
+
+    projected = client.get(f"/projects/{project_id}/asset-requirements")
+    assert projected.status_code == 200, projected.text
+    body = projected.json()
+    requirements = body["requirements"]
+    if not expected:
+        assert requirements == []
+        return
+
+    by_scene: dict[str, set[str]] = {}
+    for row in requirements:
+        assert row["kind"] == "asset_requirement"
+        assert row["scope_kind"] == "scene"
+        assert row["asset_kind"] == "character"
+        assert row["core_asset_binding_status"] == "unbound"
+        assert row["core_asset_id"] is None
+        assert row["core_asset_binding_note"] == "暂无 Core asset 绑定"
+        assert row["source_revision_id"] == revision["revision_id"]
+        by_scene.setdefault(row["scope_display_name"], set()).add(row["display_name"])
+    assert by_scene == expected
+
+    assert last is not None
+    assert last["resolved"]["asset_requirements"] == requirements
+
+
+def test_asset_requirements_bind_when_identity_bound_and_refresh_on_supersede(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from apps.api.runtime_script_core_truth import ANALYSIS_CANDIDATE_SCHEMA_VERSION
+
+    _enable_both(monkeypatch)
+    client = _client(tmp_path)
+    project_id = "proj_areq_bind"
+    _create_project(client, project_id)
+    home = (SCRIPTS / "03_labeled_fields_homecoming.txt").read_text(encoding="utf-8")
+    revision = _create_revision(client, project_id, home)
+
+    def _span(quote: str) -> dict:
+        start = home.index(quote)
+        return {"start": start, "end": start + len(quote), "quote": quote}
+
+    analysis = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+            "named_characters": [
+                {
+                    "display_name": "陈浩",
+                    "aliases": [],
+                    "pronoun_links": [],
+                    "evidence_spans": [_span("陈浩")],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                }
+            ],
+            "main_scenes": [
+                {
+                    "name": "小镇火车站",
+                    "evidence_spans": [_span("小镇火车站")],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                }
+            ],
+            "style": "x",
+            "genre": "y",
+            "tone": "z",
+            "actions": ["a"],
+            "events": ["b"],
+            "beats": [{"summary": "c"}],
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert analysis.status_code == 200, analysis.text
+    char_asset = next(
+        asset
+        for asset in analysis.json()["projection"]["assets"]
+        if asset["display_name"] == "陈浩"
+    )
+
+    refreshed = _refresh(client, project_id, revision)
+    scene_ids = _scene_name_to_entity_id(refreshed["bundle"]["items"])
+    station_id = scene_ids["小镇火车站"]
+    identity = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["field_path"] == "identity.display_name" and item["text"] == "陈浩"
+    )
+    scene = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["entity_id"] == station_id and item["field_path"] == "scene.name"
+    )
+    appearance = next(
+        item
+        for item in refreshed["bundle"]["items"]
+        if item["field_path"].startswith(f"scene[{station_id}].cast[") and item["text"] == "陈浩"
+    )
+
+    _accept_item(client, project_id, revision, scene["fact_id"])
+    _accept_item(client, project_id, revision, identity["fact_id"])
+    accept_cast = _accept_item(client, project_id, revision, appearance["fact_id"])
+
+    bound_rows = [
+        row
+        for row in accept_cast["resolved"]["asset_requirements"]
+        if row["scope_entity_id"] == station_id and row["display_name"] == "陈浩"
+    ]
+    assert len(bound_rows) == 1
+    assert bound_rows[0]["core_asset_binding_status"] == "bound"
+    assert bound_rows[0]["core_asset_id"] == char_asset["asset_id"]
+    assert bound_rows[0]["core_asset_binding_note"] is None
+
+    # Supersede cast via re-accept after refresh → requirement tracks new authoritative id.
+    refreshed2 = _refresh(client, project_id, revision)
+    appearance2 = next(
+        item
+        for item in refreshed2["bundle"]["items"]
+        if item["field_path"].startswith(f"scene[{station_id}].cast[") and item["text"] == "陈浩"
+    )
+    superseded = _accept_item(client, project_id, revision, appearance2["fact_id"])
+    new_auth = superseded["result"]["authoritative_fact_id"]
+    assert new_auth != bound_rows[0]["source_cast_authoritative_fact_id"]
+    updated = next(
+        row
+        for row in superseded["resolved"]["asset_requirements"]
+        if row["scope_entity_id"] == station_id and row["display_name"] == "陈浩"
+    )
+    assert updated["source_cast_authoritative_fact_id"] == new_auth
+    assert updated["core_asset_id"] == char_asset["asset_id"]
+
+    # New revision invalidates old authority → requirements empty for new rev.
+    text_v2 = home.replace("小镇火车站", "北方小镇火车站")
+    rev2 = _create_revision(client, project_id, text_v2, parent=revision["revision_id"])
+    _refresh(client, project_id, rev2)
+    after = client.get(
+        f"/projects/{project_id}/asset-requirements",
+        params={"source_revision_id": rev2["revision_id"]},
+    )
+    assert after.status_code == 200, after.text
+    assert after.json()["requirements"] == []

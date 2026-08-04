@@ -61,6 +61,10 @@ from apps.api.runtime_script_improved_extraction import (
     extract_script_format_profile,
     extract_script_profile_facets,
 )
+from apps.api.runtime_asset_requirements import (
+    asset_requirements_payload,
+    project_scene_character_asset_requirements,
+)
 from apps.api.runtime_entity_asset_bindings import (
     bind_authoritative_fact_to_core_asset,
     load_bindings,
@@ -1285,6 +1289,7 @@ def resolve_for_downstream(
     *,
     fresh_extraction: ExtractionResult | None = None,
     revision_id: str | None = None,
+    store: RuntimeStore | None = None,
 ) -> dict[str, Any]:
     rev = revision_id or ledger.current_revision_id
     auth = list_current_authoritative(ledger, revision_id=rev)
@@ -1343,6 +1348,14 @@ def resolve_for_downstream(
     ]
     raw_chars = list(fresh_extraction.character_texts()) if fresh_extraction else []
     raw_scenes = list(fresh_extraction.scene_texts()) if fresh_extraction else []
+    asset_requirements = asset_requirements_payload(
+        project_scene_character_asset_requirements(
+            store,
+            project_id=ledger.project_id,
+            authoritative_facts=auth,
+            revision_id=rev,
+        )
+    )
     return {
         "revision_id": rev,
         "characters": auth_chars or raw_chars,
@@ -1352,6 +1365,7 @@ def resolve_for_downstream(
         "beats": auth_beats,
         "beat_facets": auth_beat_facets,
         "scene_cast": auth_cast,
+        "asset_requirements": asset_requirements,
         "authority_source": "authoritative_ledger" if auth else "raw_extraction_only",
         "authoritative_fact_ids": [f.authoritative_fact_id for f in auth],
         "raw_extraction_characters": raw_chars,
@@ -1998,7 +2012,7 @@ def register_runtime_candidate_confirmation_routes(
             "authoritative": [
                 f.model_dump(mode="json") for f in list_current_authoritative(ledger)
             ],
-            "resolved": resolve_for_downstream(ledger),
+            "resolved": resolve_for_downstream(ledger, store=store),
             "graph_feed": graph_feed,
             "entity_asset_binding": entity_asset_binding,
             "affects_production_graph": bool(graph_feed.get("fed")),
@@ -2160,6 +2174,44 @@ def register_runtime_candidate_confirmation_routes(
             "enabled": True,
             "project_id": project_id,
             "bindings": [row.model_dump(mode="json") for row in rows],
+        }
+
+    @app.get("/projects/{project_id}/asset-requirements")
+    def get_asset_requirements(
+        project_id: str,
+        request: Request,
+        source_revision_id: str | None = None,
+        scope_entity_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Read-only Scene character asset needs derived from confirmed cast."""
+
+        _enforce_project_access(auth, request, project_id)
+        _require_loop_enabled()
+        store.ensure_project_manifest(project_id)
+        ledger = load_ledger(store, project_id)
+        rev = source_revision_id or ledger.current_revision_id
+        authoritative = list_current_authoritative(ledger, revision_id=rev)
+        rows = project_scene_character_asset_requirements(
+            store,
+            project_id=project_id,
+            authoritative_facts=authoritative,
+            revision_id=rev,
+        )
+        if scope_entity_id:
+            rows = [row for row in rows if row.scope_entity_id == scope_entity_id]
+        return {
+            "enabled": True,
+            "project_id": project_id,
+            "revision_id": rev,
+            "projection": "derived_from_confirmed_scene_cast",
+            "asset_kinds_included": ["character"],
+            "asset_kinds_omitted": [
+                {
+                    "asset_kind": "prop",
+                    "reason": "SceneProps is draft-only; not in production candidate loop",
+                }
+            ],
+            "requirements": asset_requirements_payload(rows),
         }
 
 
