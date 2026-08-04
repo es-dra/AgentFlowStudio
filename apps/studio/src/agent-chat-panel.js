@@ -35,6 +35,7 @@ import {
   productionBriefLabel,
   shotPlanDurationAssessment,
 } from "./storyboard-duration-contract.js";
+import { handleScriptCandidateReview } from "./script-candidate-review.js";
 
 export function buildAgentChatPanel({
   session,
@@ -59,17 +60,102 @@ export function buildAgentChatPanel({
 
   const body = el("div", "agent-chat-body");
   body.appendChild(contextStrip(context));
-  if (copilot && !session?.pendingCommand) body.appendChild(productionCopilot(copilot, onNextAction));
-  syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
-  const taskReview = currentTaskReview({ store, runtime, onRender });
-  if (taskReview) body.appendChild(taskReview);
-  body.appendChild(messageLog(session));
+  const candidateReview = scriptCandidateReview({ store, runtime, onRender });
+  if (copilot && !session?.pendingCommand && !candidateReview) body.appendChild(productionCopilot(copilot, onNextAction));
+  if (candidateReview) {
+    body.appendChild(candidateReview);
+  } else {
+    syncEmbeddedCreativeAssistantMessages(session, store?.get?.());
+    const taskReview = currentTaskReview({ store, runtime, onRender });
+    if (taskReview) body.appendChild(taskReview);
+    body.appendChild(messageLog(session));
+  }
   if (session?.conversationRequest) body.appendChild(conversationStatus({ session, context, runtime, onRender }));
   if (session?.pendingCommand) body.appendChild(commandPreview({ session, store, runtime, onRender }));
   body.appendChild(receiptList({ session, store, runtime, onRender }));
   body.appendChild(composer({ session, context, runtime, onOpen, onRender }));
   aside.appendChild(body);
   return aside;
+}
+
+function scriptCandidateReview({ store, runtime, onRender }) {
+  const state = store?.get?.() || {};
+  const node = selectedCanvasNode(state);
+  const truth = node?.params?.coreAssetTruth;
+  if (!node || !truth) return null;
+  const review = node.params?.coreAssetReview || {};
+  const editable = ["candidate", "modified"].includes(truth.status);
+  const wrap = el("section", "agent-current-task-review agent-script-candidate-review");
+  wrap.dataset.nodeId = node.id;
+  wrap.setAttribute("aria-label", "候选审阅");
+  const header = el("header", "agent-current-task-head");
+  header.append(
+    el("span", "eyebrow", "当前任务"),
+    el("strong", "", "候选审阅"),
+    el("small", "", scriptCandidateStatusLabel(truth.status)),
+  );
+  wrap.appendChild(header);
+  const evidence = (Array.isArray(truth.evidence_spans) ? truth.evidence_spans : [])
+    .map((item) => String(item?.quote || "").trim())
+    .filter(Boolean);
+  wrap.appendChild(el(
+    "p",
+    "agent-current-task-copy agent-script-candidate-evidence",
+    evidence.length ? `来源证据：${evidence.join(" / ")}` : "没有可核对的来源证据。",
+  ));
+  const label = document.createElement("label");
+  label.className = "agent-script-candidate-label";
+  label.textContent = "名称";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 120;
+  input.value = String(truth.display_name || node.title || "");
+  input.disabled = !editable || Boolean(review.busy);
+  input.setAttribute("aria-label", "候选名称");
+  label.appendChild(input);
+  wrap.appendChild(label);
+  const actions = el("div", "agent-current-task-actions");
+  if (editable) {
+    actions.append(
+      candidateReviewButton("保存修改", "studio-secondary-button", "edit", input),
+      candidateReviewButton("确认", "studio-primary-button", "confirm", input),
+      candidateReviewButton("拒绝", "studio-secondary-button", "reject", input),
+    );
+  }
+  wrap.appendChild(actions);
+  const status = el(
+    "p",
+    `agent-script-candidate-status${review.error ? " error" : ""}`,
+    review.error || review.message || scriptCandidateStatusLabel(truth.status),
+  );
+  status.setAttribute("aria-live", "polite");
+  wrap.appendChild(status);
+  return wrap;
+
+  function candidateReviewButton(text, className, action, nameInput) {
+    const button = taskButton(text, className, () => {
+      void handleScriptCandidateReview({
+        action,
+        label: action === "edit" ? nameInput.value : "",
+        node,
+        runtime,
+        store,
+      }).finally(() => onRender?.());
+      onRender?.();
+    });
+    button.disabled = Boolean(review.busy);
+    return button;
+  }
+}
+
+function scriptCandidateStatusLabel(value) {
+  return {
+    candidate: "待审阅",
+    modified: "已修改，待审阅",
+    confirmed: "已确认",
+    rejected: "已拒绝",
+    expired: "已过期",
+  }[String(value || "")] || "待审阅";
 }
 
 function panelHeader({ context, collapsed, onToggleCollapse }) {

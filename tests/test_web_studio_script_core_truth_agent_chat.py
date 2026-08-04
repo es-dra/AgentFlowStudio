@@ -12,6 +12,9 @@ def test_script_core_truth_frontend_contract_has_no_production_pollution() -> No
         STUDIO_ROOT / "src" / "agent-chat-panel.js",
         STUDIO_ROOT / "src" / "script-core-truth-projection.js",
         STUDIO_ROOT / "src" / "runtime-client.js",
+        STUDIO_ROOT / "src" / "script-candidate-review.js",
+        STUDIO_ROOT / "src" / "canvas-input.js",
+        STUDIO_ROOT / "src" / "panels" / "inspector-panel.js",
     ]
     runtime_file = "apps/api/runtime_script_core_truth.py"
     combined = "\n".join(path.read_text(encoding="utf-8") for path in production_files)
@@ -23,6 +26,13 @@ def test_script_core_truth_frontend_contract_has_no_production_pollution() -> No
     assert "createScriptRevision" in combined
     assert "confirmCoreAssetCommand" in combined
     assert "undoCoreAssetCommand" in combined
+    assert "reviewAnalysisAsset" in combined
+    assert "loadProductionGraph" in combined
+    assert "候选审阅" in combined
+    assert "opensCandidateReview" in combined
+    assert "s.ui.inspectorOpen = true" in combined
+    assert "agent-script-candidate-review" in combined
+    assert "handleScriptCandidateReview" in combined
     assert "auto_props: 0" in combined
 
 
@@ -262,4 +272,122 @@ process.stdout.write(JSON.stringify({
         "storyboardBlockedStatus": "blocked",
         "storyboardRequiresConfirmation": False,
         "providerDispatchCount": 0,
+    }
+
+
+def test_studio_candidate_review_edits_confirms_rejects_and_refreshes_projection() -> None:
+    script = r'''
+import { applyScriptCoreTruthProjection } from "./apps/studio/src/script-core-truth-projection.js";
+import { handleScriptCandidateReview } from "./apps/studio/src/script-candidate-review.js";
+
+const digest = "a".repeat(64);
+const revision = {
+  project_id: "p1", revision_id: "rev1", source_kind: "script", source_digest: digest,
+  source_length: 20, source_text: "Mira enters the hall.", analysis_state: "pending_confirmation",
+};
+function projection(status, version, versionId, label = "Mira") {
+  return {
+    schema_version: "afs.script_core_truth.v0.1", project_id: "p1", current_revision_id: "rev1",
+    current_revision: revision, revision_history: [revision], analysis_state: status === "confirmed" ? "confirmed" : "pending_confirmation",
+    asset_counts: { characters: 1, main_scenes: 0, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
+    assets: [{
+      asset_id: "char1", asset_type: "character", source_mode: "analysis_candidate", status,
+      project_id: "p1", revision_id: "rev1", source_digest: digest, candidate_id: "candidate1",
+      version, version_id: versionId, parent_version_id: version > 1 ? `v${version - 1}` : "",
+      display_name: label, name: label, aliases: [], pronoun_links: [], confidence: 0.99,
+      evidence_spans: [{ start: 0, end: 4, quote: "Mira" }], lineage: {},
+    }],
+  };
+}
+function harness(initial) {
+  const state = {
+    meta: { projectId: "p1" }, nodes: {}, edges: {}, groups: {}, order: [], assets: [], production: {},
+    selection: { nodeIds: [], edgeId: null }, ui: {}, viewport: { x: 0, y: 0, scale: 1 },
+  };
+  applyScriptCoreTruthProjection(state, initial);
+  state.selection = { nodeIds: ["script_truth_asset_char1"], edgeId: null };
+  const store = { get: () => state, set: (mutator) => mutator(state) };
+  return { state, store, node: state.nodes["script_truth_asset_char1"] };
+}
+
+let editPayload = null;
+const edited = harness(projection("candidate", 1, "v1"));
+await handleScriptCandidateReview({
+  action: "edit", label: "Mira Vale", node: edited.node, store: edited.store,
+  runtime: {
+    confirmCoreAssetCommand: async (payload) => { editPayload = payload; return { projection: projection("modified", 2, "v2", "Mira Vale") }; },
+  },
+});
+
+const chineseEditKeys = [];
+for (const label of ["米拉", "明月"]) {
+  const localized = harness(projection("candidate", 1, "v1"));
+  await handleScriptCandidateReview({
+    action: "edit", label, node: localized.node, store: localized.store,
+    runtime: {
+      confirmCoreAssetCommand: async (payload) => {
+        chineseEditKeys.push(payload.idempotency_key);
+        return { projection: projection("modified", 2, "v2", label) };
+      },
+    },
+  });
+}
+
+let confirmPayload = null;
+const confirmed = harness(projection("modified", 2, "v2", "Mira Vale"));
+await handleScriptCandidateReview({
+  action: "confirm", node: confirmed.node, store: confirmed.store,
+  runtime: {
+    loadProductionGraph: async () => ({ graph: { version: 7 } }),
+    reviewAnalysisAsset: async (_revisionId, _assetId, payload) => { confirmPayload = payload; return {}; },
+    loadScriptTruth: async () => ({ projection: projection("confirmed", 3, "v3", "Mira Vale") }),
+  },
+});
+
+let rejectPayload = null;
+const rejected = harness(projection("candidate", 1, "v1"));
+await handleScriptCandidateReview({
+  action: "reject", node: rejected.node, store: rejected.store,
+  runtime: {
+    loadProductionGraph: async () => ({ graph: { version: 7 } }),
+    reviewAnalysisAsset: async (_revisionId, _assetId, payload) => { rejectPayload = payload; return {}; },
+    loadScriptTruth: async () => ({ projection: projection("rejected", 2, "v2") }),
+  },
+});
+
+process.stdout.write(JSON.stringify({
+  editType: editPayload.command_type,
+  editExpectedVersion: editPayload.expected_asset_version,
+  editedStatus: edited.state.nodes["script_truth_asset_char1"].params.coreAssetTruth.status,
+  editedSelection: edited.state.selection.nodeIds,
+  distinctChineseEditKeys: new Set(chineseEditKeys).size,
+  confirmDecision: confirmPayload.decision,
+  confirmGraphVersion: confirmPayload.expected_graph_version,
+  confirmCandidateId: confirmPayload.candidate_id,
+  confirmedStatus: confirmed.state.nodes["script_truth_asset_char1"].params.coreAssetTruth.status,
+  rejectDecision: rejectPayload.decision,
+  rejectedStatus: rejected.state.nodes["script_truth_asset_char1"].params.coreAssetTruth.status,
+  evidence: confirmed.state.nodes["script_truth_asset_char1"].params.coreAssetTruth.evidence_spans[0].quote,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert json.loads(completed.stdout) == {
+        "editType": "edit_asset",
+        "editExpectedVersion": 1,
+        "editedStatus": "modified",
+        "editedSelection": ["script_truth_asset_char1"],
+        "distinctChineseEditKeys": 2,
+        "confirmDecision": "confirm",
+        "confirmGraphVersion": 7,
+        "confirmCandidateId": "candidate1",
+        "confirmedStatus": "confirmed",
+        "rejectDecision": "reject",
+        "rejectedStatus": "rejected",
+        "evidence": "Mira",
     }

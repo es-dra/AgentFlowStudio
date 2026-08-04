@@ -36,6 +36,7 @@ import { bindHumanGateDecisionEvents, bindStudioWorkflowEvents, bindVideoAssetCa
 import { createProjectReadyHandler, hydrateStartupProject } from "./studio-startup-project.js";
 import { bindCanvasEmptyOnboarding } from "./studio-canvas-onboarding.js";
 import { beginProjectIdentityLoad, clearProjectIdentity } from "./project-identity-gate.js";
+import { bindScriptCandidateReviewEvents } from "./script-candidate-review.js";
 
 let runtime = createRuntimeClient("studio-pending");
 let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
@@ -82,6 +83,7 @@ async function bootstrap() {
   bindQualityFeedback();
   bindHumanGateDecisionEvents({ getRuntime: () => runtime, store, safeError });
   bindVideoAssetCardDraft({ getRuntime: () => runtime, store, safeError });
+  bindScriptCandidateReviewEvents({ getRuntime: () => runtime, store, formatError: safeError });
   bindStudioWorkflowEvents({ store, runtimeRef });
   bindCanvasSafeAreaEvents();
   bindDomainCrewEvents();

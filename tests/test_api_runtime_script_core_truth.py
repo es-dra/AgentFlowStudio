@@ -170,7 +170,7 @@ def test_revision_candidate_contract_fails_closed_and_keeps_narrative_fields_out
     )
     assert accepted.status_code == 200, accepted.text
     projection = accepted.json()["projection"]
-    assert projection["analysis_state"] == "confirmed"
+    assert projection["analysis_state"] == "pending_confirmation"
     assert projection["asset_counts"] == {
         "characters": 2,
         "main_scenes": 1,
@@ -180,6 +180,7 @@ def test_revision_candidate_contract_fails_closed_and_keeps_narrative_fields_out
         "action_event_assets": 0,
     }
     assert {item["asset_type"] for item in projection["assets"]} == {"character", "main_scene"}
+    assert {item["status"] for item in projection["assets"]} == {"candidate"}
     assert projection["narrative_fields"]["promoted_to_assets"] is False
     assert projection["narrative_fields"]["actions_count"] == 1
     assert accepted.json()["provider_dispatch_count"] == 0
@@ -197,7 +198,7 @@ def test_varied_structured_candidates_cover_aliases_scenes_and_low_confidence(tm
                 characters=[_character(text, "Iris", "Iris"), _character(text, "Niko", "Niko")],
                 scenes=[_scene(text, "Ferry Terminal", "ferry terminal")],
             ),
-            "confirmed",
+            "pending_confirmation",
             2,
             1,
         ),
@@ -213,7 +214,7 @@ def test_varied_structured_candidates_cover_aliases_scenes_and_low_confidence(tm
                 ],
                 scenes=[_scene(text, "Archive", "archive")],
             ),
-            "confirmed",
+            "pending_confirmation",
             2,
             1,
         ),
@@ -226,7 +227,7 @@ def test_varied_structured_candidates_cover_aliases_scenes_and_low_confidence(tm
                 characters=[_character(text, "Lena", "Lena"), _character(text, "Omar", "Omar")],
                 scenes=[_scene(text, "Clinic", "clinic"), _scene(text, "Rooftop", "rooftop")],
             ),
-            "confirmed",
+            "pending_confirmation",
             2,
             2,
         ),
@@ -369,7 +370,7 @@ def test_revision_history_selection_and_preserved_affected_sets(tmp_path) -> Non
         json=body_two,
     )
     assert second.status_code == 200, second.text
-    assert asset_id in second.json()["preserved_asset_ids"]
+    assert asset_id in second.json()["affected_asset_ids"]
     assert len(second.json()["projection"]["revision_history"]) == 2
 
     select_old = client.post(f"/projects/{project_id}/script-revisions/{revision_one['revision_id']}/select")
