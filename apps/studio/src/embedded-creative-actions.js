@@ -22,6 +22,7 @@ const ACTION_MODES = {
   script_revision: "professional_expansion",
   shot_breakdown: "dynamic_shot_breakdown",
 };
+const pendingScriptRevisionBindings = new WeakMap();
 
 export function canUseEmbeddedCreativeAction(node, actionType = "script_revision") {
   if (!node) return false;
@@ -37,18 +38,49 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       mode: options.mode || ACTION_MODES.shot_breakdown,
     });
   }
+  const preparedActionId = actionType === "shot_breakdown"
+    ? String(node?.params?.embeddedCreativeAction?.action_id || "")
+    : "";
+  let actionNode = node;
+  if (actionType === "shot_breakdown") {
+    try {
+      actionNode = await ensureCurrentScriptRevision(store, runtime, node, sourceText);
+    } catch (error) {
+      markEmbeddedCreativeUnavailable(store, node.id, preparedActionId, {
+        category: "script_revision_save_failed",
+        error_owner: "runtime",
+        message: "剧本版本暂时无法保存，分镜预览尚未开始。",
+        detail: safeFailureText(error?.message || error || ""),
+        next_action: "检查连接后重新确认目标时长；不会重复调用文本模型。",
+      });
+      await store.flushRuntimeSave?.();
+      return null;
+    }
+    const preparedNode = store.get()?.nodes?.[node.id];
+    if (
+      preparedActionId
+      && preparedNode
+      && preparedNode.params?.embeddedCreativeAction?.action_id !== preparedActionId
+    ) return null;
+  }
   const actionId = `embedded_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const clientRequestId = options.clientRequestId
     || runtime?.newEmbeddedCreativeClientRequestId?.()
     || `cli_embedded_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const mode = options.mode || ACTION_MODES[actionType] || "professional_expansion";
   const productionBrief = actionType === "shot_breakdown"
-    ? productionBriefForNode(node, sourceText, options.productionBrief)
+    ? productionBriefForNode(actionNode, sourceText, options.productionBrief)
     : null;
-  const localTask = createLocalCreativeTask(node, actionId, actionType, mode, sourceText);
+  const localTask = createLocalCreativeTask(actionNode, actionId, actionType, mode, sourceText);
   store.set((state) => {
-    const target = state.nodes[node.id];
+    const target = state.nodes[actionNode.id];
     if (!target) return;
+    if (actionNode.id !== node.id) {
+      const preparedNode = state.nodes[node.id];
+      if (preparedNode?.params?.embeddedCreativeAction?.action_id === preparedActionId) {
+        delete preparedNode.params.embeddedCreativeAction;
+      }
+    }
     target.params.embeddedCreativeAction = {
       action_id: actionId,
       action_type: actionType,
@@ -66,18 +98,18 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       preview: null,
       error: "",
     };
-    state.selection = { nodeIds: [node.id], edgeId: null };
+    state.selection = { nodeIds: [actionNode.id], edgeId: null };
   }, { history: false });
   dispatchBrowserEvent("afs:agent-chat-open-task", {
-    detail: { node_id: node.id, action_type: actionType, task_id: actionId },
+    detail: { node_id: actionNode.id, action_type: actionType, task_id: actionId },
   });
   dispatchBrowserEvent("afs:embedded-creative-task-running", {
-    detail: { node_id: node.id, action_type: actionType, task_id: actionId, phase: "dispatching" },
+    detail: { node_id: actionNode.id, action_type: actionType, task_id: actionId, phase: "dispatching" },
   });
   void store.flushRuntimeSave?.();
   if (!sourceText.trim()) return null;
   if (!runtime?.previewEmbeddedCreativeAction) {
-    markEmbeddedCreativeUnavailable(store, node.id, actionId, {
+    markEmbeddedCreativeUnavailable(store, actionNode.id, actionId, {
       category: "runtime_unavailable",
       error_owner: "runtime",
       message: "运行服务没有可用的节点内 AI 预览接口；不会使用本地模板冒充改写。",
@@ -89,19 +121,19 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
   try {
     const response = await runtime.previewEmbeddedCreativeAction({
       action_type: actionType,
-      node_id: node.id,
-      node_type: node.type,
+      node_id: actionNode.id,
+      node_type: actionNode.type,
       source_text: sourceText,
       mode,
-      context_summary: safeNodeContext(store.get(), node),
+      context_summary: safeNodeContext(store.get(), actionNode),
       constraints: embeddedConstraints(actionType),
       production_brief: productionBrief,
-      source_revision_id: cleanToken(node?.params?.scriptRevision?.revision_id, 140),
-      source_digest: cleanDigest(node?.params?.scriptRevision?.source_digest),
+      source_revision_id: cleanToken(actionNode?.params?.scriptRevision?.revision_id, 140),
+      source_digest: cleanDigest(actionNode?.params?.scriptRevision?.source_digest),
       provider_service_id: "server_codex",
       generated_at: new Date().toISOString(),
     }, { clientRequestId });
-    applyEmbeddedCreativeResponse(store, node.id, actionId, actionType, response, localTask);
+    applyEmbeddedCreativeResponse(store, actionNode.id, actionId, actionType, response, localTask);
     await store.flushRuntimeSave?.();
     return response;
   } catch (error) {
@@ -111,15 +143,15 @@ export async function startEmbeddedCreativeAction(store, runtime, node, actionTy
       ([0, 504].includes(Number(error?.status || 0)) || recoverableConflict)
       && runtime?.recoverEmbeddedCreativeActionByClient
     ) {
-      markEmbeddedCreativeRecovering(store, node.id, actionId, localTask);
+      markEmbeddedCreativeRecovering(store, actionNode.id, actionId, localTask);
       const recovered = await recoverEmbeddedCreativeResponse(runtime, clientRequestId);
       if (recovered) {
-        applyEmbeddedCreativeResponse(store, node.id, actionId, actionType, recovered, localTask);
+        applyEmbeddedCreativeResponse(store, actionNode.id, actionId, actionType, recovered, localTask);
         await store.flushRuntimeSave?.();
         return recovered;
       }
     }
-    markEmbeddedCreativeUnavailable(store, node.id, actionId, safeEmbeddedActionError(error, actionType), localTask);
+    markEmbeddedCreativeUnavailable(store, actionNode.id, actionId, safeEmbeddedActionError(error, actionType), localTask);
     return null;
   }
 }
@@ -1003,13 +1035,111 @@ function compactShotText(value) {
 }
 
 function sourceTextForNode(node) {
-  return String(
-    node?.params?.scriptRevision?.source_text
-    || node?.content
-    || node?.prompt
-    || node?.result
-    || "",
-  ).trim();
+  const source = node?.params?.scriptCoreProjection
+    ? node?.params?.scriptRevision?.source_text || node?.content || node?.prompt || node?.result
+    : node?.content || node?.prompt || node?.params?.scriptRevision?.source_text || node?.result;
+  return normalizeSourceText(source);
+}
+
+async function ensureCurrentScriptRevision(store, runtime, node, sourceText) {
+  const state = store.get?.() || {};
+  const current = state.production?.script_core_truth_projection || {};
+  const currentRevisionId = cleanToken(current.current_revision_id, 140);
+  const currentDigest = cleanDigest(current.source_digest);
+  const currentSource = normalizeSourceText(current.source_text);
+  const canonical = currentRevisionId
+    ? state.nodes?.[`script_truth_revision_${currentRevisionId}`] || null
+    : null;
+  if (
+    currentRevisionId
+    && currentDigest
+    && currentSource === sourceText
+    && scriptRevisionMatchesSource(canonical, sourceText, currentRevisionId, currentDigest)
+  ) return canonical;
+  if (
+    (!currentRevisionId && scriptRevisionMatchesSource(node, sourceText))
+    || (
+      currentRevisionId
+      && currentDigest
+      && currentSource === sourceText
+      && scriptRevisionMatchesSource(node, sourceText, currentRevisionId, currentDigest)
+    )
+  ) return node;
+  if (!runtime?.createScriptRevision) throw new Error("script revision endpoint unavailable");
+  let pendingForStore = pendingScriptRevisionBindings.get(store);
+  if (!pendingForStore) {
+    pendingForStore = new Map();
+    pendingScriptRevisionBindings.set(store, pendingForStore);
+  }
+  const pendingKey = `${cleanToken(state.meta?.projectId, 128)}\n${sourceText}`;
+  if (pendingForStore.has(pendingKey)) return pendingForStore.get(pendingKey);
+  const pending = createCurrentScriptRevision(store, runtime, node, sourceText, currentRevisionId);
+  pendingForStore.set(pendingKey, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingForStore.delete(pendingKey);
+  }
+}
+
+async function createCurrentScriptRevision(store, runtime, node, sourceText, currentRevisionId) {
+  const response = await runtime.createScriptRevision({
+    source_kind: "script",
+    source_text: sourceText,
+    parent_revision_id: currentRevisionId || cleanToken(node?.params?.scriptRevision?.revision_id, 140) || null,
+    provenance: {
+      source: "embedded_storyboard_preview",
+      node_id: cleanToken(node?.id, 140),
+    },
+    created_at: new Date().toISOString(),
+  });
+  const projection = response?.projection;
+  const projectedRevision = projection?.current_revision;
+  const revisionId = cleanToken(projection?.current_revision_id || projectedRevision?.revision_id, 140);
+  const projectedRevisionId = cleanToken(projectedRevision?.revision_id, 140);
+  const sourceDigest = cleanDigest(projectedRevision?.source_digest);
+  const revisionSource = normalizeSourceText(projectedRevision?.source_text);
+  const responseRevision = response?.revision;
+  const responseMatchesProjection = !responseRevision || (
+    cleanToken(responseRevision.revision_id, 140) === revisionId
+    && cleanDigest(responseRevision.source_digest) === sourceDigest
+    && normalizeSourceText(responseRevision.source_text) === revisionSource
+  );
+  if (
+    !projection
+    || !projectedRevision
+    || !revisionId
+    || projectedRevisionId !== revisionId
+    || !sourceDigest
+    || revisionSource !== sourceText
+    || !responseMatchesProjection
+  ) {
+    throw new Error("script revision endpoint returned an invalid source binding");
+  }
+  store.set((nextState) => applyScriptCoreTruthProjection(nextState, projection), { history: false });
+  const projected = store.get()?.nodes?.[`script_truth_revision_${revisionId}`] || null;
+  if (!scriptRevisionMatchesSource(projected, sourceText, revisionId, sourceDigest)) {
+    throw new Error("script revision projection did not bind the saved source");
+  }
+  await store.flushRuntimeSave?.();
+  return projected;
+}
+
+function scriptRevisionMatchesSource(node, sourceText, expectedRevisionId = "", expectedDigest = "") {
+  const binding = node?.params?.scriptRevision || {};
+  const revisionId = cleanToken(binding.revision_id, 140);
+  const sourceDigest = cleanDigest(binding.source_digest);
+  return Boolean(
+    revisionId
+    && (!expectedRevisionId || revisionId === expectedRevisionId)
+    && sourceDigest
+    && (!expectedDigest || sourceDigest === expectedDigest)
+    && normalizeSourceText(binding.source_text) === sourceText,
+  );
+}
+
+function normalizeSourceText(value) {
+  return String(value || "").replace(/\r\n?/g, "\n").trim();
 }
 
 function safeNodeContext(state, node) {
