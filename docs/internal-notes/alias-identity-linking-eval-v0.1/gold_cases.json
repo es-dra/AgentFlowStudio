@@ -1,0 +1,147 @@
+{
+  "schema_version": "alias_identity_linking_eval_gold_v0.1",
+  "metric_contract": {
+    "source": "DESIGN.md",
+    "proposal_layer_only": true,
+    "notes": [
+      "Gold clusters contain only scorable alias/person surface strings.",
+      "Exempt or ambiguous strings may appear in expected_surface_mentions and scoring_notes, but are excluded from gold_clusters unless explicitly scorable.",
+      "must_not_link pairs are hard constraints when both surfaces are present in the scoring universe."
+    ]
+  },
+  "cases": [
+    {
+      "id": "A1",
+      "type": ["surname_title"],
+      "title": "姓+职衔（核心正例）",
+      "source": "标题：夜校的灯\n\n第一场 - 内景 - 修理铺后院 - 夜\n\n人物：陈默\n\n陈默蹲在桌边，把一盏旧台灯拆开。门外有人喊。\n\n李薇\n陈师傅，零件送来了。\n\n陈默\n放门口就行。",
+      "expected_surface_mentions": ["陈默", "李薇", "陈师傅"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["陈默", "陈师傅"]},
+        {"id": "C2", "mentions": ["李薇"]}
+      ],
+      "must_not_link": [
+        ["陈默", "李薇"],
+        ["陈师傅", "李薇"]
+      ],
+      "scoring_notes": "同场景、同姓、职衔称呼指向已出现的本名。"
+    },
+    {
+      "id": "A2",
+      "type": ["aka_nickname"],
+      "title": "本名 + 外号",
+      "source": "标题：外号\n\n第一场\n\n地点：校园天台\n人物：周可（外号「阿可」）\n\n周可靠着栏杆。\n\n阿可\n风有点大。\n\n林夏\n阿可，别靠那么外面。",
+      "expected_surface_mentions": ["周可", "阿可", "林夏"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["周可", "阿可"]},
+        {"id": "C2", "mentions": ["林夏"]}
+      ],
+      "must_not_link": [
+        ["周可", "林夏"],
+        ["阿可", "林夏"]
+      ],
+      "scoring_notes": "标签行显式给出外号关系。"
+    },
+    {
+      "id": "A3",
+      "type": ["address_shift"],
+      "title": "称呼升级（正式 → 亲昵）",
+      "source": "标题：熟了以后\n\n第一场 - 内景 - 编辑部 - 日\n\n人物：陈默、苏晴\n\n苏晴\n陈默，这篇还要改一版。\n\n陈默\n好。\n\n第二场 - 内景 - 编辑部走廊 - 夜\n\n苏晴\n老陈，走吧，楼下还有灯。\n\n陈默\n你先下，我锁门。",
+      "expected_surface_mentions": ["陈默", "苏晴", "老陈"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["陈默", "老陈"]},
+        {"id": "C2", "mentions": ["苏晴"]}
+      ],
+      "must_not_link": [
+        ["陈默", "苏晴"],
+        ["老陈", "苏晴"]
+      ],
+      "scoring_notes": "老X 只应在已有 X... 本名锚点且无冲突时提案。"
+    },
+    {
+      "id": "A4",
+      "type": ["given_vs_full"],
+      "title": "全名 ↔ 名（截短）",
+      "source": "标题：叫我小名也行\n\n第一场\n\n地点：排练厅\n人物：林悦安\n\n林悦安\n今天从第二段开始。\n\n导演\n悦安，眼神再收一点。\n\n林悦安\n明白。",
+      "expected_surface_mentions": ["林悦安", "悦安", "导演"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["林悦安", "悦安"]}
+      ],
+      "must_not_link": [
+        ["导演", "林悦安"],
+        ["导演", "悦安"]
+      ],
+      "scoring_notes": "DESIGN.md 将“导演”列为过滤器相关；本 JSON 把它作为 expected mention 和禁止链入 C1 的额外约束，但不放入 gold_clusters。"
+    },
+    {
+      "id": "A5",
+      "type": ["near_homograph_negative"],
+      "title": "反例：同姓形近，不是同一人",
+      "source": "标题：两个陈\n\n第一场 - 内景 - 派出所接待室 - 日\n\n人物：陈默、陈明\n\n陈默\n我是来做笔录的。\n\n陈明\n我是来找人的。\n\n民警\n陈先生，两位先别急，一个一个说。",
+      "expected_surface_mentions": ["陈默", "陈明", "民警", "陈先生"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["陈默"]},
+        {"id": "C2", "mentions": ["陈明"]},
+        {"id": "C3", "mentions": ["民警"]}
+      ],
+      "must_not_link": [
+        ["陈默", "陈明"]
+      ],
+      "ambiguous_mentions": ["陈先生"],
+      "scoring_notes": "陈先生不要求链到任何一人；若它作为桥导致陈默与陈明同簇，则由 must_not_link 硬失败捕获。"
+    },
+    {
+      "id": "A6",
+      "type": ["near_homograph_negative"],
+      "title": "反例：无关职衔撞车",
+      "source": "标题：另一个师傅\n\n第一场\n\n地点：菜场口\n人物：陈默、王师傅（卖鱼）\n\n陈默\n王师傅，今天的鱼还新鲜吗？\n\n王师傅\n刚到的。\n\n远处有人喊：\n陈师傅！修车的！\n\n陈默愣了一下——那是在叫别人。",
+      "expected_surface_mentions": ["陈默", "王师傅", "陈师傅"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["陈默"]},
+        {"id": "C2", "mentions": ["王师傅"]}
+      ],
+      "must_not_link": [
+        ["陈默", "王师傅"],
+        ["陈默", "陈师傅"]
+      ],
+      "scoring_notes": "陈师傅是场外修车人；若系统未抽出该旁白称呼，不因召回缺口外再扣假分裂。"
+    },
+    {
+      "id": "A7",
+      "type": ["reuse_week_script", "surname_title"],
+      "title": "复用 week 剧本 + 补别名层（《海边的信》片段）",
+      "source": "标题：海边的信\n\n第一场 - 外景 - 海边邮局 - 黄昏\n\n人物：苏晴、邮局职员老王\n\n苏晴把一封没有贴邮票的信递过去。\n\n老王\n还是寄给林悦？\n\n苏晴\n嗯，寄到老地址。\n\n老王看了看信封，没有多问。",
+      "expected_surface_mentions": ["苏晴", "老王", "林悦"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["苏晴"]},
+        {"id": "C2", "mentions": ["老王"]},
+        {"id": "C3", "mentions": ["林悦"]}
+      ],
+      "must_not_link": [
+        ["苏晴", "老王"],
+        ["苏晴", "林悦"],
+        ["老王", "林悦"]
+      ],
+      "scoring_notes": "当前工作树没有 DESIGN.md 引用的 week 源文件；按设计允许的“至少第一场”落成内联回归片段。"
+    },
+    {
+      "id": "A8",
+      "type": ["kinship_address", "aka_nickname"],
+      "title": "亲属称呼与本名（边界，记分方式特殊）",
+      "source": "标题：归途（别名增补）\n\n第一场\n\n时间：正午\n地点：老屋门口\n人物：陈浩、林秀（陈浩的母亲）\n\n林秀\n浩子，你瘦了。\n\n陈浩\n妈，我回来了。",
+      "expected_surface_mentions": ["陈浩", "林秀", "浩子", "妈"],
+      "gold_clusters": [
+        {"id": "C1", "mentions": ["陈浩", "浩子"]},
+        {"id": "C2", "mentions": ["林秀"]}
+      ],
+      "must_not_link": [
+        ["陈浩", "林秀"],
+        ["浩子", "林秀"],
+        ["妈", "陈浩"],
+        ["妈", "浩子"]
+      ],
+      "soft_mentions": ["妈"],
+      "scoring_notes": "妈不纳入林秀的强制别名簇；链到林秀不计正确别名加分，链到陈浩/浩子计假合并。"
+    }
+  ]
+}
