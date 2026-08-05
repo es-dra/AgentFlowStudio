@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_script_core_truth import ANALYSIS_REVIEW_SCHEMA_VERSION
+from apps.api.runtime_script_core_truth import CORE_ASSET_COMMAND_SCHEMA_VERSION
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -25,6 +26,21 @@ def _create_revision(client: TestClient, project_id: str, source_text: str) -> d
     )
     assert response.status_code == 200, response.text
     return response.json()["revision"]
+
+
+def _merge_alias_command(project_id: str, revision: dict, target_asset_id: str, alias: str) -> dict:
+    return {
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        "command_type": "merge_alias",
+        "target_asset_id": target_asset_id,
+        "patch": {"alias": alias},
+        "idempotency_key": f"merge-{target_asset_id}-{alias}",
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
 
 
 def test_deterministic_extraction_enters_the_existing_review_loop(tmp_path) -> None:
@@ -209,6 +225,119 @@ def test_deterministic_extraction_rejects_standalone_action_fragments(tmp_path) 
 
     assert {item["display_name"] for item in assets if item["asset_type"] == "character"} == {"苏晴"}
     assert {item["name"] for item in assets if item["asset_type"] == "main_scene"} == {"废弃灯塔"}
+
+
+def test_alias_link_proposals_are_feature_flagged_off_by_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ENABLE_ALIAS_LINK_PROPOSALS", raising=False)
+    project_id = "alias-proposals-flag-off"
+    source_text = """标题：夜校的灯
+
+第一场 - 内景 - 修理铺后院 - 夜
+
+人物：陈默、李薇
+
+李薇
+陈师傅，零件送来了。
+
+陈默
+放门口就行。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert "alias_link_proposal_count" not in payload["candidate"]
+    assert "alias_link_proposals" not in payload["candidate"]
+    assert all(item["aliases"] == [] for item in payload["projection"]["assets"] if item["asset_type"] == "character")
+
+
+def test_alias_link_proposals_are_candidates_until_merge_alias_confirms_them(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_ALIAS_LINK_PROPOSALS", "true")
+    project_id = "alias-proposals-enabled"
+    source_text = """标题：夜校的灯
+
+第一场 - 内景 - 修理铺后院 - 夜
+
+人物：陈默、李薇、林悦安
+
+李薇
+陈师傅，零件送来了。
+
+林悦安
+今天从第二段开始。
+
+导演
+悦安，眼神再收一点。
+
+陈默
+放门口就行。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    proposals = payload["candidate"]["alias_link_proposals"]
+
+    assert {
+        (item["target_display_name"], item["alias"], item["extraction_method"])
+        for item in proposals
+    } >= {
+        ("陈默", "陈师傅", "surname_title_same_scene"),
+        ("林悦安", "悦安", "given_name_suffix_same_scene_unique_anchor"),
+    }
+    assert {item["status"] for item in proposals} == {"candidate"}
+    assert {item["authority"] for item in proposals} == {"non_authoritative_proposal"}
+    assert {item["review_action"] for item in proposals} == {"use_core_asset_command_merge_alias"}
+    for proposal in proposals:
+        for span in proposal["evidence_spans"]:
+            assert source_text[span["start"] : span["end"]] == span["quote"]
+
+    character_assets = {
+        item["display_name"]: item for item in payload["projection"]["assets"] if item["asset_type"] == "character"
+    }
+    assert character_assets["陈默"]["aliases"] == []
+    assert character_assets["林悦安"]["aliases"] == []
+
+    reviewed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character_assets['陈默']['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": character_assets["陈默"]["version_id"],
+            "expected_asset_version": character_assets["陈默"]["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "confirm-chenmo-without-alias-authority",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["asset"]["status"] == "confirmed"
+    assert reviewed.json()["asset"]["aliases"] == []
+
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_alias_command(project_id, revision, character_assets["陈默"]["asset_id"], "陈师傅"),
+            "expected_asset_version": reviewed.json()["asset"]["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_character = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == character_assets["陈默"]["asset_id"]
+    )
+    assert "陈师傅" in merged_character["aliases"]
 
 
 def test_studio_runtime_client_exposes_the_same_extraction_route() -> None:

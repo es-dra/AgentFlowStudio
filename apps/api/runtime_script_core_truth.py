@@ -25,6 +25,11 @@ from apps.api.runtime_script_candidate_extraction import (
     DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
     build_deterministic_analysis_candidate,
 )
+from apps.api.runtime_script_scene_block_match import (
+    member_spans_in_scene_block as _member_spans_in_scene_block,
+    scene_content_start as _scene_content_start,
+    scene_evidence_start as _scene_start,
+)
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -79,6 +84,24 @@ class CandidateMainScene(BaseModel):
     uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
+class AliasLinkProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    relation_type: Literal["alias_identity_link"] = "alias_identity_link"
+    status: Literal["candidate"] = "candidate"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    target_display_name: str = Field(min_length=1, max_length=120)
+    alias: str = Field(min_length=1, max_length=120)
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
+    extraction_method: str = Field(min_length=1, max_length=120)
+    review_action: Literal["use_core_asset_command_merge_alias"] = "use_core_asset_command_merge_alias"
+    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+
+
 class ScriptRevisionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,6 +127,7 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     actions: list[str] = Field(default_factory=list, max_length=120)
     events: list[str] = Field(default_factory=list, max_length=120)
     beats: list[dict[str, Any]] = Field(default_factory=list, max_length=120)
+    alias_link_proposals: list[AliasLinkProposal] = Field(default_factory=list, max_length=120)
     missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
     extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
@@ -1024,7 +1048,7 @@ def public_revision(revision: dict[str, Any], *, include_source: bool) -> dict[s
 def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     if not candidate:
         return {}
-    return {
+    payload = {
         "candidate_id": str(candidate.get("candidate_id") or ""),
         "schema_version": str(candidate.get("schema_version") or ""),
         "project_id": str(candidate.get("project_id") or ""),
@@ -1044,6 +1068,31 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "beats_count": len(candidate.get("beats") or []),
         "missing_slots": [str(item) for item in candidate.get("missing_slots", [])[:10]],
         "extraction_notes": [str(item)[:600] for item in candidate.get("extraction_notes", [])[:20]],
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    if "alias_link_proposals" in candidate:
+        payload["alias_link_proposal_count"] = len(candidate.get("alias_link_proposals") or [])
+        payload["alias_link_proposals"] = [
+            public_alias_link_proposal(item)
+            for item in (candidate.get("alias_link_proposals") or [])[:120]
+        ]
+    return payload
+
+
+def public_alias_link_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "proposal_id": str(proposal.get("proposal_id") or ""),
+        "schema_version": str(proposal.get("schema_version") or ""),
+        "relation_type": str(proposal.get("relation_type") or "alias_identity_link"),
+        "status": str(proposal.get("status") or "candidate"),
+        "authority": str(proposal.get("authority") or "non_authoritative_proposal"),
+        "target_display_name": str(proposal.get("target_display_name") or ""),
+        "alias": str(proposal.get("alias") or ""),
+        "confidence": float(proposal.get("confidence") or 0.0),
+        "evidence_spans": list(proposal.get("evidence_spans") or []),
+        "extraction_method": str(proposal.get("extraction_method") or ""),
+        "review_action": str(proposal.get("review_action") or "use_core_asset_command_merge_alias"),
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -1699,6 +1748,8 @@ def _analysis_candidate_record(
     body: StructuredAnalysisCandidateRequest,
 ) -> dict[str, Any]:
     payload = body.model_dump(mode="json")
+    if not payload.get("alias_link_proposals"):
+        payload.pop("alias_link_proposals", None)
     payload["artifact_type"] = "afs_structured_analysis_candidate"
     payload["candidate_id"] = f"candidate_{_sha256_json(payload)[:16]}"
     payload["created_at"] = _safe_time(body.generated_at)
@@ -2041,62 +2092,6 @@ def _extract_scene_ownership(
             _record_relationship_version(state, relationship)
             relationships.append(relationship)
     return relationships, _unique(affected), _unique(preserved)
-
-
-def _scene_start(scene: dict[str, Any]) -> int:
-    starts = [
-        int(span.get("start"))
-        for span in (scene.get("evidence_spans") or [])
-        if isinstance(span, dict) and isinstance(span.get("start"), int)
-    ]
-    return min(starts) if starts else -1
-
-
-def _scene_content_start(source_text: str, scene: dict[str, Any], scene_end: int) -> int:
-    evidence_ends = [
-        int(span.get("end"))
-        for span in (scene.get("evidence_spans") or [])
-        if isinstance(span, dict) and isinstance(span.get("end"), int)
-    ]
-    if not evidence_ends:
-        return scene_end
-    heading_evidence_end = max(evidence_ends)
-    line_end = source_text.find("\n", heading_evidence_end, scene_end)
-    return scene_end if line_end < 0 else line_end + 1
-
-
-def _member_spans_in_scene_block(
-    source_text: str,
-    start: int,
-    end: int,
-    member: dict[str, Any],
-) -> list[dict[str, Any]]:
-    labels = _clean_text_list(
-        [
-            str(member.get("display_name") or member.get("name") or ""),
-            *[str(item) for item in (member.get("aliases") or [])],
-        ]
-    )
-    spans: list[dict[str, Any]] = []
-    block = source_text[start:end]
-    seen: set[tuple[int, int]] = set()
-    for label in labels:
-        pattern = re.compile(rf"(?<!\w){re.escape(label)}(?!\w)", re.IGNORECASE)
-        for match in pattern.finditer(block):
-            absolute_start = start + match.start()
-            absolute_end = start + match.end()
-            identity = (absolute_start, absolute_end)
-            if identity in seen:
-                continue
-            seen.add(identity)
-            spans.append(
-                {
-                    "start": absolute_start,
-                    "end": absolute_end,
-                    "quote": source_text[absolute_start:absolute_end],
-                }
-            )
-    return sorted(spans, key=lambda item: (item["start"], item["end"]))[:12]
 
 
 def _relationship_extraction_content(relationship: dict[str, Any]) -> dict[str, Any]:
@@ -2554,7 +2549,7 @@ def _require_revision_contract(
 
 def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision: dict[str, Any]) -> None:
     source_text = str(revision.get("source_text") or "")
-    for item in [*body.named_characters, *body.main_scenes]:
+    for item in [*body.named_characters, *body.main_scenes, *body.alias_link_proposals]:
         for span in item.evidence_spans:
             expected = source_text[span.start : span.end]
             if expected != span.quote:
