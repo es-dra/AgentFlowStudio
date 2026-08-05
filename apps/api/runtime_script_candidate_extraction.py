@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from apps.api.runtime_script_alias_proposals import build_alias_link_proposals
+from apps.api.runtime_script_scene_name_normalization import build_scene_name_normalization_proposals
 
 
 DETERMINISTIC_EXTRACTION_SCHEMA_VERSION = "afs.deterministic_script_extraction.v0.1"
 ALIAS_LINK_PROPOSALS_ENV = "AFS_ENABLE_ALIAS_LINK_PROPOSALS"
+SCENE_NAME_NORMALIZATION_PROPOSALS_ENV = "AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS"
 
 
 @dataclass(frozen=True)
@@ -149,6 +151,11 @@ def build_deterministic_analysis_candidate(
         if _alias_link_proposals_enabled()
         else []
     )
+    scene_name_normalization_proposals = (
+        build_scene_name_normalization_proposals(source_text, scenes)
+        if _scene_name_normalization_proposals_enabled()
+        else []
+    )
     missing_slots: list[str] = []
     notes: list[str] = []
     if not characters:
@@ -189,6 +196,7 @@ def build_deterministic_analysis_candidate(
         "missing_slots": missing_slots,
         "extraction_notes": notes,
         "alias_link_proposals": alias_link_proposals,
+        "scene_name_normalization_proposals": scene_name_normalization_proposals,
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -196,6 +204,15 @@ def build_deterministic_analysis_candidate(
 
 def _alias_link_proposals_enabled() -> bool:
     return str(os.getenv(ALIAS_LINK_PROPOSALS_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _scene_name_normalization_proposals_enabled() -> bool:
+    return str(os.getenv(SCENE_NAME_NORMALIZATION_PROPOSALS_ENV, "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def extract_characters(source_text: str) -> list[ExtractedFact]:
@@ -375,6 +392,7 @@ __all__ = (
     "ALIAS_LINK_PROPOSALS_ENV",
     "DETERMINISTIC_EXTRACTION_SCHEMA_VERSION",
     "ExtractedFact",
+    "SCENE_NAME_NORMALIZATION_PROPOSALS_ENV",
     "build_deterministic_analysis_candidate",
     "extract_characters",
     "extract_scenes",
