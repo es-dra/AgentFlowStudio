@@ -1,0 +1,222 @@
+{
+  "schema_version": "missing_evidence_score_v0.1",
+  "summary": {
+    "case_count": 5,
+    "relation_judgment_count": 8,
+    "relation_judgments_scored": 8,
+    "relation_judgment_coverage_rate": 1.0,
+    "cases_with_prerequisite_gaps_count": 0,
+    "cases_with_prerequisite_gaps": [],
+    "cases_with_uncovered_relations_count": 0,
+    "cases_with_uncovered_relations": [],
+    "judgment_count_scored": 18,
+    "true_positive_missing": 4,
+    "true_negative_present": 14,
+    "false_positive_missing": 0,
+    "false_negative_missing": 0,
+    "missing_judgment_accuracy": 1.0,
+    "false_positive_missing_rate": 0.0,
+    "false_negative_missing_rate": 0.0
+  },
+  "cases": [
+    {
+      "id": "M1",
+      "prerequisite_gaps": [],
+      "uncovered_relation_keys": [],
+      "true_positive_missing": 1,
+      "true_negative_present": 5,
+      "false_positive_missing": 0,
+      "false_negative_missing": 0,
+      "judgments": [
+        {
+          "kind": "slot",
+          "key": "named_characters",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "slot",
+          "key": "main_scenes",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|地下车库|陈默",
+          "expected_missing": true,
+          "predicted_missing": true,
+          "detail": "missing",
+          "outcome": "TP"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|会议室|陈默",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|会议室|李薇",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|地下车库|李薇",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "prerequisite_gaps": [],
+      "uncovered_relation_keys": [],
+      "true_positive_missing": 2,
+      "true_negative_present": 0,
+      "false_positive_missing": 0,
+      "false_negative_missing": 0,
+      "judgments": [
+        {
+          "kind": "slot",
+          "key": "named_characters",
+          "expected_missing": true,
+          "predicted_missing": true,
+          "detail": "expected_missing_slots",
+          "outcome": "TP"
+        },
+        {
+          "kind": "slot",
+          "key": "main_scenes",
+          "expected_missing": true,
+          "predicted_missing": true,
+          "detail": "expected_missing_slots",
+          "outcome": "TP"
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "prerequisite_gaps": [],
+      "uncovered_relation_keys": [],
+      "true_positive_missing": 0,
+      "true_negative_present": 4,
+      "false_positive_missing": 0,
+      "false_negative_missing": 0,
+      "judgments": [
+        {
+          "kind": "slot",
+          "key": "named_characters",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "slot",
+          "key": "main_scenes",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|咖啡馆|陈默",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|咖啡馆|李薇",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "prerequisite_gaps": [],
+      "uncovered_relation_keys": [],
+      "true_positive_missing": 0,
+      "true_negative_present": 4,
+      "false_positive_missing": 0,
+      "false_negative_missing": 0,
+      "judgments": [
+        {
+          "kind": "slot",
+          "key": "named_characters",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "slot",
+          "key": "main_scenes",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|书房|陈默",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        },
+        {
+          "kind": "relation",
+          "key": "scene_cast|书房|李薇",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "candidate",
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "prerequisite_gaps": [],
+      "uncovered_relation_keys": [],
+      "true_positive_missing": 1,
+      "true_negative_present": 1,
+      "false_positive_missing": 0,
+      "false_negative_missing": 0,
+      "judgments": [
+        {
+          "kind": "slot",
+          "key": "named_characters",
+          "expected_missing": false,
+          "predicted_missing": false,
+          "detail": "forbidden_missing_slots",
+          "outcome": "TN"
+        },
+        {
+          "kind": "slot",
+          "key": "main_scenes",
+          "expected_missing": true,
+          "predicted_missing": true,
+          "detail": "expected_missing_slots",
+          "outcome": "TP"
+        }
+      ]
+    }
+  ]
+}

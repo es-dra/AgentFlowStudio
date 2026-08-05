@@ -1,0 +1,86 @@
+{
+  "schema_version": "script_understanding_eval_framework_v0.1",
+  "framework_health": {
+    "covered_dimensions": [
+      "aliases",
+      "missing-evidence"
+    ],
+    "protocol_verified_dimensions": [
+      "aliases",
+      "missing-evidence"
+    ],
+    "protocol_unverified_dimensions": [],
+    "health_note": "Framework reports dimension-level metrics only; it does not combine aliases and missing-evidence into a single score."
+  },
+  "dimensions": [
+    {
+      "dimension": "aliases",
+      "description": "alias and identity-linking proposal clusters",
+      "protocol": {
+        "verified_with_synthetic_data": true,
+        "synthetic_checks": {
+          "perfect_macro_f1_is_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "split_aliases_has_false_splits": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "must_not_violation_triggers_hard_fail": {
+            "passed": true,
+            "observed": 1
+          }
+        },
+        "failed_checks": []
+      },
+      "real_run": {
+        "candidate_path": "aliases/deterministic_candidates.json",
+        "report_path": "aliases/deterministic_score_report.json",
+        "case_count": 8,
+        "macro_bcubed_f1": 1.0,
+        "linkable_cluster_coverage_rate": 0.8,
+        "macro_false_split_rate": 0.0,
+        "macro_false_merge_rate": 0.0,
+        "hard_fail_case_count": 0,
+        "cases_missing_fsr_score": [
+          "A8"
+        ]
+      }
+    },
+    {
+      "dimension": "missing-evidence",
+      "description": "missing slot and scene_cast evidence judgments",
+      "protocol": {
+        "verified_with_synthetic_data": true,
+        "synthetic_checks": {
+          "perfect_accuracy_is_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "over_missing_has_fp_rate_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "under_missing_has_fn_rate_1": {
+            "passed": true,
+            "observed": 1.0
+          }
+        },
+        "failed_checks": []
+      },
+      "real_run": {
+        "candidate_path": "missing-evidence/runtime_candidates.json",
+        "report_path": "missing-evidence/runtime_score_report.json",
+        "case_count": 5,
+        "judgment_count_scored": 18,
+        "missing_judgment_accuracy": 1.0,
+        "false_positive_missing_rate": 0.0,
+        "false_negative_missing_rate": 0.0,
+        "relation_judgment_coverage_rate": 1.0,
+        "cases_with_prerequisite_gaps_count": 0,
+        "cases_with_uncovered_relations_count": 0
+      }
+    }
+  ]
+}

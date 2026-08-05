@@ -25,6 +25,9 @@ The scorer implements the formulas in DESIGN.md:
   - false merge rate is over cross-gold-cluster forbidden pairs plus must_not_link
   - must_not_link pairs are HARD_FAIL when both surfaces are present in system output
     and placed in the same predicted cluster
+  - coverage metrics sit in the same summary as macro F1/FSR/FMR: what share of
+    gold multi-mention clusters (size >= 2) actually enter the FSR scoring universe
+    (|C ∩ M| >= 2), and which cases have linkable gold but no FSR score
 
 Small clarification from DESIGN.md:
   must_not_link pairs that include a gold-exempt or ambiguous surface, such as A6
@@ -51,6 +54,10 @@ class CaseScore:
     system_mentions: int
     scoring_mentions: int
     extraction_recall_gap: list[str]
+    linkable_gold_cluster_count: int
+    linkable_gold_clusters_scored: int
+    linkable_gold_clusters_unscored: list[str]
+    fsr_scorable: bool
     bcubed_precision: float | None
     bcubed_recall: float | None
     bcubed_f1: float | None
@@ -199,6 +206,29 @@ def _false_merge(
     return false_merge_count / denominator, false_merge_count, denominator, bool(hard_fail_pairs), sorted(set(hard_fail_pairs))
 
 
+def _linkable_coverage(
+    gold_clusters: dict[str, set[str]],
+    universe: set[str],
+) -> tuple[int, int, list[str]]:
+    """Gold clusters with size >= 2 need a linking judgment.
+
+    A cluster is *scored* for FSR only when at least two of its surfaces are in M.
+    Otherwise it is uncovered: missing aliases inflate macro F1/FSR by dropping out.
+    """
+    linkable = 0
+    scored = 0
+    unscored_ids: list[str] = []
+    for cluster_id, gold_set in gold_clusters.items():
+        if len(gold_set) < 2:
+            continue
+        linkable += 1
+        if len(gold_set.intersection(universe)) >= 2:
+            scored += 1
+        else:
+            unscored_ids.append(cluster_id)
+    return linkable, scored, unscored_ids
+
+
 def score_case(gold_case: dict[str, Any], candidate_case: dict[str, Any]) -> CaseScore:
     case_id = str(gold_case["id"])
     gold_clusters, gold_index = _index_clusters(gold_case.get("gold_clusters", []), label=f"{case_id}:gold")
@@ -208,6 +238,7 @@ def score_case(gold_case: dict[str, Any], candidate_case: dict[str, Any]) -> Cas
     system_mentions = set(sys_index)
     universe = gold_mentions.intersection(system_mentions)
     extraction_recall_gap = sorted(gold_mentions.difference(system_mentions))
+    linkable, linkable_scored, unscored_ids = _linkable_coverage(gold_clusters, universe)
 
     precision, recall, f1 = _bcubed(universe, gold_clusters, gold_index, sys_clusters, sys_index)
     fsr, split_count, split_denominator, fragment_mean = _false_split(universe, gold_clusters, sys_index)
@@ -225,6 +256,10 @@ def score_case(gold_case: dict[str, Any], candidate_case: dict[str, Any]) -> Cas
         system_mentions=len(system_mentions),
         scoring_mentions=len(universe),
         extraction_recall_gap=extraction_recall_gap,
+        linkable_gold_cluster_count=linkable,
+        linkable_gold_clusters_scored=linkable_scored,
+        linkable_gold_clusters_unscored=unscored_ids,
+        fsr_scorable=fsr is not None,
         bcubed_precision=precision,
         bcubed_recall=recall,
         bcubed_f1=f1,
@@ -255,9 +290,25 @@ def score_dataset(gold_data: dict[str, Any], candidate_data: dict[str, Any]) -> 
             return None
         return sum(actual) / len(actual)
 
+    linkable_total = sum(score.linkable_gold_cluster_count for score in case_scores)
+    linkable_scored = sum(score.linkable_gold_clusters_scored for score in case_scores)
+    cases_missing_fsr = [
+        score.case_id
+        for score in case_scores
+        if score.linkable_gold_cluster_count > 0 and not score.fsr_scorable
+    ]
+    coverage_rate = (linkable_scored / linkable_total) if linkable_total else None
+
+    # Coverage fields sit beside quality macros on purpose: F1 without coverage
+    # overstates how much of the alias problem was actually judged.
     summary = {
         "case_count": len(case_scores),
         "hard_fail_case_count": sum(1 for score in case_scores if score.hard_fail),
+        "linkable_gold_cluster_count": linkable_total,
+        "linkable_gold_clusters_scored": linkable_scored,
+        "linkable_cluster_coverage_rate": coverage_rate,
+        "cases_missing_fsr_score_count": len(cases_missing_fsr),
+        "cases_missing_fsr_score": cases_missing_fsr,
         "macro_bcubed_precision": macro(score.bcubed_precision for score in case_scores),
         "macro_bcubed_recall": macro(score.bcubed_recall for score in case_scores),
         "macro_bcubed_f1": macro(score.bcubed_f1 for score in case_scores),
@@ -275,6 +326,10 @@ def score_dataset(gold_data: dict[str, Any], candidate_data: dict[str, Any]) -> 
                 "system_mentions": score.system_mentions,
                 "scoring_mentions": score.scoring_mentions,
                 "extraction_recall_gap": score.extraction_recall_gap,
+                "linkable_gold_cluster_count": score.linkable_gold_cluster_count,
+                "linkable_gold_clusters_scored": score.linkable_gold_clusters_scored,
+                "linkable_gold_clusters_unscored": score.linkable_gold_clusters_unscored,
+                "fsr_scorable": score.fsr_scorable,
                 "bcubed_precision": score.bcubed_precision,
                 "bcubed_recall": score.bcubed_recall,
                 "bcubed_f1": score.bcubed_f1,

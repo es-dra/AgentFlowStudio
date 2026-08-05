@@ -1,0 +1,105 @@
+{
+  "schema_version": "missing_evidence_eval_gold_v0.1",
+  "scope": {
+    "source_memo": "docs/internal-notes/missing-evidence-eval-scope-memo-20260805.md",
+    "in_scope": [
+      "slot-level missing_slots for named_characters / main_scenes",
+      "relation-level scene_cast status=missing / evidence_status=missing"
+    ],
+    "out_of_scope": [
+      "ScriptProfile facets",
+      "Beat facets",
+      "anonymous name_missing entities",
+      "scene_core_prop depth cases"
+    ]
+  },
+  "metric_contract": {
+    "proposal_layer_only": true,
+    "notes": [
+      "Slot judgments compare expected_missing_slots / forbidden_missing_slots to system missing_slots.",
+      "Relation judgments compare expected_relation_missing / expected_relation_present to scene_cast rows keyed by scene display_name × member display_name.",
+      "If a relation gold row's scene or member is absent from extracted assets, that judgment is uncovered (coverage gap), not an automatic false negative.",
+      "False-positive missing = gold says present/not-missing but system marks missing.",
+      "False-negative missing = gold says missing but system does not."
+    ]
+  },
+  "cases": [
+    {
+      "id": "M1",
+      "type": ["relation_missing_named_no_presence"],
+      "title": "有名无戏份：名单有陈默，地下车库无字面",
+      "source": "标题：只在名单里\n\n第一场 - 内景 - 会议室 - 日\n\n人物：陈默、李薇\n\n陈默\n纪要发我一份。\n\n李薇\n好。\n\n第二场 - 内景 - 地下车库 - 夜\n\n李薇独自走向车门，掏出车钥匙。引擎声在空旷车位间回响。\n\n李薇\n（自语）\n还是自己回去吧。",
+      "require_characters": ["陈默", "李薇"],
+      "require_scenes": ["会议室", "地下车库"],
+      "expected_missing_slots": [],
+      "forbidden_missing_slots": ["named_characters", "main_scenes"],
+      "expected_relation_missing": [
+        {"relation_type": "scene_cast", "scene": "地下车库", "member": "陈默"}
+      ],
+      "expected_relation_present": [
+        {"relation_type": "scene_cast", "scene": "会议室", "member": "陈默"},
+        {"relation_type": "scene_cast", "scene": "会议室", "member": "李薇"},
+        {"relation_type": "scene_cast", "scene": "地下车库", "member": "李薇"}
+      ],
+      "scoring_notes": "核心：资产存在不等于每场有出演证据；不得脑补车库×陈默。"
+    },
+    {
+      "id": "M2",
+      "type": ["slot_missing_whole_class"],
+      "title": "槽级对照：陌生来电式无专名无场景标",
+      "source": "标题：陌生来电（槽级对照）\n\n第一场\n\n深夜，一个女人坐在昏暗的房间里，手机屏幕的光照着她的脸。\n屏幕上显示一个陌生号码。她犹豫很久，接通电话。\n\n女人\n（压低声音）\n喂？\n\n电话那头只有呼吸声。电话挂断了。",
+      "require_characters": [],
+      "require_scenes": [],
+      "expected_missing_slots": ["named_characters", "main_scenes"],
+      "forbidden_missing_slots": [],
+      "expected_relation_missing": [],
+      "expected_relation_present": [],
+      "scoring_notes": "泛称「女人」不得填成命名人物；散文无合格场景 heading 时 main_scenes 也应 missing。"
+    },
+    {
+      "id": "M3",
+      "type": ["slot_false_positive_guard"],
+      "title": "槽级反例：有字面人物与场景，不得误标 missing",
+      "source": "标题：有名有场\n\n第一场 - 内景 - 咖啡馆 - 日\n\n人物：陈默、李薇\n\n陈默\n今天的咖啡不错。\n\n李薇\n嗯。",
+      "require_characters": ["陈默", "李薇"],
+      "require_scenes": ["咖啡馆"],
+      "expected_missing_slots": [],
+      "forbidden_missing_slots": ["named_characters", "main_scenes"],
+      "expected_relation_missing": [],
+      "expected_relation_present": [
+        {"relation_type": "scene_cast", "scene": "咖啡馆", "member": "陈默"},
+        {"relation_type": "scene_cast", "scene": "咖啡馆", "member": "李薇"}
+      ],
+      "scoring_notes": "假阳性 missing 守卫：有证据时 missing_slots 必须为空，且场内出演应为 present。"
+    },
+    {
+      "id": "M4",
+      "type": ["relation_present_guard"],
+      "title": "关系级正例：两人在书房均有字面，不得过度标 missing",
+      "source": "标题：两人都在场\n\n第一场 - 内景 - 书房 - 夜\n\n人物：陈默、李薇\n\n陈默坐在书桌前。李薇站在门口。\n\n陈默\n文件在第二抽屉。\n\n李薇\n我看到了。",
+      "require_characters": ["陈默", "李薇"],
+      "require_scenes": ["书房"],
+      "expected_missing_slots": [],
+      "forbidden_missing_slots": ["named_characters", "main_scenes"],
+      "expected_relation_missing": [],
+      "expected_relation_present": [
+        {"relation_type": "scene_cast", "scene": "书房", "member": "陈默"},
+        {"relation_type": "scene_cast", "scene": "书房", "member": "李薇"}
+      ],
+      "scoring_notes": "叙述句中的姓名字面也算 #231 精确命中；过度保守把有证据关系标 missing 记假阳性。"
+    },
+    {
+      "id": "M5",
+      "type": ["slot_partial_scene_missing"],
+      "title": "槽级部分：有人物无合格场景 heading",
+      "source": "标题：有人无场标\n\n人物：陈默\n\n陈默\n我在说话，但没有场景标题。",
+      "require_characters": ["陈默"],
+      "require_scenes": [],
+      "expected_missing_slots": ["main_scenes"],
+      "forbidden_missing_slots": ["named_characters"],
+      "expected_relation_missing": [],
+      "expected_relation_present": [],
+      "scoring_notes": "只缺场景槽；人物槽不得被连带标 missing。无场景资产时不评关系级。"
+    }
+  ]
+}
