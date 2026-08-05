@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
 
+from apps.api.runtime_script_alias_proposals import build_alias_link_proposals
+
 
 DETERMINISTIC_EXTRACTION_SCHEMA_VERSION = "afs.deterministic_script_extraction.v0.1"
+ALIAS_LINK_PROPOSALS_ENV = "AFS_ENABLE_ALIAS_LINK_PROPOSALS"
 
 
 @dataclass(frozen=True)
@@ -140,6 +144,11 @@ def build_deterministic_analysis_candidate(
 ) -> dict[str, Any]:
     characters = extract_characters(source_text)
     scenes = extract_scenes(source_text)
+    alias_link_proposals = (
+        build_alias_link_proposals(source_text, characters)
+        if alias_link_proposals_enabled()
+        else []
+    )
     missing_slots: list[str] = []
     notes: list[str] = []
     if not characters:
@@ -179,9 +188,14 @@ def build_deterministic_analysis_candidate(
         ],
         "missing_slots": missing_slots,
         "extraction_notes": notes,
+        "alias_link_proposals": alias_link_proposals,
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+
+
+def alias_link_proposals_enabled() -> bool:
+    return str(os.getenv(ALIAS_LINK_PROPOSALS_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def extract_characters(source_text: str) -> list[ExtractedFact]:
@@ -358,8 +372,10 @@ def _is_specific_scene(value: str) -> bool:
 
 
 __all__ = (
+    "ALIAS_LINK_PROPOSALS_ENV",
     "DETERMINISTIC_EXTRACTION_SCHEMA_VERSION",
     "ExtractedFact",
+    "alias_link_proposals_enabled",
     "build_deterministic_analysis_candidate",
     "extract_characters",
     "extract_scenes",
