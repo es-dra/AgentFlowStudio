@@ -92,7 +92,7 @@
 
 ### 3.3 与资产级 `evidence_status` 的边界
 
-Character/Scene 资产上的 `evidence_status` 枚举是 `extracted_from_text | model_inferred | conflicting`，**不含 missing**。  
+Character/Scene 资产上的 `evidence_status` 枚举是 `extracted_from_text | model_inferred | conflicting`，**不含 missing**。
 「有名无戏份」测的是 **关系** missing，不是把人物资产标成 missing。备忘要求金标与报告写清这一层，避免评测写错对象。
 
 ---
@@ -191,10 +191,10 @@ Character/Scene 资产上的 `evidence_status` 枚举是 `extracted_from_text | 
 ### 5.1 「有人但叫不出名字」要不要动 schema？
 
 - **现象：** 叙事需要「未具名角色」占位，但当前候选人物强制有名 + 至少一段 evidence span。
-- **若要处理，大致会动到：**  
-  - `CandidateCharacter`（或后继）是否允许 `display_name` 空 / 占位类型；  
-  - `evidence_spans` 的 min_length 与「姓名证据 vs 出场证据」是否拆分；  
-  - 确认门：无名实体能否 confirm、Graph 节点标签是什么；  
+- **若要处理，大致会动到：**
+  - `CandidateCharacter`（或后继）是否允许 `display_name` 空 / 占位类型；
+  - `evidence_spans` 的 min_length 与「姓名证据 vs 出场证据」是否拆分；
+  - 确认门：无名实体能否 confirm、Graph 节点标签是什么；
   - Studio 审阅文案（避免把占位当成已命名事实）。
 - **建议态度：** 先当 **明确的产品/契约债** 记账；在未改 schema 前，**不要**用评测协议假装已支持。
 
@@ -202,24 +202,24 @@ Character/Scene 资产上的 `evidence_status` 枚举是 `extracted_from_text | 
 
 - **已有价值：** facet 级 present/missing、缺证据不可 accept、只能 `edit_confirm`——与老板「复杂/部分缺失」高度相关。
 - **迁移前提（矩阵已暗示）：** 每类要有真实下游消费者；挂到 **单一** 审阅骨架，禁止再开 CandidateFact 第二账本。
-- **决策问题：**  
-  - 先迁 Profile 五维，还是等媒体/计划侧真正消费 theme/genre？  
-  - Beat 是否仍因边界难题继续整类 missing，只迁「显式标签才 present」？  
+- **决策问题：**
+  - 先迁 Profile 五维，还是等媒体/计划侧真正消费 theme/genre？
+  - Beat 是否仍因边界难题继续整类 missing，只迁「显式标签才 present」？
   - missing facet 在 analysis-candidates 上是做成 asset 字段、独立 relationship，还是 candidate 级 structured slots？
 - **建议态度：** 与本备忘的槽级+关系级评测 **解耦排期**；本备忘跑通后，再单独开「Profile/Beat 迁入范围」备忘，避免一次评测协议吞三层本体。
 
 ### 5.3 可选的小扩展（仍非本次必做）
 
-- 为 `scene_core_prop` 加一条对称的「道具已建、场内无字面」金标。  
+- 为 `scene_core_prop` 加一条对称的「道具已建、场内无字面」金标。
 - 计分侧是否需要类似别名的 **coverage** 指标（例如：期望 missing 的关系有多少被系统标出）——留给正式设计稿，本备忘不定义公式。
 
 ---
 
 ## 6. 本备忘不交付什么
 
-- 不写 `gold_cases.json` / 计分脚本 / 生产代码。  
-- 不改 `apps/api` schema。  
-- 不推分支、不开 PR。  
+- 不写 `gold_cases.json` / 计分脚本 / 生产代码。
+- 不改 `apps/api` schema。
+- 不推分支、不开 PR。
 - 不把 week 的 Profile/Beat 实现「假设为已在 master」。
 
 ---

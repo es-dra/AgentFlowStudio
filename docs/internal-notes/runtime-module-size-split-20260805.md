@@ -61,10 +61,10 @@
 ### 2.2 `runtime_script_core_truth.py`（~3k）— 收益高、全拆风险高
 
 - **为什么大：** 同文件混合：Pydantic 契约、HTTP 路由注册、revision/candidate/asset 持久化、审阅与 Graph 写入、core-asset 命令、**#231 场景归属**。
-- **自然边界：**  
-  - 已拆：确定性人物/场景提取 → `runtime_script_candidate_extraction.py`  
-  - 可继续：场景块字面匹配（纯函数）→ 本次已做  
-  - 下一步候选（未做）：ownership 路由+审阅状态机、core-asset 命令、public projection DTO  
+- **自然边界：**
+  - 已拆：确定性人物/场景提取 → `runtime_script_candidate_extraction.py`
+  - 可继续：场景块字面匹配（纯函数）→ 本次已做
+  - 下一步候选（未做）：ownership 路由+审阅状态机、core-asset 命令、public projection DTO
 - **依赖：** API/tests 约 **15** 处直接引用；内部私有函数互相调用密。
 - **本次：** 只拆 **纯匹配辅助**，不动路由与状态机。
 
@@ -84,7 +84,7 @@
 | `_scene_start` / `_scene_content_start` / `_member_spans_in_scene_block` 在 `runtime_script_core_truth.py` | 迁至 `apps/api/runtime_script_scene_block_match.py`（公开名 `scene_evidence_start` 等） |
 | 同文件直接定义 | `runtime_script_core_truth` **仅改 import 别名**，仍用 `_scene_start` 等内部名调用 |
 
-- **未改：** HTTP 路径、JSON 契约、ownership 状态机、Graph 写入。  
+- **未改：** HTTP 路径、JSON 契约、ownership 状态机、Graph 写入。
 - 新模块内保留与原先等价的 label 清洗私有辅助（避免把全局 `_clean_text_list` 大搬家）。
 
 ### 3.2 行数对比
@@ -116,8 +116,8 @@ pytest tests/test_api_runtime_scene_ownership.py \
 
 ## 4. 后续拆分建议（未做）
 
-1. 将 `#231` ownership **审阅/失效/Graph 边** 整段迁到 `runtime_script_scene_ownership.py`（仍依赖 store 辅助，需一次较大 PR）。  
-2. `product-shell.js` 按 workspace 切片（独立里程碑，需前端专项）。  
+1. 将 `#231` ownership **审阅/失效/Graph 边** 整段迁到 `runtime_script_scene_ownership.py`（仍依赖 store 辅助，需一次较大 PR）。
+2. `product-shell.js` 按 workspace 切片（独立里程碑，需前端专项）。
 3. `runtime_embedded_creative_actions.py` 先抽 screenplay safety 纯函数簇（需先抽出共享 `_safe_text` 小模块以免循环依赖）。
 
 ---
