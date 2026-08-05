@@ -12,7 +12,6 @@ configs/providers.*.local.json
 !configs/providers.example.json
 configs/ffmpeg.yaml
 !configs/ffmpeg.example.yaml
-
 # python
 __pycache__/
 *.pyc
@@ -23,7 +22,6 @@ venv/
 .ruff_cache/
 build/
 *.egg-info/
-
 # local data and generated artifacts
 data/raw/*
 data/processed/*
@@ -35,7 +33,6 @@ data/reports/*
 !data/models/.gitkeep
 !data/outputs/.gitkeep
 !data/reports/.gitkeep
-
 # media
 *.mp4
 *.mov
@@ -44,18 +41,15 @@ data/reports/*
 *.wav
 *.mp3
 *.flac
-
 # generated
 /outputs/
 /artifacts/
 /runs/
-
 # node and tool caches
 node_modules/
 .claude-data/
 .codex/
 .cache/
-
 # secrets
 *.key
 *.pem
