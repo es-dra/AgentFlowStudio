@@ -1,0 +1,115 @@
+{
+  "01_echo_inn_long.txt": {
+    "char_count": 3238,
+    "lines": 272,
+    "under_200k": true,
+    "ms_median": 1.011,
+    "ms_max": 4.652,
+    "characters": [
+      "老周",
+      "苏晴",
+      "林悦",
+      "陈默",
+      "苏衡"
+    ],
+    "character_methods": [
+      [
+        "老周",
+        "character_bio_intro"
+      ],
+      [
+        "苏晴",
+        "character_bio_intro"
+      ],
+      [
+        "林悦",
+        "dialogue_speaker_cue"
+      ],
+      [
+        "陈默",
+        "dialogue_speaker_cue"
+      ],
+      [
+        "苏衡",
+        "dialogue_speaker_cue"
+      ]
+    ],
+    "scenes": [
+      "回声旅馆大堂",
+      "三零二客房",
+      "旅馆餐厅",
+      "旅馆后院晾衣场",
+      "老周值班室",
+      "老宅巷口",
+      "苏衡老宅客厅",
+      "旅馆地下室门廊",
+      "地下室机房",
+      "旅馆门前台阶"
+    ],
+    "missing_slots": []
+  },
+  "02_night_post_long.txt": {
+    "char_count": 2898,
+    "lines": 223,
+    "under_200k": true,
+    "ms_median": 0.868,
+    "ms_max": 1.304,
+    "characters": [
+      "赵石",
+      "顾晚",
+      "何婶",
+      "方糖",
+      "周伯",
+      "刘正",
+      "陈默",
+      "站长刘正"
+    ],
+    "character_methods": [
+      [
+        "赵石",
+        "labeled_character_field"
+      ],
+      [
+        "顾晚",
+        "labeled_character_field"
+      ],
+      [
+        "何婶",
+        "labeled_character_field"
+      ],
+      [
+        "方糖",
+        "character_bio_intro"
+      ],
+      [
+        "周伯",
+        "dialogue_speaker_cue"
+      ],
+      [
+        "刘正",
+        "dialogue_speaker_cue"
+      ],
+      [
+        "陈默",
+        "dialogue_speaker_cue"
+      ],
+      [
+        "站长刘正",
+        "character_bio_intro"
+      ]
+    ],
+    "scenes": [
+      "老城区二十四小时邮局大厅",
+      "邮局后院卸货区",
+      "邮局更衣室",
+      "顾晚合租屋的客厅",
+      "邮局大厅",
+      "邮局站长办公室",
+      "护城河步道",
+      "合租屋客厅",
+      "护城河对岸旧仓",
+      "旧仓铁柜前"
+    ],
+    "missing_slots": []
+  }
+}
