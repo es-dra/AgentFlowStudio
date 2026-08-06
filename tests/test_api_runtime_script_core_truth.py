@@ -188,7 +188,7 @@ def test_revision_candidate_contract_fails_closed_and_keeps_narrative_fields_out
     assert accepted.json()["provider_dispatch_count"] == 0
 
 
-def test_structured_candidate_aliases_require_explicit_merge_alias(tmp_path) -> None:
+def test_structured_candidate_aliases_are_accepted_but_never_become_authoritative(tmp_path) -> None:
     client = _client(tmp_path)
     project_id = "candidate-alias-authority-boundary"
     text = "Captain Vale, called V, waits in the archive."
@@ -205,10 +205,16 @@ def test_structured_candidate_aliases_require_explicit_merge_alias(tmp_path) -> 
         ),
     )
 
-    assert response.status_code == 422, response.text
-    projection = client.get(f"/projects/{project_id}/script-truth").json()["projection"]
-    assert projection["assets"] == []
-    assert projection["current_revision"]["analysis_state"] == "analysis_required"
+    assert response.status_code == 200, response.text
+    state_path = tmp_path / "projects" / project_id / "script_core_truth" / "truth_state.json"
+    stored_state = json.loads(state_path.read_text(encoding="utf-8"))
+    stored_candidate = next(iter(stored_state["analysis_candidates"].values()))
+    assert stored_candidate["named_characters"][0]["aliases"] == []
+    projection = response.json()["projection"]
+    character = next(item for item in projection["assets"] if item["asset_type"] == "character")
+    assert character["aliases"] == []
+    assert character["status"] == "candidate"
+    assert client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]["nodes"] == {}
 
 
 def test_legacy_candidate_alias_needs_merge_receipt_before_review_after_restart(tmp_path) -> None:

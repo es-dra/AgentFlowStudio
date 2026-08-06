@@ -58,7 +58,7 @@ class CandidateCharacter(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: str = Field(min_length=1, max_length=120)
-    aliases: list[str] = Field(default_factory=list, max_length=0)
+    aliases: list[str] = Field(default_factory=list, max_length=20)
     pronoun_links: list[str] = Field(default_factory=list, max_length=20)
     evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
     confidence: float = Field(ge=0.0, le=1.0)
@@ -1771,6 +1771,8 @@ def _analysis_candidate_record(
     body: StructuredAnalysisCandidateRequest,
 ) -> dict[str, Any]:
     payload = body.model_dump(mode="json")
+    for character in payload.get("named_characters") or []:
+        character["aliases"] = []
     if not payload.get("alias_link_proposals"):
         payload.pop("alias_link_proposals", None)
     payload["artifact_type"] = "afs_structured_analysis_candidate"
@@ -2657,14 +2659,6 @@ def _validate_candidate_alias_authority(
     *,
     project_id: str,
 ) -> None:
-    if any(item.aliases for item in body.named_characters):
-        raise _contract_error(
-            "candidate_aliases_require_merge_alias",
-            "Candidate aliases must be submitted as non-authoritative proposals and promoted through merge_alias.",
-            project_id=project_id,
-            stage="analysis_candidate_submit",
-            status_code=409,
-        )
     if body.alias_link_proposals and not alias_link_proposals_enabled():
         raise _contract_error(
             "alias_link_proposals_disabled",
