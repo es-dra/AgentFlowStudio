@@ -2,37 +2,40 @@
 
 Status: internal evaluation framework v0.1.
 
-This framework measures the quality of script-understanding candidate proposals.
-It does not confirm facts, write authoritative Production Graph state, perform
-human acceptance, validate generated media, or prove business readiness.
+This framework measures script-understanding candidate quality **and** long-text
+runtime stability. It does not confirm facts, write authoritative Production
+Graph state, perform human acceptance, validate generated media, or prove
+business readiness.
 
 ## Purpose
 
-The framework keeps representative script-understanding evaluations in one
-place while preserving each dimension's verified scoring protocol. Different
-dimensions keep separate metrics because they measure different failure modes;
-the framework reports health and coverage instead of inventing a combined score.
+The framework keeps representative evaluations in one place while preserving
+each dimension's verified scoring protocol. Dimensions measure **different
+failure categories**; the framework reports health and coverage instead of
+inventing a combined score.
 
-## Current Dimensions
+## Current Dimensions (4 / 4)
 
-| Dimension | Path | What it measures | Key metrics |
-|---|---|---|---|
-| Aliases | `aliases/` | Whether candidate identity clusters link alias surfaces that should be the same person without false merges. | macro BCubed F1, linkable-cluster coverage, false split rate, false merge rate, hard-fail count |
-| Missing evidence | `missing-evidence/` | Whether slot-level and `scene_cast` relationship judgments correctly mark missing versus present evidence. | missing judgment accuracy, false-positive missing rate, false-negative missing rate, relation judgment coverage |
-| Indirect mentions | `indirect-mentions/` | Whether paid LLM split-field judgments correctly classify person-reference vs on-stage presence (and the derived indirect-mention label). | refers/present/indirect accuracy, precision, recall; false-positive vs false-negative rates reported separately |
+Two categories of question:
 
-Each dimension includes gold cases, its scorer, a way to produce current real
-candidates, and saved analysis/report artifacts.
+| Category | Dimension | Path | What it measures | Key metrics |
+|---|---|---|---|---|
+| **Understanding correctness** | Aliases | `aliases/` | Whether identity clusters link alias surfaces that should be the same person without false merges. | macro BCubed F1, linkable-cluster coverage, false split / false merge rates, hard-fail count |
+| **Understanding correctness** | Missing evidence | `missing-evidence/` | Whether slot-level and `scene_cast` judgments correctly mark missing versus present evidence. | missing judgment accuracy, FP/FN missing rates, relation coverage |
+| **Understanding correctness** | Indirect mentions | `indirect-mentions/` | Whether paid LLM split-field judgments classify person-reference vs on-stage presence (and derived indirect). | refers/present/indirect accuracy, precision, recall; FP vs FN separately |
+| **Runtime stability / operability** | Long scripts | `long-scripts/` | Whether free deterministic paths stay bit-stable on long+generalization scripts, discovery volume stays bounded, paid LLM budgets truncate, and the pipeline does not crash. | checklist pass rate; free-path determinism rate; soft/hard discovery ceilings; budget enforcement rate; crash-free rate |
 
-Coverage: **3 / 4** planned script-understanding concerns. Long scripts remain
-out of scope as a separate dimension (see below).
+Coverage: **4 / 4**. These are not four parallel accuracy scores.
 
-## Not Covered
+### Why long-scripts is stability, not accuracy
 
-Long scripts are not a separate v0.1 dimension. Current analysis treats long
-scripts as an amplifier for alias linking and indirect-mention failures; adding
-a separate long-script score would duplicate those dimensions without a clearer
-protocol.
+Long scripts amplify alias and indirect-mention *correctness* failures; those
+are already scored in `aliases/` and `indirect-mentions/`. Re-running those
+accuracy metrics on longer text would duplicate information and contradict the
+finding that “long script” is not a separate understanding problem.
+
+`long-scripts/` therefore uses a **checklist protocol** (self-consistency +
+boundary behavior), not precision/recall gold labels.
 
 ## Running
 
@@ -55,44 +58,43 @@ The unified runner:
 - regenerates alias deterministic candidates and scores them;
 - runs the missing-evidence runtime extraction harness and scores it;
 - runs the indirect-mention oracle LLM harness (paid) and scores it;
+- runs long-script stability observations (**mock judge, zero remote LLM by default**) and scores the checklist;
 - writes `script_understanding_eval_summary.json`;
 - updates each dimension's saved real score report.
 
-**Cost note:** the indirect-mentions real path issues one remote LLM call per
-gold case (oracle on `context_snippet`). It does not full-script discover+judge.
-Requires `AFS_ALLOW_REMOTE_LLM=true` and `AFS_PROVIDER_CONFIG`.
+**Cost note:** indirect-mentions real path issues one remote LLM call per gold
+case. Long-scripts default path issues **no** remote LLM calls (budget probe
+uses a mock judge). Requires `AFS_ALLOW_REMOTE_LLM=true` only for the
+indirect-mentions real path.
 
-You can still run a dimension directly from its subdirectory, using that
-dimension's local scripts and `gold_cases.json`.
+You can still run a dimension directly from its subdirectory.
 
 ## Framework Health
 
-Framework health answers three questions:
+Framework health answers:
 
-1. Which dimensions are currently covered.
-2. Whether each dimension's scoring protocol has been checked with synthetic
-   data that should produce known pass/fail behavior.
-3. What the current real candidate path scores for that dimension.
+1. Which dimensions are covered.
+2. Whether each dimension's scoring protocol was checked with synthetic data.
+3. What the current real candidate / observation path scores for that dimension.
 
-It does not average alias F1 with missing-evidence accuracy or indirect-mention
-binary rates. Those numbers are not commensurate.
+It does not average alias F1 with missing-evidence accuracy, indirect-mention
+binary rates, or long-script checklist rates. Those numbers are not commensurate.
 
 ## Adding A Dimension
 
-Add a new dimension as a sibling directory, for example `long-scripts/` only if
-it has a distinct protocol.
+Add a sibling directory only if it has a **distinct** protocol (accuracy vs
+stability vs another category).
 
 Use this pattern:
 
-- `gold_cases.json` with stable case IDs and explicit expected judgments.
-- one scorer script that can score supplied candidate JSON.
-- synthetic scorer checks with at least a perfect case and one meaningful
-  failure mode.
-- one real-candidate runner or generator for the current implementation path.
-- saved candidate/report artifacts when useful for analysis.
-- a short `ANALYSIS.md` if the dimension has interpretation caveats.
-- a `run_all.py` adapter that reports dimension-level metrics and protocol
-  verification without changing the scorer's internal logic.
+- corpus or `gold_cases.json` with stable IDs;
+- one scorer that can score supplied candidate/observation JSON;
+- synthetic scorer checks (perfect + meaningful failure modes);
+- one real runner for the current implementation path;
+- saved report artifacts;
+- short `PROTOCOL.md` / `ANALYSIS.md` when interpretation caveats matter;
+- a `run_all.py` adapter that reports dimension-level metrics without changing
+  the scorer's internal logic.
 
 Candidate outputs remain proposals. A passing score does not authorize automatic
 confirmation or durable graph writes.

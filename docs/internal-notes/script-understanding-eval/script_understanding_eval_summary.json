@@ -4,15 +4,17 @@
     "covered_dimensions": [
       "aliases",
       "missing-evidence",
-      "indirect-mentions"
+      "indirect-mentions",
+      "long-scripts"
     ],
     "protocol_verified_dimensions": [
       "aliases",
       "missing-evidence",
-      "indirect-mentions"
+      "indirect-mentions",
+      "long-scripts"
     ],
     "protocol_unverified_dimensions": [],
-    "health_note": "Framework reports dimension-level metrics only; it does not combine aliases, missing-evidence, and indirect-mentions into a single score. Coverage is 3/4 (long scripts remain an amplifier, not a separate dimension)."
+    "health_note": "Framework reports dimension-level metrics only; it does not combine scores. Coverage is 4/4 across two categories: understanding correctness (aliases, missing-evidence, indirect-mentions) and runtime stability (long-scripts checklist). Long-scripts is not a fourth accuracy metric."
   },
   "dimensions": [
     {
@@ -121,6 +123,42 @@
         "uncovered_required_case_count": 0,
         "llm_call_count": 24,
         "wall_time_sec": 94.67
+      }
+    },
+    {
+      "dimension": "long-scripts",
+      "description": "long-text runtime stability / operability (not understanding accuracy)",
+      "protocol": {
+        "verified_with_synthetic_data": true,
+        "synthetic_checks": {
+          "perfect_checklist_pass_rate_is_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "nondeterministic_lowers_free_path_rate": {
+            "passed": true,
+            "observed": 0.8
+          },
+          "budget_bypass_lowers_budget_rate": {
+            "passed": true,
+            "observed": 0.8
+          }
+        },
+        "failed_checks": []
+      },
+      "real_run": {
+        "observation_path": "long-scripts/stability_observations.json",
+        "report_path": "long-scripts/stability_score_report.json",
+        "script_count": 5,
+        "checklist_pass_rate": 1.0,
+        "all_scripts_passed": true,
+        "crash_free_rate": 1.0,
+        "free_path_deterministic_rate": 1.0,
+        "budget_enforced_rate": 1.0,
+        "soft_ceiling_pass_rate": 1.0,
+        "hard_ceiling_pass_rate": 1.0,
+        "remote_llm_calls": 0,
+        "failed_probe_names": []
       }
     }
   ]

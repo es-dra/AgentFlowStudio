@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent
 ALIASES = ROOT / "aliases"
 MISSING_EVIDENCE = ROOT / "missing-evidence"
 INDIRECT_MENTIONS = ROOT / "indirect-mentions"
+LONG_SCRIPTS = ROOT / "long-scripts"
 SUMMARY_PATH = ROOT / "script_understanding_eval_summary.json"
 
 
@@ -226,8 +227,91 @@ def _run_indirect_mentions(python: str) -> dict[str, Any]:
     }
 
 
+def _run_long_scripts(python: str) -> dict[str, Any]:
+    corpus = LONG_SCRIPTS / "corpus.json"
+    observations = LONG_SCRIPTS / "stability_observations.json"
+    report = LONG_SCRIPTS / "stability_score_report.json"
+
+    synthetic_perfect = _run_json(
+        [python, str(LONG_SCRIPTS / "score_long_script_stability.py"), str(corpus), "--synthetic", "perfect"]
+    )
+    synthetic_nondet = _run_json(
+        [
+            python,
+            str(LONG_SCRIPTS / "score_long_script_stability.py"),
+            str(corpus),
+            "--synthetic",
+            "nondeterministic",
+        ]
+    )
+    synthetic_budget = _run_json(
+        [
+            python,
+            str(LONG_SCRIPTS / "score_long_script_stability.py"),
+            str(corpus),
+            "--synthetic",
+            "budget_bypass",
+        ]
+    )
+
+    _run(
+        [
+            python,
+            str(LONG_SCRIPTS / "run_stability_checks.py"),
+            "--corpus",
+            str(corpus),
+            "--out",
+            str(observations),
+        ]
+    )
+    real = _run_json(
+        [python, str(LONG_SCRIPTS / "score_long_script_stability.py"), str(corpus), str(observations)]
+    )
+    report.write_text(json.dumps(_round(real), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    checks = {
+        "perfect_checklist_pass_rate_is_1": {
+            "passed": synthetic_perfect["summary"].get("checklist_pass_rate") == 1.0,
+            "observed": synthetic_perfect["summary"].get("checklist_pass_rate"),
+        },
+        "nondeterministic_lowers_free_path_rate": {
+            "passed": (synthetic_nondet["summary"].get("free_path_deterministic_rate") or 1.0) < 1.0,
+            "observed": synthetic_nondet["summary"].get("free_path_deterministic_rate"),
+        },
+        "budget_bypass_lowers_budget_rate": {
+            "passed": (synthetic_budget["summary"].get("budget_enforced_rate") or 1.0) < 1.0,
+            "observed": synthetic_budget["summary"].get("budget_enforced_rate"),
+        },
+    }
+    summary = real["summary"]
+    return {
+        "dimension": "long-scripts",
+        "description": "long-text runtime stability / operability (not understanding accuracy)",
+        "protocol": _protocol_status(checks),
+        "real_run": {
+            "observation_path": str(observations.relative_to(ROOT)),
+            "report_path": str(report.relative_to(ROOT)),
+            "script_count": summary.get("script_count"),
+            "checklist_pass_rate": summary.get("checklist_pass_rate"),
+            "all_scripts_passed": summary.get("all_scripts_passed"),
+            "crash_free_rate": summary.get("crash_free_rate"),
+            "free_path_deterministic_rate": summary.get("free_path_deterministic_rate"),
+            "budget_enforced_rate": summary.get("budget_enforced_rate"),
+            "soft_ceiling_pass_rate": summary.get("soft_ceiling_pass_rate"),
+            "hard_ceiling_pass_rate": summary.get("hard_ceiling_pass_rate"),
+            "remote_llm_calls": summary.get("remote_llm_calls_in_observations"),
+            "failed_probe_names": summary.get("failed_probe_names"),
+        },
+    }
+
+
 def run_all(python: str) -> dict[str, Any]:
-    dimensions = [_run_aliases(python), _run_missing_evidence(python), _run_indirect_mentions(python)]
+    dimensions = [
+        _run_aliases(python),
+        _run_missing_evidence(python),
+        _run_indirect_mentions(python),
+        _run_long_scripts(python),
+    ]
     verified = [item["dimension"] for item in dimensions if item["protocol"]["verified_with_synthetic_data"]]
     unverified = [item["dimension"] for item in dimensions if not item["protocol"]["verified_with_synthetic_data"]]
     payload = {
@@ -237,9 +321,10 @@ def run_all(python: str) -> dict[str, Any]:
             "protocol_verified_dimensions": verified,
             "protocol_unverified_dimensions": unverified,
             "health_note": (
-                "Framework reports dimension-level metrics only; it does not combine aliases, "
-                "missing-evidence, and indirect-mentions into a single score. Coverage is 3/4 "
-                "(long scripts remain an amplifier, not a separate dimension)."
+                "Framework reports dimension-level metrics only; it does not combine scores. "
+                "Coverage is 4/4 across two categories: understanding correctness "
+                "(aliases, missing-evidence, indirect-mentions) and runtime stability "
+                "(long-scripts checklist). Long-scripts is not a fourth accuracy metric."
             ),
         },
         "dimensions": dimensions,
