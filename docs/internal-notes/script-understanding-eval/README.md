@@ -19,20 +19,20 @@ the framework reports health and coverage instead of inventing a combined score.
 |---|---|---|---|
 | Aliases | `aliases/` | Whether candidate identity clusters link alias surfaces that should be the same person without false merges. | macro BCubed F1, linkable-cluster coverage, false split rate, false merge rate, hard-fail count |
 | Missing evidence | `missing-evidence/` | Whether slot-level and `scene_cast` relationship judgments correctly mark missing versus present evidence. | missing judgment accuracy, false-positive missing rate, false-negative missing rate, relation judgment coverage |
+| Indirect mentions | `indirect-mentions/` | Whether paid LLM split-field judgments correctly classify person-reference vs on-stage presence (and the derived indirect-mention label). | refers/present/indirect accuracy, precision, recall; false-positive vs false-negative rates reported separately |
 
 Each dimension includes gold cases, its scorer, a way to produce current real
 candidates, and saved analysis/report artifacts.
 
+Coverage: **3 / 4** planned script-understanding concerns. Long scripts remain
+out of scope as a separate dimension (see below).
+
 ## Not Covered
 
 Long scripts are not a separate v0.1 dimension. Current analysis treats long
-scripts as an amplifier for alias linking, mention discovery, and indirect
-mention failures; adding a separate long-script score would duplicate those
-dimensions without a clearer protocol.
-
-Indirect mentions are also not a v0.1 dimension. Current judgment is that they
-need model-assisted candidate generation or policy support before a stable
-offline scoring protocol would be meaningful.
+scripts as an amplifier for alias linking and indirect-mention failures; adding
+a separate long-script score would duplicate those dimensions without a clearer
+protocol.
 
 ## Running
 
@@ -54,8 +54,13 @@ The unified runner:
 - runs scorer synthetic checks for each dimension;
 - regenerates alias deterministic candidates and scores them;
 - runs the missing-evidence runtime extraction harness and scores it;
+- runs the indirect-mention oracle LLM harness (paid) and scores it;
 - writes `script_understanding_eval_summary.json`;
 - updates each dimension's saved real score report.
+
+**Cost note:** the indirect-mentions real path issues one remote LLM call per
+gold case (oracle on `context_snippet`). It does not full-script discover+judge.
+Requires `AFS_ALLOW_REMOTE_LLM=true` and `AFS_PROVIDER_CONFIG`.
 
 You can still run a dimension directly from its subdirectory, using that
 dimension's local scripts and `gold_cases.json`.
@@ -69,8 +74,8 @@ Framework health answers three questions:
    data that should produce known pass/fail behavior.
 3. What the current real candidate path scores for that dimension.
 
-It does not average alias F1 with missing-evidence accuracy. Those numbers are
-not commensurate.
+It does not average alias F1 with missing-evidence accuracy or indirect-mention
+binary rates. Those numbers are not commensurate.
 
 ## Adding A Dimension
 

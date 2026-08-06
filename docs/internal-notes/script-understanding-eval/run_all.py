@@ -18,6 +18,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 ALIASES = ROOT / "aliases"
 MISSING_EVIDENCE = ROOT / "missing-evidence"
+INDIRECT_MENTIONS = ROOT / "indirect-mentions"
 SUMMARY_PATH = ROOT / "script_understanding_eval_summary.json"
 
 
@@ -157,8 +158,76 @@ def _run_missing_evidence(python: str) -> dict[str, Any]:
     }
 
 
+def _run_indirect_mentions(python: str) -> dict[str, Any]:
+    gold = INDIRECT_MENTIONS / "gold_cases.json"
+    candidates = INDIRECT_MENTIONS / "llm_candidates.json"
+    report = INDIRECT_MENTIONS / "llm_score_report.json"
+
+    synthetic_perfect = _run_json(
+        [python, str(INDIRECT_MENTIONS / "score_indirect_mentions.py"), str(gold), "--synthetic", "perfect"]
+    )
+    synthetic_fp = _run_json(
+        [
+            python,
+            str(INDIRECT_MENTIONS / "score_indirect_mentions.py"),
+            str(gold),
+            "--synthetic",
+            "false_positive_refers",
+        ]
+    )
+    synthetic_fn = _run_json(
+        [
+            python,
+            str(INDIRECT_MENTIONS / "score_indirect_mentions.py"),
+            str(gold),
+            "--synthetic",
+            "false_negative_indirect",
+        ]
+    )
+
+    _run([python, str(INDIRECT_MENTIONS / "run_against_llm.py"), "--gold", str(gold), "--out", str(candidates)])
+    real = _run_json([python, str(INDIRECT_MENTIONS / "score_indirect_mentions.py"), str(gold), str(candidates)])
+    report.write_text(json.dumps(_round(real), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    checks = {
+        "perfect_indirect_accuracy_is_1": {
+            "passed": synthetic_perfect["summary"].get("indirect_mention_accuracy") == 1.0,
+            "observed": synthetic_perfect["summary"].get("indirect_mention_accuracy"),
+        },
+        "false_positive_refers_has_fp_rate_1": {
+            "passed": synthetic_fp["summary"].get("false_positive_refers_rate") == 1.0,
+            "observed": synthetic_fp["summary"].get("false_positive_refers_rate"),
+        },
+        "false_negative_indirect_has_fn_rate_1": {
+            "passed": synthetic_fn["summary"].get("false_negative_indirect_rate") == 1.0,
+            "observed": synthetic_fn["summary"].get("false_negative_indirect_rate"),
+        },
+    }
+    summary = real["summary"]
+    return {
+        "dimension": "indirect-mentions",
+        "description": "indirect-mention split-field LLM judgments (refers / present / derived)",
+        "protocol": _protocol_status(checks),
+        "real_run": {
+            "candidate_path": str(candidates.relative_to(ROOT)),
+            "report_path": str(report.relative_to(ROOT)),
+            "case_count": summary.get("case_count"),
+            "required_case_count": summary.get("required_case_count"),
+            "known_limitation_case_count": summary.get("known_limitation_case_count"),
+            "refers_accuracy": (summary.get("refers") or {}).get("accuracy"),
+            "present_accuracy": (summary.get("present") or {}).get("accuracy"),
+            "indirect_mention_accuracy": summary.get("indirect_mention_accuracy"),
+            "false_positive_refers_rate": summary.get("false_positive_refers_rate"),
+            "false_negative_refers_rate": summary.get("false_negative_refers_rate"),
+            "false_positive_indirect_rate": summary.get("false_positive_indirect_rate"),
+            "false_negative_indirect_rate": summary.get("false_negative_indirect_rate"),
+            "uncovered_required_case_count": summary.get("uncovered_required_case_count"),
+        },
+    }
+
+
 def run_all(python: str) -> dict[str, Any]:
-    dimensions = [_run_aliases(python), _run_missing_evidence(python)]
+    dimensions = [_run_aliases(python), _run_missing_evidence(python), _run_indirect_mentions(python)]
     verified = [item["dimension"] for item in dimensions if item["protocol"]["verified_with_synthetic_data"]]
     unverified = [item["dimension"] for item in dimensions if not item["protocol"]["verified_with_synthetic_data"]]
     payload = {
@@ -168,8 +237,9 @@ def run_all(python: str) -> dict[str, Any]:
             "protocol_verified_dimensions": verified,
             "protocol_unverified_dimensions": unverified,
             "health_note": (
-                "Framework reports dimension-level metrics only; it does not combine aliases and "
-                "missing-evidence into a single score."
+                "Framework reports dimension-level metrics only; it does not combine aliases, "
+                "missing-evidence, and indirect-mentions into a single score. Coverage is 3/4 "
+                "(long scripts remain an amplifier, not a separate dimension)."
             ),
         },
         "dimensions": dimensions,

@@ -1,0 +1,655 @@
+{
+  "schema_version": "indirect_mention_score_v0.1",
+  "summary": {
+    "case_count": 24,
+    "required_case_count": 23,
+    "known_limitation_case_count": 1,
+    "uncovered_required_case_count": 0,
+    "uncovered_required_cases": [],
+    "refers": {
+      "judgment_count_scored": 23,
+      "true_positive": 4,
+      "true_negative": 18,
+      "false_positive": 1,
+      "false_negative": 0,
+      "accuracy": 0.956522,
+      "precision": 0.8,
+      "recall": 1.0,
+      "false_positive_rate": 0.052632,
+      "false_negative_rate": 0.0
+    },
+    "present": {
+      "judgment_count_scored": 23,
+      "true_positive": 0,
+      "true_negative": 23,
+      "false_positive": 0,
+      "false_negative": 0,
+      "accuracy": 1.0,
+      "precision": null,
+      "recall": null,
+      "false_positive_rate": 0.0,
+      "false_negative_rate": null
+    },
+    "indirect": {
+      "judgment_count_scored": 23,
+      "true_positive": 4,
+      "true_negative": 18,
+      "false_positive": 1,
+      "false_negative": 0,
+      "accuracy": 0.956522,
+      "precision": 0.8,
+      "recall": 1.0,
+      "false_positive_rate": 0.052632,
+      "false_negative_rate": 0.0
+    },
+    "indirect_mention_accuracy": 0.956522,
+    "false_positive_indirect_rate": 0.052632,
+    "false_negative_indirect_rate": 0.0,
+    "false_positive_refers_rate": 0.052632,
+    "false_negative_refers_rate": 0.0
+  },
+  "cases": [
+    {
+      "id": "I1",
+      "mention": "沈岚",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        }
+      ]
+    },
+    {
+      "id": "I10",
+      "mention": "钥匙在三零二的钟里。",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I11",
+      "mention": "别再甩锅",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I12",
+      "mention": "开会开到吐",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I13",
+      "mention": "把节奏交给下一棒",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I14",
+      "mention": "少抱怨多冲刺",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I15",
+      "mention": "权限不足",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I16",
+      "mention": "重启实验舱",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I17",
+      "mention": "设备老化，待报修",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I18",
+      "mention": "晚上见",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I19",
+      "mention": "别让她当着人拆。",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I2",
+      "mention": "江澄",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        }
+      ]
+    },
+    {
+      "id": "I20",
+      "mention": "夜班邮筒第七格",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I21",
+      "mention": "失踪汇款",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I22",
+      "mention": "第七格——顾衡案——不得夜班单独开启。",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": true,
+          "outcome": "FP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": true,
+          "outcome": "FP"
+        }
+      ]
+    },
+    {
+      "id": "I23",
+      "mention": "回声-07",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I24",
+      "mention": "默记修缮",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I3",
+      "mention": "顾衡",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        }
+      ]
+    },
+    {
+      "id": "I4",
+      "mention": "柯衡",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        }
+      ]
+    },
+    {
+      "id": "I6",
+      "mention": "别自己拆",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I7",
+      "mention": "留局待领",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I8",
+      "mention": "周五前提交",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    },
+    {
+      "id": "I9",
+      "mention": "样本冷藏",
+      "scoring_policy": "required",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    }
+  ],
+  "boundary_cases": [
+    {
+      "id": "I5",
+      "mention": "悦安",
+      "scoring_policy": "known_limitation_excluded",
+      "fields": [
+        {
+          "field": "refers_to_real_character",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_present_in_scene",
+          "expected": true,
+          "predicted": true,
+          "outcome": "TP"
+        },
+        {
+          "field": "is_indirect_mention",
+          "expected": false,
+          "predicted": false,
+          "outcome": "TN"
+        }
+      ]
+    }
+  ]
+}

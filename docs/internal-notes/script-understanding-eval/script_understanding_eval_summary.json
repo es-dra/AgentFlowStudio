@@ -3,14 +3,16 @@
   "framework_health": {
     "covered_dimensions": [
       "aliases",
-      "missing-evidence"
+      "missing-evidence",
+      "indirect-mentions"
     ],
     "protocol_verified_dimensions": [
       "aliases",
-      "missing-evidence"
+      "missing-evidence",
+      "indirect-mentions"
     ],
     "protocol_unverified_dimensions": [],
-    "health_note": "Framework reports dimension-level metrics only; it does not combine aliases and missing-evidence into a single score."
+    "health_note": "Framework reports dimension-level metrics only; it does not combine aliases, missing-evidence, and indirect-mentions into a single score. Coverage is 3/4 (long scripts remain an amplifier, not a separate dimension)."
   },
   "dimensions": [
     {
@@ -80,6 +82,45 @@
         "relation_judgment_coverage_rate": 1.0,
         "cases_with_prerequisite_gaps_count": 0,
         "cases_with_uncovered_relations_count": 0
+      }
+    },
+    {
+      "dimension": "indirect-mentions",
+      "description": "indirect-mention split-field LLM judgments (refers / present / derived)",
+      "protocol": {
+        "verified_with_synthetic_data": true,
+        "synthetic_checks": {
+          "perfect_indirect_accuracy_is_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "false_positive_refers_has_fp_rate_1": {
+            "passed": true,
+            "observed": 1.0
+          },
+          "false_negative_indirect_has_fn_rate_1": {
+            "passed": true,
+            "observed": 1.0
+          }
+        },
+        "failed_checks": []
+      },
+      "real_run": {
+        "candidate_path": "indirect-mentions/llm_candidates.json",
+        "report_path": "indirect-mentions/llm_score_report.json",
+        "case_count": 24,
+        "required_case_count": 23,
+        "known_limitation_case_count": 1,
+        "refers_accuracy": 0.956522,
+        "present_accuracy": 1.0,
+        "indirect_mention_accuracy": 0.956522,
+        "false_positive_refers_rate": 0.052632,
+        "false_negative_refers_rate": 0.0,
+        "false_positive_indirect_rate": 0.052632,
+        "false_negative_indirect_rate": 0.0,
+        "uncovered_required_case_count": 0,
+        "llm_call_count": 24,
+        "wall_time_sec": 94.67
       }
     }
   ]
