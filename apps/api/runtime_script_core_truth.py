@@ -1878,7 +1878,14 @@ def _apply_structured_analysis_candidate(
             [str(asset["asset_id"]) for asset in existing_assets],
         )
     previous_assets = dict(state.get("assets") or {})
-    assets, affected, preserved = _assets_from_candidate(project_id, revision, candidate, previous_assets)
+    receipt_backed_asset_ids = _active_human_command_asset_ids(state, revision_id)
+    assets, affected, preserved = _assets_from_candidate(
+        project_id,
+        revision,
+        candidate,
+        previous_assets,
+        receipt_backed_asset_ids,
+    )
     for asset in assets:
         state["assets"][asset["asset_id"]] = asset
         _record_asset_version(state, asset)
@@ -1931,6 +1938,7 @@ def _assets_from_candidate(
     revision: dict[str, Any],
     candidate: dict[str, Any],
     previous_assets: dict[str, Any],
+    receipt_backed_asset_ids: set[str],
 ) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     revision_id = revision["revision_id"]
     source_digest = revision["source_digest"]
@@ -1962,7 +1970,13 @@ def _assets_from_candidate(
             uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
-        asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
+        asset = _preserve_asset_identity(
+            asset,
+            previous_by_lineage,
+            affected,
+            preserved,
+            receipt_backed_asset_ids,
+        )
         assets.append(asset)
     for item in candidate.get("main_scenes") or []:
         asset = _candidate_asset(
@@ -1983,7 +1997,13 @@ def _assets_from_candidate(
             uncertainty_note=str(item.get("uncertainty_note") or ""),
             created_at=now,
         )
-        asset = _preserve_asset_identity(asset, previous_by_lineage, affected, preserved)
+        asset = _preserve_asset_identity(
+            asset,
+            previous_by_lineage,
+            affected,
+            preserved,
+            receipt_backed_asset_ids,
+        )
         assets.append(asset)
     active_lineage = {_asset_preservation_key(asset) for asset in assets}
     for asset in previous_assets.values():
@@ -2064,6 +2084,7 @@ def _preserve_asset_identity(
     previous_by_lineage: dict[str, Any],
     affected: list[str],
     preserved: list[str],
+    receipt_backed_asset_ids: set[str],
 ) -> dict[str, Any]:
     previous = previous_by_lineage.get(_asset_preservation_key(asset))
     if not previous:
@@ -2075,6 +2096,20 @@ def _preserve_asset_identity(
     ):
         preserved.append(str(previous["asset_id"]))
         return dict(previous)
+    if (
+        previous.get("revision_id") == asset.get("revision_id")
+        and str(previous.get("asset_id") or "") in receipt_backed_asset_ids
+    ):
+        rebound = _new_asset_version(
+            {
+                **previous,
+                "candidate_id": asset.get("candidate_id"),
+                "updated_at": asset.get("updated_at"),
+            },
+            parent=previous,
+        )
+        preserved.append(str(previous["asset_id"]))
+        return rebound
     if (
         previous.get("revision_id") == asset.get("revision_id")
         and previous.get("candidate_id") == asset.get("candidate_id")
@@ -2095,6 +2130,22 @@ def _preserve_asset_identity(
     else:
         affected.append(str(previous["asset_id"]))
     return merged
+
+
+def _active_human_command_asset_ids(state: dict[str, Any], revision_id: str) -> set[str]:
+    asset_ids: set[str] = set()
+    for raw in (state.get("receipts") or {}).values():
+        receipt = dict(raw or {})
+        if (
+            receipt.get("undone")
+            or receipt.get("revision_id") != revision_id
+            or receipt.get("command_type") not in {"edit_asset", "merge_alias", "merge_scene_name"}
+        ):
+            continue
+        asset_id = str((receipt.get("after") or {}).get("asset_id") or "")
+        if asset_id:
+            asset_ids.add(asset_id)
+    return asset_ids
 
 
 def _extract_scene_ownership(

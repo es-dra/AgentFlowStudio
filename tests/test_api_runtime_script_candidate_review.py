@@ -512,6 +512,45 @@ def test_name_command_graph_projection_preserves_existing_alias_idempotency_keys
     ]
 
 
+def test_candidate_rebinding_only_uses_active_scoped_human_command_receipts() -> None:
+    state = {
+        "receipts": {
+            "valid-scene": {
+                "command_type": "merge_scene_name",
+                "revision_id": "rev1",
+                "after": {"asset_id": "scene1"},
+                "undone": False,
+            },
+            "valid-edit": {
+                "command_type": "edit_asset",
+                "revision_id": "rev1",
+                "after": {"asset_id": "char1"},
+                "undone": False,
+            },
+            "undone": {
+                "command_type": "merge_alias",
+                "revision_id": "rev1",
+                "after": {"asset_id": "char2"},
+                "undone": True,
+            },
+            "wrong-revision": {
+                "command_type": "merge_scene_name",
+                "revision_id": "rev2",
+                "after": {"asset_id": "scene2"},
+                "undone": False,
+            },
+            "wrong-command": {
+                "command_type": "retire_asset",
+                "revision_id": "rev1",
+                "after": {"asset_id": "scene3"},
+                "undone": False,
+            },
+        }
+    }
+
+    assert script_truth._active_human_command_asset_ids(state, "rev1") == {"scene1", "char1"}
+
+
 def test_merge_scene_name_graph_write_recovers_truth_state_failure_without_duplicate_fact(
     tmp_path,
     monkeypatch,
