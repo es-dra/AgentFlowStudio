@@ -998,6 +998,27 @@ def test_scene_name_normalization_proposal_requires_explicit_merge_scene_name_co
     assert scenes_after[variant["asset_id"]]["name"] == "邮局大厅"
     assert scenes_after[variant["asset_id"]]["aliases"] == []
 
+    reviewed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{canonical['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": scenes_after[canonical["asset_id"]]["version_id"],
+            "expected_asset_version": scenes_after[canonical["asset_id"]]["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "review-scene-after-explicit-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["asset"]["status"] == "confirmed"
+    assert reviewed.json()["asset"]["aliases"] == ["邮局大厅"]
+    assert reviewed.json()["graph"]["version"] == 1
+    assert reviewed.json()["graph"]["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == ["邮局大厅"]
+
     replay = client.post(
         f"/projects/{project_id}/core-assets/commands/confirm",
         json={
@@ -1122,7 +1143,7 @@ def test_confirmed_scene_name_merge_and_undo_keep_canonical_graph_in_sync(tmp_pa
 def test_merge_scene_name_rejects_invalid_scene_targets(tmp_path) -> None:
     project_id = "scene-norm-invalid-targets"
     source_text = """Characters: Mira
-Scenes: Archive Hall
+Scenes: Archive Hall, Side Hall
 
 Mira
 Ready.
@@ -1134,9 +1155,12 @@ Ready.
         f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
     )
     assert response.status_code == 200, response.text
-    assets = response.json()["projection"]["assets"]
+    payload = response.json()
+    assets = payload["projection"]["assets"]
     character = next(item for item in assets if item["asset_type"] == "character")
-    scene = next(item for item in assets if item["asset_type"] == "main_scene")
+    scenes = {item["name"]: item for item in assets if item["asset_type"] == "main_scene"}
+    scene = scenes["Archive Hall"]
+    variant = scenes["Side Hall"]
 
     wrong_target = client.post(
         f"/projects/{project_id}/core-assets/commands/confirm",
@@ -1185,6 +1209,73 @@ Ready.
     )
     assert same_scene.status_code == 409, same_scene.text
     assert same_scene.json()["detail"]["error"] == "scene_name_variant_matches_canonical"
+
+    rejected_variant = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{variant['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": variant["version_id"],
+            "expected_asset_version": variant["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "reject-variant-before-scene-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "reject",
+        },
+    )
+    assert rejected_variant.status_code == 200, rejected_variant.text
+    assert rejected_variant.json()["asset"]["status"] == "rejected"
+
+    inactive_variant = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                variant["asset_id"],
+                key="rejected-variant-id",
+            ),
+            "expected_asset_version": scene["version"],
+        },
+    )
+    assert inactive_variant.status_code == 409, inactive_variant.text
+    assert inactive_variant.json()["detail"]["error"] == "scene_name_variant_not_active"
+
+    rejected_canonical = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{scene['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": scene["version_id"],
+            "expected_asset_version": scene["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "reject-canonical-before-scene-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "reject",
+        },
+    )
+    assert rejected_canonical.status_code == 200, rejected_canonical.text
+
+    inactive_canonical = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                variant["asset_id"],
+                key="rejected-canonical-id",
+            ),
+            "expected_asset_version": rejected_canonical.json()["asset"]["version"],
+        },
+    )
+    assert inactive_canonical.status_code == 409, inactive_canonical.text
+    assert inactive_canonical.json()["detail"]["error"] == "scene_name_canonical_not_active"
 
 
 def test_studio_runtime_client_exposes_the_same_extraction_route() -> None:

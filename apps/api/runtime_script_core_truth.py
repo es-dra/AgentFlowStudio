@@ -735,7 +735,7 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 )
             asset = dict((state.get("assets") or {}).get(asset_id) or {})
             _require_reviewable_asset(asset, body, project_id=project_id, asset_id=asset_id)
-            _require_review_alias_authority(state, asset, body, project_id=project_id)
+            _require_review_name_authority(state, asset, body, project_id=project_id)
             decided_at = _safe_time(body.decided_at)
             reviewed_asset = _reviewed_asset_version(
                 asset,
@@ -2409,6 +2409,14 @@ def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: Co
             )
         mutation_body = body
         if body.command_type == "merge_scene_name":
+            if before.get("status") not in ACTIVE_STATUSES:
+                raise _contract_error(
+                    "scene_name_canonical_not_active",
+                    "Canonical scene asset must be active before merging a scene name.",
+                    project_id=project_id,
+                    stage="core_asset_command_preview",
+                    status_code=409,
+                )
             variant_asset = _scene_name_variant_asset(assets, project_id, body, before)
             if variant_asset:
                 mutation_body = body.model_copy(
@@ -2682,6 +2690,14 @@ def _scene_name_variant_asset(
             stage="core_asset_command_preview",
             status_code=409,
         )
+    if variant.get("status") not in ACTIVE_STATUSES:
+        raise _contract_error(
+            "scene_name_variant_not_active",
+            "Variant scene asset must be active before merging a scene name.",
+            project_id=project_id,
+            stage="core_asset_command_preview",
+            status_code=409,
+        )
     return public_asset(variant)
 
 
@@ -2874,7 +2890,7 @@ def _validate_candidate_proposal_authority(
             )
 
 
-def _require_review_alias_authority(
+def _require_review_name_authority(
     state: dict[str, Any],
     asset: dict[str, Any],
     body: AnalysisAssetReviewRequest,
@@ -2884,19 +2900,22 @@ def _require_review_alias_authority(
     aliases = set(_clean_text_list([str(item) for item in (asset.get("aliases") or [])]))
     if body.decision != "confirm" or not aliases:
         return
+    asset_type = str(asset.get("asset_type") or "")
+    expected_command = "merge_scene_name" if asset_type == "main_scene" else "merge_alias"
+    authority_field = "authorized_scene_name" if asset_type == "main_scene" else "authorized_alias"
     authorized: set[str] = set()
     for raw in (state.get("receipts") or {}).values():
         receipt = dict(raw or {})
         after = dict(receipt.get("after") or {})
         if (
-            receipt.get("command_type") != "merge_alias"
+            receipt.get("command_type") != expected_command
             or receipt.get("undone")
             or receipt.get("project_id") != project_id
             or receipt.get("revision_id") != body.revision_id
             or after.get("asset_id") != asset.get("asset_id")
         ):
             continue
-        explicit_alias = _clean_label(receipt.get("authorized_alias"))
+        explicit_alias = _clean_label(receipt.get(authority_field))
         if explicit_alias:
             authorized.add(explicit_alias)
         before_aliases = set(
@@ -2905,9 +2924,19 @@ def _require_review_alias_authority(
         after_aliases = set(_clean_text_list([str(item) for item in (after.get("aliases") or [])]))
         authorized.update(after_aliases - before_aliases)
     if not aliases.issubset(authorized):
+        error = (
+            "candidate_scene_names_require_merge_scene_name"
+            if asset_type == "main_scene"
+            else "candidate_aliases_require_merge_alias"
+        )
+        message = (
+            "Candidate scene names require an explicit merge_scene_name receipt before confirmation."
+            if asset_type == "main_scene"
+            else "Candidate aliases require an explicit merge_alias receipt before confirmation."
+        )
         raise _contract_error(
-            "candidate_aliases_require_merge_alias",
-            "Candidate aliases require an explicit merge_alias receipt before confirmation.",
+            error,
+            message,
             project_id=project_id,
             stage="analysis_asset_review",
             status_code=409,
