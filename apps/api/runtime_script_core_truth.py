@@ -2071,6 +2071,12 @@ def _preserve_asset_identity(
         return asset
     if (
         previous.get("revision_id") == asset.get("revision_id")
+        and previous.get("status") in {"confirmed", "rejected"}
+    ):
+        preserved.append(str(previous["asset_id"]))
+        return dict(previous)
+    if (
+        previous.get("revision_id") == asset.get("revision_id")
         and previous.get("candidate_id") == asset.get("candidate_id")
         and _asset_review_content(previous) == _asset_review_content(asset)
     ):

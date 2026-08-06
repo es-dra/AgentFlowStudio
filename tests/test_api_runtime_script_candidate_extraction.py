@@ -200,6 +200,89 @@ def test_reextraction_preserves_final_human_decisions_and_graph_authority(tmp_pa
     assert scene["asset_id"] not in graph["nodes"]
 
 
+def test_enabling_scene_name_proposals_preserves_confirmed_scene_versions_and_graph(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", raising=False)
+    project_id = "scene-norm-flag-rollout-authority"
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    initial = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert initial.status_code == 200, initial.text
+    initial_payload = initial.json()
+    assert "scene_name_normalization_proposals" not in initial_payload["candidate"]
+    scenes = {
+        item["name"]: item
+        for item in initial_payload["projection"]["assets"]
+        if item["asset_type"] == "main_scene"
+    }
+    canonical = scenes["Old Town Post Office Hall"]
+    variant = scenes["Post Office Hall"]
+
+    def confirm_scene(asset: dict, graph_version: int, key: str) -> dict:
+        response = client.post(
+            f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{asset['asset_id']}/review",
+            json={
+                "project_id": project_id,
+                "revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+                "candidate_id": initial_payload["candidate"]["candidate_id"],
+                "asset_version_id": asset["version_id"],
+                "expected_asset_version": asset["version"],
+                "expected_graph_version": graph_version,
+                "idempotency_key": key,
+                "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+                "decision": "confirm",
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["asset"]
+
+    confirmed_canonical = confirm_scene(canonical, 0, "confirm-canonical-before-flag-rollout")
+    confirmed_variant = confirm_scene(variant, 1, "confirm-variant-before-flag-rollout")
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="merge-scene-before-flag-rollout",
+            ),
+            "expected_asset_version": confirmed_canonical["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_canonical = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    graph_before = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_before["version"] == 3
+
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    replay = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert replay.status_code == 200, replay.text
+    replay_payload = replay.json()
+    assert replay_payload["candidate"]["candidate_id"] != initial_payload["candidate"]["candidate_id"]
+    assert replay_payload["candidate"]["scene_name_normalization_proposals"]
+    replay_assets = {item["asset_id"]: item for item in replay_payload["projection"]["assets"]}
+    assert replay_assets[canonical["asset_id"]]["status"] == "confirmed"
+    assert replay_assets[canonical["asset_id"]]["version_id"] == merged_canonical["version_id"]
+    assert replay_assets[canonical["asset_id"]]["aliases"] == ["Post Office Hall"]
+    assert replay_assets[variant["asset_id"]]["status"] == "confirmed"
+    assert replay_assets[variant["asset_id"]]["version_id"] == confirmed_variant["version_id"]
+    assert set(replay_payload["preserved_asset_ids"]) == {canonical["asset_id"], variant["asset_id"]}
+    graph_after = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after == graph_before
+
+
 def test_deterministic_extraction_records_missing_without_inventing_facts(tmp_path) -> None:
     project_id = "candidate-extraction-missing"
     source_text = """第一场 - 内景 - 一个房间 - 夜

@@ -366,6 +366,90 @@ def test_merge_alias_graph_write_recovers_truth_state_failure_without_duplicate_
     assert graph_after_recovery["nodes"][character["asset_id"]]["metadata"]["asset_version_id"] == recovered_character["version_id"]
 
 
+def test_alias_merge_after_confirmed_asset_edit_reenters_review_before_graph_projection(tmp_path) -> None:
+    project_id = "script-alias-after-confirmed-edit"
+    client = _client(tmp_path)
+    revision, candidate, assets = _seed_candidate(client, project_id)
+    character = next(item for item in assets if item["asset_type"] == "character")
+    confirmed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json=_review_body(
+            project_id,
+            revision,
+            candidate,
+            character,
+            decision="confirm",
+            key="confirm-before-edit-and-alias",
+            graph_version=0,
+        ),
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    confirmed_character = confirmed.json()["asset"]
+
+    edited = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "edit_asset",
+            "target_asset_id": character["asset_id"],
+            "patch": {"display_name": "Mira Vale"},
+            "expected_asset_version": confirmed_character["version"],
+            "idempotency_key": "edit-confirmed-mira-before-alias",
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    edited_character = next(
+        item for item in edited.json()["projection"]["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    assert edited_character["status"] == "modified"
+
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "merge_alias",
+            "target_asset_id": character["asset_id"],
+            "patch": {"alias": "M"},
+            "expected_asset_version": edited_character["version"],
+            "idempotency_key": "merge-alias-after-confirmed-edit",
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_character = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    assert merged_character["status"] == "modified"
+    assert merged_character["aliases"] == ["M"]
+    assert merged.json()["receipt"]["production_graph_version"] == 0
+    graph_before_review = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_before_review["version"] == 1
+    assert graph_before_review["nodes"][character["asset_id"]]["metadata"]["aliases"] == []
+
+    reconfirmed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json=_review_body(
+            project_id,
+            revision,
+            candidate,
+            merged_character,
+            decision="confirm",
+            key="reconfirm-after-edit-and-alias",
+            graph_version=1,
+        ),
+    )
+    assert reconfirmed.status_code == 200, reconfirmed.text
+    assert reconfirmed.json()["asset"]["status"] == "confirmed"
+    assert reconfirmed.json()["asset"]["aliases"] == ["M"]
+    assert reconfirmed.json()["graph"]["version"] == 2
+    assert reconfirmed.json()["graph"]["nodes"][character["asset_id"]]["metadata"]["aliases"] == ["M"]
+
+
 def test_name_command_graph_projection_preserves_existing_alias_idempotency_keys() -> None:
     class CapturingGraphStore:
         def __init__(self) -> None:
