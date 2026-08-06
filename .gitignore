@@ -56,3 +56,5 @@ node_modules/
 *.p12
 .env
 .env
+.env
+.env
