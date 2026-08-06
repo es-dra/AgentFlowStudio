@@ -279,6 +279,154 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_agent_chat_scene_name_merge_is_explicit_recoverable_and_undoable() -> None:
+    script = r'''
+import {
+  agentChatContextKey,
+  agentChatContextSnapshot,
+  createAgentChatContextStore,
+  executePendingAgentCommandWithRuntime,
+  submitAgentChatMessage,
+  undoAgentReceiptWithRuntime,
+} from "./apps/studio/src/agent-chat-lifecycle.js";
+
+const digest = "b".repeat(64);
+const revision = {
+  revision_id: "rev_scene_names",
+  source_kind: "script",
+  source_digest: digest,
+  source_length: 41,
+  analysis_state: "confirmed",
+};
+const canonicalScene = {
+  asset_id: "scene_canonical",
+  asset_type: "main_scene",
+  source_mode: "analysis_candidate",
+  status: "confirmed",
+  project_id: "p1",
+  revision_id: revision.revision_id,
+  source_digest: digest,
+  display_name: "Old Town Post Office Hall",
+  name: "Old Town Post Office Hall",
+  aliases: [],
+  pronoun_links: [],
+  evidence_spans: [{ start: 0, end: 25, quote: "Old Town Post Office Hall" }],
+  confidence: 0.98,
+  version: 2,
+  version_id: "assetver_scene_2",
+  lineage: {},
+};
+function projection(aliases = []) {
+  const scene = { ...canonicalScene, aliases };
+  return {
+    schema_version: "afs.script_core_truth.v0.1",
+    project_id: "p1",
+    current_revision_id: revision.revision_id,
+    current_revision: revision,
+    revision_history: [revision],
+    assets: [scene],
+    asset_counts: { characters: 0, main_scenes: 1, manual_props: 0, auto_props: 0, style_assets: 0, action_event_assets: 0 },
+    analysis_state: "confirmed",
+    provider_dispatch_count: 0,
+    remote_dispatch_count: 0,
+  };
+}
+
+const state = {
+  meta: { projectId: "p1", projectName: "Frontend", canvasName: "Canvas", seq: 1 },
+  viewport: { x: 0, y: 0, scale: 1 }, nodes: {}, edges: {}, groups: {}, order: [], assets: [],
+  production: {}, selection: { nodeIds: [], edgeId: null }, ui: {},
+};
+const store = { get: () => state, set: (mutator) => mutator(state) };
+const session = createAgentChatContextStore().get(agentChatContextKey(agentChatContextSnapshot({
+  project: { project_id: "p1", name: "Frontend" }, studioState: state, section: "canvas",
+})));
+
+let context = agentChatContextSnapshot({ project: { project_id: "p1", name: "Frontend" }, studioState: state, section: "canvas" });
+submitAgentChatMessage(session, "/refresh-script-truth", context);
+await executePendingAgentCommandWithRuntime(session, store, { loadScriptTruth: async () => ({ projection: projection() }) });
+
+const nodeId = state.order.find((id) => id.includes("scene_canonical"));
+state.selection = { nodeIds: [nodeId], edgeId: null };
+context = agentChatContextSnapshot({
+  project: { project_id: "p1", name: "Frontend" }, studioState: state, section: "canvas", selectedNode: state.nodes[nodeId],
+});
+const preview = submitAgentChatMessage(session, "/merge-scene-name Post Office Hall", context);
+const beforeConfirm = state.nodes[nodeId].content;
+let previewPayload = null;
+let failed = false;
+try {
+  await executePendingAgentCommandWithRuntime(session, store, {
+    previewCoreAssetCommand: async (payload) => { previewPayload = payload; return { projection: projection(["Post Office Hall"]) }; },
+    confirmCoreAssetCommand: async () => { throw new Error("simulated confirm failure"); },
+  });
+} catch (error) {
+  failed = error.message === "simulated confirm failure";
+}
+const afterFailure = state.nodes[nodeId].content;
+const pendingAfterFailure = session.pendingCommand?.command_type || "";
+
+const receipt = await executePendingAgentCommandWithRuntime(session, store, {
+  previewCoreAssetCommand: async () => ({ projection: projection(["Post Office Hall"]) }),
+  confirmCoreAssetCommand: async (payload) => ({
+    receipt: {
+      receipt_id: "receipt_scene_merge",
+      command_type: payload.command_type,
+      status: "executed",
+      revision_id: revision.revision_id,
+      source_digest: digest,
+      affected_asset_ids: [canonicalScene.asset_id],
+      undo_available: true,
+    },
+    projection: projection(["Post Office Hall"]),
+  }),
+});
+const afterConfirm = state.nodes[nodeId].content;
+const undo = await undoAgentReceiptWithRuntime(session, receipt, store, {
+  undoCoreAssetCommand: async () => ({
+    receipt: { receipt_id: "receipt_scene_undo", command_type: "undo", status: "undone", summary: "runtime undo" },
+    projection: projection(),
+  }),
+});
+
+process.stdout.write(JSON.stringify({
+  previewStatus: preview.status,
+  previewType: preview.command.command_type,
+  previewPayloadType: previewPayload.command_type,
+  previewAlias: previewPayload.patch.alias,
+  beforeConfirmHasAlias: beforeConfirm.includes("别名：Post Office Hall"),
+  failed,
+  unchangedAfterFailure: afterFailure === beforeConfirm,
+  pendingAfterFailure,
+  receiptStatus: receipt.status,
+  afterConfirmHasAlias: afterConfirm.includes("别名：Post Office Hall"),
+  undoStatus: undo.status,
+  aliasRemovedAfterUndo: !state.nodes[nodeId].content.includes("别名：Post Office Hall"),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert json.loads(completed.stdout) == {
+        "previewStatus": "preview",
+        "previewType": "merge_scene_name",
+        "previewPayloadType": "merge_scene_name",
+        "previewAlias": "Post Office Hall",
+        "beforeConfirmHasAlias": False,
+        "failed": True,
+        "unchangedAfterFailure": True,
+        "pendingAfterFailure": "merge_scene_name",
+        "receiptStatus": "executed",
+        "afterConfirmHasAlias": True,
+        "undoStatus": "undone",
+        "aliasRemovedAfterUndo": True,
+    }
+
+
 def test_studio_candidate_review_edits_confirms_rejects_and_refreshes_projection() -> None:
     script = r'''
 import { applyScriptCoreTruthProjection } from "./apps/studio/src/script-core-truth-projection.js";

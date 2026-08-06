@@ -44,6 +44,27 @@ def _merge_alias_command(project_id: str, revision: dict, target_asset_id: str, 
     }
 
 
+def _merge_scene_name_command(
+    project_id: str,
+    revision: dict,
+    canonical_asset_id: str,
+    variant_asset_id: str,
+    key: str = "merge-scene-name",
+) -> dict:
+    return {
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        "command_type": "merge_scene_name",
+        "target_asset_id": canonical_asset_id,
+        "patch": {"variant_asset_id": variant_asset_id},
+        "idempotency_key": key,
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
 def test_deterministic_extraction_enters_the_existing_review_loop(tmp_path) -> None:
     project_id = "candidate-extraction-letter"
     source_text = """标题：海边的信
@@ -177,6 +198,166 @@ def test_reextraction_preserves_final_human_decisions_and_graph_authority(tmp_pa
     graph = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert character["asset_id"] in graph["nodes"]
     assert scene["asset_id"] not in graph["nodes"]
+
+
+def test_enabling_scene_name_proposals_preserves_confirmed_scene_versions_and_graph(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", raising=False)
+    project_id = "scene-norm-flag-rollout-authority"
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    initial = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert initial.status_code == 200, initial.text
+    initial_payload = initial.json()
+    assert "scene_name_normalization_proposals" not in initial_payload["candidate"]
+    scenes = {
+        item["name"]: item
+        for item in initial_payload["projection"]["assets"]
+        if item["asset_type"] == "main_scene"
+    }
+    canonical = scenes["Old Town Post Office Hall"]
+    variant = scenes["Post Office Hall"]
+
+    def confirm_scene(asset: dict, graph_version: int, key: str) -> dict:
+        response = client.post(
+            f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{asset['asset_id']}/review",
+            json={
+                "project_id": project_id,
+                "revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+                "candidate_id": initial_payload["candidate"]["candidate_id"],
+                "asset_version_id": asset["version_id"],
+                "expected_asset_version": asset["version"],
+                "expected_graph_version": graph_version,
+                "idempotency_key": key,
+                "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+                "decision": "confirm",
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["asset"]
+
+    confirmed_canonical = confirm_scene(canonical, 0, "confirm-canonical-before-flag-rollout")
+    confirmed_variant = confirm_scene(variant, 1, "confirm-variant-before-flag-rollout")
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="merge-scene-before-flag-rollout",
+            ),
+            "expected_asset_version": confirmed_canonical["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_canonical = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    graph_before = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_before["version"] == 3
+
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    replay = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert replay.status_code == 200, replay.text
+    replay_payload = replay.json()
+    assert replay_payload["candidate"]["candidate_id"] != initial_payload["candidate"]["candidate_id"]
+    assert replay_payload["candidate"]["scene_name_normalization_proposals"]
+    replay_assets = {item["asset_id"]: item for item in replay_payload["projection"]["assets"]}
+    assert replay_assets[canonical["asset_id"]]["status"] == "confirmed"
+    assert replay_assets[canonical["asset_id"]]["version_id"] == merged_canonical["version_id"]
+    assert replay_assets[canonical["asset_id"]]["aliases"] == ["Post Office Hall"]
+    assert replay_assets[variant["asset_id"]]["status"] == "confirmed"
+    assert replay_assets[variant["asset_id"]]["version_id"] == confirmed_variant["version_id"]
+    assert set(replay_payload["preserved_asset_ids"]) == {canonical["asset_id"], variant["asset_id"]}
+    graph_after = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after == graph_before
+
+
+def test_enabling_scene_name_proposals_rebinds_receipt_backed_candidate_merge_for_review(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", raising=False)
+    project_id = "scene-norm-candidate-merge-rollout"
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    initial = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert initial.status_code == 200, initial.text
+    initial_payload = initial.json()
+    scenes = {
+        item["name"]: item
+        for item in initial_payload["projection"]["assets"]
+        if item["asset_type"] == "main_scene"
+    }
+    canonical = scenes["Old Town Post Office Hall"]
+    variant = scenes["Post Office Hall"]
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="merge-candidate-before-flag-rollout",
+            ),
+            "expected_asset_version": canonical["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_canonical = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    assert merged_canonical["status"] == "candidate"
+    assert merged_canonical["aliases"] == ["Post Office Hall"]
+    assert client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]["nodes"] == {}
+
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    replay = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert replay.status_code == 200, replay.text
+    replay_payload = replay.json()
+    assert replay_payload["candidate"]["candidate_id"] != initial_payload["candidate"]["candidate_id"]
+    rebound = next(
+        item for item in replay_payload["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    assert rebound["status"] == "candidate"
+    assert rebound["candidate_id"] == replay_payload["candidate"]["candidate_id"]
+    assert rebound["aliases"] == ["Post Office Hall"]
+    assert rebound["parent_version_id"] == merged_canonical["version_id"]
+
+    reviewed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{canonical['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": replay_payload["candidate"]["candidate_id"],
+            "asset_version_id": rebound["version_id"],
+            "expected_asset_version": rebound["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "review-rebound-scene-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["asset"]["aliases"] == ["Post Office Hall"]
+    assert reviewed.json()["graph"]["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == ["Post Office Hall"]
 
 
 def test_deterministic_extraction_records_missing_without_inventing_facts(tmp_path) -> None:
@@ -569,6 +750,609 @@ def test_alias_link_proposals_are_candidates_until_merge_alias_confirms_them(tmp
     assert graph_after_undo["version"] == graph_after_merge["version"] + 1
     assert graph_character_after_undo["metadata"]["asset_version_id"] == undone_character["version_id"]
     assert graph_character_after_undo["metadata"]["aliases"] == []
+
+
+def test_scene_name_normalization_proposals_are_feature_flagged_off_by_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", raising=False)
+    project_id = "scene-norm-flag-off"
+    source_text = """标题：邮局
+
+第一场
+
+地点：老城区二十四小时邮局大厅
+
+顾晚
+上班。
+
+第二场 - 内景 - 邮局大厅 - 夜
+
+顾晚
+加班。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert "scene_name_normalization_proposals" not in payload["candidate"]
+    assert "scene_name_normalization_proposal_count" not in payload["candidate"]
+    scenes = {item["name"] for item in payload["projection"]["assets"] if item["asset_type"] == "main_scene"}
+    assert "老城区二十四小时邮局大厅" in scenes
+    assert "邮局大厅" in scenes
+
+
+def test_direct_scene_name_normalization_proposals_cannot_bypass_default_off_flag(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", raising=False)
+    project_id = "scene-norm-direct-flag-off"
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    canonical_start = source_text.index("Old Town Post Office Hall")
+    variant_start = source_text.index("Post Office Hall", canonical_start + 1)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+            "named_characters": [],
+            "main_scenes": [
+                {
+                    "name": "Old Town Post Office Hall",
+                    "evidence_spans": [{
+                        "start": canonical_start,
+                        "end": canonical_start + len("Old Town Post Office Hall"),
+                        "quote": "Old Town Post Office Hall",
+                    }],
+                    "confidence": 0.95,
+                    "status": "candidate",
+                },
+                {
+                    "name": "Post Office Hall",
+                    "evidence_spans": [{
+                        "start": variant_start,
+                        "end": variant_start + len("Post Office Hall"),
+                        "quote": "Post Office Hall",
+                    }],
+                    "confidence": 0.9,
+                    "status": "candidate",
+                },
+            ],
+            "scene_name_normalization_proposals": [{
+                "proposal_id": "scenenorm_direct_bypass",
+                "schema_version": "afs.scene_name_normalization_proposal.v0.1",
+                "relation_type": "scene_name_normalization",
+                "status": "candidate",
+                "authority": "non_authoritative_proposal",
+                "canonical_scene_name": "Old Town Post Office Hall",
+                "variant_scene_name": "Post Office Hall",
+                "confidence": 0.82,
+                "evidence_spans": [{
+                    "start": variant_start,
+                    "end": variant_start + len("Post Office Hall"),
+                    "quote": "Post Office Hall",
+                }],
+                "extraction_method": "scene_name_prefix_or_suffix_unique",
+                "review_action": "use_core_asset_command_merge_scene_name",
+            }],
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["error"] == "scene_name_normalization_proposals_disabled"
+    assert client.get(f"/projects/{project_id}/script-truth").json()["projection"]["assets"] == []
+
+
+def test_direct_scene_name_normalization_proposals_require_distinct_candidate_endpoints(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+
+    for suffix, canonical_name, variant_name, expected_error in (
+        (
+            "orphan",
+            "Missing Scene",
+            "Post Office Hall",
+            "scene_name_normalization_target_not_found",
+        ),
+        (
+            "self",
+            "Post Office Hall",
+            "Post Office Hall",
+            "scene_name_normalization_self_reference",
+        ),
+    ):
+        project_id = f"scene-norm-invalid-{suffix}"
+        client = _client(tmp_path / suffix)
+        revision = _create_revision(client, project_id, source_text)
+        canonical_start = source_text.index("Old Town Post Office Hall")
+        variant_start = source_text.index("Post Office Hall", canonical_start + 1)
+        response = client.post(
+            f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+            json={
+                "project_id": project_id,
+                "revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+                "schema_version": ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+                "named_characters": [],
+                "main_scenes": [
+                    {
+                        "name": "Old Town Post Office Hall",
+                        "evidence_spans": [{
+                            "start": canonical_start,
+                            "end": canonical_start + len("Old Town Post Office Hall"),
+                            "quote": "Old Town Post Office Hall",
+                        }],
+                        "confidence": 0.95,
+                    },
+                    {
+                        "name": "Post Office Hall",
+                        "evidence_spans": [{
+                            "start": variant_start,
+                            "end": variant_start + len("Post Office Hall"),
+                            "quote": "Post Office Hall",
+                        }],
+                        "confidence": 0.9,
+                    },
+                ],
+                "scene_name_normalization_proposals": [{
+                    "proposal_id": f"scenenorm_invalid_{suffix}",
+                    "schema_version": "afs.scene_name_normalization_proposal.v0.1",
+                    "relation_type": "scene_name_normalization",
+                    "status": "candidate",
+                    "authority": "non_authoritative_proposal",
+                    "canonical_scene_name": canonical_name,
+                    "variant_scene_name": variant_name,
+                    "confidence": 0.82,
+                    "evidence_spans": [{
+                        "start": variant_start,
+                        "end": variant_start + len("Post Office Hall"),
+                        "quote": "Post Office Hall",
+                    }],
+                    "extraction_method": "scene_name_prefix_or_suffix_unique",
+                    "review_action": "use_core_asset_command_merge_scene_name",
+                }],
+            },
+        )
+
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["error"] == expected_error
+        assert client.get(f"/projects/{project_id}/script-truth").json()["projection"]["assets"] == []
+
+
+def test_scene_name_normalization_proposals_are_non_authoritative(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    project_id = "scene-norm-enabled"
+    source_text = """标题：邮局
+
+第一场
+
+地点：老城区二十四小时邮局大厅
+
+顾晚
+上班。
+
+第二场 - 内景 - 邮局大厅 - 夜
+
+顾晚
+加班。
+
+第三场 - 内景 - 顾晚合租屋的客厅 - 夜
+
+顾晚坐着。
+
+第四场 - 内景 - 合租屋客厅 - 日
+
+顾晚站着。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    proposals = payload["candidate"]["scene_name_normalization_proposals"]
+
+    assert {
+        (item["canonical_scene_name"], item["variant_scene_name"], item["extraction_method"])
+        for item in proposals
+    } == {("老城区二十四小时邮局大厅", "邮局大厅", "scene_name_prefix_or_suffix_unique")}
+    # Mid-substring with intervening 的 is intentionally not proposed.
+    assert all(item["variant_scene_name"] != "合租屋客厅" for item in proposals)
+    assert {item["status"] for item in proposals} == {"candidate"}
+    assert {item["authority"] for item in proposals} == {"non_authoritative_proposal"}
+    assert {item["review_action"] for item in proposals} == {"use_core_asset_command_merge_scene_name"}
+    for proposal in proposals:
+        for span in proposal["evidence_spans"]:
+            assert source_text[span["start"] : span["end"]] == span["quote"]
+
+    scene_assets = [item for item in payload["projection"]["assets"] if item["asset_type"] == "main_scene"]
+    assert {item["name"] for item in scene_assets} >= {
+        "老城区二十四小时邮局大厅",
+        "邮局大厅",
+        "顾晚合租屋的客厅",
+        "合租屋客厅",
+    }
+    # Proposals never collapse scene assets.
+    assert len({item["asset_id"] for item in scene_assets if item["name"] in {"老城区二十四小时邮局大厅", "邮局大厅"}}) == 2
+    assert all(item["aliases"] == [] for item in scene_assets)
+
+
+def test_scene_name_normalization_proposal_requires_explicit_merge_scene_name_confirm(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    project_id = "scene-norm-confirm"
+    source_text = """标题：邮局
+
+第一场
+
+地点：老城区二十四小时邮局大厅
+
+顾晚
+上班。
+
+第二场 - 内景 - 邮局大厅 - 夜
+
+顾晚
+加班。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    proposal = payload["candidate"]["scene_name_normalization_proposals"][0]
+    assert proposal["canonical_scene_name"] == "老城区二十四小时邮局大厅"
+    assert proposal["variant_scene_name"] == "邮局大厅"
+
+    scene_assets = {item["name"]: item for item in payload["projection"]["assets"] if item["asset_type"] == "main_scene"}
+    canonical = scene_assets["老城区二十四小时邮局大厅"]
+    variant = scene_assets["邮局大厅"]
+    assert canonical["aliases"] == []
+    assert variant["aliases"] == []
+
+    preview = client.post(
+        f"/projects/{project_id}/core-assets/commands/preview",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="preview-scene-name",
+            ),
+            "expected_asset_version": canonical["version"],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["command"]["requires_confirmation"] is True
+    assert preview.json()["command"]["after"]["aliases"] == ["邮局大厅"]
+
+    truth_before_confirm = client.get(f"/projects/{project_id}/script-truth")
+    assert truth_before_confirm.status_code == 200, truth_before_confirm.text
+    canonical_before = next(
+        item
+        for item in truth_before_confirm.json()["projection"]["assets"]
+        if item["asset_id"] == canonical["asset_id"]
+    )
+    assert canonical_before["aliases"] == []
+
+    confirmed = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="confirm-scene-name",
+            ),
+            "expected_asset_version": canonical["version"],
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    confirmed_payload = confirmed.json()
+    assert confirmed_payload["receipt"]["command_type"] == "merge_scene_name"
+    scenes_after = {
+        item["asset_id"]: item
+        for item in confirmed_payload["projection"]["assets"]
+        if item["asset_type"] == "main_scene"
+    }
+    assert scenes_after[canonical["asset_id"]]["name"] == "老城区二十四小时邮局大厅"
+    assert scenes_after[canonical["asset_id"]]["aliases"] == ["邮局大厅"]
+    assert scenes_after[variant["asset_id"]]["name"] == "邮局大厅"
+    assert scenes_after[variant["asset_id"]]["aliases"] == []
+
+    reviewed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{canonical['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": scenes_after[canonical["asset_id"]]["version_id"],
+            "expected_asset_version": scenes_after[canonical["asset_id"]]["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "review-scene-after-explicit-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["asset"]["status"] == "confirmed"
+    assert reviewed.json()["asset"]["aliases"] == ["邮局大厅"]
+    assert reviewed.json()["graph"]["version"] == 1
+    assert reviewed.json()["graph"]["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == ["邮局大厅"]
+
+    replay = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="confirm-scene-name",
+            ),
+            "expected_asset_version": canonical["version"],
+        },
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["idempotent_replay"] is True
+    assert replay.json()["receipt"]["receipt_id"] == confirmed_payload["receipt"]["receipt_id"]
+
+    stale = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="stale-scene-name",
+            ),
+            "expected_asset_version": canonical["version"],
+        },
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["detail"]["error"] == "core_asset_version_conflict"
+
+
+def test_confirmed_scene_name_merge_and_undo_keep_canonical_graph_in_sync(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS", "true")
+    project_id = "scene-norm-graph-sync"
+    source_text = "Scenes: Old Town Post Office Hall, Post Office Hall"
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    extracted = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert extracted.status_code == 200, extracted.text
+    payload = extracted.json()
+    scenes = {
+        item["name"]: item
+        for item in payload["projection"]["assets"]
+        if item["asset_type"] == "main_scene"
+    }
+    canonical = scenes["Old Town Post Office Hall"]
+    variant = scenes["Post Office Hall"]
+
+    def confirm_scene(asset: dict, graph_version: int, key: str) -> dict:
+        response = client.post(
+            f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{asset['asset_id']}/review",
+            json={
+                "project_id": project_id,
+                "revision_id": revision["revision_id"],
+                "source_digest": revision["source_digest"],
+                "candidate_id": payload["candidate"]["candidate_id"],
+                "asset_version_id": asset["version_id"],
+                "expected_asset_version": asset["version"],
+                "expected_graph_version": graph_version,
+                "idempotency_key": key,
+                "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+                "decision": "confirm",
+            },
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["asset"]
+
+    confirmed_canonical = confirm_scene(canonical, 0, "confirm-canonical-scene")
+    confirm_scene(variant, 1, "confirm-variant-scene")
+    graph_before = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_before["version"] == 2
+    assert graph_before["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == []
+
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                canonical["asset_id"],
+                variant["asset_id"],
+                key="merge-confirmed-scene-name",
+            ),
+            "expected_asset_version": confirmed_canonical["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    merged_scene = next(
+        item for item in merged.json()["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    graph_after_merge = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_merge["version"] == 3
+    assert graph_after_merge["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == ["Post Office Hall"]
+    assert graph_after_merge["nodes"][canonical["asset_id"]]["metadata"]["asset_version_id"] == merged_scene["version_id"]
+    assert merged.json()["receipt"]["production_graph_version"] == 3
+
+    undone = client.post(
+        f"/projects/{project_id}/core-assets/commands/undo",
+        json={
+            "project_id": project_id,
+            "receipt_id": merged.json()["receipt"]["receipt_id"],
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        },
+    )
+    assert undone.status_code == 200, undone.text
+    restored_scene = next(
+        item for item in undone.json()["projection"]["assets"] if item["asset_id"] == canonical["asset_id"]
+    )
+    graph_after_undo = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_undo["version"] == 4
+    assert graph_after_undo["nodes"][canonical["asset_id"]]["metadata"]["aliases"] == []
+    assert graph_after_undo["nodes"][canonical["asset_id"]]["metadata"]["asset_version_id"] == restored_scene["version_id"]
+
+
+def test_merge_scene_name_rejects_invalid_scene_targets(tmp_path) -> None:
+    project_id = "scene-norm-invalid-targets"
+    source_text = """Characters: Mira
+Scenes: Archive Hall, Side Hall
+
+Mira
+Ready.
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assets = payload["projection"]["assets"]
+    character = next(item for item in assets if item["asset_type"] == "character")
+    scenes = {item["name"]: item for item in assets if item["asset_type"] == "main_scene"}
+    scene = scenes["Archive Hall"]
+    variant = scenes["Side Hall"]
+
+    wrong_target = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                character["asset_id"],
+                scene["asset_id"],
+                key="wrong-canonical-type",
+            ),
+            "expected_asset_version": character["version"],
+        },
+    )
+    assert wrong_target.status_code == 409, wrong_target.text
+    assert wrong_target.json()["detail"]["error"] == "merge_scene_name_requires_main_scene"
+
+    missing_variant = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                "scene_missing",
+                key="missing-variant-id",
+            ),
+            "expected_asset_version": scene["version"],
+        },
+    )
+    assert missing_variant.status_code == 404, missing_variant.text
+    assert missing_variant.json()["detail"]["error"] == "core_asset_target_not_found"
+
+    same_scene = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                scene["asset_id"],
+                key="same-scene-id",
+            ),
+            "expected_asset_version": scene["version"],
+        },
+    )
+    assert same_scene.status_code == 409, same_scene.text
+    assert same_scene.json()["detail"]["error"] == "scene_name_variant_matches_canonical"
+
+    rejected_variant = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{variant['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": variant["version_id"],
+            "expected_asset_version": variant["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "reject-variant-before-scene-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "reject",
+        },
+    )
+    assert rejected_variant.status_code == 200, rejected_variant.text
+    assert rejected_variant.json()["asset"]["status"] == "rejected"
+
+    inactive_variant = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                variant["asset_id"],
+                key="rejected-variant-id",
+            ),
+            "expected_asset_version": scene["version"],
+        },
+    )
+    assert inactive_variant.status_code == 409, inactive_variant.text
+    assert inactive_variant.json()["detail"]["error"] == "scene_name_variant_not_active"
+
+    rejected_canonical = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{scene['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": scene["version_id"],
+            "expected_asset_version": scene["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "reject-canonical-before-scene-name-merge",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "reject",
+        },
+    )
+    assert rejected_canonical.status_code == 200, rejected_canonical.text
+
+    inactive_canonical = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_scene_name_command(
+                project_id,
+                revision,
+                scene["asset_id"],
+                variant["asset_id"],
+                key="rejected-canonical-id",
+            ),
+            "expected_asset_version": rejected_canonical.json()["asset"]["version"],
+        },
+    )
+    assert inactive_canonical.status_code == 409, inactive_canonical.text
+    assert inactive_canonical.json()["detail"]["error"] == "scene_name_canonical_not_active"
 
 
 def test_studio_runtime_client_exposes_the_same_extraction_route() -> None:

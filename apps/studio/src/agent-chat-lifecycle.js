@@ -1210,6 +1210,20 @@ function previewAgentCommand(message, context = {}) {
     });
   }
 
+  const sceneNameText = matchCommand(message, [
+    /^\/merge-scene-name\s+(.+)$/i,
+    /^合并场景别名[:：]\s*(.+)$/i,
+  ]);
+  if (sceneNameText) {
+    return coreAssetCommand({
+      context,
+      commandType: "merge_scene_name",
+      title: "合并场景别名",
+      summary: `把「${cleanText(sceneNameText, 60)}」合并为当前场景别名`,
+      patch: { alias: cleanText(sceneNameText, 120) },
+    });
+  }
+
   if (/^\/retire-selected-asset$/i.test(message) || /^停用当前资产$/i.test(message)) {
     return coreAssetCommand({
       context,
@@ -2369,6 +2383,7 @@ function coreAssetCommandLabel(commandType) {
     create_manual_prop: "手动道具创建",
     edit_asset: "核心资产编辑",
     merge_alias: "角色别名合并",
+    merge_scene_name: "场景别名合并",
     retire_asset: "核心资产停用",
     retire_manual_prop: "手动道具停用",
     restore_asset: "核心资产恢复",

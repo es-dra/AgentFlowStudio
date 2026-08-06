@@ -40,6 +40,7 @@ static memory-workbench paths are not task entrypoints.
 - [Episode production fact contract](architecture/AFS_EPISODE_PRODUCTION_FACT_CONTRACT.md)
 - [Production Control Contract v0.1](architecture/AFS_PRODUCTION_CONTROL_CONTRACT_V0.1.md)
 - [Studio entity/status vocabulary contract](architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md)
+- [Scene name normalization confirmation](architecture/SCENE_NAME_NORMALIZATION_CONFIRMATION.md)
 - [Node prompt optimizer contract](architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md)
 - [Creative intent control agent engineering summary](architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md)
 - [Provider adapter contract](provider_adapter_contract.md)
