@@ -12,6 +12,10 @@ from apps.api.runtime_script_scene_name_normalization import build_scene_name_no
 DETERMINISTIC_EXTRACTION_SCHEMA_VERSION = "afs.deterministic_script_extraction.v0.1"
 ALIAS_LINK_PROPOSALS_ENV = "AFS_ENABLE_ALIAS_LINK_PROPOSALS"
 SCENE_NAME_NORMALIZATION_PROPOSALS_ENV = "AFS_ENABLE_SCENE_NAME_NORMALIZATION_PROPOSALS"
+# Paid remote-LLM path (NOT free like alias/scene flags). Imported lazily below
+# to avoid a circular import with runtime_script_indirect_mention_discovery.
+# Env: AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS (default off).
+
 
 
 @dataclass(frozen=True)
@@ -143,6 +147,7 @@ def build_deterministic_analysis_candidate(
     source_digest: str,
     source_text: str,
     candidate_schema_version: str,
+    known_identity_surfaces: set[str] | frozenset[str] | None = None,
 ) -> dict[str, Any]:
     characters = extract_characters(source_text)
     scenes = extract_scenes(source_text)
@@ -156,6 +161,41 @@ def build_deterministic_analysis_candidate(
         if _scene_name_normalization_proposals_enabled()
         else []
     )
+    # COST: this block may issue real remote LLM calls when the paid flag is on.
+    # Lazy import keeps flag-off extract free of the discovery↔extraction cycle.
+    from apps.api.runtime_script_indirect_mention_proposals import (
+        INDIRECT_MENTION_PROPOSALS_ENV,
+        build_indirect_mention_proposals,
+        indirect_mention_llm_max_calls,
+        indirect_mention_llm_proposals_enabled,
+    )
+
+    # Exact identity surfaces: this extract's canonical names + any confirmed
+    # names/aliases already on revision assets (passed by the extract route).
+    identity_surfaces = {item.value for item in characters}
+    for surface in known_identity_surfaces or ():
+        text = str(surface or "").strip()
+        if text:
+            identity_surfaces.add(text)
+
+    paid_indirect_enabled = indirect_mention_llm_proposals_enabled()
+    indirect_mention_bundle = (
+        build_indirect_mention_proposals(
+            source_text,
+            max_calls=indirect_mention_llm_max_calls(),
+            known_identity_surfaces=identity_surfaces,
+        )
+        if paid_indirect_enabled
+        else {
+            "proposals": [],
+            "budget_skipped": [],
+            "suppressed_known_identity": [],
+            "discovered_count": 0,
+            "judged_count": 0,
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+    )
     missing_slots: list[str] = []
     notes: list[str] = []
     if not characters:
@@ -164,6 +204,15 @@ def build_deterministic_analysis_candidate(
     if not scenes:
         missing_slots.append("main_scenes")
         notes.append("main scenes missing: no specific labeled location or industry heading found")
+    if paid_indirect_enabled:
+        notes.append(
+            "indirect_mention_llm_proposals: PAID remote LLM path enabled "
+            f"({INDIRECT_MENTION_PROPOSALS_ENV}); "
+            f"judged={indirect_mention_bundle['judged_count']} "
+            f"discovered={indirect_mention_bundle['discovered_count']} "
+            f"budget_skipped={len(indirect_mention_bundle['budget_skipped'])} "
+            f"suppressed_known_identity={len(indirect_mention_bundle.get('suppressed_known_identity') or [])}"
+        )
     return {
         "project_id": project_id,
         "revision_id": revision_id,
@@ -197,8 +246,13 @@ def build_deterministic_analysis_candidate(
         "extraction_notes": notes,
         "alias_link_proposals": alias_link_proposals,
         "scene_name_normalization_proposals": scene_name_normalization_proposals,
-        "provider_dispatch_count": 0,
-        "remote_dispatch_count": 0,
+        "indirect_mention_proposals": list(indirect_mention_bundle["proposals"]),
+        "indirect_mention_budget_skipped": list(indirect_mention_bundle["budget_skipped"]),
+        "indirect_mention_suppressed_known_identity": list(
+            indirect_mention_bundle.get("suppressed_known_identity") or []
+        ),
+        "provider_dispatch_count": int(indirect_mention_bundle["provider_dispatch_count"]),
+        "remote_dispatch_count": int(indirect_mention_bundle["remote_dispatch_count"]),
     }
 
 

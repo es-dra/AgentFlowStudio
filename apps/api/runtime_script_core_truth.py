@@ -122,6 +122,85 @@ class SceneNameNormalizationProposal(BaseModel):
     remote_dispatch_count: int = Field(default=0, ge=0, le=0)
 
 
+class IndirectMentionProposal(BaseModel):
+    """Paid remote-LLM indirect-mention proposal (NOT free like alias/scene).
+
+    Only emitted when refers_to_real_character=true AND is_present_in_scene=false.
+    Never auto-authoritative; human must call create_manual_character.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    relation_type: Literal["indirect_mention"] = "indirect_mention"
+    status: Literal["candidate"] = "candidate"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    mention: str = Field(min_length=1, max_length=120)
+    refers_to_real_character: Literal[True] = True
+    refers_to_real_character_confidence: float = Field(ge=0.0, le=1.0)
+    refers_to_real_character_reason: str = Field(default="", max_length=600)
+    is_present_in_scene: Literal[False] = False
+    is_present_in_scene_confidence: float = Field(ge=0.0, le=1.0)
+    is_present_in_scene_reason: str = Field(default="", max_length=600)
+    is_indirect_mention: Literal[True] = True
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
+    extraction_method: str = Field(min_length=1, max_length=120)
+    discovery_method: str | None = Field(default=None, max_length=120)
+    review_action: Literal["use_core_asset_command_create_manual_character"] = (
+        "use_core_asset_command_create_manual_character"
+    )
+    cost_class: Literal["paid_remote_llm"] = "paid_remote_llm"
+    already_extracted_as_character: bool = False
+    # Per-proposal LLM call accounting (paid path; unlike free alias/scene proposals).
+    provider_dispatch_count: int = Field(default=1, ge=0, le=1)
+    remote_dispatch_count: int = Field(default=1, ge=0, le=1)
+
+
+class IndirectMentionBudgetSkipped(BaseModel):
+    """Discovered mention not judged because the paid LLM call budget was exhausted.
+
+    Explicitly surfaced so callers never silently drop over-budget discoveries.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mention: str = Field(min_length=1, max_length=120)
+    source_span: EvidenceSpan
+    status: Literal["budget_skipped_unjudged"] = "budget_skipped_unjudged"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    cost_class: Literal["paid_remote_llm"] = "paid_remote_llm"
+    reason: str = Field(min_length=1, max_length=600)
+    discovery_method: str | None = Field(default=None, max_length=120)
+    discovery_methods: list[str] = Field(default_factory=list, max_length=12)
+    already_extracted_as_character: bool = False
+    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+
+
+class IndirectMentionSuppressedKnownIdentity(BaseModel):
+    """Mention discovered but not proposed because it already matches a known identity.
+
+    Exact match against extracted canonical names and/or confirmed asset aliases.
+    No create_manual_character review_action is emitted for these.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mention: str = Field(min_length=1, max_length=120)
+    source_span: EvidenceSpan
+    status: Literal["suppressed_known_identity"] = "suppressed_known_identity"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    cost_class: Literal["paid_remote_llm"] = "paid_remote_llm"
+    reason: str = Field(min_length=1, max_length=600)
+    discovery_method: str | None = Field(default=None, max_length=120)
+    discovery_methods: list[str] = Field(default_factory=list, max_length=12)
+    already_extracted_as_character: bool = True
+    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+
+
 class ScriptRevisionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -151,11 +230,24 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     scene_name_normalization_proposals: list[SceneNameNormalizationProposal] = Field(
         default_factory=list, max_length=120
     )
+    # Paid remote-LLM proposals (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS).
+    # Unlike alias/scene lists, enabling this path incurs real LLM cost/latency.
+    indirect_mention_proposals: list[IndirectMentionProposal] = Field(
+        default_factory=list, max_length=120
+    )
+    indirect_mention_budget_skipped: list[IndirectMentionBudgetSkipped] = Field(
+        default_factory=list, max_length=240
+    )
+    indirect_mention_suppressed_known_identity: list[IndirectMentionSuppressedKnownIdentity] = Field(
+        default_factory=list, max_length=240
+    )
     missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
     extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
-    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
-    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+    # Default remains 0 (free extract). When paid indirect-mention LLM is on,
+    # these may be >0 to reflect real remote dispatches (capped by max-calls).
+    provider_dispatch_count: int = Field(default=0, ge=0, le=120)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=120)
 
 
 class CoreAssetCommandRequest(BaseModel):
@@ -172,6 +264,7 @@ class CoreAssetCommandRequest(BaseModel):
         "merge_alias",
         "merge_scene_name",
         "create_manual_prop",
+        "create_manual_character",
         "retire_manual_prop",
     ]
     target_asset_id: str | None = Field(default=None, max_length=140)
@@ -394,6 +487,11 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                     source_digest=str(revision["source_digest"]),
                     source_text=str(revision["source_text"]),
                     candidate_schema_version=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+                    known_identity_surfaces=_known_character_identity_surfaces(
+                        state,
+                        project_id=project_id,
+                        revision_id=revision_id,
+                    ),
                 )
             )
             revision, candidate, assets, affected, preserved = _apply_structured_analysis_candidate(
@@ -410,6 +508,8 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 stage="analysis_candidate_extract",
             )
             _write_state(store, project_id, state)
+        dispatch_count = int(body.provider_dispatch_count or 0)
+        remote_count = int(body.remote_dispatch_count or 0)
         return {
             "project_id": project_id,
             "candidate": public_candidate(candidate),
@@ -422,8 +522,9 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 "missing_slots": list(body.missing_slots),
                 "notes": list(body.extraction_notes),
             },
-            "provider_dispatch_count": 0,
-            "remote_dispatch_count": 0,
+            # May be >0 only when paid AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS is on.
+            "provider_dispatch_count": dispatch_count,
+            "remote_dispatch_count": remote_count,
         }
 
     @app.post("/projects/{project_id}/script-revisions/{revision_id}/analysis-relationships/extract")
@@ -1092,8 +1193,9 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "beats_count": len(candidate.get("beats") or []),
         "missing_slots": [str(item) for item in candidate.get("missing_slots", [])[:10]],
         "extraction_notes": [str(item)[:600] for item in candidate.get("extraction_notes", [])[:20]],
-        "provider_dispatch_count": 0,
-        "remote_dispatch_count": 0,
+        # Pass through paid-path accounting when present; default stays 0.
+        "provider_dispatch_count": int(candidate.get("provider_dispatch_count") or 0),
+        "remote_dispatch_count": int(candidate.get("remote_dispatch_count") or 0),
     }
     if "alias_link_proposals" in candidate:
         payload["alias_link_proposal_count"] = len(candidate.get("alias_link_proposals") or [])
@@ -1108,6 +1210,28 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         payload["scene_name_normalization_proposals"] = [
             public_scene_name_normalization_proposal(item)
             for item in (candidate.get("scene_name_normalization_proposals") or [])[:120]
+        ]
+    if "indirect_mention_proposals" in candidate:
+        payload["indirect_mention_proposal_count"] = len(candidate.get("indirect_mention_proposals") or [])
+        payload["indirect_mention_proposals"] = [
+            public_indirect_mention_proposal(item)
+            for item in (candidate.get("indirect_mention_proposals") or [])[:120]
+        ]
+    if "indirect_mention_budget_skipped" in candidate:
+        payload["indirect_mention_budget_skipped_count"] = len(
+            candidate.get("indirect_mention_budget_skipped") or []
+        )
+        payload["indirect_mention_budget_skipped"] = [
+            public_indirect_mention_budget_skipped(item)
+            for item in (candidate.get("indirect_mention_budget_skipped") or [])[:240]
+        ]
+    if "indirect_mention_suppressed_known_identity" in candidate:
+        payload["indirect_mention_suppressed_known_identity_count"] = len(
+            candidate.get("indirect_mention_suppressed_known_identity") or []
+        )
+        payload["indirect_mention_suppressed_known_identity"] = [
+            public_indirect_mention_suppressed_known_identity(item)
+            for item in (candidate.get("indirect_mention_suppressed_known_identity") or [])[:240]
         ]
     return payload
 
@@ -1143,6 +1267,69 @@ def public_scene_name_normalization_proposal(proposal: dict[str, Any]) -> dict[s
         "evidence_spans": list(proposal.get("evidence_spans") or []),
         "extraction_method": str(proposal.get("extraction_method") or ""),
         "review_action": str(proposal.get("review_action") or "use_core_asset_command_merge_scene_name"),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def public_indirect_mention_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "proposal_id": str(proposal.get("proposal_id") or ""),
+        "schema_version": str(proposal.get("schema_version") or ""),
+        "relation_type": str(proposal.get("relation_type") or "indirect_mention"),
+        "status": str(proposal.get("status") or "candidate"),
+        "authority": str(proposal.get("authority") or "non_authoritative_proposal"),
+        "mention": str(proposal.get("mention") or ""),
+        "refers_to_real_character": True,
+        "refers_to_real_character_confidence": float(
+            proposal.get("refers_to_real_character_confidence") or 0.0
+        ),
+        "refers_to_real_character_reason": str(proposal.get("refers_to_real_character_reason") or ""),
+        "is_present_in_scene": False,
+        "is_present_in_scene_confidence": float(proposal.get("is_present_in_scene_confidence") or 0.0),
+        "is_present_in_scene_reason": str(proposal.get("is_present_in_scene_reason") or ""),
+        "is_indirect_mention": True,
+        "confidence": float(proposal.get("confidence") or 0.0),
+        "evidence_spans": list(proposal.get("evidence_spans") or []),
+        "extraction_method": str(proposal.get("extraction_method") or ""),
+        "discovery_method": str(proposal.get("discovery_method") or ""),
+        "review_action": str(
+            proposal.get("review_action") or "use_core_asset_command_create_manual_character"
+        ),
+        "cost_class": "paid_remote_llm",
+        "already_extracted_as_character": bool(proposal.get("already_extracted_as_character")),
+        "provider_dispatch_count": int(proposal.get("provider_dispatch_count") or 0),
+        "remote_dispatch_count": int(proposal.get("remote_dispatch_count") or 0),
+    }
+
+
+def public_indirect_mention_budget_skipped(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "mention": str(item.get("mention") or ""),
+        "source_span": dict(item.get("source_span") or {}),
+        "status": "budget_skipped_unjudged",
+        "authority": "non_authoritative_proposal",
+        "cost_class": "paid_remote_llm",
+        "reason": str(item.get("reason") or ""),
+        "discovery_method": str(item.get("discovery_method") or ""),
+        "discovery_methods": [str(value) for value in (item.get("discovery_methods") or [])[:12]],
+        "already_extracted_as_character": bool(item.get("already_extracted_as_character")),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def public_indirect_mention_suppressed_known_identity(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "mention": str(item.get("mention") or ""),
+        "source_span": dict(item.get("source_span") or {}),
+        "status": "suppressed_known_identity",
+        "authority": "non_authoritative_proposal",
+        "cost_class": "paid_remote_llm",
+        "reason": str(item.get("reason") or ""),
+        "discovery_method": str(item.get("discovery_method") or ""),
+        "discovery_methods": [str(value) for value in (item.get("discovery_methods") or [])[:12]],
+        "already_extracted_as_character": True,
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -1802,6 +1989,12 @@ def _analysis_candidate_record(
         payload.pop("alias_link_proposals", None)
     if not payload.get("scene_name_normalization_proposals"):
         payload.pop("scene_name_normalization_proposals", None)
+    if not payload.get("indirect_mention_proposals"):
+        payload.pop("indirect_mention_proposals", None)
+    if not payload.get("indirect_mention_budget_skipped"):
+        payload.pop("indirect_mention_budget_skipped", None)
+    if not payload.get("indirect_mention_suppressed_known_identity"):
+        payload.pop("indirect_mention_suppressed_known_identity", None)
     payload["artifact_type"] = "afs_structured_analysis_candidate"
     payload["candidate_id"] = f"candidate_{_sha256_json(payload)[:16]}"
     payload["created_at"] = _safe_time(body.generated_at)
@@ -2304,6 +2497,89 @@ def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: Co
             "remote_dispatch_count": 0,
         }
         after = _new_asset_version(after)
+    elif body.command_type == "create_manual_character":
+        # Human confirmation entry for paid indirect-mention proposals (and
+        # other manual character creates). Never auto-run from extract/review.
+        name = _clean_label(
+            body.patch.get("display_name") or body.patch.get("name") or body.patch.get("mention")
+        )
+        if not name:
+            raise _contract_error(
+                "manual_character_name_required",
+                "Manual character command requires a display_name, name, or mention patch.",
+                project_id=project_id,
+                stage="core_asset_command_preview",
+            )
+        allow_duplicate = _truthy_patch_flag(body.patch.get("allow_duplicate_display_name"))
+        conflict = _find_character_identity_conflict(
+            assets,
+            project_id=project_id,
+            revision_id=body.revision_id,
+            surface=name,
+        )
+        if conflict and not allow_duplicate:
+            raise _contract_error(
+                "manual_character_identity_exists",
+                (
+                    f"Character identity surface '{name}' already exists on "
+                    f"{conflict['asset_id']} ({conflict['matched_as']}="
+                    f"'{conflict['matched_surface']}'). Use merge_alias to attach an "
+                    "alias to that character, or set patch.allow_duplicate_display_name=true "
+                    "only for a true homonym (two distinct people who share the same surface)."
+                ),
+                project_id=project_id,
+                stage="core_asset_command_preview",
+                status_code=409,
+                details={
+                    "existing_asset_id": conflict["asset_id"],
+                    "matched_as": conflict["matched_as"],
+                    "matched_surface": conflict["matched_surface"],
+                    "suggested_command": "merge_alias",
+                    "allow_duplicate_display_name": False,
+                },
+            )
+        evidence_spans = [
+            dict(span)
+            for span in (body.patch.get("evidence_spans") or [])
+            if isinstance(span, dict)
+        ]
+        asset_id = (
+            f"char_"
+            f"{hashlib.sha256(f'{project_id}:{body.revision_id}:manual:{name}:{now}'.encode('utf-8')).hexdigest()[:16]}"
+        )
+        lineage = {
+            "source_revision_id": body.revision_id,
+            "source_digest": body.source_digest,
+            "manual_command": "create_manual_character",
+            "proposal_id": str(body.patch.get("proposal_id") or ""),
+        }
+        if allow_duplicate and conflict:
+            lineage["allow_duplicate_display_name"] = True
+            lineage["duplicate_of_asset_id"] = conflict["asset_id"]
+        after = {
+            "asset_id": asset_id,
+            "asset_type": "character",
+            "source_mode": "manual",
+            "status": "confirmed",
+            "candidate_id": "",
+            "project_id": project_id,
+            "revision_id": body.revision_id,
+            "source_digest": body.source_digest,
+            "display_name": name,
+            "name": name,
+            "aliases": _clean_text_list(list(body.patch.get("aliases") or [])),
+            "pronoun_links": [],
+            "evidence_spans": evidence_spans,
+            "confidence": 1.0,
+            "evidence_status": "human_confirmed",
+            "extraction_method": "create_manual_character",
+            "lineage": lineage,
+            "created_at": now,
+            "updated_at": now,
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        }
+        after = _new_asset_version(after)
     else:
         before = _require_asset_for_command(assets, project_id, body.revision_id, target_id, body.command_type)
         if body.expected_asset_version is not None and int(before.get("version") or 1) != body.expected_asset_version:
@@ -2687,6 +2963,7 @@ def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision:
         *body.main_scenes,
         *body.alias_link_proposals,
         *body.scene_name_normalization_proposals,
+        *body.indirect_mention_proposals,
     ]:
         for span in item.evidence_spans:
             expected = source_text[span.start : span.end]
@@ -2699,6 +2976,21 @@ def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision:
                     status_code=409,
                     details={"revision_id": body.revision_id},
                 )
+    for skipped in [
+        *body.indirect_mention_budget_skipped,
+        *body.indirect_mention_suppressed_known_identity,
+    ]:
+        span = skipped.source_span
+        expected = source_text[span.start : span.end]
+        if expected != span.quote:
+            raise _contract_error(
+                "evidence_span_mismatch",
+                "Evidence span quote must exactly match the bound source revision text.",
+                project_id=str(body.project_id),
+                stage="analysis_candidate_submit",
+                status_code=409,
+                details={"revision_id": body.revision_id},
+            )
 
 
 def _analysis_state_for_assets(assets: list[dict[str, Any]]) -> str:
@@ -3231,8 +3523,85 @@ def _command_title(command_type: str) -> str:
         "merge_alias": "Merge character alias",
         "merge_scene_name": "Merge scene name",
         "create_manual_prop": "Create manual prop",
+        "create_manual_character": "Create manual character",
         "retire_manual_prop": "Retire manual prop",
     }.get(command_type, "Core asset command")
+
+
+def _truthy_patch_flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _known_character_identity_surfaces(
+    state: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+) -> set[str]:
+    """Exact canonical names + confirmed aliases on active characters for this revision."""
+    surfaces: set[str] = set()
+    for asset in (state.get("assets") or {}).values():
+        if not isinstance(asset, dict):
+            continue
+        if str(asset.get("project_id") or "") != project_id:
+            continue
+        if not _asset_belongs_to_revision(asset, revision_id):
+            continue
+        if asset.get("asset_type") != "character":
+            continue
+        if str(asset.get("status") or "") in {"retired", "undone", "rejected"}:
+            continue
+        for key in ("display_name", "name"):
+            label = _clean_label(asset.get(key))
+            if label:
+                surfaces.add(label)
+        for alias in asset.get("aliases") or []:
+            label = _clean_label(alias)
+            if label:
+                surfaces.add(label)
+    return surfaces
+
+
+def _find_character_identity_conflict(
+    assets: dict[str, Any],
+    *,
+    project_id: str,
+    revision_id: str,
+    surface: str,
+) -> dict[str, str] | None:
+    needle = _normal_key(surface)
+    if not needle:
+        return None
+    for asset in assets.values():
+        if not isinstance(asset, dict):
+            continue
+        if str(asset.get("project_id") or "") != project_id:
+            continue
+        if not _asset_belongs_to_revision(asset, revision_id):
+            continue
+        if asset.get("asset_type") != "character":
+            continue
+        if str(asset.get("status") or "") in {"retired", "undone", "rejected"}:
+            continue
+        for key in ("display_name", "name"):
+            label = _clean_label(asset.get(key))
+            if label and _normal_key(label) == needle:
+                return {
+                    "asset_id": str(asset.get("asset_id") or ""),
+                    "matched_as": key,
+                    "matched_surface": label,
+                }
+        for alias in asset.get("aliases") or []:
+            label = _clean_label(alias)
+            if label and _normal_key(label) == needle:
+                return {
+                    "asset_id": str(asset.get("asset_id") or ""),
+                    "matched_as": "alias",
+                    "matched_surface": label,
+                }
+    return None
 
 
 def _command_summary(command_type: str, asset: dict[str, Any]) -> str:

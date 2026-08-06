@@ -1182,6 +1182,22 @@ function previewAgentCommand(message, context = {}) {
     });
   }
 
+  const manualCharacter = matchCommand(message, [
+    /^\/manual-character\s+(.+)$/i,
+    /^\/add-character\s+(.+)$/i,
+    /^手动角色[:：]\s*(.+)$/i,
+  ]);
+  if (manualCharacter) {
+    return coreAssetCommand({
+      context,
+      commandType: "create_manual_character",
+      title: "创建手动角色",
+      summary: `创建绑定当前剧本版本的手动角色「${cleanText(manualCharacter, 60)}」（间接提及等人肉确认入口；不自动权威化）`,
+      patch: { display_name: cleanText(manualCharacter, 120) },
+      allowMissingTarget: true,
+    });
+  }
+
   const editAsset = matchCommand(message, [
     /^\/edit-selected-asset\s+(.+)$/i,
     /^编辑当前资产[:：]\s*(.+)$/i,
@@ -2381,6 +2397,7 @@ function coreAssetCommandLabel(commandType) {
   return ({
     refresh_script_truth: "刷新剧本与资产事实",
     create_manual_prop: "手动道具创建",
+    create_manual_character: "手动角色创建",
     edit_asset: "核心资产编辑",
     merge_alias: "角色别名合并",
     merge_scene_name: "场景别名合并",

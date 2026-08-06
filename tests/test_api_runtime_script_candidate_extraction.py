@@ -651,3 +651,453 @@ def test_studio_runtime_client_exposes_the_same_extraction_route() -> None:
     assert "extractStructuredAnalysisCandidate(revisionId)" in runtime_client
     assert "/analysis-candidates/extract" in runtime_client
     assert 'return "extract_structured_analysis_candidate"' in runtime_client
+
+
+def _fake_indirect_judge(_text: str, mention: str, _output_dir) -> dict:
+    """Mock paid LLM judge — never hits a remote provider in unit/API tests."""
+    if mention in {"顾衡", "沈岚", "江澄", "柯衡"}:
+        return {
+            "refers_to_real_character": True,
+            "refers_to_real_character_confidence": 0.95,
+            "refers_to_real_character_reason": f"{mention} 是真实人物",
+            "is_present_in_scene": False,
+            "is_present_in_scene_confidence": 0.9,
+            "is_present_in_scene_reason": "仅被提及",
+            "is_indirect_mention": True,
+        }
+    return {
+        "refers_to_real_character": False,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "噪声",
+        "is_present_in_scene": False,
+        "is_present_in_scene_confidence": 0.95,
+        "is_present_in_scene_reason": "非人物",
+        "is_indirect_mention": False,
+    }
+
+
+def test_indirect_mention_llm_proposals_are_feature_flagged_off_by_default(tmp_path, monkeypatch) -> None:
+    # Paid path must stay off by default so extract remains free/zero-dispatch.
+    monkeypatch.delenv("AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS", raising=False)
+    project_id = "indirect-mention-flag-off"
+    source_text = """标题：夜班
+
+第一场 - 内景 - 邮局大厅 - 夜
+
+人物：顾晚
+
+顾晚拆开汇款单：收款人是「顾衡」。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["provider_dispatch_count"] == 0
+    assert payload["remote_dispatch_count"] == 0
+    assert "indirect_mention_proposals" not in payload["candidate"]
+    assert "indirect_mention_proposal_count" not in payload["candidate"]
+    assert "indirect_mention_budget_skipped" not in payload["candidate"]
+    assert all(
+        item["display_name"] != "顾衡"
+        for item in payload["projection"]["assets"]
+        if item["asset_type"] == "character"
+    )
+
+
+def test_indirect_mention_llm_proposals_are_non_authoritative_until_manual_create(
+    tmp_path, monkeypatch
+) -> None:
+    # COST: flag enables paid remote LLM. This test mocks the judge — no real calls.
+    monkeypatch.setenv("AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS", "true")
+    monkeypatch.setenv("AFS_INDIRECT_MENTION_LLM_MAX_CALLS", "12")
+    monkeypatch.setattr(
+        "apps.api.runtime_script_indirect_mention_proposals._default_remote_judge",
+        _fake_indirect_judge,
+    )
+    project_id = "indirect-mention-enabled"
+    source_text = """标题：夜班
+
+第一场 - 内景 - 邮局大厅 - 夜
+
+人物：顾晚
+
+顾晚拆开：收款人是「顾衡」。
+
+方糖
+顾衡是谁？
+
+顾晚
+照片背面写着「沈岚」。电话那头喊「江澄」。
+巷口喷着「默记修缮」。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["provider_dispatch_count"] > 0
+    assert payload["remote_dispatch_count"] == payload["provider_dispatch_count"]
+    assert any("PAID remote LLM" in note for note in payload["extraction"]["notes"])
+
+    proposals = payload["candidate"]["indirect_mention_proposals"]
+    mentions = {item["mention"] for item in proposals}
+    assert {"顾衡", "沈岚", "江澄"} <= mentions
+    assert "默记修缮" not in mentions
+    assert {item["status"] for item in proposals} == {"candidate"}
+    assert {item["authority"] for item in proposals} == {"non_authoritative_proposal"}
+    assert {item["cost_class"] for item in proposals} == {"paid_remote_llm"}
+    assert {item["review_action"] for item in proposals} == {
+        "use_core_asset_command_create_manual_character"
+    }
+    character_names = {
+        item["display_name"] for item in payload["projection"]["assets"] if item["asset_type"] == "character"
+    }
+    assert "顾衡" not in character_names
+    assert "沈岚" not in character_names
+    assert "江澄" not in character_names
+
+    guwan = next(item for item in payload["projection"]["assets"] if item["display_name"] == "顾晚")
+    reviewed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{guwan['asset_id']}/review",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "candidate_id": payload["candidate"]["candidate_id"],
+            "asset_version_id": guwan["version_id"],
+            "expected_asset_version": guwan["version"],
+            "expected_graph_version": 0,
+            "idempotency_key": "confirm-guwan-no-indirect-authority",
+            "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+            "decision": "confirm",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["asset"]["status"] == "confirmed"
+    truth_after_review = client.get(f"/projects/{project_id}/script-truth")
+    assert truth_after_review.status_code == 200, truth_after_review.text
+    after_review_names = {
+        item["display_name"]
+        for item in truth_after_review.json()["projection"]["assets"]
+        if item["asset_type"] == "character"
+    }
+    assert "顾衡" not in after_review_names
+    assert "沈岚" not in after_review_names
+    assert "江澄" not in after_review_names
+
+    proposal = next(item for item in proposals if item["mention"] == "顾衡")
+    preview = client.post(
+        f"/projects/{project_id}/core-assets/commands/preview",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {
+                "display_name": proposal["mention"],
+                "evidence_spans": proposal["evidence_spans"],
+                "proposal_id": proposal["proposal_id"],
+            },
+            "idempotency_key": "preview-manual-guheng",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["command"]["requires_confirmation"] is True
+    assert preview.json()["command"]["after"]["status"] == "confirmed"
+    assert preview.json()["command"]["after"]["asset_type"] == "character"
+
+    truth_before_confirm = client.get(f"/projects/{project_id}/script-truth")
+    assert truth_before_confirm.status_code == 200, truth_before_confirm.text
+    assert "顾衡" not in {
+        item["display_name"]
+        for item in truth_before_confirm.json()["projection"]["assets"]
+        if item["asset_type"] == "character"
+    }
+
+    confirmed = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {
+                "display_name": proposal["mention"],
+                "evidence_spans": proposal["evidence_spans"],
+                "proposal_id": proposal["proposal_id"],
+            },
+            "idempotency_key": "confirm-manual-guheng",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["receipt"]["command_type"] == "create_manual_character"
+    confirmed_names = {
+        item["display_name"]
+        for item in confirmed.json()["projection"]["assets"]
+        if item["asset_type"] == "character"
+    }
+    assert "顾衡" in confirmed_names
+    guheng = next(
+        item
+        for item in confirmed.json()["projection"]["assets"]
+        if item["display_name"] == "顾衡"
+    )
+    assert guheng["status"] == "confirmed"
+    assert guheng["source_mode"] == "manual"
+
+
+def test_indirect_mention_budget_skip_is_explicit(tmp_path, monkeypatch) -> None:
+    # COST: paid path with tiny budget — over-budget discoveries must be explicit.
+    monkeypatch.setenv("AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS", "true")
+    monkeypatch.setenv("AFS_INDIRECT_MENTION_LLM_MAX_CALLS", "1")
+    monkeypatch.setattr(
+        "apps.api.runtime_script_indirect_mention_proposals._default_remote_judge",
+        _fake_indirect_judge,
+    )
+    project_id = "indirect-mention-budget"
+    source_text = """标题：预算探针
+
+第一场 - 内景 - 实验室 - 夜
+
+人物：顾晚
+
+收款人是「顾衡」。
+照片背面写着「沈岚」。
+电话里说「江澄」。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["provider_dispatch_count"] == 1
+    skipped = payload["candidate"]["indirect_mention_budget_skipped"]
+    assert skipped
+    assert all(item["status"] == "budget_skipped_unjudged" for item in skipped)
+    assert all(item["cost_class"] == "paid_remote_llm" for item in skipped)
+    assert all("Exceeded" in item["reason"] for item in skipped)
+
+
+def test_studio_agent_chat_exposes_manual_character_entry() -> None:
+    source = (
+        Path(__file__).resolve().parents[1] / "apps" / "studio" / "src" / "agent-chat-lifecycle.js"
+    ).read_text(encoding="utf-8")
+    assert "/manual-character" in source
+    assert 'commandType: "create_manual_character"' in source
+    assert "create_manual_character: \"手动角色创建\"" in source
+
+
+def test_indirect_mention_suppresses_already_extracted_suheng_and_chenmo(tmp_path, monkeypatch) -> None:
+    # Real cases from live e2e: 苏衡 / 陈默 were extracted AND wrongly proposed.
+    # Force the LLM judge to say "indirect" so suppression (not judgment) is what blocks them.
+    def force_indirect_judge(_text: str, mention: str, _output_dir) -> dict:
+        return {
+            "refers_to_real_character": True,
+            "refers_to_real_character_confidence": 0.95,
+            "refers_to_real_character_reason": f"{mention} forced",
+            "is_present_in_scene": False,
+            "is_present_in_scene_confidence": 0.9,
+            "is_present_in_scene_reason": "forced absent",
+            "is_indirect_mention": True,
+        }
+
+    monkeypatch.setenv("AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS", "true")
+    monkeypatch.setenv("AFS_INDIRECT_MENTION_LLM_MAX_CALLS", "20")
+    monkeypatch.setattr(
+        "apps.api.runtime_script_indirect_mention_proposals._default_remote_judge",
+        force_indirect_judge,
+    )
+    project_id = "indirect-suppress-known"
+    source_text = """标题：回声与夜班
+
+第一场 - 内景 - 旅馆走廊 - 夜
+
+人物：苏衡、陈默、顾晚
+
+苏衡
+别回头。
+
+陈默
+我只修水管。
+
+杂音里仿佛有人喊了一声「苏衡」，随后恢复死寂。
+草稿上又把「陈默」三个字划掉。
+顾晚拆开汇款单：收款人是「顾衡」。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    proposals = payload["candidate"].get("indirect_mention_proposals") or []
+    suppressed = payload["candidate"].get("indirect_mention_suppressed_known_identity") or []
+    proposal_names = {item["mention"] for item in proposals}
+    suppressed_names = {item["mention"] for item in suppressed}
+    assert "苏衡" in suppressed_names
+    assert "陈默" in suppressed_names
+    assert "苏衡" not in proposal_names
+    assert "陈默" not in proposal_names
+    assert "顾衡" in proposal_names
+    assert all(item["status"] == "suppressed_known_identity" for item in suppressed)
+    assert all(item["already_extracted_as_character"] is True for item in suppressed)
+    # Suppressed known identities must not consume paid dispatches.
+    assert "suppressed_known_identity=" in " ".join(payload["extraction"]["notes"])
+
+
+def test_create_manual_character_rejects_exact_identity_duplicates(tmp_path) -> None:
+    project_id = "manual-char-dedupe"
+    source_text = """标题：夜班
+
+第一场 - 内景 - 邮局 - 夜
+
+人物：顾晚、陈默
+
+顾晚
+上班。
+
+陈默
+到了。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    extracted = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert extracted.status_code == 200, extracted.text
+
+    # Duplicate exact canonical name must be rejected (no silent second identity).
+    dup = client.post(
+        f"/projects/{project_id}/core-assets/commands/preview",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {"display_name": "顾晚"},
+            "idempotency_key": "dup-guwan",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert dup.status_code == 409, dup.text
+    detail = dup.json()["detail"]
+    assert detail["error"] == "manual_character_identity_exists"
+    assert detail["details"]["suggested_command"] == "merge_alias"
+
+    # A5-style distinct people sharing only a surname must not be blocked.
+    chenming = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {"display_name": "陈明"},
+            "idempotency_key": "create-chenming",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert chenming.status_code == 200, chenming.text
+    names = {
+        item["display_name"]
+        for item in chenming.json()["projection"]["assets"]
+        if item["asset_type"] == "character"
+    }
+    assert "陈默" in names
+    assert "陈明" in names
+
+    # True homonym bypass: allow_duplicate_display_name=true.
+    twin = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {"display_name": "陈默", "allow_duplicate_display_name": True},
+            "idempotency_key": "create-chenmo-homonym",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert twin.status_code == 200, twin.text
+    chenmo_assets = [
+        item
+        for item in twin.json()["projection"]["assets"]
+        if item["asset_type"] == "character" and item["display_name"] == "陈默"
+    ]
+    assert len(chenmo_assets) >= 2
+    assert any(
+        (item.get("lineage") or {}).get("allow_duplicate_display_name") is True for item in chenmo_assets
+    )
+
+
+def test_create_manual_character_rejects_alias_surface_duplicates(tmp_path) -> None:
+    project_id = "manual-char-alias-dedupe"
+    source_text = """标题：排练
+
+第一场
+
+人物：林悦安
+
+林悦安
+今天从第二段开始。
+"""
+    client = _client(tmp_path)
+    revision = _create_revision(client, project_id, source_text)
+    extracted = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates/extract"
+    )
+    assert extracted.status_code == 200, extracted.text
+    character = next(
+        item
+        for item in extracted.json()["projection"]["assets"]
+        if item["asset_type"] == "character" and item["display_name"] == "林悦安"
+    )
+    merged = client.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_merge_alias_command(project_id, revision, character["asset_id"], "悦安"),
+            "expected_asset_version": character["version"],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+
+    blocked = client.post(
+        f"/projects/{project_id}/core-assets/commands/preview",
+        json={
+            "project_id": project_id,
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+            "command_type": "create_manual_character",
+            "patch": {"display_name": "悦安"},
+            "idempotency_key": "dup-yuean-alias",
+            "provider_dispatch_count": 0,
+            "remote_dispatch_count": 0,
+        },
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["error"] == "manual_character_identity_exists"
+    assert blocked.json()["detail"]["details"]["matched_as"] == "alias"
