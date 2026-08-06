@@ -113,7 +113,7 @@ def test_candidate_edit_review_graph_write_and_restart_recovery(tmp_path) -> Non
             "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
             "command_type": "edit_asset",
             "target_asset_id": character["asset_id"],
-            "patch": {"display_name": "Mira Vale", "aliases": ["Mira"]},
+            "patch": {"display_name": "Mira Vale"},
             "expected_asset_version": character["version"],
             "idempotency_key": "edit-mira-v1",
         },
@@ -301,3 +301,66 @@ def test_graph_first_confirmation_recovers_state_write_failure_without_duplicate
     assert recovered.json()["graph"]["version"] == 1
     assert recovered.json()["graph_idempotent_replay"] is True
     assert recovered.json()["asset"]["status"] == "confirmed"
+
+
+def test_merge_alias_graph_write_recovers_truth_state_failure_without_duplicate_fact(tmp_path, monkeypatch) -> None:
+    project_id = "script-alias-graph-recovery"
+    client = _client(tmp_path)
+    revision, candidate, assets = _seed_candidate(client, project_id)
+    character = next(item for item in assets if item["asset_type"] == "character")
+    confirmed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json=_review_body(
+            project_id,
+            revision,
+            candidate,
+            character,
+            decision="confirm",
+            key="confirm-before-alias",
+            graph_version=0,
+        ),
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    command = {
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        "command_type": "merge_alias",
+        "target_asset_id": character["asset_id"],
+        "patch": {"alias": "M"},
+        "expected_asset_version": confirmed.json()["asset"]["version"],
+        "idempotency_key": "merge-mira-alias-recovery",
+    }
+    original_write = script_truth._write_state
+    failed = False
+
+    def fail_once(store, scoped_project_id, state):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("injected alias truth-state write failure")
+        return original_write(store, scoped_project_id, state)
+
+    monkeypatch.setattr(script_truth, "_write_state", fail_once)
+    with pytest.raises(RuntimeError, match="injected alias truth-state write failure"):
+        client.post(f"/projects/{project_id}/core-assets/commands/confirm", json=command)
+    monkeypatch.setattr(script_truth, "_write_state", original_write)
+
+    graph_after_failure = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_failure["version"] == 2
+    assert graph_after_failure["nodes"][character["asset_id"]]["metadata"]["aliases"] == ["M"]
+    truth_after_failure = client.get(f"/projects/{project_id}/script-truth").json()["projection"]
+    stale_character = next(item for item in truth_after_failure["assets"] if item["asset_id"] == character["asset_id"])
+    assert stale_character["aliases"] == []
+
+    recovered = client.post(f"/projects/{project_id}/core-assets/commands/confirm", json=command)
+    assert recovered.status_code == 200, recovered.text
+    recovered_character = next(
+        item for item in recovered.json()["projection"]["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    assert recovered_character["aliases"] == ["M"]
+    assert recovered.json()["receipt"]["production_graph_version"] == 2
+    graph_after_recovery = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_recovery["version"] == 2
+    assert graph_after_recovery["nodes"][character["asset_id"]]["metadata"]["asset_version_id"] == recovered_character["version_id"]

@@ -23,6 +23,7 @@ from apps.api.runtime_production_graph import (
 )
 from apps.api.runtime_script_candidate_extraction import (
     DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
+    alias_link_proposals_enabled,
     build_deterministic_analysis_candidate,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
@@ -79,6 +80,24 @@ class CandidateMainScene(BaseModel):
     uncertainty_note: str | None = Field(default=None, max_length=600)
 
 
+class AliasLinkProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    relation_type: Literal["alias_identity_link"] = "alias_identity_link"
+    status: Literal["candidate"] = "candidate"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    target_display_name: str = Field(min_length=1, max_length=120)
+    alias: str = Field(min_length=1, max_length=120)
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
+    extraction_method: str = Field(min_length=1, max_length=120)
+    review_action: Literal["use_core_asset_command_merge_alias"] = "use_core_asset_command_merge_alias"
+    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+
+
 class ScriptRevisionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,6 +123,7 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     actions: list[str] = Field(default_factory=list, max_length=120)
     events: list[str] = Field(default_factory=list, max_length=120)
     beats: list[dict[str, Any]] = Field(default_factory=list, max_length=120)
+    alias_link_proposals: list[AliasLinkProposal] = Field(default_factory=list, max_length=120)
     missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
     extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
@@ -690,6 +710,7 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 )
             asset = dict((state.get("assets") or {}).get(asset_id) or {})
             _require_reviewable_asset(asset, body, project_id=project_id, asset_id=asset_id)
+            _require_review_alias_authority(state, asset, body, project_id=project_id)
             decided_at = _safe_time(body.decided_at)
             reviewed_asset = _reviewed_asset_version(
                 asset,
@@ -836,7 +857,17 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 idempotency_key=f"scene-ownership-asset-change:{preview['command_id']}",
                 stage="core_asset_command_confirm",
             )
+            graph = _project_confirmed_alias_command_to_graph(
+                graph_store,
+                project_id=project_id,
+                preview=preview,
+            )
             receipt = _apply_core_asset_command(state, project_id, body, preview)
+            if graph:
+                receipt["production_graph_node_id"] = str((preview.get("after") or {}).get("asset_id") or "")
+                receipt["production_graph_version"] = int(graph.get("version") or 0)
+                receipt["production_graph_digest"] = str(graph.get("graph_digest") or "")
+                receipt["graph_idempotent_replay"] = bool(graph.get("idempotent_replay"))
             _expire_relationships(
                 state,
                 target_relationships,
@@ -900,6 +931,17 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 stage="core_asset_command_undo",
             )
             undo_receipt = _apply_undo(state, receipt)
+            graph = _project_undone_alias_command_to_graph(
+                graph_store,
+                project_id=project_id,
+                original_receipt=receipt,
+                undo_receipt=undo_receipt,
+            )
+            if graph:
+                undo_receipt["production_graph_node_id"] = asset_id
+                undo_receipt["production_graph_version"] = int(graph.get("version") or 0)
+                undo_receipt["production_graph_digest"] = str(graph.get("graph_digest") or "")
+                undo_receipt["graph_idempotent_replay"] = bool(graph.get("idempotent_replay"))
             _expire_relationships(
                 state,
                 active_relationships,
@@ -1024,7 +1066,7 @@ def public_revision(revision: dict[str, Any], *, include_source: bool) -> dict[s
 def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     if not candidate:
         return {}
-    return {
+    payload = {
         "candidate_id": str(candidate.get("candidate_id") or ""),
         "schema_version": str(candidate.get("schema_version") or ""),
         "project_id": str(candidate.get("project_id") or ""),
@@ -1044,6 +1086,31 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "beats_count": len(candidate.get("beats") or []),
         "missing_slots": [str(item) for item in candidate.get("missing_slots", [])[:10]],
         "extraction_notes": [str(item)[:600] for item in candidate.get("extraction_notes", [])[:20]],
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+    if "alias_link_proposals" in candidate:
+        payload["alias_link_proposal_count"] = len(candidate.get("alias_link_proposals") or [])
+        payload["alias_link_proposals"] = [
+            public_alias_link_proposal(item)
+            for item in (candidate.get("alias_link_proposals") or [])[:120]
+        ]
+    return payload
+
+
+def public_alias_link_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "proposal_id": str(proposal.get("proposal_id") or ""),
+        "schema_version": str(proposal.get("schema_version") or ""),
+        "relation_type": str(proposal.get("relation_type") or "alias_identity_link"),
+        "status": str(proposal.get("status") or "candidate"),
+        "authority": str(proposal.get("authority") or "non_authoritative_proposal"),
+        "target_display_name": str(proposal.get("target_display_name") or ""),
+        "alias": str(proposal.get("alias") or ""),
+        "confidence": float(proposal.get("confidence") or 0.0),
+        "evidence_spans": list(proposal.get("evidence_spans") or []),
+        "extraction_method": str(proposal.get("extraction_method") or ""),
+        "review_action": str(proposal.get("review_action") or "use_core_asset_command_merge_alias"),
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -1082,7 +1149,7 @@ def public_asset(asset: dict[str, Any]) -> dict[str, Any]:
 
 
 def public_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload = {
         "receipt_id": str(receipt.get("receipt_id") or ""),
         "command_id": str(receipt.get("command_id") or ""),
         "command_type": str(receipt.get("command_type") or ""),
@@ -1102,6 +1169,10 @@ def public_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+    authorized_alias = _clean_label(receipt.get("authorized_alias"))
+    if authorized_alias:
+        payload["authorized_alias"] = authorized_alias
+    return payload
 
 
 def public_review_decision(decision: dict[str, Any]) -> dict[str, Any]:
@@ -1563,6 +1634,7 @@ def _analysis_confirmation_events(
                     "source_digest": revision["source_digest"],
                     "candidate_id": candidate["candidate_id"],
                     "asset_version_id": asset["version_id"],
+                    "aliases": list(asset.get("aliases") or []),
                     "evidence_span_count": len(asset.get("evidence_spans") or []),
                     "review_semantic_digest": semantic_digest,
                     "lineage": dict(asset.get("lineage") or {}),
@@ -1699,6 +1771,10 @@ def _analysis_candidate_record(
     body: StructuredAnalysisCandidateRequest,
 ) -> dict[str, Any]:
     payload = body.model_dump(mode="json")
+    for character in payload.get("named_characters") or []:
+        character["aliases"] = []
+    if not payload.get("alias_link_proposals"):
+        payload.pop("alias_link_proposals", None)
     payload["artifact_type"] = "afs_structured_analysis_candidate"
     payload["candidate_id"] = f"candidate_{_sha256_json(payload)[:16]}"
     payload["created_at"] = _safe_time(body.generated_at)
@@ -1727,6 +1803,7 @@ def _apply_structured_analysis_candidate(
         stage="analysis_candidate_submit",
         expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
     )
+    _validate_candidate_alias_authority(body, project_id=project_id)
     _validate_evidence_spans(body, revision)
     candidate = _analysis_candidate_record(project_id, revision, body)
     existing_candidate = dict(
@@ -1819,7 +1896,7 @@ def _assets_from_candidate(
             candidate_id=str(candidate["candidate_id"]),
             asset_type="character",
             label=str(item["display_name"]),
-            aliases=[str(value) for value in item.get("aliases", [])],
+            aliases=[],
             pronoun_links=[str(value) for value in item.get("pronoun_links", [])],
             evidence_spans=item.get("evidence_spans") or [],
             confidence=float(item.get("confidence") or 0.0),
@@ -2330,6 +2407,8 @@ def _apply_core_asset_command(
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
+    if body.command_type == "merge_alias":
+        receipt["authorized_alias"] = _clean_label(body.patch.get("alias") or body.patch.get("display_name"))
     state.setdefault("receipts", {})[receipt["receipt_id"]] = receipt
     return receipt
 
@@ -2358,6 +2437,7 @@ def _apply_undo(state: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any
         _record_asset_version(state, assets[asset_id])
     receipt["undone"] = True
     receipt["undo_available"] = False
+    state.setdefault("receipts", {})[str(receipt.get("receipt_id") or "")] = receipt
     undo_receipt = {
         "receipt_id": f"receipt_{uuid4().hex[:16]}",
         "command_id": receipt.get("command_id", ""),
@@ -2385,6 +2465,14 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
     after = dict(before)
     after["updated_at"] = now
     if body.command_type == "edit_asset":
+        if "aliases" in body.patch:
+            raise _contract_error(
+                "edit_asset_aliases_require_merge_alias",
+                "Aliases must be promoted through the explicit merge_alias command.",
+                project_id=str(body.project_id),
+                stage="core_asset_command_preview",
+                status_code=409,
+            )
         previous_label = _clean_label(before.get("display_name") or before.get("name"))
         label = _clean_label(body.patch.get("display_name") or body.patch.get("name") or after.get("display_name"))
         if not label:
@@ -2406,8 +2494,6 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
             lineage["evidence_status"] = "human_edited"
             lineage["extraction_method"] = "human_edit"
             after["lineage"] = lineage
-        if "aliases" in body.patch:
-            after["aliases"] = _clean_text_list(list(body.patch.get("aliases") or []))
     elif body.command_type == "retire_asset" or body.command_type == "retire_manual_prop":
         after["status"] = "retired"
         after["retired_at"] = now
@@ -2554,7 +2640,7 @@ def _require_revision_contract(
 
 def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision: dict[str, Any]) -> None:
     source_text = str(revision.get("source_text") or "")
-    for item in [*body.named_characters, *body.main_scenes]:
+    for item in [*body.named_characters, *body.main_scenes, *body.alias_link_proposals]:
         for span in item.evidence_spans:
             expected = source_text[span.start : span.end]
             if expected != span.quote:
@@ -2566,6 +2652,81 @@ def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision:
                     status_code=409,
                     details={"revision_id": body.revision_id},
                 )
+
+
+def _validate_candidate_alias_authority(
+    body: StructuredAnalysisCandidateRequest,
+    *,
+    project_id: str,
+) -> None:
+    if body.alias_link_proposals and not alias_link_proposals_enabled():
+        raise _contract_error(
+            "alias_link_proposals_disabled",
+            "Alias link proposals are disabled for this runtime.",
+            project_id=project_id,
+            stage="analysis_candidate_submit",
+            status_code=409,
+        )
+    character_names = {_clean_label(item.display_name) for item in body.named_characters}
+    for proposal in body.alias_link_proposals:
+        target = _clean_label(proposal.target_display_name)
+        alias = _clean_label(proposal.alias)
+        if target not in character_names:
+            raise _contract_error(
+                "alias_link_proposal_target_not_found",
+                "Alias link proposal target must name a character in the same candidate.",
+                project_id=project_id,
+                stage="analysis_candidate_submit",
+                status_code=409,
+            )
+        if target == alias:
+            raise _contract_error(
+                "alias_link_proposal_self_reference",
+                "Alias link proposal cannot link a character name to itself.",
+                project_id=project_id,
+                stage="analysis_candidate_submit",
+                status_code=409,
+            )
+
+
+def _require_review_alias_authority(
+    state: dict[str, Any],
+    asset: dict[str, Any],
+    body: AnalysisAssetReviewRequest,
+    *,
+    project_id: str,
+) -> None:
+    aliases = set(_clean_text_list([str(item) for item in (asset.get("aliases") or [])]))
+    if body.decision != "confirm" or not aliases:
+        return
+    authorized: set[str] = set()
+    for raw in (state.get("receipts") or {}).values():
+        receipt = dict(raw or {})
+        after = dict(receipt.get("after") or {})
+        if (
+            receipt.get("command_type") != "merge_alias"
+            or receipt.get("undone")
+            or receipt.get("project_id") != project_id
+            or receipt.get("revision_id") != body.revision_id
+            or after.get("asset_id") != asset.get("asset_id")
+        ):
+            continue
+        explicit_alias = _clean_label(receipt.get("authorized_alias"))
+        if explicit_alias:
+            authorized.add(explicit_alias)
+        before_aliases = set(
+            _clean_text_list([str(item) for item in (dict(receipt.get("before") or {}).get("aliases") or [])])
+        )
+        after_aliases = set(_clean_text_list([str(item) for item in (after.get("aliases") or [])]))
+        authorized.update(after_aliases - before_aliases)
+    if not aliases.issubset(authorized):
+        raise _contract_error(
+            "candidate_aliases_require_merge_alias",
+            "Candidate aliases require an explicit merge_alias receipt before confirmation.",
+            project_id=project_id,
+            stage="analysis_asset_review",
+            status_code=409,
+        )
 
 
 def _analysis_state_for_assets(assets: list[dict[str, Any]]) -> str:
@@ -2772,6 +2933,133 @@ def _active_relationships(
             or asset_id in {str(item.get("scene_asset_id") or ""), str(item.get("member_asset_id") or "")}
         )
     ]
+
+
+def _project_confirmed_alias_command_to_graph(
+    graph_store: ProductionGraphStore,
+    *,
+    project_id: str,
+    preview: dict[str, Any],
+) -> dict[str, Any]:
+    before = dict(preview.get("before") or {})
+    after = dict(preview.get("after") or {})
+    if preview.get("command_type") != "merge_alias" or before.get("status") != "confirmed":
+        return {}
+    return _upsert_alias_asset_graph_node(
+        graph_store,
+        project_id=project_id,
+        before=before,
+        after=after,
+        idempotency_key=f"core-asset-alias:{preview['command_id']}",
+        operation="merge_alias",
+        stage="core_asset_command_confirm",
+    )
+
+
+def _project_undone_alias_command_to_graph(
+    graph_store: ProductionGraphStore,
+    *,
+    project_id: str,
+    original_receipt: dict[str, Any],
+    undo_receipt: dict[str, Any],
+) -> dict[str, Any]:
+    before = dict(original_receipt.get("after") or {})
+    after = dict(undo_receipt.get("after") or {})
+    if original_receipt.get("command_type") != "merge_alias" or before.get("status") != "confirmed":
+        return {}
+    return _upsert_alias_asset_graph_node(
+        graph_store,
+        project_id=project_id,
+        before=before,
+        after=after,
+        idempotency_key=f"core-asset-alias-undo:{original_receipt['receipt_id']}",
+        operation="merge_alias_undo",
+        stage="core_asset_command_undo",
+    )
+
+
+def _upsert_alias_asset_graph_node(
+    graph_store: ProductionGraphStore,
+    *,
+    project_id: str,
+    before: dict[str, Any],
+    after: dict[str, Any],
+    idempotency_key: str,
+    operation: str,
+    stage: str,
+) -> dict[str, Any]:
+    asset_id = str(after.get("asset_id") or "")
+    graph = graph_store.ensure(project_id)
+    current_node = dict((graph.get("nodes") or {}).get(asset_id) or {})
+    current_metadata = dict(current_node.get("metadata") or {})
+    allowed_versions = {
+        str(before.get("version_id") or ""),
+        str(after.get("version_id") or ""),
+    }
+    if (
+        not current_node
+        or current_node.get("state") != "active"
+        or current_metadata.get("kind") != "script_core_asset"
+        or str(current_metadata.get("asset_version_id") or "") not in allowed_versions
+    ):
+        raise _contract_error(
+            "core_asset_graph_projection_stale",
+            "Canonical Production Graph does not match the alias command asset version.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        )
+    desired_node = {
+        "node_id": asset_id,
+        "category": str(current_node.get("category") or "character"),
+        "metadata": {
+            **current_metadata,
+            "display_name": after.get("display_name") or after.get("name") or "",
+            "asset_version_id": str(after.get("version_id") or ""),
+            "aliases": list(after.get("aliases") or []),
+            "lineage": dict(after.get("lineage") or {}),
+        },
+    }
+    semantic_digest = canonical_digest(
+        {
+            "operation": operation,
+            "before_asset_version_id": str(before.get("version_id") or ""),
+            "after_asset_version_id": str(after.get("version_id") or ""),
+            "node": desired_node,
+        }
+    )
+    try:
+        return graph_store.append(
+            project_id,
+            expected_version=int(graph.get("version") or 0),
+            idempotency_key=idempotency_key,
+            semantic_digest=semantic_digest,
+            events=[{"type": "node_upserted", "node": desired_node}],
+        )
+    except GraphIdempotencyConflict as exc:
+        raise _contract_error(
+            "core_asset_graph_idempotency_conflict",
+            "Alias command replay does not match its existing Production Graph mutation.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
+    except GraphVersionConflict as exc:
+        raise _contract_error(
+            "production_graph_version_conflict",
+            "Production Graph changed before the alias command was committed.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
+    except ProductionGraphError as exc:
+        raise _contract_error(
+            "production_graph_write_rejected",
+            "Confirmed alias command could not be written to Production Graph.",
+            project_id=project_id,
+            stage=stage,
+            status_code=409,
+        ) from exc
 
 
 def _remove_confirmed_relationships_from_graph(

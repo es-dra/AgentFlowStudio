@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_script_core_truth import (
     ANALYSIS_CANDIDATE_SCHEMA_VERSION,
+    ANALYSIS_REVIEW_SCHEMA_VERSION,
     CORE_ASSET_COMMAND_SCHEMA_VERSION,
 )
 from apps.api.runtime_service import create_runtime_app
@@ -186,7 +188,176 @@ def test_revision_candidate_contract_fails_closed_and_keeps_narrative_fields_out
     assert accepted.json()["provider_dispatch_count"] == 0
 
 
-def test_varied_structured_candidates_cover_aliases_scenes_and_low_confidence(tmp_path) -> None:
+def test_structured_candidate_aliases_are_accepted_but_never_become_authoritative(tmp_path) -> None:
+    client = _client(tmp_path)
+    project_id = "candidate-alias-authority-boundary"
+    text = "Captain Vale, called V, waits in the archive."
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, text)
+
+    response = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+        json=_candidate(
+            project_id,
+            revision,
+            characters=[_character(text, "Captain Vale", "Captain Vale", aliases=["V"])],
+            scenes=[_scene(text, "Archive", "archive")],
+        ),
+    )
+
+    assert response.status_code == 200, response.text
+    state_path = tmp_path / "projects" / project_id / "script_core_truth" / "truth_state.json"
+    stored_state = json.loads(state_path.read_text(encoding="utf-8"))
+    stored_candidate = next(iter(stored_state["analysis_candidates"].values()))
+    assert stored_candidate["named_characters"][0]["aliases"] == []
+    projection = response.json()["projection"]
+    character = next(item for item in projection["assets"] if item["asset_type"] == "character")
+    assert character["aliases"] == []
+    assert character["status"] == "candidate"
+    assert client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]["nodes"] == {}
+
+
+def test_legacy_candidate_alias_needs_merge_receipt_before_review_after_restart(tmp_path) -> None:
+    client = _client(tmp_path)
+    project_id = "legacy-candidate-alias-recovery"
+    text = "Captain Vale waits in the archive."
+    _create_project(client, project_id)
+    revision = _create_revision(client, project_id, text)
+    accepted = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-candidates",
+        json=_candidate(
+            project_id,
+            revision,
+            characters=[_character(text, "Captain Vale", "Captain Vale")],
+            scenes=[_scene(text, "Archive", "archive")],
+        ),
+    )
+    assert accepted.status_code == 200, accepted.text
+    candidate = accepted.json()["candidate"]
+    character = next(
+        item for item in accepted.json()["projection"]["assets"] if item["asset_type"] == "character"
+    )
+
+    state_path = tmp_path / "projects" / project_id / "script_core_truth" / "truth_state.json"
+    legacy_state = json.loads(state_path.read_text(encoding="utf-8"))
+    legacy_state["assets"][character["asset_id"]]["aliases"] = ["V"]
+    state_path.write_text(json.dumps(legacy_state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    restarted = _client(tmp_path)
+    review_body = {
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "candidate_id": candidate["candidate_id"],
+        "asset_version_id": character["version_id"],
+        "expected_asset_version": character["version"],
+        "expected_graph_version": 0,
+        "idempotency_key": "confirm-legacy-alias-without-merge",
+        "schema_version": ANALYSIS_REVIEW_SCHEMA_VERSION,
+        "decision": "confirm",
+    }
+    blocked = restarted.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json=review_body,
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["detail"]["error"] == "candidate_aliases_require_merge_alias"
+    blocked_projection = restarted.get(f"/projects/{project_id}/script-truth").json()["projection"]
+    blocked_character = next(
+        item for item in blocked_projection["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    assert blocked_character["status"] == "candidate"
+    assert blocked_character["version"] == character["version"]
+    assert restarted.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]["nodes"] == {}
+
+    merged = restarted.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_command(
+                project_id,
+                revision,
+                "merge_alias",
+                target_asset_id=character["asset_id"],
+                patch={"alias": "V"},
+            ),
+            "expected_asset_version": character["version"],
+            "idempotency_key": "authorize-legacy-alias-v",
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["receipt"]["authorized_alias"] == "V"
+    undone = restarted.post(
+        f"/projects/{project_id}/core-assets/commands/undo",
+        json={
+            "project_id": project_id,
+            "receipt_id": merged.json()["receipt"]["receipt_id"],
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        },
+    )
+    assert undone.status_code == 200, undone.text
+    undone_character = next(
+        item for item in undone.json()["projection"]["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    restarted = _client(tmp_path)
+    duplicate_undo = restarted.post(
+        f"/projects/{project_id}/core-assets/commands/undo",
+        json={
+            "project_id": project_id,
+            "receipt_id": merged.json()["receipt"]["receipt_id"],
+            "revision_id": revision["revision_id"],
+            "source_digest": revision["source_digest"],
+            "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        },
+    )
+    assert duplicate_undo.status_code == 409, duplicate_undo.text
+    assert duplicate_undo.json()["detail"]["error"] == "core_asset_receipt_not_undoable"
+    blocked_after_undo = restarted.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json={
+            **review_body,
+            "asset_version_id": undone_character["version_id"],
+            "expected_asset_version": undone_character["version"],
+            "idempotency_key": "confirm-legacy-alias-after-merge-undo",
+        },
+    )
+    assert blocked_after_undo.status_code == 409, blocked_after_undo.text
+    assert blocked_after_undo.json()["detail"]["error"] == "candidate_aliases_require_merge_alias"
+
+    remerged = restarted.post(
+        f"/projects/{project_id}/core-assets/commands/confirm",
+        json={
+            **_command(
+                project_id,
+                revision,
+                "merge_alias",
+                target_asset_id=character["asset_id"],
+                patch={"alias": "V"},
+            ),
+            "expected_asset_version": undone_character["version"],
+            "idempotency_key": "reauthorize-legacy-alias-v",
+        },
+    )
+    assert remerged.status_code == 200, remerged.text
+    remerged_character = next(
+        item for item in remerged.json()["projection"]["assets"] if item["asset_id"] == character["asset_id"]
+    )
+    confirmed = restarted.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{character['asset_id']}/review",
+        json={
+            **review_body,
+            "asset_version_id": remerged_character["version_id"],
+            "expected_asset_version": remerged_character["version"],
+            "idempotency_key": "confirm-legacy-alias-after-remerge",
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["asset"]["status"] == "confirmed"
+    assert confirmed.json()["asset"]["aliases"] == ["V"]
+
+
+def test_varied_structured_candidates_cover_scenes_and_low_confidence(tmp_path) -> None:
     client = _client(tmp_path)
     cases = [
         (
@@ -203,14 +374,14 @@ def test_varied_structured_candidates_cover_aliases_scenes_and_low_confidence(tm
             1,
         ),
         (
-            "dual-leads-aliases",
+            "dual-leads",
             "Captain Vale, called V, argues with Dr. Sato before she unlocks the archive.",
             lambda text, revision, project_id: _candidate(
                 project_id,
                 revision,
                 characters=[
-                    _character(text, "Captain Vale", "Captain Vale", aliases=["V"]),
-                    _character(text, "Dr. Sato", "Dr. Sato", aliases=["she"]),
+                    _character(text, "Captain Vale", "Captain Vale"),
+                    _character(text, "Dr. Sato", "Dr. Sato"),
                 ],
                 scenes=[_scene(text, "Archive", "archive")],
             ),
