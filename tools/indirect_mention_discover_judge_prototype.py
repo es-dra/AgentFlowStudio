@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Discover suspected indirect mentions, then LLM-judge them (prototype closed loop).
+"""Discover suspected indirect mentions, then LLM-judge them (exploratory runner).
 
-Exploratory only:
-  - NOT wired into analysis-candidates
-  - does not confirm/merge/authorize
-  - outputs non_authoritative_proposal records only
+Production path (flagged, paid):
+  apps.api.runtime_script_indirect_mention_proposals
+  gated by AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS (default off).
 
-Requires the same remote provider gates as indirect_mention_llm_prototype.py.
+This CLI remains a read-only exploration harness. It does not confirm/merge/
+authorize and still incurs real LLM cost when run.
 """
 
 from __future__ import annotations
@@ -49,9 +49,23 @@ def proposal_from_judgment(
     return {
         "mention": discovery["mention"],
         "source_span": discovery["source_span"],
-        "is_character": bool(judgment.get("is_character")),
-        "confidence": float(judgment.get("confidence") or 0.0),
-        "reason": str(judgment.get("reason") or ""),
+        "refers_to_real_character": bool(judgment.get("refers_to_real_character")),
+        "refers_to_real_character_confidence": float(
+            judgment.get("refers_to_real_character_confidence") or 0.0
+        ),
+        "refers_to_real_character_reason": str(
+            judgment.get("refers_to_real_character_reason") or ""
+        ),
+        "is_present_in_scene": bool(judgment.get("is_present_in_scene")),
+        "is_present_in_scene_confidence": float(
+            judgment.get("is_present_in_scene_confidence") or 0.0
+        ),
+        "is_present_in_scene_reason": str(judgment.get("is_present_in_scene_reason") or ""),
+        "is_indirect_mention": bool(judgment.get("is_indirect_mention")),
+        # Legacy presence alias for older report readers.
+        "is_character": bool(judgment.get("is_present_in_scene")),
+        "confidence": float(judgment.get("is_present_in_scene_confidence") or 0.0),
+        "reason": str(judgment.get("is_present_in_scene_reason") or ""),
         "status": "candidate",
         "authority": "non_authoritative_proposal",
         "discovery_method": discovery.get("discovery_method"),
@@ -74,7 +88,7 @@ def run_script(
 ) -> dict[str, Any]:
     source_text = script_path.read_text(encoding="utf-8")
     discoveries = discover_indirect_mention_candidates(source_text)
-    selected = discoveries[: max(0, max_mentions)]
+    selected = discoveries if max_mentions <= 0 else discoveries[:max_mentions]
     proposals: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     wall_started = time.perf_counter()
@@ -152,7 +166,12 @@ def main(argv: list[str] | None = None) -> int:
         default=os.environ.get("AFS_PROVIDER_CONFIG", DEFAULT_PROVIDER_CONFIG),
     )
     parser.add_argument("--timeout-sec", type=float, default=60.0)
-    parser.add_argument("--max-mentions", type=int, default=12)
+    parser.add_argument(
+        "--max-mentions",
+        type=int,
+        default=1000,
+        help="Maximum discoveries to judge. Use <=0 to judge every discovery.",
+    )
     parser.add_argument("--context-radius", type=int, default=220)
     parser.add_argument(
         "--report",

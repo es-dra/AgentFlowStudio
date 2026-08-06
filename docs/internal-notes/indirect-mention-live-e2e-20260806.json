@@ -1,0 +1,154 @@
+{
+  "schema_version": "afs.indirect_mention_live_e2e.v0.1",
+  "cost_class": "paid_remote_llm_when_flag_on",
+  "flag_off": [
+    {
+      "script": "01_echo_inn_long.txt",
+      "provider_dispatch_count": 0,
+      "has_proposals": false,
+      "character_names": [
+        "林悦",
+        "老周",
+        "苏晴",
+        "苏衡",
+        "陈默"
+      ]
+    },
+    {
+      "script": "02_night_post_long.txt",
+      "provider_dispatch_count": 0,
+      "has_proposals": false,
+      "character_names": [
+        "何婶",
+        "刘正",
+        "周伯",
+        "方糖",
+        "站长刘正",
+        "赵石",
+        "陈默",
+        "顾晚"
+      ]
+    },
+    {
+      "script": "01_office_standup.txt",
+      "provider_dispatch_count": 0,
+      "has_proposals": false,
+      "character_names": [
+        "小蔡",
+        "陆远"
+      ]
+    },
+    {
+      "script": "02_campus_relay.txt",
+      "provider_dispatch_count": 0,
+      "has_proposals": false,
+      "character_names": [
+        "周磊",
+        "阿拓"
+      ]
+    },
+    {
+      "script": "03_lab_night_shift.txt",
+      "provider_dispatch_count": 0,
+      "has_proposals": false,
+      "character_names": [
+        "阮青"
+      ]
+    }
+  ],
+  "flag_on": [
+    {
+      "script": "01_echo_inn_long.txt",
+      "provider_dispatch_count": 6,
+      "proposal_mentions": [
+        "悦安",
+        "苏衡"
+      ],
+      "budget_skipped": [],
+      "expected_missing": [],
+      "noise_hit": [],
+      "notes": [
+        "indirect_mention_llm_proposals: PAID remote LLM path enabled (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS); judged=6 discovered=6 budget_skipped=0"
+      ]
+    },
+    {
+      "script": "02_night_post_long.txt",
+      "provider_dispatch_count": 12,
+      "proposal_mentions": [
+        "晚晚",
+        "第七格——顾衡案——不得夜班单独开启。",
+        "陈默",
+        "顾衡"
+      ],
+      "budget_skipped": [],
+      "expected_missing": [],
+      "noise_hit": [],
+      "notes": [
+        "indirect_mention_llm_proposals: PAID remote LLM path enabled (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS); judged=12 discovered=12 budget_skipped=0"
+      ]
+    },
+    {
+      "script": "01_office_standup.txt",
+      "provider_dispatch_count": 4,
+      "proposal_mentions": [
+        "沈岚"
+      ],
+      "budget_skipped": [],
+      "expected_missing": [],
+      "noise_hit": [],
+      "notes": [
+        "indirect_mention_llm_proposals: PAID remote LLM path enabled (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS); judged=4 discovered=4 budget_skipped=0"
+      ]
+    },
+    {
+      "script": "02_campus_relay.txt",
+      "provider_dispatch_count": 3,
+      "proposal_mentions": [
+        "江澄"
+      ],
+      "budget_skipped": [],
+      "expected_missing": [],
+      "noise_hit": [],
+      "notes": [
+        "indirect_mention_llm_proposals: PAID remote LLM path enabled (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS); judged=3 discovered=3 budget_skipped=0"
+      ]
+    },
+    {
+      "script": "03_lab_night_shift.txt",
+      "provider_dispatch_count": 4,
+      "proposal_mentions": [
+        "柯衡"
+      ],
+      "budget_skipped": [],
+      "expected_missing": [],
+      "noise_hit": [],
+      "notes": [
+        "indirect_mention_llm_proposals: PAID remote LLM path enabled (AFS_ENABLE_INDIRECT_MENTION_LLM_PROPOSALS); judged=4 discovered=4 budget_skipped=0"
+      ]
+    }
+  ],
+  "authority_check": {
+    "ordinary_review_promoted_guheng": false,
+    "reviewed_asset": "刘正",
+    "manual_create_guheng": true
+  },
+  "post_e2e_mitigation": {
+    "issue": "LLM marked long quoted clause 第七格——顾衡案——不得夜班单独开启。 as refers=true",
+    "fixigation": "post-judgment _is_person_name shape gate in build_indirect_mention_proposals",
+    "verified_by": "tests/test_runtime_script_indirect_mention_proposals.py::test_builder_rejects_non_person_shaped_mentions_even_if_llm_says_refers",
+    "live_rerun": "not re-run (unit-covered); prior live report retained as evidence of the bug"
+  },
+  "honest_extra_proposals_seen": {
+    "01_echo_inn_long.txt": [
+      "悦安",
+      "苏衡"
+    ],
+    "02_night_post_long.txt": [
+      "晚晚",
+      "第七格——顾衡案——不得夜班单独开启。",
+      "陈默",
+      "顾衡"
+    ],
+    "note": "第七格… filtered by subsequent shape gate; 悦安/苏衡/晚晚/陈默 remain person-shaped review signals"
+  }
+}

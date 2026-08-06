@@ -1,0 +1,1223 @@
+{
+  "schema_version": "afs.indirect_mention_discover_judge_prototype.v0.1",
+  "authority": "non_authoritative_prototype_only",
+  "writes_candidates": false,
+  "wired_into_analysis_candidates": false,
+  "confirm_or_merge": false,
+  "provider_config": "/etc/afs/providers.local.json",
+  "service_id": "prompt_optimizer",
+  "discover_only": false,
+  "started_at_unix": 1785982540.4174345,
+  "scripts": [
+    {
+      "script": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "script_chars": 3238,
+      "discovered_count": 6,
+      "judged_count": 6,
+      "discoveries": [
+        {
+          "mention": "苏衡",
+          "start": 497,
+          "end": 499,
+          "quote": "苏衡",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "source_span": {
+            "start": 497,
+            "end": 499,
+            "quote": "苏衡"
+          }
+        },
+        {
+          "mention": "别自己拆",
+          "start": 1275,
+          "end": 1279,
+          "quote": "别自己拆",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1275,
+            "end": 1279,
+            "quote": "别自己拆"
+          }
+        },
+        {
+          "mention": "回声-07",
+          "start": 1362,
+          "end": 1367,
+          "quote": "回声-07",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1362,
+            "end": 1367,
+            "quote": "回声-07"
+          }
+        },
+        {
+          "mention": "默记修缮",
+          "start": 1605,
+          "end": 1609,
+          "quote": "默记修缮",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1605,
+            "end": 1609,
+            "quote": "默记修缮"
+          }
+        },
+        {
+          "mention": "悦安",
+          "start": 1898,
+          "end": 1900,
+          "quote": "悦安",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1898,
+            "end": 1900,
+            "quote": "悦安"
+          }
+        },
+        {
+          "mention": "钥匙在三零二的钟里。",
+          "start": 1992,
+          "end": 2002,
+          "quote": "钥匙在三零二的钟里。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1992,
+            "end": 2002,
+            "quote": "钥匙在三零二的钟里。"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "苏衡",
+          "source_span": {
+            "start": 497,
+            "end": 499,
+            "quote": "苏衡"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "苏衡仅出现在苏晴的回忆（照片）和远处模糊的广播杂音中，无动作、无在场对白、无舞台指示表明其当前在场，符合规则1：仅被提及于回忆与听觉幻觉/远距离间接声音，非实际在场角色。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "latency_ms": 2845.9,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"苏衡仅出现在苏晴的回忆（照片）和远处模糊的广播杂音中，无动作、无在场对白、无舞台指示表明其当前在场，符合规则1：仅被提及于回忆与听觉幻觉/远距离间接声音，非实际在场角色。\"}",
+          "context_window": "笺和一支没水的笔。便笺抬头印着：回声旅馆——听见该听见的。\n\n苏晴\n（自语）\n爸说过这句话。\n\n她坐下，从口袋里取出一张泛黄照片：照片里是年轻时的父亲苏衡，和另一个看不清脸的男人，站在同一盏吊灯下。\n\n门外有脚步声停了一停，又走开了。苏晴走到门边，透过猫眼只看见空荡走廊和一盏忽明忽暗的壁灯。她回身把照片压在枕头下，强迫自己躺下，却一直在数自己的呼吸。\n\n远处不知哪一层传来极轻的广播杂音，像有人试过开关又立刻关掉。杂音里仿佛有人喊了一声「苏衡」，随后恢复死寂。\n\n第三场 - 内景 - 旅馆餐厅 - 次日清晨\n\n餐厅只开了半边灯。林悦（二十多岁，直率，苏晴的朋友）坐在靠窗位置，面前一杯冷掉的豆浆。\n\n林悦\n你真住这儿？我还以为你只是路过看看。\n\n苏晴\n我得把东西找回来。\n\n林悦\n你爸留下的到底是什么？别又是一张旧照片。\n\n苏晴没立刻回答。她看着厨房门帘晃动，总觉得有人在听。\n\n林悦\n（压低声音）\n老周刚才在走廊盯我们。你注意点。\n\n第四场 - 外景 - 旅馆后院晾衣场 - 上"
+        },
+        {
+          "mention": "别自己拆",
+          "source_span": {
+            "start": 1275,
+            "end": 1279,
+            "quote": "别自己拆"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "“别自己拆”是陈默说过的提示性短语，属于台词内容中的引述指令，非人名；且未以任何形式指代在场人物，不符合角色候选的命名与在场双重条件。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2590.6,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"“别自己拆”是陈默说过的提示性短语，属于台词内容中的引述指令，非人名；且未以任何形式指代在场人物，不符合角色候选的命名与在场双重条件。\"}",
+          "context_window": "\n周叔，我想看十年前的住客登记。\n\n老周\n（不看她）\n按规定，不给。\n\n苏晴\n只要苏衡那个名字。\n\n老周沉默很久，终于从抽屉夹层抽出一张复印模糊的卡片，推到桌边，却用杯子压住一角。\n\n老周\n看一眼。不许拍照。\n\n苏晴低头：卡片上写着苏衡，房号三零二，同行人一栏却是空白。空白处有被擦掉的痕迹。\n\n苏晴\n同行人是谁？\n\n老周\n我记不清了。别问了。\n\n第六场 - 内景 - 三零二客房 - 黄昏\n\n苏晴撬开床头板——不是暴力，是陈默白天说过的「别自己拆」让她反而去找接缝。墙里没有水管，只有一个铁皮小盒，盒盖锈住了。\n\n林悦\n你疯了？老周要是上来——\n\n苏晴\n帮我按着手电。\n\n铁盒打开：里面是一盘旧录音带，标签写着「回声-07」。没有播放器。\n\n林悦\n现在谁还用这个。\n\n苏晴\n我爸的抽屉里有一台。在老宅。\n\n她把铁盒塞进旅行箱夹层。门外又一次响起短暂停顿的脚步，这次停得更久。林悦把耳朵贴上门板，摇头：走廊没人。可两人还是屏住呼吸等了很久，才听见远处电梯机房方向传来金属碰撞的一声轻响。\n"
+        },
+        {
+          "mention": "回声-07",
+          "source_span": {
+            "start": 1362,
+            "end": 1367,
+            "quote": "回声-07"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘回声-07’是录音带标签，属物品标识符，非人名；剧本中无任何动作、对白、舞台指示或介绍表明其为在场人物，仅作为物证出现。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 2915.6,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘回声-07’是录音带标签，属物品标识符，非人名；剧本中无任何动作、对白、舞台指示或介绍表明其为在场人物，仅作为物证出现。\"}",
+          "context_window": "一角。\n\n老周\n看一眼。不许拍照。\n\n苏晴低头：卡片上写着苏衡，房号三零二，同行人一栏却是空白。空白处有被擦掉的痕迹。\n\n苏晴\n同行人是谁？\n\n老周\n我记不清了。别问了。\n\n第六场 - 内景 - 三零二客房 - 黄昏\n\n苏晴撬开床头板——不是暴力，是陈默白天说过的「别自己拆」让她反而去找接缝。墙里没有水管，只有一个铁皮小盒，盒盖锈住了。\n\n林悦\n你疯了？老周要是上来——\n\n苏晴\n帮我按着手电。\n\n铁盒打开：里面是一盘旧录音带，标签写着「回声-07」。没有播放器。\n\n林悦\n现在谁还用这个。\n\n苏晴\n我爸的抽屉里有一台。在老宅。\n\n她把铁盒塞进旅行箱夹层。门外又一次响起短暂停顿的脚步，这次停得更久。林悦把耳朵贴上门板，摇头：走廊没人。可两人还是屏住呼吸等了很久，才听见远处电梯机房方向传来金属碰撞的一声轻响。\n\n苏晴把箱子锁扣扣死。她忽然想起父亲常说的另一句话：旅馆里的回声不认人，只认钥匙。\n\n第七场 - 外景 - 老宅巷口 - 夜\n\n老宅在两条街外。路灯坏了一盏，苏晴和林悦的影子被"
+        },
+        {
+          "mention": "默记修缮",
+          "source_span": {
+            "start": 1605,
+            "end": 1609,
+            "quote": "默记修缮"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘默记修缮’是面包车侧面喷涂的公司/店铺名称，属业务标识，非人名；虽后文提及‘陈师傅’，但‘默记修缮’本身未以人名形式出现，也无动作、对白或在场行为指向其为人，符合硬规则0（业务术语）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 2420.9,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘默记修缮’是面包车侧面喷涂的公司/店铺名称，属业务标识，非人名；虽后文提及‘陈师傅’，但‘默记修缮’本身未以人名形式出现，也无动作、对白或在场行为指向其为人，符合硬规则0（业务术语）\"}",
+          "context_window": "这个。\n\n苏晴\n我爸的抽屉里有一台。在老宅。\n\n她把铁盒塞进旅行箱夹层。门外又一次响起短暂停顿的脚步，这次停得更久。林悦把耳朵贴上门板，摇头：走廊没人。可两人还是屏住呼吸等了很久，才听见远处电梯机房方向传来金属碰撞的一声轻响。\n\n苏晴把箱子锁扣扣死。她忽然想起父亲常说的另一句话：旅馆里的回声不认人，只认钥匙。\n\n第七场 - 外景 - 老宅巷口 - 夜\n\n老宅在两条街外。路灯坏了一盏，苏晴和林悦的影子被拉得很长。巷口有辆面包车，车侧喷着「默记修缮」。\n\n林悦\n陈师傅的车？这时间他来老宅干什么。\n\n苏晴\n也许他不只是修水管。\n\n她们没有靠近。面包车熄着灯，驾驶座空着。苏晴摸到口袋里的钥匙——老宅钥匙，也是父亲留下的。\n\n第八场 - 内景 - 苏衡老宅客厅 - 夜\n\n灰尘味道很重。苏晴打开客厅柜，果然有一台袖珍录音机。她塞进磁带，按下播放。\n\n磁带沙沙作响，然后是苏衡的声音，比记忆中更年轻：\n\n苏衡\n（录音）\n如果你听到这盘带，说明旅馆还在。别相信登记簿上的空白。空白是有人的名字。"
+        },
+        {
+          "mention": "悦安",
+          "source_span": {
+            "start": 1898,
+            "end": 1900,
+            "quote": "悦安"
+          },
+          "is_character": true,
+          "confidence": 0.95,
+          "reason": "‘悦安’在录音中被苏衡以第二人称直接称呼（‘如果她来了——让她别进后院’），且林悦当场回应‘他叫我悦安。只有他那么叫’，表明该称呼指向当前在场的林悦，属在场角色的别名/小名，符合规则3",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 3197.8,
+          "raw_judgment_text": "{\"is_character\": true, \"confidence\": 0.95, \"reason\": \"‘悦安’在录音中被苏衡以第二人称直接称呼（‘如果她来了——让她别进后院’），且林悦当场回应‘他叫我悦安。只有他那么叫’，表明该称呼指向当前在场的林悦，属在场角色的别名/小名，符合规则3\"}",
+          "context_window": "钥匙——老宅钥匙，也是父亲留下的。\n\n第八场 - 内景 - 苏衡老宅客厅 - 夜\n\n灰尘味道很重。苏晴打开客厅柜，果然有一台袖珍录音机。她塞进磁带，按下播放。\n\n磁带沙沙作响，然后是苏衡的声音，比记忆中更年轻：\n\n苏衡\n（录音）\n如果你听到这盘带，说明旅馆还在。别相信登记簿上的空白。空白是有人的名字。\n\n林悦倒吸一口气。录音继续：\n\n苏衡\n（录音）\n周会害怕。陈会装作不认识你。悦安——如果她来了——让她别进后院。\n\n苏晴怔住。录音里的「悦安」让林悦脸色发白。\n\n林悦\n他叫我悦安。只有他那么叫。\n\n苏晴\n所以你早就知道有这盘带？\n\n林悦\n我只知道他不让我靠近晾衣场。我不知道为什么。\n\n录音末尾多了一句几乎被噪声淹没的话：「钥匙在三零二的钟里。」\n\n第九场 - 内景 - 回声旅馆大堂 - 深夜\n\n大堂只剩安全出口的绿光。老周不在柜台。苏晴走上楼梯，林悦守在一楼盯着旋转门。\n\n三零二的墙上那口钟——客房里也有同样款式的挂钟。苏晴把它取下，后盖松动，掉出一枚薄铜钥匙，齿形怪异。\n"
+        },
+        {
+          "mention": "钥匙在三零二的钟里。",
+          "source_span": {
+            "start": 1992,
+            "end": 2002,
+            "quote": "钥匙在三零二的钟里。"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘钥匙在三零二的钟里’是录音中一句陈述性台词，内容为物品位置提示，非人名；字符串本身是地点+物品的短语结构，不符合人名形态，硬规则0直接触发",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2284.9,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘钥匙在三零二的钟里’是录音中一句陈述性台词，内容为物品位置提示，非人名；字符串本身是地点+物品的短语结构，不符合人名形态，硬规则0直接触发\"}",
+          "context_window": "声音，比记忆中更年轻：\n\n苏衡\n（录音）\n如果你听到这盘带，说明旅馆还在。别相信登记簿上的空白。空白是有人的名字。\n\n林悦倒吸一口气。录音继续：\n\n苏衡\n（录音）\n周会害怕。陈会装作不认识你。悦安——如果她来了——让她别进后院。\n\n苏晴怔住。录音里的「悦安」让林悦脸色发白。\n\n林悦\n他叫我悦安。只有他那么叫。\n\n苏晴\n所以你早就知道有这盘带？\n\n林悦\n我只知道他不让我靠近晾衣场。我不知道为什么。\n\n录音末尾多了一句几乎被噪声淹没的话：「钥匙在三零二的钟里。」\n\n第九场 - 内景 - 回声旅馆大堂 - 深夜\n\n大堂只剩安全出口的绿光。老周不在柜台。苏晴走上楼梯，林悦守在一楼盯着旋转门。\n\n三零二的墙上那口钟——客房里也有同样款式的挂钟。苏晴把它取下，后盖松动，掉出一枚薄铜钥匙，齿形怪异。\n\n苏晴\n（对门外）\n林悦，钥匙在。\n\n没有回应。楼梯间有人呼吸。\n\n陈默\n把钥匙给我。\n\n苏晴转身。陈默站在阴影里，手里没有扳手，只有那张被擦过的登记卡片复印件——不知何时离了老周的杯子。\n\n苏晴\n你认识"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 16.26,
+      "llm_call_count": 6,
+      "ok_llm_call_count": 6
+    },
+    {
+      "script": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt",
+      "script_chars": 2898,
+      "discovered_count": 12,
+      "judged_count": 12,
+      "discoveries": [
+        {
+          "mention": "留局待领",
+          "start": 129,
+          "end": 133,
+          "quote": "留局待领",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 129,
+            "end": 133,
+            "quote": "留局待领"
+          }
+        },
+        {
+          "mention": "别让她当着人拆。",
+          "start": 381,
+          "end": 389,
+          "quote": "别让她当着人拆。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 381,
+            "end": 389,
+            "quote": "别让她当着人拆。"
+          }
+        },
+        {
+          "mention": "顾衡",
+          "start": 703,
+          "end": 705,
+          "quote": "顾衡",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "mention_cue",
+            "parent_name_cue",
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 703,
+            "end": 705,
+            "quote": "顾衡"
+          }
+        },
+        {
+          "mention": "夜班邮筒第七格",
+          "start": 718,
+          "end": 725,
+          "quote": "夜班邮筒第七格",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 718,
+            "end": 725,
+            "quote": "夜班邮筒第七格"
+          }
+        },
+        {
+          "mention": "默记",
+          "start": 1349,
+          "end": 1351,
+          "quote": "默记",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1349,
+            "end": 1351,
+            "quote": "默记"
+          }
+        },
+        {
+          "mention": "夜班邮筒",
+          "start": 1417,
+          "end": 1421,
+          "quote": "夜班邮筒",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1417,
+            "end": 1421,
+            "quote": "夜班邮筒"
+          }
+        },
+        {
+          "mention": "失踪汇款",
+          "start": 1423,
+          "end": 1427,
+          "quote": "失踪汇款",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1423,
+            "end": 1427,
+            "quote": "失踪汇款"
+          }
+        },
+        {
+          "mention": "第七格——顾衡案——不得夜班单独开启。",
+          "start": 1572,
+          "end": 1591,
+          "quote": "第七格——顾衡案——不得夜班单独开启。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1572,
+            "end": 1591,
+            "quote": "第七格——顾衡案——不得夜班单独开启。"
+          }
+        },
+        {
+          "mention": "晚晚",
+          "start": 1967,
+          "end": 1969,
+          "quote": "晚晚",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1967,
+            "end": 1969,
+            "quote": "晚晚"
+          }
+        },
+        {
+          "mention": "设备老化，待报修",
+          "start": 2233,
+          "end": 2241,
+          "quote": "设备老化，待报修",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 2233,
+            "end": 2241,
+            "quote": "设备老化，待报修"
+          }
+        },
+        {
+          "mention": "晚上见",
+          "start": 2582,
+          "end": 2585,
+          "quote": "晚上见",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 2582,
+            "end": 2585,
+            "quote": "晚上见"
+          }
+        },
+        {
+          "mention": "陈默",
+          "start": 2883,
+          "end": 2885,
+          "quote": "陈默",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "source_span": {
+            "start": 2883,
+            "end": 2885,
+            "quote": "陈默"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "留局待领",
+          "source_span": {
+            "start": 129,
+            "end": 133,
+            "quote": "留局待领"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘留局待领’是邮政业务术语，指邮件暂存邮局等候收件人领取，剧本中多次作为名词性短语出现（如‘写着「留局待领」’‘「留局待领」格’），无动作、对白、舞台指示或在场行为指向其为人名，硬规则0触发",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "latency_ms": 2639.1,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘留局待领’是邮政业务术语，指邮件暂存邮局等候收件人领取，剧本中多次作为名词性短语出现（如‘写着「留局待领」’‘「留局待领」格’），无动作、对白、舞台指示或在场行为指向其为人名，硬规则0触发\"}",
+          "context_window": "标题：夜班邮筒\n\n第一场\n\n时间：冬夜十一点\n地点：老城区二十四小时邮局大厅\n人物：顾晚（二十八岁，夜班柜员）、赵石（快递站临时工）\n\n顾晚把最后一摞信件盖上邮戳。大厅只剩暖气片的声响。暖气把窗玻璃呵出白雾，雾里隐约能看见对街停着的三轮车。她数了数柜台上的「留局待领」格，习惯性跳过第七格——那里早就用铁丝缠着，像一颗谁都不愿碰的牙。赵石把帆布袋往柜台上一搁，手套上结着霜。\n\n赵石\n还有出城的吗？末班车卡点了。\n\n顾晚\n三封。都写着「留局待领」。奇怪，留局的人通常白天来。\n\n赵石\n也许怕见人。\n\n第二场\n\n时间：冬夜十一点半\n地点：邮局后院卸货区\n人物：赵石、神秘寄件人（只在阴影里，未报姓名）\n\n赵石把帆布袋扛上三轮。阴影里有人递来一个牛皮纸包，上面只写：交顾晚亲启。没有寄件地址。\n\n赵石\n你自己进"
+        },
+        {
+          "mention": "别让她当着人拆。",
+          "source_span": {
+            "start": 381,
+            "end": 389,
+            "quote": "别让她当着人拆。"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘别让她当着人拆’是引述的台词内容，属于指令性短语，非人名；且上下文明确显示这是‘神秘寄件人’留下的口头嘱咐，并非角色姓名或代称，不符合硬规则0（明显不是人名）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2745.0,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘别让她当着人拆’是引述的台词内容，属于指令性短语，非人名；且上下文明确显示这是‘神秘寄件人’留下的口头嘱咐，并非角色姓名或代称，不符合硬规则0（明显不是人名）\"}",
+          "context_window": "不愿碰的牙。赵石把帆布袋往柜台上一搁，手套上结着霜。\n\n赵石\n还有出城的吗？末班车卡点了。\n\n顾晚\n三封。都写着「留局待领」。奇怪，留局的人通常白天来。\n\n赵石\n也许怕见人。\n\n第二场\n\n时间：冬夜十一点半\n地点：邮局后院卸货区\n人物：赵石、神秘寄件人（只在阴影里，未报姓名）\n\n赵石把帆布袋扛上三轮。阴影里有人递来一个牛皮纸包，上面只写：交顾晚亲启。没有寄件地址。\n\n赵石\n你自己进去交不行？\n\n对方没有回答，只留下纸包和一行极轻的话：「别让她当着人拆。」脚步声消失在巷子里。赵石看着纸包，犹豫要不要交给顾晚。\n\n第三场\n\n时间：次日清晨\n地点：邮局更衣室\n人物：顾晚、何婶（早班保洁）\n\n何婶\n（扫地）\n小顾，你眼睛红了。夜班别熬太狠。\n\n顾晚\n何婶，昨天有没有陌生人找我？\n\n何婶\n没有。就赵石那孩子进进出出。对了，他说给你留了东西在抽屉——我没动。\n\n顾晚打开抽屉：牛皮纸包还在。她没有当何婶的面拆开。\n\n第四场\n\n时间：当日午后\n地点：顾晚合租屋的客厅\n人物：顾晚、室友方糖（外号，真名"
+        },
+        {
+          "mention": "顾衡",
+          "source_span": {
+            "start": 703,
+            "end": 705,
+            "quote": "顾衡"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "顾衡仅出现在汇款单复印件的收款人栏及顾晚的回忆性对白中，明确说明‘他去世三年了’，且无任何在场动作、对白、舞台指示或出场介绍，属于非在场背景人物。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "mention_cue",
+            "parent_name_cue",
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "latency_ms": 2896.7,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"顾衡仅出现在汇款单复印件的收款人栏及顾晚的回忆性对白中，明确说明‘他去世三年了’，且无任何在场动作、对白、舞台指示或出场介绍，属于非在场背景人物。\"}",
+          "context_window": "顾晚\n何婶，昨天有没有陌生人找我？\n\n何婶\n没有。就赵石那孩子进进出出。对了，他说给你留了东西在抽屉——我没动。\n\n顾晚打开抽屉：牛皮纸包还在。她没有当何婶的面拆开。\n\n第四场\n\n时间：当日午后\n地点：顾晚合租屋的客厅\n人物：顾晚、室友方糖（外号，真名方恬）\n\n方糖靠在沙发上吃冰糖葫芦，看顾晚把纸包放在茶几正中。\n\n方糖\n拆啊。搞得像拆炸弹。\n\n顾晚\n上面写亲启。\n\n方糖\n那我闭上眼。\n\n顾晚拆开：里面是一张旧式汇款单复印件，收款人是「顾衡」，金额空白，备注栏写着「夜班邮筒第七格」。没有信件正文。\n\n方糖\n顾衡是谁？你亲戚？\n\n顾晚\n我爸。他去世三年了。他从不让我碰邮局的夜班。\n\n第五场 - 内景 - 邮局大厅 - 当日黄昏\n\n顾晚提前到岗。赵石不在。她走到公共邮筒墙，数到第七格——格口被人用铁丝缠住，打着一个不专业的结。\n\n顾晚\n（自语）\n谁缠的。\n\n老顾客周伯路过，咳了一声。\n\n周伯\n姑娘，第七格坏很久了。你们站长不修。\n\n顾晚\n周伯，你见过有人往第七格塞东西吗？\n\n"
+        },
+        {
+          "mention": "夜班邮筒第七格",
+          "source_span": {
+            "start": 718,
+            "end": 725,
+            "quote": "夜班邮筒第七格"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "夜班邮筒第七格是汇款单备注中的地点标识（邮筒编号），属物品/位置片段，非人名；剧本中所有上下文均将其作为物理格口描述（如‘第七格坏很久了’‘数到第七格’），无任何动作、对白、舞台指示或介绍表明其为在场人物。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 3256.5,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"夜班邮筒第七格是汇款单备注中的地点标识（邮筒编号），属物品/位置片段，非人名；剧本中所有上下文均将其作为物理格口描述（如‘第七格坏很久了’‘数到第七格’），无任何动作、对白、舞台指示或介绍表明其为在场人物。\"}",
+          "context_window": "我？\n\n何婶\n没有。就赵石那孩子进进出出。对了，他说给你留了东西在抽屉——我没动。\n\n顾晚打开抽屉：牛皮纸包还在。她没有当何婶的面拆开。\n\n第四场\n\n时间：当日午后\n地点：顾晚合租屋的客厅\n人物：顾晚、室友方糖（外号，真名方恬）\n\n方糖靠在沙发上吃冰糖葫芦，看顾晚把纸包放在茶几正中。\n\n方糖\n拆啊。搞得像拆炸弹。\n\n顾晚\n上面写亲启。\n\n方糖\n那我闭上眼。\n\n顾晚拆开：里面是一张旧式汇款单复印件，收款人是「顾衡」，金额空白，备注栏写着「夜班邮筒第七格」。没有信件正文。\n\n方糖\n顾衡是谁？你亲戚？\n\n顾晚\n我爸。他去世三年了。他从不让我碰邮局的夜班。\n\n第五场 - 内景 - 邮局大厅 - 当日黄昏\n\n顾晚提前到岗。赵石不在。她走到公共邮筒墙，数到第七格——格口被人用铁丝缠住，打着一个不专业的结。\n\n顾晚\n（自语）\n谁缠的。\n\n老顾客周伯路过，咳了一声。\n\n周伯\n姑娘，第七格坏很久了。你们站长不修。\n\n顾晚\n周伯，你见过有人往第七格塞东西吗？\n\n周伯\n夜里见过一次。看不清脸。像怕光。\n"
+        },
+        {
+          "mention": "默记",
+          "source_span": {
+            "start": 1349,
+            "end": 1351,
+            "quote": "默记"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘默记’出现在何婶回忆中，仅作为车门喷漆字样被提及，无动作、对白、在场行为或出场介绍；属背景信息中的标识符，非人物在场证据。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 2323.4,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘默记’出现在何婶回忆中，仅作为车门喷漆字样被提及，无动作、对白、在场行为或出场介绍；属背景信息中的标识符，非人物在场证据。\"}",
+          "context_window": "婶裹着围巾，不肯进咖啡馆。风把她的话吹散一半。\n\n何婶\n你爸顾衡以前也上夜班。有一年来了一个女人，只寄「留局待领」，收件人永远写顾衡。后来女人不来了，你爸开始守第七格。\n\n顾晚\n女人叫什么？\n\n何婶\n不记得。只记得她把一枚铜扣子塞进格口，说等孩子长大再取。\n\n顾晚摸向口袋——牛皮纸包里其实还有一枚铜扣，她刚才没拿给方糖看。河风更冷了。何婶补了一句：你爸说过，若铜扣回来，先别找刘正，先找修锁的人。何婶不记得修锁人的名字，只记得车门上喷过「默记」两个字。\n\n第八场 - 内景 - 合租屋客厅 - 深夜\n\n方糖（方恬）把笔记本电脑推过来，检索页停在一份旧社会新闻扫描件：标题含「夜班邮筒」「失踪汇款」。\n\n方糖\n你看评论区。有人说收据在站长抽屉。\n\n顾晚\n刘正？\n\n方糖\n别现在冲回去。叫上赵石。他认识卸货区的监控角度。\n\n第九场 - 内景 - 邮局大厅 - 次日凌晨四点\n\n只有应急灯。赵石用备用钥匙开了侧门。顾晚走向站长办公室，方糖在门外放风。\n\n抽屉没有汇款单。却有一份手写备忘："
+        },
+        {
+          "mention": "夜班邮筒",
+          "source_span": {
+            "start": 1417,
+            "end": 1421,
+            "quote": "夜班邮筒"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "夜班邮筒是新闻标题中的业务术语/设施名称，非人名；剧本中未出现其作为有动作、对白或在场行为的实体，仅作为事件标签被引用。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2303.3,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"夜班邮筒是新闻标题中的业务术语/设施名称，非人名；剧本中未出现其作为有动作、对白或在场行为的实体，仅作为事件标签被引用。\"}",
+          "context_window": "来女人不来了，你爸开始守第七格。\n\n顾晚\n女人叫什么？\n\n何婶\n不记得。只记得她把一枚铜扣子塞进格口，说等孩子长大再取。\n\n顾晚摸向口袋——牛皮纸包里其实还有一枚铜扣，她刚才没拿给方糖看。河风更冷了。何婶补了一句：你爸说过，若铜扣回来，先别找刘正，先找修锁的人。何婶不记得修锁人的名字，只记得车门上喷过「默记」两个字。\n\n第八场 - 内景 - 合租屋客厅 - 深夜\n\n方糖（方恬）把笔记本电脑推过来，检索页停在一份旧社会新闻扫描件：标题含「夜班邮筒」「失踪汇款」。\n\n方糖\n你看评论区。有人说收据在站长抽屉。\n\n顾晚\n刘正？\n\n方糖\n别现在冲回去。叫上赵石。他认识卸货区的监控角度。\n\n第九场 - 内景 - 邮局大厅 - 次日凌晨四点\n\n只有应急灯。赵石用备用钥匙开了侧门。顾晚走向站长办公室，方糖在门外放风。\n\n抽屉没有汇款单。却有一份手写备忘：「第七格——顾衡案——不得夜班单独开启。」字迹像刘正。\n\n赵石\n（耳语）\n监控扫不到第七格正前方。有人算好了。\n\n顾晚把铜扣按进第七格缝隙。"
+        },
+        {
+          "mention": "失踪汇款",
+          "source_span": {
+            "start": 1423,
+            "end": 1427,
+            "quote": "失踪汇款"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘失踪汇款’是新闻标题中的业务术语/事件名称，非人名；剧本中仅作为检索关键词出现在电脑页面，无动作、对白、舞台指示或在场行为指向其为人，且上下文明确其为旧社会新闻事件主题。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2791.2,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘失踪汇款’是新闻标题中的业务术语/事件名称，非人名；剧本中仅作为检索关键词出现在电脑页面，无动作、对白、舞台指示或在场行为指向其为人，且上下文明确其为旧社会新闻事件主题。\"}",
+          "context_window": "，你爸开始守第七格。\n\n顾晚\n女人叫什么？\n\n何婶\n不记得。只记得她把一枚铜扣子塞进格口，说等孩子长大再取。\n\n顾晚摸向口袋——牛皮纸包里其实还有一枚铜扣，她刚才没拿给方糖看。河风更冷了。何婶补了一句：你爸说过，若铜扣回来，先别找刘正，先找修锁的人。何婶不记得修锁人的名字，只记得车门上喷过「默记」两个字。\n\n第八场 - 内景 - 合租屋客厅 - 深夜\n\n方糖（方恬）把笔记本电脑推过来，检索页停在一份旧社会新闻扫描件：标题含「夜班邮筒」「失踪汇款」。\n\n方糖\n你看评论区。有人说收据在站长抽屉。\n\n顾晚\n刘正？\n\n方糖\n别现在冲回去。叫上赵石。他认识卸货区的监控角度。\n\n第九场 - 内景 - 邮局大厅 - 次日凌晨四点\n\n只有应急灯。赵石用备用钥匙开了侧门。顾晚走向站长办公室，方糖在门外放风。\n\n抽屉没有汇款单。却有一份手写备忘：「第七格——顾衡案——不得夜班单独开启。」字迹像刘正。\n\n赵石\n（耳语）\n监控扫不到第七格正前方。有人算好了。\n\n顾晚把铜扣按进第七格缝隙。铁丝结忽然松"
+        },
+        {
+          "mention": "第七格——顾衡案——不得夜班单独开启。",
+          "source_span": {
+            "start": 1572,
+            "end": 1591,
+            "quote": "第七格——顾衡案——不得夜班单独开启。"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘第七格——顾衡案——不得夜班单独开启’是抽屉中手写备忘录的文本内容，属于物品上的文字信息，非人物在场行为、对白或舞台指示中的出场描述；‘顾衡’在此处为案件代称（‘顾衡案’），且上下文明确其为已故/未出场人物（后文陈默称顾晚为‘顾衡的女儿’，证实顾衡本人未在场）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 3089.2,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘第七格——顾衡案——不得夜班单独开启’是抽屉中手写备忘录的文本内容，属于物品上的文字信息，非人物在场行为、对白或舞台指示中的出场描述；‘顾衡’在此处为案件代称（‘顾衡案’），且上下文明确其为已故/未出场人物（后文陈默称顾晚为‘顾衡的女儿’，证实顾衡本人未在场）\"}",
+          "context_window": "两个字。\n\n第八场 - 内景 - 合租屋客厅 - 深夜\n\n方糖（方恬）把笔记本电脑推过来，检索页停在一份旧社会新闻扫描件：标题含「夜班邮筒」「失踪汇款」。\n\n方糖\n你看评论区。有人说收据在站长抽屉。\n\n顾晚\n刘正？\n\n方糖\n别现在冲回去。叫上赵石。他认识卸货区的监控角度。\n\n第九场 - 内景 - 邮局大厅 - 次日凌晨四点\n\n只有应急灯。赵石用备用钥匙开了侧门。顾晚走向站长办公室，方糖在门外放风。\n\n抽屉没有汇款单。却有一份手写备忘：「第七格——顾衡案——不得夜班单独开启。」字迹像刘正。\n\n赵石\n（耳语）\n监控扫不到第七格正前方。有人算好了。\n\n顾晚把铜扣按进第七格缝隙。铁丝结忽然松脱，格内掉出一张叠小的纸：地址是护城河对岸的旧仓，署名只有一个「衡」字。\n\n第十场 - 外景 - 护城河对岸旧仓 - 黎明前\n\n旧仓门锁着。陈默（修锁师傅，本场初次出场）蹲在门口抽烟，看见三人走近，把烟掐了。\n\n陈默\n你们找哪一间？\n\n顾晚\n不知道。只有「衡」。\n\n陈默看了看她手里的铜扣，脸色变了。\n\n陈默\n顾衡的女儿？钥匙我"
+        },
+        {
+          "mention": "晚晚",
+          "source_span": {
+            "start": 1967,
+            "end": 1969,
+            "quote": "晚晚"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘晚晚’仅出现在信件收件人栏，属回忆/书信中被提及的称呼，无动作、对白、舞台指示或在场行为支撑其为当前场景在场角色；虽与顾晚名字相关，但未明确指向同一人，且无任何在场证据。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2293.5,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘晚晚’仅出现在信件收件人栏，属回忆/书信中被提及的称呼，无动作、对白、舞台指示或在场行为支撑其为当前场景在场角色；虽与顾晚名字相关，但未明确指向同一人，且无任何在场证据。\"}",
+          "context_window": "烟掐了。\n\n陈默\n你们找哪一间？\n\n顾晚\n不知道。只有「衡」。\n\n陈默看了看她手里的铜扣，脸色变了。\n\n陈默\n顾衡的女儿？钥匙我有——不是开仓的，是开里面铁柜的。你爸托我保管，说等铜扣回来再给。\n\n赵石\n你怎么证明？\n\n陈默\n证明不了。你们可以不信。也可以跟我进去看完再报警。\n\n方糖拉了拉顾晚的袖子，点头。\n\n第十一场 - 内景 - 旧仓铁柜前 - 黎明\n\n铁柜打开：一叠留局待领单据，收款人全是顾衡；最底下是一封没寄出的信，收件人写着「晚晚」。\n\n顾晚展开信。顾衡写道：第七格不是邮筒，是我藏给你的门。刘正怕的不是丢件，是有人用夜班通道寄走本不该流通的证词。铜扣是你母亲留下的信物——她不是失踪，她是被要求忘记。\n\n方糖\n（轻声）\n所以刘正封存，是在保护，还是在藏？\n\n陈默\n两种都有。我只负责钥匙。\n\n赵石看着窗外发白的天。\n\n赵石\n我们先把信复印一份。原件先别公开。\n\n\n\n【附记：本场与前后场连续，不另标场号】\n\n卸货区的监控镜头永远差那么几度。赵石后来才告诉顾晚：有人故意"
+        },
+        {
+          "mention": "设备老化，待报修",
+          "source_span": {
+            "start": 2233,
+            "end": 2241,
+            "quote": "设备老化，待报修"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "‘设备老化，待报修’是顾晚在夜班日志中写的维修备注，属于物品状态描述和业务用语，不符合人名定义，硬规则0直接触发",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2102.7,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"‘设备老化，待报修’是顾晚在夜班日志中写的维修备注，属于物品状态描述和业务用语，不符合人名定义，硬规则0直接触发\"}",
+          "context_window": "夜班通道寄走本不该流通的证词。铜扣是你母亲留下的信物——她不是失踪，她是被要求忘记。\n\n方糖\n（轻声）\n所以刘正封存，是在保护，还是在藏？\n\n陈默\n两种都有。我只负责钥匙。\n\n赵石看着窗外发白的天。\n\n赵石\n我们先把信复印一份。原件先别公开。\n\n\n\n【附记：本场与前后场连续，不另标场号】\n\n卸货区的监控镜头永远差那么几度。赵石后来才告诉顾晚：有人故意把支架拧松过，像怕拍到第七格正前方。顾晚把这个细节写进了自己的夜班日志，又划掉，改写成「设备老化，待报修」。她不确定哪一句才安全。\n\n方恬——也就是方糖——在合租屋检索到更多旧闻碎片：有人声称在护城河见过「留局待领」的女人；有人说顾衡辞职不是因为身体，是因为被要求签字。这些都无法确证，却让顾晚更不想在公开场合提起父亲的名字。\n\n第十二场 - 内景 - 邮局大厅 - 次日白天\n\n阳光很好。刘正站在第七格前，看见铁丝结已不在，没有发怒，只是看了顾晚一眼。\n\n刘正\n夜班你还上吗？\n\n顾晚\n上。但第七格我会按规章报修——公开报修。\n\n刘正沉默片刻"
+        },
+        {
+          "mention": "晚上见",
+          "source_span": {
+            "start": 2582,
+            "end": 2585,
+            "quote": "晚上见"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "“晚上见”是告别用语，属于日常口语表达，非人名；硬规则0明确要求口号、对白片段等非人名字符串必须is_character=false",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2192.7,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"“晚上见”是告别用语，属于日常口语表达，非人名；硬规则0明确要求口号、对白片段等非人名字符串必须is_character=false\"}",
+          "context_window": "景 - 邮局大厅 - 次日白天\n\n阳光很好。刘正站在第七格前，看见铁丝结已不在，没有发怒，只是看了顾晚一眼。\n\n刘正\n夜班你还上吗？\n\n顾晚\n上。但第七格我会按规章报修——公开报修。\n\n刘正沉默片刻，点头，走开了。何婶在角落拖地，假装什么都没听见。方糖在门外朝顾晚挥了挥手，口型像在说：回家吃饭。\n\n顾晚把铜扣放进工作服内侧口袋。她在第七格前站了很久，直到有普通顾客来寄明信片，她才回到柜台，盖上今日第一个邮戳。\n\n赵石从侧门探头，做了个「晚上见」的手势。方糖已经去买早餐了。何婶拖过湿漉漉的拖把，经过第七格时，刻意把水声弄得很大，像是在掩盖什么，又像是在祝福什么。\n\n大厅广播响起末班收件提醒，平凡得像什么都没有发生过。可顾晚知道，从今夜起，夜班邮筒里少了一格秘密，多了一格必须公开报修的故障。\n她在日志最后一行写下：今晚不谈顾衡。先把第七格变成可以报修的普通故障。写完后她又加了一句：方恬说得对，原件先别公开。\n\n（字数填充说明：以下为顾晚夜班日志摘录，仅作长度与叙事密度，不改变场"
+        },
+        {
+          "mention": "陈默",
+          "source_span": {
+            "start": 2883,
+            "end": 2885,
+            "quote": "陈默"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘陈默’仅出现在顾晚回忆何婶话语后的草稿书写与划掉行为中，属内心活动中的名字复现，无动作、对白、舞台指示或在场介绍，符合规则1（仅被提及于回忆/转述）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "latency_ms": 2267.8,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘陈默’仅出现在顾晚回忆何婶话语后的草稿书写与划掉行为中，属内心活动中的名字复现，无动作、对白、舞台指示或在场介绍，符合规则1（仅被提及于回忆/转述）\"}",
+          "context_window": "像什么都没有发生过。可顾晚知道，从今夜起，夜班邮筒里少了一格秘密，多了一格必须公开报修的故障。\n她在日志最后一行写下：今晚不谈顾衡。先把第七格变成可以报修的普通故障。写完后她又加了一句：方恬说得对，原件先别公开。\n\n（字数填充说明：以下为顾晚夜班日志摘录，仅作长度与叙事密度，不改变场结构。）\n夜班日志：零点过十分，大厅无人。我检查了留局格一到六，跳过七。赵石送来出城件三封。我没有追问阴影里的人。铜扣在内袋。我想起何婶说的「默记」，又把「陈默」三个字写在草稿上划掉。\n"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 30.91,
+      "llm_call_count": 12,
+      "ok_llm_call_count": 12
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "script_chars": 557,
+      "discovered_count": 4,
+      "judged_count": 4,
+      "discoveries": [
+        {
+          "mention": "周五前提交",
+          "start": 137,
+          "end": 142,
+          "quote": "周五前提交",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 137,
+            "end": 142,
+            "quote": "周五前提交"
+          }
+        },
+        {
+          "mention": "别再甩锅",
+          "start": 163,
+          "end": 167,
+          "quote": "别再甩锅",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 163,
+            "end": 167,
+            "quote": "别再甩锅"
+          }
+        },
+        {
+          "mention": "沈岚",
+          "start": 254,
+          "end": 256,
+          "quote": "沈岚",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 254,
+            "end": 256,
+            "quote": "沈岚"
+          }
+        },
+        {
+          "mention": "开会开到吐",
+          "start": 477,
+          "end": 482,
+          "quote": "开会开到吐",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 477,
+            "end": 482,
+            "quote": "开会开到吐"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "周五前提交",
+          "source_span": {
+            "start": 137,
+            "end": 142,
+            "quote": "周五前提交"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "‘周五前提交’是打印稿封面贴纸上的任务截止提示语，属于UI文案/业务用语，非人名，不符合角色候选基本条件。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2555.0,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"‘周五前提交’是打印稿封面贴纸上的任务截止提示语，属于UI文案/业务用语，非人名，不符合角色候选基本条件。\"}",
+          "context_window": "标题：周五站会\n\n类型：职场轻喜剧（短片）\n\n第一场 - 内景 - 开放办公区 - 日\n\n陆远（三十岁，产品经理，永远端着保温杯）敲了敲白板。小蔡（二十二岁，实习生）抱着一摞打印稿站在旁边。\n\n陆远\n今天只盯三件事。别发散。\n\n小蔡把稿子往桌上一放，封面贴纸上用马克笔写着「周五前提交」。另一张便利贴斜贴在显示器边框，内容是「别再甩锅」。\n\n小蔡\n周报模板我改了两版。你看哪版能过。\n\n陆远\n先过业务，再过格式。格式这事——\n\n他顿住。抽屉最下层露出一张旧工牌照片：合影里多出一个没见过的女人。照片背面写着「沈岚」，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面"
+        },
+        {
+          "mention": "别再甩锅",
+          "source_span": {
+            "start": 163,
+            "end": 167,
+            "quote": "别再甩锅"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘别再甩锅’是贴在显示器上的便利贴文案，属于UI类告示性文字，非人名，不指向具体在场人物，硬规则0直接适用。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2237.8,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘别再甩锅’是贴在显示器上的便利贴文案，属于UI类告示性文字，非人名，不指向具体在场人物，硬规则0直接适用。\"}",
+          "context_window": "标题：周五站会\n\n类型：职场轻喜剧（短片）\n\n第一场 - 内景 - 开放办公区 - 日\n\n陆远（三十岁，产品经理，永远端着保温杯）敲了敲白板。小蔡（二十二岁，实习生）抱着一摞打印稿站在旁边。\n\n陆远\n今天只盯三件事。别发散。\n\n小蔡把稿子往桌上一放，封面贴纸上用马克笔写着「周五前提交」。另一张便利贴斜贴在显示器边框，内容是「别再甩锅」。\n\n小蔡\n周报模板我改了两版。你看哪版能过。\n\n陆远\n先过业务，再过格式。格式这事——\n\n他顿住。抽屉最下层露出一张旧工牌照片：合影里多出一个没见过的女人。照片背面写着「沈岚」，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面的字。\n\n小蔡\n反正不是我。我入职才三个月。\n\n第"
+        },
+        {
+          "mention": "沈岚",
+          "source_span": {
+            "start": 254,
+            "end": 256,
+            "quote": "沈岚"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "沈岚仅出现在照片背面手写文字中，属回忆/物品附带信息；未在本场有任何动作、对白、舞台指示中的在场行为或出场介绍，符合硬规则1（非在场形式提及）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 3984.3,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"沈岚仅出现在照片背面手写文字中，属回忆/物品附带信息；未在本场有任何动作、对白、舞台指示中的在场行为或出场介绍，符合硬规则1（非在场形式提及）\"}",
+          "context_window": "开放办公区 - 日\n\n陆远（三十岁，产品经理，永远端着保温杯）敲了敲白板。小蔡（二十二岁，实习生）抱着一摞打印稿站在旁边。\n\n陆远\n今天只盯三件事。别发散。\n\n小蔡把稿子往桌上一放，封面贴纸上用马克笔写着「周五前提交」。另一张便利贴斜贴在显示器边框，内容是「别再甩锅」。\n\n小蔡\n周报模板我改了两版。你看哪版能过。\n\n陆远\n先过业务，再过格式。格式这事——\n\n他顿住。抽屉最下层露出一张旧工牌照片：合影里多出一个没见过的女人。照片背面写着「沈岚」，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面的字。\n\n小蔡\n反正不是我。我入职才三个月。\n\n第二场 - 内景 - 茶水间 - 日\n\n饮水机咕嘟响。陆远把照片塞回抽屉前，又拿出来看了一眼背面。\n\n陆远\n（自语）\n沈岚……谁啊。\n\n小蔡从门外探头，手里晃着第三张贴纸，上面写着"
+        },
+        {
+          "mention": "开会开到吐",
+          "source_span": {
+            "start": 477,
+            "end": 482,
+            "quote": "开会开到吐"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "“开会开到吐”是贴纸上的标语，属于UI文案/口号类文本，非人名，不符合角色候选定义。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 1923.8,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"“开会开到吐”是贴纸上的标语，属于UI文案/口号类文本，非人名，不符合角色候选定义。\"}",
+          "context_window": "，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面的字。\n\n小蔡\n反正不是我。我入职才三个月。\n\n第二场 - 内景 - 茶水间 - 日\n\n饮水机咕嘟响。陆远把照片塞回抽屉前，又拿出来看了一眼背面。\n\n陆远\n（自语）\n沈岚……谁啊。\n\n小蔡从门外探头，手里晃着第三张贴纸，上面写着「开会开到吐」。\n\n小蔡\n茶水间禁止开小会。这是你自己定的规矩。\n\n陆远\n行。回工位。\n\n他们离开。沈岚始终没有到场；这个名字只停在照片背面与陆远的一句自语里。\n"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 10.7,
+      "llm_call_count": 4,
+      "ok_llm_call_count": 4
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt",
+      "script_chars": 457,
+      "discovered_count": 3,
+      "judged_count": 3,
+      "discoveries": [
+        {
+          "mention": "江澄",
+          "start": 177,
+          "end": 179,
+          "quote": "江澄",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 177,
+            "end": 179,
+            "quote": "江澄"
+          }
+        },
+        {
+          "mention": "把节奏交给下一棒",
+          "start": 337,
+          "end": 345,
+          "quote": "把节奏交给下一棒",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 337,
+            "end": 345,
+            "quote": "把节奏交给下一棒"
+          }
+        },
+        {
+          "mention": "少抱怨多冲刺",
+          "start": 353,
+          "end": 359,
+          "quote": "少抱怨多冲刺",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 353,
+            "end": 359,
+            "quote": "少抱怨多冲刺"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "江澄",
+          "source_span": {
+            "start": 177,
+            "end": 179,
+            "quote": "江澄"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "江澄仅出现在电话中被提及（非在场发声）、号码本上被雨水晕开的模糊字迹（无行为/对白/舞台指示证明其在场），符合规则1：仅通过回忆/传闻/电话/物品文字间接出现，无任何在场证据。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 2677.2,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"江澄仅出现在电话中被提及（非在场发声）、号码本上被雨水晕开的模糊字迹（无行为/对白/舞台指示证明其在场），符合规则1：仅通过回忆/传闻/电话/物品文字间接出现，无任何在场证据。\"}",
+          "context_window": "标题：雨天接力\n\n类型：校园体育短片\n\n第一场 - 外景 - 塑胶跑道 - 黄昏\n\n教练周磊把秒表按停。队员阿拓弯着腰喘气，鞋侧泥点像散弹。\n\n周磊\n最后一棒别想英雄。交接稳就行。\n\n阿拓\n我腿在抖。\n\n周磊朝看台扬了扬下巴。看台上没有人应答。他的手机在外套里震动，他接通后把听筒偏开一点——电话那头传来断续的呼吸声，随即一个很轻的问句，只听清两个字：「江澄」。\n\n周磊没有回答那个名字。他把电话挂断，对阿拓说：\n\n周磊\n把鞋带系紧。少抱怨多冲刺。\n\n阿拓低头系鞋带时，看见周磊掌心的旧号码本上有一行被雨水晕开的字，只能辨认出「江澄」两个字的轮廓，没有抬头念出来。\n\n第二场 - 内景 - 器材室 - 夜\n\n雨敲铁皮屋顶。阿拓找备用钉鞋，踢到一只纸箱。箱盖内侧用油漆笔写着「把节奏交给下一棒」，另一侧写着「少抱怨多冲刺」。\n\n阿拓\n教练，外面有人找你吗？刚才电话……\n\n周磊\n没有。训练的事，场上解"
+        },
+        {
+          "mention": "把节奏交给下一棒",
+          "source_span": {
+            "start": 337,
+            "end": 345,
+            "quote": "把节奏交给下一棒"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "‘把节奏交给下一棒’是器材箱上的标语性文案，属于口号类文本，不符合人名特征，硬规则0直接判定非角色候选。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2022.4,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"‘把节奏交给下一棒’是器材箱上的标语性文案，属于口号类文本，不符合人名特征，硬规则0直接判定非角色候选。\"}",
+          "context_window": "有人应答。他的手机在外套里震动，他接通后把听筒偏开一点——电话那头传来断续的呼吸声，随即一个很轻的问句，只听清两个字：「江澄」。\n\n周磊没有回答那个名字。他把电话挂断，对阿拓说：\n\n周磊\n把鞋带系紧。少抱怨多冲刺。\n\n阿拓低头系鞋带时，看见周磊掌心的旧号码本上有一行被雨水晕开的字，只能辨认出「江澄」两个字的轮廓，没有抬头念出来。\n\n第二场 - 内景 - 器材室 - 夜\n\n雨敲铁皮屋顶。阿拓找备用钉鞋，踢到一只纸箱。箱盖内侧用油漆笔写着「把节奏交给下一棒」，另一侧写着「少抱怨多冲刺」。\n\n阿拓\n教练，外面有人找你吗？刚才电话……\n\n周磊\n没有。训练的事，场上解决。\n\n他没有提江澄。江澄从未出现在跑道上，也没有对白行；这个名字只来自电话里那一声试探，以及被雨水晕开的号码本。\n"
+        },
+        {
+          "mention": "少抱怨多冲刺",
+          "source_span": {
+            "start": 353,
+            "end": 359,
+            "quote": "少抱怨多冲刺"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "‘少抱怨多冲刺’是口号式标语，出现在纸箱内侧和对白中，属于激励性文案，非人名，不符合角色候选定义。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2013.1,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"‘少抱怨多冲刺’是口号式标语，出现在纸箱内侧和对白中，属于激励性文案，非人名，不符合角色候选定义。\"}",
+          "context_window": "他接通后把听筒偏开一点——电话那头传来断续的呼吸声，随即一个很轻的问句，只听清两个字：「江澄」。\n\n周磊没有回答那个名字。他把电话挂断，对阿拓说：\n\n周磊\n把鞋带系紧。少抱怨多冲刺。\n\n阿拓低头系鞋带时，看见周磊掌心的旧号码本上有一行被雨水晕开的字，只能辨认出「江澄」两个字的轮廓，没有抬头念出来。\n\n第二场 - 内景 - 器材室 - 夜\n\n雨敲铁皮屋顶。阿拓找备用钉鞋，踢到一只纸箱。箱盖内侧用油漆笔写着「把节奏交给下一棒」，另一侧写着「少抱怨多冲刺」。\n\n阿拓\n教练，外面有人找你吗？刚才电话……\n\n周磊\n没有。训练的事，场上解决。\n\n他没有提江澄。江澄从未出现在跑道上，也没有对白行；这个名字只来自电话里那一声试探，以及被雨水晕开的号码本。\n"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 6.72,
+      "llm_call_count": 3,
+      "ok_llm_call_count": 3
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "script_chars": 400,
+      "discovered_count": 4,
+      "judged_count": 4,
+      "discoveries": [
+        {
+          "mention": "样本冷藏",
+          "start": 68,
+          "end": 72,
+          "quote": "样本冷藏",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 68,
+            "end": 72,
+            "quote": "样本冷藏"
+          }
+        },
+        {
+          "mention": "权限不足",
+          "start": 74,
+          "end": 78,
+          "quote": "权限不足",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 74,
+            "end": 78,
+            "quote": "权限不足"
+          }
+        },
+        {
+          "mention": "柯衡",
+          "start": 175,
+          "end": 177,
+          "quote": "柯衡",
+          "discovery_method": "mention_cue",
+          "discovery_methods": [
+            "mention_cue"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          }
+        },
+        {
+          "mention": "重启实验舱",
+          "start": 262,
+          "end": 267,
+          "quote": "重启实验舱",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 262,
+            "end": 267,
+            "quote": "重启实验舱"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "样本冷藏",
+          "source_span": {
+            "start": 68,
+            "end": 72,
+            "quote": "样本冷藏"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "‘样本冷藏’是电子告示显示的业务状态提示语，属于环境UI文案，非人名，不符合角色候选定义。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "latency_ms": 2004.7,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"‘样本冷藏’是电子告示显示的业务状态提示语，属于环境UI文案，非人名，不符合角色候选定义。\"}",
+          "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条"
+        },
+        {
+          "mention": "权限不足",
+          "source_span": {
+            "start": 74,
+            "end": 78,
+            "quote": "权限不足"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "“权限不足”是电子告示显示的系统提示文案，属于UI界面文本，非人名，不符合角色候选定义。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 1787.1,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"“权限不足”是电子告示显示的系统提示文案，属于UI界面文本，非人名，不符合角色候选定义。\"}",
+          "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条上写着「样本"
+        },
+        {
+          "mention": "柯衡",
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "柯衡仅出现在日记转述（‘上个季度被调走的校准员’）和阮青的自语复述中，无动作、无对白行speaker、无在场行为或出场介绍，符合规则1（仅传闻/转述形式）",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "mention_cue",
+          "discovery_methods": [
+            "mention_cue"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2646.4,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"柯衡仅出现在日记转述（‘上个季度被调走的校准员’）和阮青的自语复述中，无动作、无对白行speaker、无在场行为或出场介绍，符合规则1（仅传闻/转述形式）\"}",
+          "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条上写着「样本冷藏」，字迹很新。\n\n对讲机再次响起，电流声里夹着含混音节，不像清晰人名。阮青没有追问。\n\n阮青把日记合上。柯衡没有进门，没有对白行，没有生物特征录入；他只存在于日记那一行转述，以及阮青重复的那句自"
+        },
+        {
+          "mention": "重启实验舱",
+          "source_span": {
+            "start": 262,
+            "end": 267,
+            "quote": "重启实验舱"
+          },
+          "is_character": false,
+          "confidence": 1.0,
+          "reason": "‘重启实验舱’是终端弹出的系统提示文案，属于UI界面文本，非人名，违反硬规则0",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 2051.4,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 1.0, \"reason\": \"‘重启实验舱’是终端弹出的系统提示文案，属于UI界面文本，非人名，违反硬规则0\"}",
+          "context_window": "夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条上写着「样本冷藏」，字迹很新。\n\n对讲机再次响起，电流声里夹着含混音节，不像清晰人名。阮青没有追问。\n\n阮青把日记合上。柯衡没有进门，没有对白行，没有生物特征录入；他只存在于日记那一行转述，以及阮青重复的那句自语。\n"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 8.49,
+      "llm_call_count": 4,
+      "ok_llm_call_count": 4
+    }
+  ],
+  "finished_at_unix": 1785982613.5199208,
+  "wall_time_sec": 73.1,
+  "llm_call_count": 29,
+  "ok_llm_call_count": 29,
+  "discovered_total": 29
+}

@@ -1,0 +1,291 @@
+{
+  "schema_version": "afs.indirect_mention_split_fields.v0.1",
+  "cases": [
+    {
+      "case_id": "shenlan",
+      "mention": "沈岚",
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "expected": {
+        "refers_to_real_character": true,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3824.8,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "‘沈岚’明确写在照片背面，附带具体时间（三年前入职周）和上下文（旧工牌合影中多出的女人），构成可识别、有身份绑定的真实人物指称。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "沈岚未发言、未被舞台指示描述为在场动作主体，也未作为出场人物被介绍；仅以照片背面文字形式被间接提及。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "沈岚未发言、未被舞台指示描述为在场动作主体，也未作为出场人物被介绍；仅以照片背面文字形式被间接提及。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"‘沈岚’明确写在照片背面，附带具体时间（三年前入职周）和上下文（旧工牌合影中多出的女人），构成可识别、有身份绑定的真实人物指称。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"沈岚未发言、未被舞台指示描述为在场动作主体，也未作为出场人物被介绍；仅以照片背面文字形式被间接提及。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "开放办公区 - 日\n\n陆远（三十岁，产品经理，永远端着保温杯）敲了敲白板。小蔡（二十二岁，实习生）抱着一摞打印稿站在旁边。\n\n陆远\n今天只盯三件事。别发散。\n\n小蔡把稿子往桌上一放，封面贴纸上用马克笔写着「周五前提交」。另一张便利贴斜贴在显示器边框，内容是「别再甩锅」。\n\n小蔡\n周报模板我改了两版。你看哪版能过。\n\n陆远\n先过业务，再过格式。格式这事——\n\n他顿住。抽屉最下层露出一张旧工牌照片：合影里多出一个没见过的女人。照片背面写着「沈岚」，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面的字。\n\n小蔡\n反正不是我。我入职才三个月。\n\n第二场 - 内景 - 茶水间 - 日\n\n饮水机咕嘟响。陆远把照片塞回抽屉前，又拿出来看了一眼背面。\n\n陆远\n（自语）\n沈岚……谁啊。\n\n小蔡从门外探头，手里晃着第三张贴纸，上面写着"
+    },
+    {
+      "case_id": "jiangcheng",
+      "mention": "江澄",
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt",
+      "expected": {
+        "refers_to_real_character": true,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3806.4,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "‘江澄’是具体人名，出现在电话对话中被主动询问，且在教练的旧号码本上手写留存，具有身份唯一性和叙事关联性。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "江澄未在任何场次中发声、行动或被介绍出场；仅通过电话语音片段和模糊字迹被提及，无直接在场证据。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "江澄未在任何场次中发声、行动或被介绍出场；仅通过电话语音片段和模糊字迹被提及，无直接在场证据。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"‘江澄’是具体人名，出现在电话对话中被主动询问，且在教练的旧号码本上手写留存，具有身份唯一性和叙事关联性。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"江澄未在任何场次中发声、行动或被介绍出场；仅通过电话语音片段和模糊字迹被提及，无直接在场证据。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "标题：雨天接力\n\n类型：校园体育短片\n\n第一场 - 外景 - 塑胶跑道 - 黄昏\n\n教练周磊把秒表按停。队员阿拓弯着腰喘气，鞋侧泥点像散弹。\n\n周磊\n最后一棒别想英雄。交接稳就行。\n\n阿拓\n我腿在抖。\n\n周磊朝看台扬了扬下巴。看台上没有人应答。他的手机在外套里震动，他接通后把听筒偏开一点——电话那头传来断续的呼吸声，随即一个很轻的问句，只听清两个字：「江澄」。\n\n周磊没有回答那个名字。他把电话挂断，对阿拓说：\n\n周磊\n把鞋带系紧。少抱怨多冲刺。\n\n阿拓低头系鞋带时，看见周磊掌心的旧号码本上有一行被雨水晕开的字，只能辨认出「江澄」两个字的轮廓，没有抬头念出来。\n\n第二场 - 内景 - 器材室 - 夜\n\n雨敲铁皮屋顶。阿拓找备用钉鞋，踢到一只纸箱。箱盖内侧用油漆笔写着「把节奏交给下一棒」，另一侧写着「少抱怨多冲刺」。\n\n阿拓\n教练，外面有人找你吗？刚才电话……\n\n周磊\n没有。训练的事，场上解"
+    },
+    {
+      "case_id": "guheng",
+      "mention": "顾衡",
+      "script": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt",
+      "expected": {
+        "refers_to_real_character": true,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3570.1,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 1.0,
+        "refers_to_real_character_reason": "明确指顾晚已故父亲，有全名‘顾衡’、亲属身份（‘我爸’）及背景信息（去世三年、曾值夜班邮局），符合真实可追踪人物定义。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "顾衡仅出现在汇款单复印件和顾晚的口头转述中，无对白、无舞台指示动作、未作为在场人物出现，全程未现身。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "顾衡仅出现在汇款单复印件和顾晚的口头转述中，无对白、无舞台指示动作、未作为在场人物出现，全程未现身。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 1.0,\n  \"refers_to_real_character_reason\": \"明确指顾晚已故父亲，有全名‘顾衡’、亲属身份（‘我爸’）及背景信息（去世三年、曾值夜班邮局），符合真实可追踪人物定义。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"顾衡仅出现在汇款单复印件和顾晚的口头转述中，无对白、无舞台指示动作、未作为在场人物出现，全程未现身。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "顾晚\n何婶，昨天有没有陌生人找我？\n\n何婶\n没有。就赵石那孩子进进出出。对了，他说给你留了东西在抽屉——我没动。\n\n顾晚打开抽屉：牛皮纸包还在。她没有当何婶的面拆开。\n\n第四场\n\n时间：当日午后\n地点：顾晚合租屋的客厅\n人物：顾晚、室友方糖（外号，真名方恬）\n\n方糖靠在沙发上吃冰糖葫芦，看顾晚把纸包放在茶几正中。\n\n方糖\n拆啊。搞得像拆炸弹。\n\n顾晚\n上面写亲启。\n\n方糖\n那我闭上眼。\n\n顾晚拆开：里面是一张旧式汇款单复印件，收款人是「顾衡」，金额空白，备注栏写着「夜班邮筒第七格」。没有信件正文。\n\n方糖\n顾衡是谁？你亲戚？\n\n顾晚\n我爸。他去世三年了。他从不让我碰邮局的夜班。\n\n第五场 - 内景 - 邮局大厅 - 当日黄昏\n\n顾晚提前到岗。赵石不在。她走到公共邮筒墙，数到第七格——格口被人用铁丝缠住，打着一个不专业的结。\n\n顾晚\n（自语）\n谁缠的。\n\n老顾客周伯路过，咳了一声。\n\n周伯\n姑娘，第七格坏很久了。你们站长不修。\n\n顾晚\n周伯，你见过有人往第七格塞东西吗？\n\n"
+    },
+    {
+      "case_id": "keheng",
+      "mention": "柯衡",
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "expected": {
+        "refers_to_real_character": true,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 4739.8,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "日记明确记载柯衡是‘上个季度被调走的校准员’，有职业身份和人事变动信息，阮青亦以人名直接回应，表明其为可识别的真实故事人物。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "全文无柯衡的对白行、舞台动作、在场描述或出场介绍；阮青仅复述其名，日记中为转述内容，结尾明确强调‘柯衡没有进门，没有对白行，没有生物特征录入’。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "全文无柯衡的对白行、舞台动作、在场描述或出场介绍；阮青仅复述其名，日记中为转述内容，结尾明确强调‘柯衡没有进门，没有对白行，没有生物特征录入’。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"日记明确记载柯衡是‘上个季度被调走的校准员’，有职业身份和人事变动信息，阮青亦以人名直接回应，表明其为可识别的真实故事人物。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"全文无柯衡的对白行、舞台动作、在场描述或出场介绍；阮青仅复述其名，日记中为转述内容，结尾明确强调‘柯衡没有进门，没有对白行，没有生物特征录入’。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条上写着「样本冷藏」，字迹很新。\n\n对讲机再次响起，电流声里夹着含混音节，不像清晰人名。阮青没有追问。\n\n阮青把日记合上。柯衡没有进门，没有对白行，没有生物特征录入；他只存在于日记那一行转述，以及阮青重复的那句自"
+    },
+    {
+      "case_id": "yuean",
+      "mention": "悦安",
+      "script": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "expected": {
+        "refers_to_real_character": true,
+        "is_present_in_scene": true
+      },
+      "status": "ok",
+      "latency_ms": 3870.4,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "录音中苏衡明确称呼‘悦安’，并附加条件‘如果她来了’，表明其为有性别、可被召唤的具体人物；林悦随后确认‘他叫我悦安。只有他那么叫’，证实该称呼绑定真实人物身份。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "‘悦安’仅出现在录音台词和角色对白转述中，无对白行、无舞台指示动作、未被介绍为在场人物，林悦虽在场但未被指认为悦安，且上下文明确区分林悦与悦安。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "‘悦安’仅出现在录音台词和角色对白转述中，无对白行、无舞台指示动作、未被介绍为在场人物，林悦虽在场但未被指认为悦安，且上下文明确区分林悦与悦安。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"录音中苏衡明确称呼‘悦安’，并附加条件‘如果她来了’，表明其为有性别、可被召唤的具体人物；林悦随后确认‘他叫我悦安。只有他那么叫’，证实该称呼绑定真实人物身份。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"‘悦安’仅出现在录音台词和角色对白转述中，无对白行、无舞台指示动作、未被介绍为在场人物，林悦虽在场但未被指认为悦安，且上下文明确区分林悦与悦安。\"\n}",
+      "match_refers": true,
+      "match_present": false,
+      "match_both": false,
+      "context_window": "\n\n她们没有靠近。面包车熄着灯，驾驶座空着。苏晴摸到口袋里的钥匙——老宅钥匙，也是父亲留下的。\n\n第八场 - 内景 - 苏衡老宅客厅 - 夜\n\n灰尘味道很重。苏晴打开客厅柜，果然有一台袖珍录音机。她塞进磁带，按下播放。\n\n磁带沙沙作响，然后是苏衡的声音，比记忆中更年轻：\n\n苏衡\n（录音）\n如果你听到这盘带，说明旅馆还在。别相信登记簿上的空白。空白是有人的名字。\n\n林悦倒吸一口气。录音继续：\n\n苏衡\n（录音）\n周会害怕。陈会装作不认识你。悦安——如果她来了——让她别进后院。\n\n苏晴怔住。录音里的「悦安」让林悦脸色发白。\n\n林悦\n他叫我悦安。只有他那么叫。\n\n苏晴\n所以你早就知道有这盘带？\n\n林悦\n我只知道他不让我靠近晾衣场。我不知道为什么。\n\n录音末尾多了一句几乎被噪声淹没的话：「钥匙在三零二的钟里。」\n\n第九场 - 内景 - 回声旅馆大堂 - 深夜\n\n大堂只剩安全出口的绿光。老周不在柜台。苏晴走上楼梯，林悦守在一楼盯着旋转门。\n\n三零二的墙上那口钟——客房里也有同样款式的"
+    },
+    {
+      "case_id": "noise_bieziji",
+      "mention": "别自己拆",
+      "script": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "expected": {
+        "refers_to_real_character": false,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 5936.1,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "‘别自己拆’是陈默对苏晴的直接告诫，主语隐含为苏晴，动词‘拆’指向具体动作，结合上下文（苏晴追问墙内空管、提及父亲苏衡、陈默异常反应），可判定该指令针对苏晴这一真实、有姓名、有动机、正在推进调查的故事人物。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "‘别自己拆’是陈默的台词，说话者是陈默，不是苏晴；苏晴虽在场并提问，但该短语本身不是她的对白、动作或被舞台指示描述的行为，而是陈默发出的指令，因此苏晴并未通过此短语‘出场’——该短语不构成她的直接出场证据。",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "‘别自己拆’是陈默的台词，说话者是陈默，不是苏晴；苏晴虽在场并提问，但该短语本身不是她的对白、动作或被舞台指示描述的行为，而是陈默发出的指令，因此苏晴并未通过此短语‘出场’——该短语不构成她的直接出场证据。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"‘别自己拆’是陈默对苏晴的直接告诫，主语隐含为苏晴，动词‘拆’指向具体动作，结合上下文（苏晴追问墙内空管、提及父亲苏衡、陈默异常反应），可判定该指令针对苏晴这一真实、有姓名、有动机、正在推进调查的故事人物。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"‘别自己拆’是陈默的台词，说话者是陈默，不是苏晴；苏晴虽在场并提问，但该短语本身不是她的对白、动作或被舞台指示描述的行为，而是陈默发出的指令，因此苏晴并未通过此短语‘出场’——该短语不构成她的直接出场证据。\"\n}",
+      "match_refers": false,
+      "match_present": true,
+      "match_both": false,
+      "context_window": "照片。\n\n苏晴没立刻回答。她看着厨房门帘晃动，总觉得有人在听。\n\n林悦\n（压低声音）\n老周刚才在走廊盯我们。你注意点。\n\n第四场 - 外景 - 旅馆后院晾衣场 - 上午\n\n风把床单吹成一面白墙。陈默（四十岁上下，沉默，自称修缮工人）蹲在排水沟边，手套上沾着铁锈。他听见有人走近，没有抬头。\n\n苏晴\n陈师傅，后院水管是你修的？\n\n陈默\n是。\n\n苏晴\n三零二的墙里有没有空管？我夜里听见流水声。\n\n陈默愣了一下，终于抬眼。\n\n陈默\n旧楼都这样。别自己拆。\n\n苏晴\n我爸以前也住过这栋楼。苏衡。\n\n陈默的手套停在半空，又重新握住扳手。\n\n陈默\n不认识。\n\n他站起来走开。林悦从回廊尽头探出头，冲苏晴使了个眼色。\n\n林悦\n（走近，低声）\n他肯定认识。你看他的手——刚才抖了。\n\n第五场 - 内景 - 老周值班室 - 午后\n\n值班室小得像储物间。老周把一串钥匙丢进抽屉，上锁。墙上贴着泛黄的排班表，最下方一行被墨水涂黑。\n\n苏晴敲了敲门框。\n\n苏晴\n周叔，我想看十年前的住客登记。\n\n老周\n（不看她"
+    },
+    {
+      "case_id": "noise_liuju",
+      "mention": "留局待领",
+      "script": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt",
+      "expected": {
+        "refers_to_real_character": false,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3495.5,
+      "judgment": {
+        "refers_to_real_character": false,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "‘留局待领’是邮政业务术语，指信件暂存邮局等待收件人领取，不指向任何具体人物，无姓名、身份或关系绑定。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "该短语出现在对白中作为描述性短语，非人物名，也未被赋予说话、动作或在场行为；无 speaker 标识，非舞台指示中的角色动作。",
+        "is_indirect_mention": false,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "该短语出现在对白中作为描述性短语，非人物名，也未被赋予说话、动作或在场行为；无 speaker 标识，非舞台指示中的角色动作。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": false,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"‘留局待领’是邮政业务术语，指信件暂存邮局等待收件人领取，不指向任何具体人物，无姓名、身份或关系绑定。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"该短语出现在对白中作为描述性短语，非人物名，也未被赋予说话、动作或在场行为；无 speaker 标识，非舞台指示中的角色动作。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "标题：夜班邮筒\n\n第一场\n\n时间：冬夜十一点\n地点：老城区二十四小时邮局大厅\n人物：顾晚（二十八岁，夜班柜员）、赵石（快递站临时工）\n\n顾晚把最后一摞信件盖上邮戳。大厅只剩暖气片的声响。暖气把窗玻璃呵出白雾，雾里隐约能看见对街停着的三轮车。她数了数柜台上的「留局待领」格，习惯性跳过第七格——那里早就用铁丝缠着，像一颗谁都不愿碰的牙。赵石把帆布袋往柜台上一搁，手套上结着霜。\n\n赵石\n还有出城的吗？末班车卡点了。\n\n顾晚\n三封。都写着「留局待领」。奇怪，留局的人通常白天来。\n\n赵石\n也许怕见人。\n\n第二场\n\n时间：冬夜十一点半\n地点：邮局后院卸货区\n人物：赵石、神秘寄件人（只在阴影里，未报姓名）\n\n赵石把帆布袋扛上三轮。阴影里有人递来一个牛皮纸包，上面只写：交顾晚亲启。没有寄件地址。\n\n赵石\n你自己进"
+    },
+    {
+      "case_id": "noise_friday",
+      "mention": "周五前提交",
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "expected": {
+        "refers_to_real_character": false,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3296.5,
+      "judgment": {
+        "refers_to_real_character": false,
+        "refers_to_real_character_confidence": 0.1,
+        "refers_to_real_character_reason": "‘周五前提交’是任务截止要求，属时间性业务指令，无任何人物指称痕迹",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "纯文本标签，未绑定speaker、动作或在场描述，非人物实体",
+        "is_indirect_mention": false,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "纯文本标签，未绑定speaker、动作或在场描述，非人物实体"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": false,\n  \"refers_to_real_character_confidence\": 0.1,\n  \"refers_to_real_character_reason\": \"‘周五前提交’是任务截止要求，属时间性业务指令，无任何人物指称痕迹\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"纯文本标签，未绑定speaker、动作或在场描述，非人物实体\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "标题：周五站会\n\n类型：职场轻喜剧（短片）\n\n第一场 - 内景 - 开放办公区 - 日\n\n陆远（三十岁，产品经理，永远端着保温杯）敲了敲白板。小蔡（二十二岁，实习生）抱着一摞打印稿站在旁边。\n\n陆远\n今天只盯三件事。别发散。\n\n小蔡把稿子往桌上一放，封面贴纸上用马克笔写着「周五前提交」。另一张便利贴斜贴在显示器边框，内容是「别再甩锅」。\n\n小蔡\n周报模板我改了两版。你看哪版能过。\n\n陆远\n先过业务，再过格式。格式这事——\n\n他顿住。抽屉最下层露出一张旧工牌照片：合影里多出一个没见过的女人。照片背面写着「沈岚」，日期是三年前的入职周。沈岚没有出现在本场任何对白或舞台指示里，也没有走进办公区。\n\n小蔡\n你发呆干嘛？又想起上个版本的锅？\n\n陆远\n没有。我在想这张照片为什么在我抽屉里。\n\n小蔡凑近看了看合影正面，没有念背面"
+    },
+    {
+      "case_id": "noise_sample",
+      "mention": "样本冷藏",
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "expected": {
+        "refers_to_real_character": false,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3277.7,
+      "judgment": {
+        "refers_to_real_character": true,
+        "refers_to_real_character_confidence": 0.95,
+        "refers_to_real_character_reason": "柯衡被明确称为‘上个季度被调走的校准员’，有职业身份和人事状态，且与密码习惯关联，指向具体、可追踪的离场人物",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "柯衡仅在日记转述中被提及，无对白、无舞台动作、未被介绍出场，阮青说‘我没见过这人’进一步确认其不在场",
+        "is_indirect_mention": true,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "柯衡仅在日记转述中被提及，无对白、无舞台动作、未被介绍出场，阮青说‘我没见过这人’进一步确认其不在场"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": true,\n  \"refers_to_real_character_confidence\": 0.95,\n  \"refers_to_real_character_reason\": \"柯衡被明确称为‘上个季度被调走的校准员’，有职业身份和人事状态，且与密码习惯关联，指向具体、可追踪的离场人物\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"柯衡仅在日记转述中被提及，无对白、无舞台动作、未被介绍出场，阮青说‘我没见过这人’进一步确认其不在场\"\n}",
+      "match_refers": false,
+      "match_present": true,
+      "match_both": false,
+      "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端"
+    },
+    {
+      "case_id": "noise_key_sentence",
+      "mention": "钥匙在三零二的钟里。",
+      "script": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "expected": {
+        "refers_to_real_character": false,
+        "is_present_in_scene": false
+      },
+      "status": "ok",
+      "latency_ms": 3476.9,
+      "judgment": {
+        "refers_to_real_character": false,
+        "refers_to_real_character_confidence": 0.2,
+        "refers_to_real_character_reason": "‘钥匙在三零二的钟里’是物品位置描述，未指代任何人物；‘三零二’是房间号，非人名或身份标识。",
+        "is_present_in_scene": false,
+        "is_present_in_scene_confidence": 1.0,
+        "is_present_in_scene_reason": "该字符串出现在录音末尾，属语音内容，无 speaker 标注为人物，也无舞台指示表明任何人正在说这句话；后续动作围绕取钥匙展开，无人物与此句直接关联。",
+        "is_indirect_mention": false,
+        "is_character": false,
+        "confidence": 1.0,
+        "reason": "该字符串出现在录音末尾，属语音内容，无 speaker 标注为人物，也无舞台指示表明任何人正在说这句话；后续动作围绕取钥匙展开，无人物与此句直接关联。"
+      },
+      "raw_judgment_text": "{\n  \"refers_to_real_character\": false,\n  \"refers_to_real_character_confidence\": 0.2,\n  \"refers_to_real_character_reason\": \"‘钥匙在三零二的钟里’是物品位置描述，未指代任何人物；‘三零二’是房间号，非人名或身份标识。\",\n  \"is_present_in_scene\": false,\n  \"is_present_in_scene_confidence\": 1.0,\n  \"is_present_in_scene_reason\": \"该字符串出现在录音末尾，属语音内容，无 speaker 标注为人物，也无舞台指示表明任何人正在说这句话；后续动作围绕取钥匙展开，无人物与此句直接关联。\"\n}",
+      "match_refers": true,
+      "match_present": true,
+      "match_both": true,
+      "context_window": "声音，比记忆中更年轻：\n\n苏衡\n（录音）\n如果你听到这盘带，说明旅馆还在。别相信登记簿上的空白。空白是有人的名字。\n\n林悦倒吸一口气。录音继续：\n\n苏衡\n（录音）\n周会害怕。陈会装作不认识你。悦安——如果她来了——让她别进后院。\n\n苏晴怔住。录音里的「悦安」让林悦脸色发白。\n\n林悦\n他叫我悦安。只有他那么叫。\n\n苏晴\n所以你早就知道有这盘带？\n\n林悦\n我只知道他不让我靠近晾衣场。我不知道为什么。\n\n录音末尾多了一句几乎被噪声淹没的话：「钥匙在三零二的钟里。」\n\n第九场 - 内景 - 回声旅馆大堂 - 深夜\n\n大堂只剩安全出口的绿光。老周不在柜台。苏晴走上楼梯，林悦守在一楼盯着旋转门。\n\n三零二的墙上那口钟——客房里也有同样款式的挂钟。苏晴把它取下，后盖松动，掉出一枚薄铜钥匙，齿形怪异。\n\n苏晴\n（对门外）\n林悦，钥匙在。\n\n没有回应。楼梯间有人呼吸。\n\n陈默\n把钥匙给我。\n\n苏晴转身。陈默站在阴影里，手里没有扳手，只有那张被擦过的登记卡片复印件——不知何时离了老周的杯子。\n\n苏晴\n你认识"
+    }
+  ],
+  "started_at_unix": 1785982858.0996594,
+  "wall_time_sec": 39.3,
+  "finished_at_unix": 1785982897.4041302,
+  "call_count": 10,
+  "ok_count": 10,
+  "match_both_count": 7
+}

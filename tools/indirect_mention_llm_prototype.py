@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import tempfile
 import time
@@ -28,21 +27,18 @@ from agentflow_studio.model_gateway.provider_adapter import (  # noqa: E402
     ProviderDispatchRequest,
     load_provider_registry,
 )
+from apps.api.runtime_script_indirect_mention_proposals import (  # noqa: E402
+    SYSTEM_RULES,
+    build_prompt,
+    parse_judgment,
+)
 
 DEFAULT_SERVICE_ID = "prompt_optimizer"
 DEFAULT_PROVIDER_CONFIG = "/etc/afs/providers.local.json"
 
-SYSTEM_RULES = """你是剧本理解助手。任务：判断给定「疑似人名」在这段剧本片段里，是否应被视为「角色候选」(character candidate)。
-
-硬规则：
-1. 仅在回忆、传闻、玩笑、信件/汇款单/背景叙述中被提到的名字，默认不算角色候选，应返回 is_character=false。
-2. 需要有动作、对白、舞台指示中的在场行为、或明确作为出场人物被介绍等证据，才能返回 is_character=true。
-3. 不确定时必须返回 is_character=false，并降低 confidence。
-4. 只根据给定片段判断，不要臆造片段外剧情。
-5. 只输出一个 JSON 对象，不要 Markdown，不要代码围栏。字段严格为：
-   {"is_character": boolean, "confidence": number, "reason": string}
-   confidence 范围 0 到 1；reason 用简短中文说明依据。
-"""
+# SYSTEM_RULES / parse_judgment / build_prompt are owned by the paid production
+# module (apps.api.runtime_script_indirect_mention_proposals). This tool remains
+# an exploratory runner; do not treat it as a free path.
 
 
 CASES: list[dict[str, Any]] = [
@@ -103,37 +99,6 @@ CASES: list[dict[str, Any]] = [
 ]
 
 
-def build_prompt(text: str, mention: str) -> str:
-    return (
-        f"{SYSTEM_RULES}\n\n"
-        f"疑似人名：{mention}\n\n"
-        f"剧本片段：\n---\n{text}\n---\n\n"
-        "请只返回 JSON。"
-    )
-
-
-def parse_judgment(raw_text: str) -> dict[str, Any]:
-    text = (raw_text or "").strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{[\s\S]*\}", text)
-        if not match:
-            raise
-        payload = json.loads(match.group(0))
-    if not isinstance(payload, dict):
-        raise ValueError("judgment is not an object")
-    return {
-        "is_character": bool(payload.get("is_character")),
-        "confidence": float(payload.get("confidence") if payload.get("confidence") is not None else 0.0),
-        "reason": str(payload.get("reason") or "").strip(),
-        "raw_text": raw_text,
-    }
-
-
 def judge_one(
     *,
     text: str,
@@ -158,6 +123,13 @@ def judge_one(
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
     raw_text = str(result.get("text") or "")
     judgment = parse_judgment(raw_text)
+    # Legacy aliases for older prototype report consumers.
+    judgment = {
+        **judgment,
+        "is_character": bool(judgment.get("is_present_in_scene")),
+        "confidence": float(judgment.get("is_present_in_scene_confidence") or 0.0),
+        "reason": str(judgment.get("is_present_in_scene_reason") or ""),
+    }
     return {
         "latency_ms": latency_ms,
         "provider_calls_started": bool(result.get("provider_calls_started")),

@@ -1,0 +1,28 @@
+[
+  {
+    "script": "01_office_standup.txt",
+    "mention": "沈岚",
+    "note": "照片背面写着「沈岚」 — discovery missed",
+    "status": "ok",
+    "latency_ms": 2433.6,
+    "judgment": {
+      "is_character": false,
+      "confidence": 0.95,
+      "reason": "沈岚仅出现在照片背面文字及陆远自语中，属回忆/背景提及；未在本场有任何动作、对白、舞台指示中的在场行为，也未被作为出场人物介绍。",
+      "raw_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"沈岚仅出现在照片背面文字及陆远自语中，属回忆/背景提及；未在本场有任何动作、对白、舞台指示中的在场行为，也未被作为出场人物介绍。\"}"
+    }
+  },
+  {
+    "script": "02_campus_relay.txt",
+    "mention": "江澄",
+    "note": "电话那头…「江澄」 — discovery missed",
+    "status": "ok",
+    "latency_ms": 2125.5,
+    "judgment": {
+      "is_character": false,
+      "confidence": 0.95,
+      "reason": "江澄仅在电话中被提及，且未回应；名字出现在被雨水晕开的旧号码本上，属背景物品信息；无动作、对白、在场行为或出场介绍，符合硬规则1（传闻/背景提及）",
+      "raw_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"江澄仅在电话中被提及，且未回应；名字出现在被雨水晕开的旧号码本上，属背景物品信息；无动作、对白、在场行为或出场介绍，符合硬规则1（传闻/背景提及）\"}"
+    }
+  }
+]

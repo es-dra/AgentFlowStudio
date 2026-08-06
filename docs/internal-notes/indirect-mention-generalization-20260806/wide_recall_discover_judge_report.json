@@ -1,0 +1,931 @@
+{
+  "schema_version": "afs.indirect_mention_discover_judge_prototype.v0.1",
+  "authority": "non_authoritative_prototype_only",
+  "writes_candidates": false,
+  "wired_into_analysis_candidates": false,
+  "confirm_or_merge": false,
+  "provider_config": "/etc/afs/providers.local.json",
+  "service_id": "prompt_optimizer",
+  "discover_only": false,
+  "started_at_unix": 1785982076.6296508,
+  "scripts": [
+    {
+      "script": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "script_chars": 3238,
+      "discovered_count": 6,
+      "judged_count": 6,
+      "discoveries": [
+        {
+          "mention": "苏衡",
+          "start": 497,
+          "end": 499,
+          "quote": "苏衡",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "source_span": {
+            "start": 497,
+            "end": 499,
+            "quote": "苏衡"
+          }
+        },
+        {
+          "mention": "别自己拆",
+          "start": 1275,
+          "end": 1279,
+          "quote": "别自己拆",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1275,
+            "end": 1279,
+            "quote": "别自己拆"
+          }
+        },
+        {
+          "mention": "回声-07",
+          "start": 1362,
+          "end": 1367,
+          "quote": "回声-07",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1362,
+            "end": 1367,
+            "quote": "回声-07"
+          }
+        },
+        {
+          "mention": "默记修缮",
+          "start": 1605,
+          "end": 1609,
+          "quote": "默记修缮",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1605,
+            "end": 1609,
+            "quote": "默记修缮"
+          }
+        },
+        {
+          "mention": "悦安",
+          "start": 1898,
+          "end": 1900,
+          "quote": "悦安",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1898,
+            "end": 1900,
+            "quote": "悦安"
+          }
+        },
+        {
+          "mention": "钥匙在三零二的钟里。",
+          "start": 1992,
+          "end": 2002,
+          "quote": "钥匙在三零二的钟里。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1992,
+            "end": 2002,
+            "quote": "钥匙在三零二的钟里。"
+          }
+        }
+      ],
+      "proposals": [],
+      "errors": [
+        {
+          "mention": "苏衡",
+          "source_span": {
+            "start": 497,
+            "end": 499,
+            "quote": "苏衡"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 2026080602075766787305rxxrUCFp)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "别自己拆",
+          "source_span": {
+            "start": 1275,
+            "end": 1279,
+            "quote": "别自己拆"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020757579119560afwUAfVZ)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "回声-07",
+          "source_span": {
+            "start": 1362,
+            "end": 1367,
+            "quote": "回声-07"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 2026080602075891679984pplXjwg2)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "默记修缮",
+          "source_span": {
+            "start": 1605,
+            "end": 1609,
+            "quote": "默记修缮"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020758591718958Gekcv4MY)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "悦安",
+          "source_span": {
+            "start": 1898,
+            "end": 1900,
+            "quote": "悦安"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 2026080602075994504692MPXGbkoL)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "钥匙在三零二的钟里。",
+          "source_span": {
+            "start": 1992,
+            "end": 2002,
+            "quote": "钥匙在三零二的钟里。"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020759610754397KjoTyuiZ)\",\"type\":\"new_api_error\"}}"
+        }
+      ],
+      "wall_time_sec": 3.08,
+      "llm_call_count": 6,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt",
+      "script_chars": 2898,
+      "discovered_count": 12,
+      "judged_count": 12,
+      "discoveries": [
+        {
+          "mention": "留局待领",
+          "start": 129,
+          "end": 133,
+          "quote": "留局待领",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 129,
+            "end": 133,
+            "quote": "留局待领"
+          }
+        },
+        {
+          "mention": "别让她当着人拆。",
+          "start": 381,
+          "end": 389,
+          "quote": "别让她当着人拆。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 381,
+            "end": 389,
+            "quote": "别让她当着人拆。"
+          }
+        },
+        {
+          "mention": "顾衡",
+          "start": 703,
+          "end": 705,
+          "quote": "顾衡",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "mention_cue",
+            "parent_name_cue",
+            "quoted_name"
+          ],
+          "occurrence_count": 4,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 703,
+            "end": 705,
+            "quote": "顾衡"
+          }
+        },
+        {
+          "mention": "夜班邮筒第七格",
+          "start": 718,
+          "end": 725,
+          "quote": "夜班邮筒第七格",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 718,
+            "end": 725,
+            "quote": "夜班邮筒第七格"
+          }
+        },
+        {
+          "mention": "默记",
+          "start": 1349,
+          "end": 1351,
+          "quote": "默记",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1349,
+            "end": 1351,
+            "quote": "默记"
+          }
+        },
+        {
+          "mention": "夜班邮筒",
+          "start": 1417,
+          "end": 1421,
+          "quote": "夜班邮筒",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1417,
+            "end": 1421,
+            "quote": "夜班邮筒"
+          }
+        },
+        {
+          "mention": "失踪汇款",
+          "start": 1423,
+          "end": 1427,
+          "quote": "失踪汇款",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1423,
+            "end": 1427,
+            "quote": "失踪汇款"
+          }
+        },
+        {
+          "mention": "第七格——顾衡案——不得夜班单独开启。",
+          "start": 1572,
+          "end": 1591,
+          "quote": "第七格——顾衡案——不得夜班单独开启。",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1572,
+            "end": 1591,
+            "quote": "第七格——顾衡案——不得夜班单独开启。"
+          }
+        },
+        {
+          "mention": "晚晚",
+          "start": 1967,
+          "end": 1969,
+          "quote": "晚晚",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 1967,
+            "end": 1969,
+            "quote": "晚晚"
+          }
+        },
+        {
+          "mention": "设备老化，待报修",
+          "start": 2233,
+          "end": 2241,
+          "quote": "设备老化，待报修",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 2233,
+            "end": 2241,
+            "quote": "设备老化，待报修"
+          }
+        },
+        {
+          "mention": "晚上见",
+          "start": 2582,
+          "end": 2585,
+          "quote": "晚上见",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 2582,
+            "end": 2585,
+            "quote": "晚上见"
+          }
+        },
+        {
+          "mention": "陈默",
+          "start": 2883,
+          "end": 2885,
+          "quote": "陈默",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": true,
+          "source_span": {
+            "start": 2883,
+            "end": 2885,
+            "quote": "陈默"
+          }
+        }
+      ],
+      "proposals": [],
+      "errors": [
+        {
+          "mention": "留局待领",
+          "source_span": {
+            "start": 129,
+            "end": 133,
+            "quote": "留局待领"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020800116026791TL0aIZUR)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "别让她当着人拆。",
+          "source_span": {
+            "start": 381,
+            "end": 389,
+            "quote": "别让她当着人拆。"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020800620836264xoLFktqK)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "顾衡",
+          "source_span": {
+            "start": 703,
+            "end": 705,
+            "quote": "顾衡"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020801137725966fwqBGmeL)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "夜班邮筒第七格",
+          "source_span": {
+            "start": 718,
+            "end": 725,
+            "quote": "夜班邮筒第七格"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020801643105358AuGq1Mjs)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "默记",
+          "source_span": {
+            "start": 1349,
+            "end": 1351,
+            "quote": "默记"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020802156972240I4MXJa5A)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "夜班邮筒",
+          "source_span": {
+            "start": 1417,
+            "end": 1421,
+            "quote": "夜班邮筒"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020802658566773uPpRMwzo)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "失踪汇款",
+          "source_span": {
+            "start": 1423,
+            "end": 1427,
+            "quote": "失踪汇款"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020803160699026mzl1LRH4)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "第七格——顾衡案——不得夜班单独开启。",
+          "source_span": {
+            "start": 1572,
+            "end": 1591,
+            "quote": "第七格——顾衡案——不得夜班单独开启。"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020803670134960zQgeHarS)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "晚晚",
+          "source_span": {
+            "start": 1967,
+            "end": 1969,
+            "quote": "晚晚"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020804196886476kEPQPNKO)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "设备老化，待报修",
+          "source_span": {
+            "start": 2233,
+            "end": 2241,
+            "quote": "设备老化，待报修"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020804706853808dzznvyjz)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "晚上见",
+          "source_span": {
+            "start": 2582,
+            "end": 2585,
+            "quote": "晚上见"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 202608060208052058651327ugCQ8WQ)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "陈默",
+          "source_span": {
+            "start": 2883,
+            "end": 2885,
+            "quote": "陈默"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 202608060208057139087834URWqjuO)\",\"type\":\"new_api_error\"}}"
+        }
+      ],
+      "wall_time_sec": 6.1,
+      "llm_call_count": 12,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "script_chars": 557,
+      "discovered_count": 4,
+      "judged_count": 4,
+      "discoveries": [
+        {
+          "mention": "周五前提交",
+          "start": 137,
+          "end": 142,
+          "quote": "周五前提交",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 137,
+            "end": 142,
+            "quote": "周五前提交"
+          }
+        },
+        {
+          "mention": "别再甩锅",
+          "start": 163,
+          "end": 167,
+          "quote": "别再甩锅",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 163,
+            "end": 167,
+            "quote": "别再甩锅"
+          }
+        },
+        {
+          "mention": "沈岚",
+          "start": 254,
+          "end": 256,
+          "quote": "沈岚",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 254,
+            "end": 256,
+            "quote": "沈岚"
+          }
+        },
+        {
+          "mention": "开会开到吐",
+          "start": 477,
+          "end": 482,
+          "quote": "开会开到吐",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 477,
+            "end": 482,
+            "quote": "开会开到吐"
+          }
+        }
+      ],
+      "proposals": [],
+      "errors": [
+        {
+          "mention": "周五前提交",
+          "source_span": {
+            "start": 137,
+            "end": 142,
+            "quote": "周五前提交"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020806214802651rYOKG081)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "别再甩锅",
+          "source_span": {
+            "start": 163,
+            "end": 167,
+            "quote": "别再甩锅"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020806714333626AgqwZz6M)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "沈岚",
+          "source_span": {
+            "start": 254,
+            "end": 256,
+            "quote": "沈岚"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020807228518601V11OU9Pz)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "开会开到吐",
+          "source_span": {
+            "start": 477,
+            "end": 482,
+            "quote": "开会开到吐"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020807760188756sxPzcNL6)\",\"type\":\"new_api_error\"}}"
+        }
+      ],
+      "wall_time_sec": 2.05,
+      "llm_call_count": 4,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt",
+      "script_chars": 457,
+      "discovered_count": 3,
+      "judged_count": 3,
+      "discoveries": [
+        {
+          "mention": "江澄",
+          "start": 177,
+          "end": 179,
+          "quote": "江澄",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 177,
+            "end": 179,
+            "quote": "江澄"
+          }
+        },
+        {
+          "mention": "把节奏交给下一棒",
+          "start": 337,
+          "end": 345,
+          "quote": "把节奏交给下一棒",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 337,
+            "end": 345,
+            "quote": "把节奏交给下一棒"
+          }
+        },
+        {
+          "mention": "少抱怨多冲刺",
+          "start": 353,
+          "end": 359,
+          "quote": "少抱怨多冲刺",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 353,
+            "end": 359,
+            "quote": "少抱怨多冲刺"
+          }
+        }
+      ],
+      "proposals": [],
+      "errors": [
+        {
+          "mention": "江澄",
+          "source_span": {
+            "start": 177,
+            "end": 179,
+            "quote": "江澄"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020808261542722qtWWANx3)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "把节奏交给下一棒",
+          "source_span": {
+            "start": 337,
+            "end": 345,
+            "quote": "把节奏交给下一棒"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020808761213498MEd3aueB)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "少抱怨多冲刺",
+          "source_span": {
+            "start": 353,
+            "end": 359,
+            "quote": "少抱怨多冲刺"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020809276630329X1ti2iZL)\",\"type\":\"new_api_error\"}}"
+        }
+      ],
+      "wall_time_sec": 1.52,
+      "llm_call_count": 3,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "script_chars": 400,
+      "discovered_count": 4,
+      "judged_count": 4,
+      "discoveries": [
+        {
+          "mention": "样本冷藏",
+          "start": 68,
+          "end": 72,
+          "quote": "样本冷藏",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 2,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 68,
+            "end": 72,
+            "quote": "样本冷藏"
+          }
+        },
+        {
+          "mention": "权限不足",
+          "start": 74,
+          "end": 78,
+          "quote": "权限不足",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 74,
+            "end": 78,
+            "quote": "权限不足"
+          }
+        },
+        {
+          "mention": "柯衡",
+          "start": 175,
+          "end": 177,
+          "quote": "柯衡",
+          "discovery_method": "mention_cue",
+          "discovery_methods": [
+            "mention_cue"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          }
+        },
+        {
+          "mention": "重启实验舱",
+          "start": 262,
+          "end": 267,
+          "quote": "重启实验舱",
+          "discovery_method": "quoted_name",
+          "discovery_methods": [
+            "quoted_name"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 262,
+            "end": 267,
+            "quote": "重启实验舱"
+          }
+        }
+      ],
+      "proposals": [],
+      "errors": [
+        {
+          "mention": "样本冷藏",
+          "source_span": {
+            "start": 68,
+            "end": 72,
+            "quote": "样本冷藏"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020809777785210cT7ZGWF3)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "权限不足",
+          "source_span": {
+            "start": 74,
+            "end": 78,
+            "quote": "权限不足"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020810279589956YjQY3nxj)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "柯衡",
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020810782839152l8Y7YMs8)\",\"type\":\"new_api_error\"}}"
+        },
+        {
+          "mention": "重启实验舱",
+          "source_span": {
+            "start": 262,
+            "end": 267,
+            "quote": "重启实验舱"
+          },
+          "status": "error",
+          "authority": "non_authoritative_proposal",
+          "error_type": "ModelProviderError",
+          "error": "OpenAI-compatible HTTP error 401: {\"error\":{\"code\":\"\",\"message\":\"无效的令牌 (request id: 20260806020811280428697ki3JghPG)\",\"type\":\"new_api_error\"}}"
+        }
+      ],
+      "wall_time_sec": 2.0,
+      "llm_call_count": 4,
+      "ok_llm_call_count": 0
+    }
+  ],
+  "finished_at_unix": 1785982091.3813741,
+  "wall_time_sec": 14.75,
+  "llm_call_count": 29,
+  "ok_llm_call_count": 0,
+  "discovered_total": 29
+}

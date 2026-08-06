@@ -1,0 +1,95 @@
+{
+  "schema_version": "afs.indirect_mention_discover_judge_prototype.v0.1",
+  "authority": "non_authoritative_prototype_only",
+  "writes_candidates": false,
+  "wired_into_analysis_candidates": false,
+  "confirm_or_merge": false,
+  "provider_config": "/etc/afs/providers.local.json",
+  "service_id": "prompt_optimizer",
+  "discover_only": false,
+  "started_at_unix": 1785981469.296848,
+  "scripts": [
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "script_chars": 557,
+      "discovered_count": 0,
+      "judged_count": 0,
+      "discoveries": [],
+      "proposals": [],
+      "errors": [],
+      "wall_time_sec": 0.0,
+      "llm_call_count": 0,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt",
+      "script_chars": 457,
+      "discovered_count": 0,
+      "judged_count": 0,
+      "discoveries": [],
+      "proposals": [],
+      "errors": [],
+      "wall_time_sec": 0.0,
+      "llm_call_count": 0,
+      "ok_llm_call_count": 0
+    },
+    {
+      "script": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "script_chars": 400,
+      "discovered_count": 1,
+      "judged_count": 1,
+      "discoveries": [
+        {
+          "mention": "柯衡",
+          "start": 175,
+          "end": 177,
+          "quote": "柯衡",
+          "discovery_method": "mention_cue",
+          "discovery_methods": [
+            "mention_cue"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          }
+        }
+      ],
+      "proposals": [
+        {
+          "mention": "柯衡",
+          "source_span": {
+            "start": 175,
+            "end": 177,
+            "quote": "柯衡"
+          },
+          "is_character": false,
+          "confidence": 0.95,
+          "reason": "柯衡仅在日记转述（‘上个季度被调走的校准员’）和阮青的自语中被提及，无动作、对白、在场行为或出场介绍；符合硬规则1：回忆/背景叙述中提到的名字不算角色候选。",
+          "status": "candidate",
+          "authority": "non_authoritative_proposal",
+          "discovery_method": "mention_cue",
+          "discovery_methods": [
+            "mention_cue"
+          ],
+          "occurrence_count": 1,
+          "already_extracted_as_character": false,
+          "latency_ms": 3054.3,
+          "raw_judgment_text": "{\"is_character\": false, \"confidence\": 0.95, \"reason\": \"柯衡仅在日记转述（‘上个季度被调走的校准员’）和阮青的自语中被提及，无动作、对白、在场行为或出场介绍；符合硬规则1：回忆/背景叙述中提到的名字不算角色候选。\"}",
+          "context_window": "标题：夜班样本\n\n类型：近未来实验室小品\n\n第一场 - 内景 - 样本冷藏走廊 - 夜\n\n值班员阮青刷卡进门。墙上的电子告示滚动两行：「样本冷藏」「权限不足」。她对讲机里有人喊交接，她回了一句就挂了。\n\n阮青\n（对记录屏）\n开始夜班巡检。\n\n她拉开抽屉，取出一本纸质交接日记。扉页有人用圆珠笔写：夜班不要独自开柜。后页中间一行被框起来——日记里提到了柯衡，说他是上个季度被调走的校准员，柜门密码仍可能是他的习惯数。\n\n阮青\n柯衡……我没见过这人。\n\n第二场 - 内景 - 校准间 - 夜\n\n警报灯闪了一下又灭。终端弹窗刷出「重启实验舱」，阮青点掉。工作台玻璃罩里压着一张临时贴条，贴条上写着「样本冷藏」，字迹很新。\n\n对讲机再次响起，电流声里夹着含混音节，不像清晰人名。阮青没有追问。\n\n阮青把日记合上。柯衡没有进门，没有对白行，没有生物特征录入；他只存在于日记那一行转述，以及阮青重复的那句自"
+        }
+      ],
+      "errors": [],
+      "wall_time_sec": 3.06,
+      "llm_call_count": 1,
+      "ok_llm_call_count": 1
+    }
+  ],
+  "finished_at_unix": 1785981472.3566995,
+  "wall_time_sec": 3.06,
+  "llm_call_count": 1,
+  "ok_llm_call_count": 1,
+  "discovered_total": 1
+}
