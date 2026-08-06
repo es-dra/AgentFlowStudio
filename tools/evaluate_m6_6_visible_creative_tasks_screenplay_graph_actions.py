@@ -20,6 +20,17 @@ SOURCE_CONTRACTS = (
         "must_include": (
             "afs.runtime.embedded_creative_action.v0.2",
             "_screenplay_candidate_schema",
+            "_validate_preview_payload",
+        ),
+        "must_exclude": ("fallback template", 'provider_raw_response_stored": True'),
+    },
+    {
+        "severity": "P0",
+        "scope": "runtime_screenplay_safety_module",
+        "issue": "screenplay/shot safety validators must remain an explicit gate",
+        "path": "apps/api/runtime_embedded_screenplay_safety.py",
+        "must_include": (
+            "_screenplay_candidate_schema",
             "_safe_screenplay_candidate",
             "screenplay candidate lacks professional scene/action structure",
             "long prose story must fail",
