@@ -25,6 +25,7 @@ from apps.api.runtime_script_candidate_extraction import (
     DETERMINISTIC_EXTRACTION_SCHEMA_VERSION,
     alias_link_proposals_enabled,
     build_deterministic_analysis_candidate,
+    scene_name_normalization_proposals_enabled,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -98,6 +99,26 @@ class AliasLinkProposal(BaseModel):
     remote_dispatch_count: int = Field(default=0, ge=0, le=0)
 
 
+class SceneNameNormalizationProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(min_length=1, max_length=160)
+    schema_version: str = Field(min_length=1, max_length=80)
+    relation_type: Literal["scene_name_normalization"] = "scene_name_normalization"
+    status: Literal["candidate"] = "candidate"
+    authority: Literal["non_authoritative_proposal"] = "non_authoritative_proposal"
+    canonical_scene_name: str = Field(min_length=1, max_length=120)
+    variant_scene_name: str = Field(min_length=1, max_length=120)
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence_spans: list[EvidenceSpan] = Field(min_length=1, max_length=12)
+    extraction_method: str = Field(min_length=1, max_length=120)
+    review_action: Literal["use_core_asset_command_merge_scene_name"] = (
+        "use_core_asset_command_merge_scene_name"
+    )
+    provider_dispatch_count: int = Field(default=0, ge=0, le=0)
+    remote_dispatch_count: int = Field(default=0, ge=0, le=0)
+
+
 class ScriptRevisionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -124,6 +145,9 @@ class StructuredAnalysisCandidateRequest(BaseModel):
     events: list[str] = Field(default_factory=list, max_length=120)
     beats: list[dict[str, Any]] = Field(default_factory=list, max_length=120)
     alias_link_proposals: list[AliasLinkProposal] = Field(default_factory=list, max_length=120)
+    scene_name_normalization_proposals: list[SceneNameNormalizationProposal] = Field(
+        default_factory=list, max_length=120
+    )
     missing_slots: list[Literal["named_characters", "main_scenes"]] = Field(default_factory=list, max_length=2)
     extraction_notes: list[str] = Field(default_factory=list, max_length=20)
     generated_at: str | None = Field(default=None, max_length=80)
@@ -143,6 +167,7 @@ class CoreAssetCommandRequest(BaseModel):
         "retire_asset",
         "restore_asset",
         "merge_alias",
+        "merge_scene_name",
         "create_manual_prop",
         "retire_manual_prop",
     ]
@@ -857,7 +882,7 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 idempotency_key=f"scene-ownership-asset-change:{preview['command_id']}",
                 stage="core_asset_command_confirm",
             )
-            graph = _project_confirmed_alias_command_to_graph(
+            graph = _project_confirmed_name_command_to_graph(
                 graph_store,
                 project_id=project_id,
                 preview=preview,
@@ -931,7 +956,7 @@ def register_runtime_script_core_truth_routes(app: FastAPI, store: RuntimeStore,
                 stage="core_asset_command_undo",
             )
             undo_receipt = _apply_undo(state, receipt)
-            graph = _project_undone_alias_command_to_graph(
+            graph = _project_undone_name_command_to_graph(
                 graph_store,
                 project_id=project_id,
                 original_receipt=receipt,
@@ -1095,6 +1120,14 @@ def public_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
             public_alias_link_proposal(item)
             for item in (candidate.get("alias_link_proposals") or [])[:120]
         ]
+    if "scene_name_normalization_proposals" in candidate:
+        payload["scene_name_normalization_proposal_count"] = len(
+            candidate.get("scene_name_normalization_proposals") or []
+        )
+        payload["scene_name_normalization_proposals"] = [
+            public_scene_name_normalization_proposal(item)
+            for item in (candidate.get("scene_name_normalization_proposals") or [])[:120]
+        ]
     return payload
 
 
@@ -1111,6 +1144,24 @@ def public_alias_link_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
         "evidence_spans": list(proposal.get("evidence_spans") or []),
         "extraction_method": str(proposal.get("extraction_method") or ""),
         "review_action": str(proposal.get("review_action") or "use_core_asset_command_merge_alias"),
+        "provider_dispatch_count": 0,
+        "remote_dispatch_count": 0,
+    }
+
+
+def public_scene_name_normalization_proposal(proposal: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "proposal_id": str(proposal.get("proposal_id") or ""),
+        "schema_version": str(proposal.get("schema_version") or ""),
+        "relation_type": str(proposal.get("relation_type") or "scene_name_normalization"),
+        "status": str(proposal.get("status") or "candidate"),
+        "authority": str(proposal.get("authority") or "non_authoritative_proposal"),
+        "canonical_scene_name": str(proposal.get("canonical_scene_name") or ""),
+        "variant_scene_name": str(proposal.get("variant_scene_name") or ""),
+        "confidence": float(proposal.get("confidence") or 0.0),
+        "evidence_spans": list(proposal.get("evidence_spans") or []),
+        "extraction_method": str(proposal.get("extraction_method") or ""),
+        "review_action": str(proposal.get("review_action") or "use_core_asset_command_merge_scene_name"),
         "provider_dispatch_count": 0,
         "remote_dispatch_count": 0,
     }
@@ -1172,6 +1223,9 @@ def public_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     authorized_alias = _clean_label(receipt.get("authorized_alias"))
     if authorized_alias:
         payload["authorized_alias"] = authorized_alias
+    authorized_scene_name = _clean_label(receipt.get("authorized_scene_name"))
+    if authorized_scene_name:
+        payload["authorized_scene_name"] = authorized_scene_name
     return payload
 
 
@@ -1775,6 +1829,8 @@ def _analysis_candidate_record(
         character["aliases"] = []
     if not payload.get("alias_link_proposals"):
         payload.pop("alias_link_proposals", None)
+    if not payload.get("scene_name_normalization_proposals"):
+        payload.pop("scene_name_normalization_proposals", None)
     payload["artifact_type"] = "afs_structured_analysis_candidate"
     payload["candidate_id"] = f"candidate_{_sha256_json(payload)[:16]}"
     payload["created_at"] = _safe_time(body.generated_at)
@@ -1803,7 +1859,7 @@ def _apply_structured_analysis_candidate(
         stage="analysis_candidate_submit",
         expected_schema=ANALYSIS_CANDIDATE_SCHEMA_VERSION,
     )
-    _validate_candidate_alias_authority(body, project_id=project_id)
+    _validate_candidate_proposal_authority(body, project_id=project_id)
     _validate_evidence_spans(body, revision)
     candidate = _analysis_candidate_record(project_id, revision, body)
     existing_candidate = dict(
@@ -2345,7 +2401,15 @@ def _preview_core_asset_command(state: dict[str, Any], project_id: str, body: Co
                 status_code=409,
                 details={"expected_asset_version": body.expected_asset_version},
             )
-        after = _mutated_asset_snapshot(before, body, now)
+        mutation_body = body
+        if body.command_type == "merge_scene_name":
+            variant_asset = _scene_name_variant_asset(assets, project_id, body, before)
+            if variant_asset:
+                mutation_body = body.model_copy(
+                    deep=True,
+                    update={"patch": {**body.patch, "variant_asset": variant_asset}},
+                )
+        after = _mutated_asset_snapshot(before, mutation_body, now)
     affected = [str(after["asset_id"])]
     return {
         "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
@@ -2409,6 +2473,15 @@ def _apply_core_asset_command(
     }
     if body.command_type == "merge_alias":
         receipt["authorized_alias"] = _clean_label(body.patch.get("alias") or body.patch.get("display_name"))
+    elif body.command_type == "merge_scene_name":
+        before_aliases = set(_clean_text_list([str(item) for item in ((preview.get("before") or {}).get("aliases") or [])]))
+        added_aliases = [
+            item
+            for item in _clean_text_list([str(item) for item in (after.get("aliases") or [])])
+            if item not in before_aliases
+        ]
+        if added_aliases:
+            receipt["authorized_scene_name"] = added_aliases[-1]
     state.setdefault("receipts", {})[receipt["receipt_id"]] = receipt
     return receipt
 
@@ -2519,6 +2592,33 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
                 stage="core_asset_command_preview",
             )
         after["aliases"] = aliases
+    elif body.command_type == "merge_scene_name":
+        if after.get("asset_type") != "main_scene":
+            raise _contract_error(
+                "merge_scene_name_requires_main_scene",
+                "Scene name merge is only available for main_scene assets.",
+                project_id=str(body.project_id),
+                stage="core_asset_command_preview",
+                status_code=409,
+            )
+        alias = _scene_name_alias_from_patch(body.patch)
+        aliases = _clean_text_list([*(after.get("aliases") or []), alias])
+        if not alias or alias not in aliases:
+            raise _contract_error(
+                "scene_name_alias_required",
+                "Scene name merge command requires an alias or variant scene asset patch.",
+                project_id=str(body.project_id),
+                stage="core_asset_command_preview",
+            )
+        if _normal_key(alias) == _normal_key(str(after.get("name") or after.get("display_name") or "")):
+            raise _contract_error(
+                "scene_name_alias_matches_canonical",
+                "Scene name merge alias must differ from the canonical scene name.",
+                project_id=str(body.project_id),
+                stage="core_asset_command_preview",
+                status_code=409,
+            )
+        after["aliases"] = aliases
     else:
         raise ValueError("unsupported command type")
     if body.command_type == "edit_asset" and before.get("source_mode") == "analysis_candidate":
@@ -2531,6 +2631,52 @@ def _mutated_asset_snapshot(before: dict[str, Any], body: CoreAssetCommandReques
     after = _new_asset_version(after, parent=before)
     reject_unsafe_payload(after)
     return after
+
+
+def _scene_name_alias_from_patch(patch: dict[str, Any]) -> str:
+    variant_asset = patch.get("variant_asset")
+    if isinstance(variant_asset, dict):
+        return _clean_label(
+            variant_asset.get("name")
+            or variant_asset.get("display_name")
+            or variant_asset.get("alias")
+        )
+    return _clean_label(patch.get("alias") or patch.get("variant_scene_name") or patch.get("display_name"))
+
+
+def _scene_name_variant_asset(
+    assets: dict[str, Any],
+    project_id: str,
+    body: CoreAssetCommandRequest,
+    canonical_asset: dict[str, Any],
+) -> dict[str, Any]:
+    variant_id = _clean_token(body.patch.get("variant_asset_id") or body.patch.get("source_asset_id") or "")
+    if not variant_id:
+        return {}
+    if variant_id == canonical_asset.get("asset_id"):
+        raise _contract_error(
+            "scene_name_variant_matches_canonical",
+            "Variant scene asset must differ from the canonical scene asset.",
+            project_id=project_id,
+            stage="core_asset_command_preview",
+            status_code=409,
+        )
+    variant = _require_asset_for_command(
+        assets,
+        project_id,
+        body.revision_id,
+        variant_id,
+        body.command_type,
+    )
+    if variant.get("asset_type") != "main_scene":
+        raise _contract_error(
+            "scene_name_variant_requires_main_scene",
+            "Variant scene asset must be a main_scene asset.",
+            project_id=project_id,
+            stage="core_asset_command_preview",
+            status_code=409,
+        )
+    return public_asset(variant)
 
 
 def _require_asset_for_command(
@@ -2640,7 +2786,12 @@ def _require_revision_contract(
 
 def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision: dict[str, Any]) -> None:
     source_text = str(revision.get("source_text") or "")
-    for item in [*body.named_characters, *body.main_scenes, *body.alias_link_proposals]:
+    for item in [
+        *body.named_characters,
+        *body.main_scenes,
+        *body.alias_link_proposals,
+        *body.scene_name_normalization_proposals,
+    ]:
         for span in item.evidence_spans:
             expected = source_text[span.start : span.end]
             if expected != span.quote:
@@ -2654,7 +2805,7 @@ def _validate_evidence_spans(body: StructuredAnalysisCandidateRequest, revision:
                 )
 
 
-def _validate_candidate_alias_authority(
+def _validate_candidate_proposal_authority(
     body: StructuredAnalysisCandidateRequest,
     *,
     project_id: str,
@@ -2683,6 +2834,34 @@ def _validate_candidate_alias_authority(
             raise _contract_error(
                 "alias_link_proposal_self_reference",
                 "Alias link proposal cannot link a character name to itself.",
+                project_id=project_id,
+                stage="analysis_candidate_submit",
+                status_code=409,
+            )
+    if body.scene_name_normalization_proposals and not scene_name_normalization_proposals_enabled():
+        raise _contract_error(
+            "scene_name_normalization_proposals_disabled",
+            "Scene name normalization proposals are disabled for this runtime.",
+            project_id=project_id,
+            stage="analysis_candidate_submit",
+            status_code=409,
+        )
+    scene_names = {_clean_label(item.name) for item in body.main_scenes}
+    for proposal in body.scene_name_normalization_proposals:
+        canonical = _clean_label(proposal.canonical_scene_name)
+        variant = _clean_label(proposal.variant_scene_name)
+        if canonical not in scene_names or variant not in scene_names:
+            raise _contract_error(
+                "scene_name_normalization_target_not_found",
+                "Scene name normalization endpoints must name scenes in the same candidate.",
+                project_id=project_id,
+                stage="analysis_candidate_submit",
+                status_code=409,
+            )
+        if _normal_key(canonical) == _normal_key(variant):
+            raise _contract_error(
+                "scene_name_normalization_self_reference",
+                "Scene name normalization cannot link a scene name to itself.",
                 project_id=project_id,
                 stage="analysis_candidate_submit",
                 status_code=409,
@@ -2935,7 +3114,7 @@ def _active_relationships(
     ]
 
 
-def _project_confirmed_alias_command_to_graph(
+def _project_confirmed_name_command_to_graph(
     graph_store: ProductionGraphStore,
     *,
     project_id: str,
@@ -2943,20 +3122,26 @@ def _project_confirmed_alias_command_to_graph(
 ) -> dict[str, Any]:
     before = dict(preview.get("before") or {})
     after = dict(preview.get("after") or {})
-    if preview.get("command_type") != "merge_alias" or before.get("status") != "confirmed":
+    command_type = str(preview.get("command_type") or "")
+    if command_type not in {"merge_alias", "merge_scene_name"} or before.get("status") != "confirmed":
         return {}
-    return _upsert_alias_asset_graph_node(
+    idempotency_key = (
+        f"core-asset-alias:{preview['command_id']}"
+        if command_type == "merge_alias"
+        else f"core-asset-scene-name:{preview['command_id']}"
+    )
+    return _upsert_name_asset_graph_node(
         graph_store,
         project_id=project_id,
         before=before,
         after=after,
-        idempotency_key=f"core-asset-alias:{preview['command_id']}",
-        operation="merge_alias",
+        idempotency_key=idempotency_key,
+        operation=command_type,
         stage="core_asset_command_confirm",
     )
 
 
-def _project_undone_alias_command_to_graph(
+def _project_undone_name_command_to_graph(
     graph_store: ProductionGraphStore,
     *,
     project_id: str,
@@ -2965,20 +3150,26 @@ def _project_undone_alias_command_to_graph(
 ) -> dict[str, Any]:
     before = dict(original_receipt.get("after") or {})
     after = dict(undo_receipt.get("after") or {})
-    if original_receipt.get("command_type") != "merge_alias" or before.get("status") != "confirmed":
+    command_type = str(original_receipt.get("command_type") or "")
+    if command_type not in {"merge_alias", "merge_scene_name"} or before.get("status") != "confirmed":
         return {}
-    return _upsert_alias_asset_graph_node(
+    idempotency_key = (
+        f"core-asset-alias-undo:{original_receipt['receipt_id']}"
+        if command_type == "merge_alias"
+        else f"core-asset-scene-name-undo:{original_receipt['receipt_id']}"
+    )
+    return _upsert_name_asset_graph_node(
         graph_store,
         project_id=project_id,
         before=before,
         after=after,
-        idempotency_key=f"core-asset-alias-undo:{original_receipt['receipt_id']}",
-        operation="merge_alias_undo",
+        idempotency_key=idempotency_key,
+        operation=f"{command_type}_undo",
         stage="core_asset_command_undo",
     )
 
 
-def _upsert_alias_asset_graph_node(
+def _upsert_name_asset_graph_node(
     graph_store: ProductionGraphStore,
     *,
     project_id: str,
@@ -3004,7 +3195,7 @@ def _upsert_alias_asset_graph_node(
     ):
         raise _contract_error(
             "core_asset_graph_projection_stale",
-            "Canonical Production Graph does not match the alias command asset version.",
+            "Canonical Production Graph does not match the name command asset version.",
             project_id=project_id,
             stage=stage,
             status_code=409,
@@ -3039,7 +3230,7 @@ def _upsert_alias_asset_graph_node(
     except GraphIdempotencyConflict as exc:
         raise _contract_error(
             "core_asset_graph_idempotency_conflict",
-            "Alias command replay does not match its existing Production Graph mutation.",
+            "Name command replay does not match its existing Production Graph mutation.",
             project_id=project_id,
             stage=stage,
             status_code=409,
@@ -3047,7 +3238,7 @@ def _upsert_alias_asset_graph_node(
     except GraphVersionConflict as exc:
         raise _contract_error(
             "production_graph_version_conflict",
-            "Production Graph changed before the alias command was committed.",
+            "Production Graph changed before the name command was committed.",
             project_id=project_id,
             stage=stage,
             status_code=409,
@@ -3055,7 +3246,7 @@ def _upsert_alias_asset_graph_node(
     except ProductionGraphError as exc:
         raise _contract_error(
             "production_graph_write_rejected",
-            "Confirmed alias command could not be written to Production Graph.",
+            "Confirmed name command could not be written to Production Graph.",
             project_id=project_id,
             stage=stage,
             status_code=409,
@@ -3384,6 +3575,7 @@ def _command_title(command_type: str) -> str:
         "retire_asset": "Retire core asset",
         "restore_asset": "Restore core asset",
         "merge_alias": "Merge character alias",
+        "merge_scene_name": "Merge scene name",
         "create_manual_prop": "Create manual prop",
         "retire_manual_prop": "Retire manual prop",
     }.get(command_type, "Core asset command")

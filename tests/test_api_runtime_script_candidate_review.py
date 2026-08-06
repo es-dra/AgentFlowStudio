@@ -364,3 +364,131 @@ def test_merge_alias_graph_write_recovers_truth_state_failure_without_duplicate_
     graph_after_recovery = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
     assert graph_after_recovery["version"] == 2
     assert graph_after_recovery["nodes"][character["asset_id"]]["metadata"]["asset_version_id"] == recovered_character["version_id"]
+
+
+def test_name_command_graph_projection_preserves_existing_alias_idempotency_keys() -> None:
+    class CapturingGraphStore:
+        def __init__(self) -> None:
+            self.keys: list[str] = []
+
+        def ensure(self, _project_id: str) -> dict:
+            return {
+                "version": len(self.keys),
+                "nodes": {
+                    "asset_1": {
+                        "node_id": "asset_1",
+                        "category": "character",
+                        "state": "active",
+                        "metadata": {
+                            "kind": "script_core_asset",
+                            "asset_version_id": "assetver_1",
+                            "aliases": [],
+                        },
+                    }
+                },
+            }
+
+        def append(self, _project_id: str, **kwargs) -> dict:
+            self.keys.append(kwargs["idempotency_key"])
+            return {"version": len(self.keys)}
+
+    graph_store = CapturingGraphStore()
+    before = {
+        "asset_id": "asset_1",
+        "asset_type": "character",
+        "status": "confirmed",
+        "version_id": "assetver_1",
+        "aliases": [],
+    }
+    after = {**before, "version_id": "assetver_2", "aliases": ["Alias"]}
+    script_truth._project_confirmed_name_command_to_graph(
+        graph_store,
+        project_id="p1",
+        preview={
+            "command_id": "command_alias",
+            "command_type": "merge_alias",
+            "before": before,
+            "after": after,
+        },
+    )
+    script_truth._project_confirmed_name_command_to_graph(
+        graph_store,
+        project_id="p1",
+        preview={
+            "command_id": "command_scene",
+            "command_type": "merge_scene_name",
+            "before": {**before, "asset_type": "main_scene"},
+            "after": {**after, "asset_type": "main_scene"},
+        },
+    )
+
+    assert graph_store.keys == [
+        "core-asset-alias:command_alias",
+        "core-asset-scene-name:command_scene",
+    ]
+
+
+def test_merge_scene_name_graph_write_recovers_truth_state_failure_without_duplicate_fact(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    project_id = "script-scene-name-graph-recovery"
+    client = _client(tmp_path)
+    revision, candidate, assets = _seed_candidate(client, project_id)
+    scene = next(item for item in assets if item["asset_type"] == "main_scene")
+    confirmed = client.post(
+        f"/projects/{project_id}/script-revisions/{revision['revision_id']}/analysis-assets/{scene['asset_id']}/review",
+        json=_review_body(
+            project_id,
+            revision,
+            candidate,
+            scene,
+            decision="confirm",
+            key="confirm-before-scene-name",
+            graph_version=0,
+        ),
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    command = {
+        "project_id": project_id,
+        "revision_id": revision["revision_id"],
+        "source_digest": revision["source_digest"],
+        "schema_version": CORE_ASSET_COMMAND_SCHEMA_VERSION,
+        "command_type": "merge_scene_name",
+        "target_asset_id": scene["asset_id"],
+        "patch": {"alias": "The Archive Hall"},
+        "expected_asset_version": confirmed.json()["asset"]["version"],
+        "idempotency_key": "merge-archive-scene-name-recovery",
+    }
+    original_write = script_truth._write_state
+    failed = False
+
+    def fail_once(store, scoped_project_id, state):
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise RuntimeError("injected scene-name truth-state write failure")
+        return original_write(store, scoped_project_id, state)
+
+    monkeypatch.setattr(script_truth, "_write_state", fail_once)
+    with pytest.raises(RuntimeError, match="injected scene-name truth-state write failure"):
+        client.post(f"/projects/{project_id}/core-assets/commands/confirm", json=command)
+    monkeypatch.setattr(script_truth, "_write_state", original_write)
+
+    graph_after_failure = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_failure["version"] == 2
+    assert graph_after_failure["nodes"][scene["asset_id"]]["metadata"]["aliases"] == ["The Archive Hall"]
+    truth_after_failure = client.get(f"/projects/{project_id}/script-truth").json()["projection"]
+    stale_scene = next(item for item in truth_after_failure["assets"] if item["asset_id"] == scene["asset_id"])
+    assert stale_scene["aliases"] == []
+
+    recovered = client.post(f"/projects/{project_id}/core-assets/commands/confirm", json=command)
+    assert recovered.status_code == 200, recovered.text
+    recovered_scene = next(
+        item for item in recovered.json()["projection"]["assets"] if item["asset_id"] == scene["asset_id"]
+    )
+    assert recovered_scene["aliases"] == ["The Archive Hall"]
+    assert recovered.json()["receipt"]["production_graph_version"] == 2
+    graph_after_recovery = client.get(f"/projects/{project_id}/m4/production-graph").json()["graph"]
+    assert graph_after_recovery["version"] == 2
+    assert graph_after_recovery["nodes"][scene["asset_id"]]["metadata"]["asset_version_id"] == recovered_scene["version_id"]
