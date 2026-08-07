@@ -1,0 +1,340 @@
+{
+  "schema_version": "long_script_stability_score_v0.1",
+  "summary": {
+    "script_count": 5,
+    "probe_count": 25,
+    "probes_passed": 25,
+    "probes_failed": 0,
+    "checklist_pass_rate": 1.0,
+    "all_scripts_passed": true,
+    "crash_free_rate": 1.0,
+    "free_path_deterministic_rate": 1.0,
+    "budget_enforced_rate": 1.0,
+    "soft_ceiling_pass_rate": 1.0,
+    "hard_ceiling_pass_rate": 1.0,
+    "failed_probe_names": [],
+    "remote_llm_calls_in_observations": 0
+  },
+  "scripts": [
+    {
+      "id": "L1",
+      "label": "echo_inn_long",
+      "kind": "long",
+      "char_count": 3238,
+      "discovery_count": 6,
+      "discovery_per_1k_chars": 1.852996,
+      "probes": [
+        {
+          "name": "crash_free",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "free_path_deterministic",
+          "passed": true,
+          "detail": {
+            "digests": [
+              "b7f16956a518e4756421e20ed66511980bdb6f42f0bfb47f68c41f9e77c04799",
+              "b7f16956a518e4756421e20ed66511980bdb6f42f0bfb47f68c41f9e77c04799"
+            ],
+            "discovery_counts_across_runs": [
+              6,
+              6
+            ]
+          }
+        },
+        {
+          "name": "discovery_soft_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 6,
+            "soft_ceiling": 40
+          }
+        },
+        {
+          "name": "discovery_hard_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 6,
+            "hard_ceiling": 80
+          }
+        },
+        {
+          "name": "budget_enforced",
+          "passed": true,
+          "detail": {
+            "max_calls": 3,
+            "discovered_count": 6,
+            "suppressed_known_identity_count": 1,
+            "eligible_count": 5,
+            "judged_count": 3,
+            "budget_skipped_count": 2,
+            "proposal_count": 2,
+            "expected_judged": 3,
+            "expected_skipped": 2,
+            "budget_enforced": true,
+            "cost_class": "paid_remote_llm",
+            "used_mock_judge": true
+          }
+        }
+      ],
+      "all_passed": true
+    },
+    {
+      "id": "L2",
+      "label": "night_post_long",
+      "kind": "long",
+      "char_count": 2898,
+      "discovery_count": 12,
+      "discovery_per_1k_chars": 4.140787,
+      "probes": [
+        {
+          "name": "crash_free",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "free_path_deterministic",
+          "passed": true,
+          "detail": {
+            "digests": [
+              "d47906926a66f5eb47c191c29a25bf173149db145aa6a3591345bde0de94fa4d",
+              "d47906926a66f5eb47c191c29a25bf173149db145aa6a3591345bde0de94fa4d"
+            ],
+            "discovery_counts_across_runs": [
+              12,
+              12
+            ]
+          }
+        },
+        {
+          "name": "discovery_soft_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 12,
+            "soft_ceiling": 40
+          }
+        },
+        {
+          "name": "discovery_hard_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 12,
+            "hard_ceiling": 80
+          }
+        },
+        {
+          "name": "budget_enforced",
+          "passed": true,
+          "detail": {
+            "max_calls": 3,
+            "discovered_count": 12,
+            "suppressed_known_identity_count": 1,
+            "eligible_count": 11,
+            "judged_count": 3,
+            "budget_skipped_count": 8,
+            "proposal_count": 2,
+            "expected_judged": 3,
+            "expected_skipped": 8,
+            "budget_enforced": true,
+            "cost_class": "paid_remote_llm",
+            "used_mock_judge": true
+          }
+        }
+      ],
+      "all_passed": true
+    },
+    {
+      "id": "G1",
+      "label": "office_standup",
+      "kind": "generalization_short",
+      "char_count": 557,
+      "discovery_count": 4,
+      "discovery_per_1k_chars": 7.181329,
+      "probes": [
+        {
+          "name": "crash_free",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "free_path_deterministic",
+          "passed": true,
+          "detail": {
+            "digests": [
+              "18edcb87152c272afe9dbce58f8abfef08b043372b11f932a5103989f6c3acf3",
+              "18edcb87152c272afe9dbce58f8abfef08b043372b11f932a5103989f6c3acf3"
+            ],
+            "discovery_counts_across_runs": [
+              4,
+              4
+            ]
+          }
+        },
+        {
+          "name": "discovery_soft_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 4,
+            "soft_ceiling": 40
+          }
+        },
+        {
+          "name": "discovery_hard_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 4,
+            "hard_ceiling": 80
+          }
+        },
+        {
+          "name": "budget_enforced",
+          "passed": true,
+          "detail": {
+            "max_calls": 3,
+            "discovered_count": 4,
+            "suppressed_known_identity_count": 0,
+            "eligible_count": 4,
+            "judged_count": 3,
+            "budget_skipped_count": 1,
+            "proposal_count": 2,
+            "expected_judged": 3,
+            "expected_skipped": 1,
+            "budget_enforced": true,
+            "cost_class": "paid_remote_llm",
+            "used_mock_judge": true
+          }
+        }
+      ],
+      "all_passed": true
+    },
+    {
+      "id": "G2",
+      "label": "campus_relay",
+      "kind": "generalization_short",
+      "char_count": 457,
+      "discovery_count": 3,
+      "discovery_per_1k_chars": 6.564551,
+      "probes": [
+        {
+          "name": "crash_free",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "free_path_deterministic",
+          "passed": true,
+          "detail": {
+            "digests": [
+              "8f35f25793a8abca767cc1e25f0dd450817f095d2fdf466b59a2fb90ebc7c5ef",
+              "8f35f25793a8abca767cc1e25f0dd450817f095d2fdf466b59a2fb90ebc7c5ef"
+            ],
+            "discovery_counts_across_runs": [
+              3,
+              3
+            ]
+          }
+        },
+        {
+          "name": "discovery_soft_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 3,
+            "soft_ceiling": 40
+          }
+        },
+        {
+          "name": "discovery_hard_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 3,
+            "hard_ceiling": 80
+          }
+        },
+        {
+          "name": "budget_enforced",
+          "passed": true,
+          "detail": {
+            "max_calls": 3,
+            "discovered_count": 3,
+            "suppressed_known_identity_count": 0,
+            "eligible_count": 3,
+            "judged_count": 3,
+            "budget_skipped_count": 0,
+            "proposal_count": 1,
+            "expected_judged": 3,
+            "expected_skipped": 0,
+            "budget_enforced": true,
+            "cost_class": "paid_remote_llm",
+            "used_mock_judge": true
+          }
+        }
+      ],
+      "all_passed": true
+    },
+    {
+      "id": "G3",
+      "label": "lab_night_shift",
+      "kind": "generalization_short",
+      "char_count": 400,
+      "discovery_count": 4,
+      "discovery_per_1k_chars": 10.0,
+      "probes": [
+        {
+          "name": "crash_free",
+          "passed": true,
+          "detail": []
+        },
+        {
+          "name": "free_path_deterministic",
+          "passed": true,
+          "detail": {
+            "digests": [
+              "4397df0aafcf2ee5533a2015f61eabe82cd4aa6f3ab150ef9085a1f9a9345886",
+              "4397df0aafcf2ee5533a2015f61eabe82cd4aa6f3ab150ef9085a1f9a9345886"
+            ],
+            "discovery_counts_across_runs": [
+              4,
+              4
+            ]
+          }
+        },
+        {
+          "name": "discovery_soft_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 4,
+            "soft_ceiling": 40
+          }
+        },
+        {
+          "name": "discovery_hard_ceiling",
+          "passed": true,
+          "detail": {
+            "discovery_count": 4,
+            "hard_ceiling": 80
+          }
+        },
+        {
+          "name": "budget_enforced",
+          "passed": true,
+          "detail": {
+            "max_calls": 3,
+            "discovered_count": 4,
+            "suppressed_known_identity_count": 0,
+            "eligible_count": 4,
+            "judged_count": 3,
+            "budget_skipped_count": 1,
+            "proposal_count": 3,
+            "expected_judged": 3,
+            "expected_skipped": 1,
+            "budget_enforced": true,
+            "cost_class": "paid_remote_llm",
+            "used_mock_judge": true
+          }
+        }
+      ],
+      "all_passed": true
+    }
+  ]
+}

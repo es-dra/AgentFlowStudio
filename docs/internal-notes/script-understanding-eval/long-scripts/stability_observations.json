@@ -1,0 +1,242 @@
+{
+  "schema_version": "long_script_stability_observations_v0.1",
+  "thresholds": {
+    "discovery_soft_ceiling": 40,
+    "discovery_hard_ceiling": 80,
+    "budget_max_calls_probe": 3,
+    "determinism_runs": 2
+  },
+  "remote_llm_calls": 0,
+  "wall_time_sec": 0.05,
+  "scripts": [
+    {
+      "id": "L1",
+      "label": "echo_inn_long",
+      "kind": "long",
+      "path": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt",
+      "errors": [],
+      "crashed": false,
+      "char_count": 3238,
+      "free_path_digests": [
+        "b7f16956a518e4756421e20ed66511980bdb6f42f0bfb47f68c41f9e77c04799",
+        "b7f16956a518e4756421e20ed66511980bdb6f42f0bfb47f68c41f9e77c04799"
+      ],
+      "free_path_deterministic": true,
+      "discovery_count": 6,
+      "discovery_counts_across_runs": [
+        6,
+        6
+      ],
+      "discovery_per_1k_chars": 1.852996,
+      "character_count": 5,
+      "scene_count": 10,
+      "alias_proposal_count": 1,
+      "scene_normalization_proposal_count": 0,
+      "discovery_mentions": [
+        "苏衡",
+        "别自己拆",
+        "回声-07",
+        "默记修缮",
+        "悦安",
+        "钥匙在三零二的钟里。"
+      ],
+      "budget_probe": {
+        "max_calls": 3,
+        "discovered_count": 6,
+        "suppressed_known_identity_count": 1,
+        "eligible_count": 5,
+        "judged_count": 3,
+        "budget_skipped_count": 2,
+        "proposal_count": 2,
+        "expected_judged": 3,
+        "expected_skipped": 2,
+        "budget_enforced": true,
+        "cost_class": "paid_remote_llm",
+        "used_mock_judge": true
+      }
+    },
+    {
+      "id": "L2",
+      "label": "night_post_long",
+      "kind": "long",
+      "path": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt",
+      "errors": [],
+      "crashed": false,
+      "char_count": 2898,
+      "free_path_digests": [
+        "d47906926a66f5eb47c191c29a25bf173149db145aa6a3591345bde0de94fa4d",
+        "d47906926a66f5eb47c191c29a25bf173149db145aa6a3591345bde0de94fa4d"
+      ],
+      "free_path_deterministic": true,
+      "discovery_count": 12,
+      "discovery_counts_across_runs": [
+        12,
+        12
+      ],
+      "discovery_per_1k_chars": 4.140787,
+      "character_count": 8,
+      "scene_count": 10,
+      "alias_proposal_count": 0,
+      "scene_normalization_proposal_count": 1,
+      "discovery_mentions": [
+        "留局待领",
+        "别让她当着人拆。",
+        "顾衡",
+        "夜班邮筒第七格",
+        "默记",
+        "夜班邮筒",
+        "失踪汇款",
+        "第七格——顾衡案——不得夜班单独开启。",
+        "晚晚",
+        "设备老化，待报修",
+        "晚上见",
+        "陈默"
+      ],
+      "budget_probe": {
+        "max_calls": 3,
+        "discovered_count": 12,
+        "suppressed_known_identity_count": 1,
+        "eligible_count": 11,
+        "judged_count": 3,
+        "budget_skipped_count": 8,
+        "proposal_count": 2,
+        "expected_judged": 3,
+        "expected_skipped": 8,
+        "budget_enforced": true,
+        "cost_class": "paid_remote_llm",
+        "used_mock_judge": true
+      }
+    },
+    {
+      "id": "G1",
+      "label": "office_standup",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt",
+      "errors": [],
+      "crashed": false,
+      "char_count": 557,
+      "free_path_digests": [
+        "18edcb87152c272afe9dbce58f8abfef08b043372b11f932a5103989f6c3acf3",
+        "18edcb87152c272afe9dbce58f8abfef08b043372b11f932a5103989f6c3acf3"
+      ],
+      "free_path_deterministic": true,
+      "discovery_count": 4,
+      "discovery_counts_across_runs": [
+        4,
+        4
+      ],
+      "discovery_per_1k_chars": 7.181329,
+      "character_count": 2,
+      "scene_count": 2,
+      "alias_proposal_count": 0,
+      "scene_normalization_proposal_count": 0,
+      "discovery_mentions": [
+        "周五前提交",
+        "别再甩锅",
+        "沈岚",
+        "开会开到吐"
+      ],
+      "budget_probe": {
+        "max_calls": 3,
+        "discovered_count": 4,
+        "suppressed_known_identity_count": 0,
+        "eligible_count": 4,
+        "judged_count": 3,
+        "budget_skipped_count": 1,
+        "proposal_count": 2,
+        "expected_judged": 3,
+        "expected_skipped": 1,
+        "budget_enforced": true,
+        "cost_class": "paid_remote_llm",
+        "used_mock_judge": true
+      }
+    },
+    {
+      "id": "G2",
+      "label": "campus_relay",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt",
+      "errors": [],
+      "crashed": false,
+      "char_count": 457,
+      "free_path_digests": [
+        "8f35f25793a8abca767cc1e25f0dd450817f095d2fdf466b59a2fb90ebc7c5ef",
+        "8f35f25793a8abca767cc1e25f0dd450817f095d2fdf466b59a2fb90ebc7c5ef"
+      ],
+      "free_path_deterministic": true,
+      "discovery_count": 3,
+      "discovery_counts_across_runs": [
+        3,
+        3
+      ],
+      "discovery_per_1k_chars": 6.564551,
+      "character_count": 2,
+      "scene_count": 2,
+      "alias_proposal_count": 0,
+      "scene_normalization_proposal_count": 0,
+      "discovery_mentions": [
+        "江澄",
+        "把节奏交给下一棒",
+        "少抱怨多冲刺"
+      ],
+      "budget_probe": {
+        "max_calls": 3,
+        "discovered_count": 3,
+        "suppressed_known_identity_count": 0,
+        "eligible_count": 3,
+        "judged_count": 3,
+        "budget_skipped_count": 0,
+        "proposal_count": 1,
+        "expected_judged": 3,
+        "expected_skipped": 0,
+        "budget_enforced": true,
+        "cost_class": "paid_remote_llm",
+        "used_mock_judge": true
+      }
+    },
+    {
+      "id": "G3",
+      "label": "lab_night_shift",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt",
+      "errors": [],
+      "crashed": false,
+      "char_count": 400,
+      "free_path_digests": [
+        "4397df0aafcf2ee5533a2015f61eabe82cd4aa6f3ab150ef9085a1f9a9345886",
+        "4397df0aafcf2ee5533a2015f61eabe82cd4aa6f3ab150ef9085a1f9a9345886"
+      ],
+      "free_path_deterministic": true,
+      "discovery_count": 4,
+      "discovery_counts_across_runs": [
+        4,
+        4
+      ],
+      "discovery_per_1k_chars": 10.0,
+      "character_count": 1,
+      "scene_count": 2,
+      "alias_proposal_count": 0,
+      "scene_normalization_proposal_count": 0,
+      "discovery_mentions": [
+        "样本冷藏",
+        "权限不足",
+        "柯衡",
+        "重启实验舱"
+      ],
+      "budget_probe": {
+        "max_calls": 3,
+        "discovered_count": 4,
+        "suppressed_known_identity_count": 0,
+        "eligible_count": 4,
+        "judged_count": 3,
+        "budget_skipped_count": 1,
+        "proposal_count": 3,
+        "expected_judged": 3,
+        "expected_skipped": 1,
+        "budget_enforced": true,
+        "cost_class": "paid_remote_llm",
+        "used_mock_judge": true
+      }
+    }
+  ]
+}

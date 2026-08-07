@@ -1,0 +1,52 @@
+{
+  "schema_version": "long_script_stability_corpus_v0.1",
+  "metric_contract": {
+    "category": "runtime_stability_operability",
+    "not_accuracy": true,
+    "notes": [
+      "This dimension does NOT score understanding correctness (alias F1, missing-evidence accuracy, or indirect-mention refers/present rates).",
+      "Those concerns are covered by aliases / missing-evidence / indirect-mentions.",
+      "Long scripts amplify those failures; this dimension checks whether free deterministic paths stay bit-stable, discovery volume stays bounded, paid LLM budgets truncate as configured, and the pipeline does not crash.",
+      "LLM judgment bit-repeatability is explicitly out of scope (remote models are not deterministic). Budget + crash checks use a mock judge so the framework run stays free.",
+      "Protocol is a checklist of pass/fail probes, not precision/recall."
+    ]
+  },
+  "thresholds": {
+    "discovery_soft_ceiling": 40,
+    "discovery_hard_ceiling": 80,
+    "budget_max_calls_probe": 3,
+    "determinism_runs": 2
+  },
+  "scripts": [
+    {
+      "id": "L1",
+      "label": "echo_inn_long",
+      "kind": "long",
+      "path": "docs/internal-notes/long-script-observation-20260805/01_echo_inn_long.txt"
+    },
+    {
+      "id": "L2",
+      "label": "night_post_long",
+      "kind": "long",
+      "path": "docs/internal-notes/long-script-observation-20260805/02_night_post_long.txt"
+    },
+    {
+      "id": "G1",
+      "label": "office_standup",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/01_office_standup.txt"
+    },
+    {
+      "id": "G2",
+      "label": "campus_relay",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/02_campus_relay.txt"
+    },
+    {
+      "id": "G3",
+      "label": "lab_night_shift",
+      "kind": "generalization_short",
+      "path": "docs/internal-notes/indirect-mention-generalization-20260806/03_lab_night_shift.txt"
+    }
+  ]
+}

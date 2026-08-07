@@ -1,0 +1,156 @@
+{
+  "schema_version": "missing_evidence_candidates_v0.1",
+  "mode": "runtime_extract",
+  "cases": [
+    {
+      "id": "M1",
+      "missing_slots": [],
+      "characters": [
+        "陈默",
+        "李薇"
+      ],
+      "scenes": [
+        "会议室",
+        "地下车库"
+      ],
+      "relations": [
+        {
+          "relation_type": "scene_cast",
+          "scene": "会议室",
+          "member": "陈默",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        },
+        {
+          "relation_type": "scene_cast",
+          "scene": "会议室",
+          "member": "李薇",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        },
+        {
+          "relation_type": "scene_cast",
+          "scene": "地下车库",
+          "member": "陈默",
+          "status": "missing",
+          "evidence_status": "missing",
+          "evidence_span_count": 0
+        },
+        {
+          "relation_type": "scene_cast",
+          "scene": "地下车库",
+          "member": "李薇",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 1
+        }
+      ],
+      "runtime": {
+        "project_id": "missing-eval-m1",
+        "revision_id": "scrrev_a3df0cd952214d00",
+        "candidate_id": "candidate_97e9ed1ff7a6cdc3"
+      }
+    },
+    {
+      "id": "M2",
+      "missing_slots": [
+        "named_characters",
+        "main_scenes"
+      ],
+      "characters": [],
+      "scenes": [],
+      "relations": [],
+      "runtime": {
+        "project_id": "missing-eval-m2",
+        "revision_id": "scrrev_b98ca82f323240ce",
+        "candidate_id": "candidate_f015ea5ee74eaabf"
+      }
+    },
+    {
+      "id": "M3",
+      "missing_slots": [],
+      "characters": [
+        "陈默",
+        "李薇"
+      ],
+      "scenes": [
+        "咖啡馆"
+      ],
+      "relations": [
+        {
+          "relation_type": "scene_cast",
+          "scene": "咖啡馆",
+          "member": "陈默",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        },
+        {
+          "relation_type": "scene_cast",
+          "scene": "咖啡馆",
+          "member": "李薇",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        }
+      ],
+      "runtime": {
+        "project_id": "missing-eval-m3",
+        "revision_id": "scrrev_7cdb7fbce8ff42ef",
+        "candidate_id": "candidate_7ae718cfa8c91df2"
+      }
+    },
+    {
+      "id": "M4",
+      "missing_slots": [],
+      "characters": [
+        "陈默",
+        "李薇"
+      ],
+      "scenes": [
+        "书房"
+      ],
+      "relations": [
+        {
+          "relation_type": "scene_cast",
+          "scene": "书房",
+          "member": "陈默",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        },
+        {
+          "relation_type": "scene_cast",
+          "scene": "书房",
+          "member": "李薇",
+          "status": "candidate",
+          "evidence_status": "extracted_from_text",
+          "evidence_span_count": 2
+        }
+      ],
+      "runtime": {
+        "project_id": "missing-eval-m4",
+        "revision_id": "scrrev_c518dbf01b28408d",
+        "candidate_id": "candidate_87b2169f786b3603"
+      }
+    },
+    {
+      "id": "M5",
+      "missing_slots": [
+        "main_scenes"
+      ],
+      "characters": [
+        "陈默"
+      ],
+      "scenes": [],
+      "relations": [],
+      "runtime": {
+        "project_id": "missing-eval-m5",
+        "revision_id": "scrrev_a5b60e7ce02c46e8",
+        "candidate_id": "candidate_62e17231520e2705"
+      }
+    }
+  ]
+}

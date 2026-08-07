@@ -1,0 +1,300 @@
+{
+  "schema_version": "alias_identity_linking_candidates_v0.1",
+  "mode": "deterministic_alias_proposer",
+  "proposer_version": "deterministic_alias_proposer_v0.1",
+  "cases": [
+    {
+      "id": "A1",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "李薇"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "陈师傅",
+            "陈默"
+          ]
+        }
+      ],
+      "link_proposals": [
+        {
+          "left": "陈默",
+          "right": "陈师傅",
+          "method": "surname_title_same_scene",
+          "confidence": 0.9,
+          "scene": 1
+        }
+      ],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "李薇",
+          "陈师傅",
+          "陈默"
+        ],
+        "anchors": [
+          "李薇",
+          "陈默"
+        ]
+      }
+    },
+    {
+      "id": "A2",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "周可",
+            "阿可"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "林夏"
+          ]
+        }
+      ],
+      "link_proposals": [
+        {
+          "left": "周可",
+          "right": "阿可",
+          "method": "explicit_aka_label",
+          "confidence": 0.95
+        }
+      ],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "周可",
+          "林夏",
+          "阿可"
+        ],
+        "anchors": [
+          "周可",
+          "林夏",
+          "阿可"
+        ]
+      }
+    },
+    {
+      "id": "A3",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "老陈",
+            "陈默"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "苏晴"
+          ]
+        }
+      ],
+      "link_proposals": [
+        {
+          "left": "陈默",
+          "right": "老陈",
+          "method": "lao_x_unique_anchor",
+          "confidence": 0.8
+        }
+      ],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "老陈",
+          "苏晴",
+          "陈默"
+        ],
+        "anchors": [
+          "苏晴",
+          "陈默"
+        ]
+      }
+    },
+    {
+      "id": "A4",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "导演"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "悦安",
+            "林悦安"
+          ]
+        }
+      ],
+      "link_proposals": [
+        {
+          "left": "林悦安",
+          "right": "悦安",
+          "method": "given_name_suffix_same_scene_unique_anchor",
+          "confidence": 0.72,
+          "scene": 1
+        }
+      ],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "导演",
+          "悦安",
+          "林悦安"
+        ],
+        "anchors": [
+          "导演",
+          "林悦安"
+        ]
+      }
+    },
+    {
+      "id": "A5",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "民警"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "陈先生"
+          ]
+        },
+        {
+          "id": "P3",
+          "mentions": [
+            "陈明"
+          ]
+        },
+        {
+          "id": "P4",
+          "mentions": [
+            "陈默"
+          ]
+        }
+      ],
+      "link_proposals": [],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "民警",
+          "陈先生",
+          "陈明",
+          "陈默"
+        ],
+        "anchors": [
+          "民警",
+          "陈明",
+          "陈默"
+        ]
+      }
+    },
+    {
+      "id": "A6",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "王师傅"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "陈师傅"
+          ]
+        },
+        {
+          "id": "P3",
+          "mentions": [
+            "陈默"
+          ]
+        }
+      ],
+      "link_proposals": [],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "王师傅",
+          "陈师傅",
+          "陈默"
+        ],
+        "anchors": [
+          "王师傅",
+          "陈默"
+        ]
+      }
+    },
+    {
+      "id": "A7",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "老王"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "苏晴"
+          ]
+        }
+      ],
+      "link_proposals": [],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "老王",
+          "苏晴"
+        ],
+        "anchors": [
+          "老王",
+          "苏晴"
+        ]
+      }
+    },
+    {
+      "id": "A8",
+      "predicted_clusters": [
+        {
+          "id": "P1",
+          "mentions": [
+            "林秀"
+          ]
+        },
+        {
+          "id": "P2",
+          "mentions": [
+            "陈浩"
+          ]
+        }
+      ],
+      "link_proposals": [],
+      "proposer_version": "deterministic_alias_proposer_v0.1",
+      "extraction": {
+        "surfaces": [
+          "林秀",
+          "陈浩"
+        ],
+        "anchors": [
+          "林秀",
+          "陈浩"
+        ]
+      }
+    }
+  ]
+}
