@@ -847,7 +847,12 @@ def test_scene_plate_prompt_is_production_environment_reference_with_shot_contin
     assert item["prompt_contract"]["provider_prompt_digest"] == canonical_digest(prompt)
 
 
-def test_current_project_mchar01_prompt_regression_changes_manifest_hash_deterministically() -> None:
+def test_current_project_mchar01_prompt_regression_changes_manifest_hash_deterministically(
+    monkeypatch,
+) -> None:
+    # Manifest hash includes live provider capability + image gate; isolate from developer shell.
+    monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     source = current_project_locked_source_contract()
     first = compile_image_admission_manifest(CURRENT_PROJECT_ID, source, created_at=REQUESTED_AT)
     second = compile_image_admission_manifest(CURRENT_PROJECT_ID, source, created_at=REQUESTED_AT)

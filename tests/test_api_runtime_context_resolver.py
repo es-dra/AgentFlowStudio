@@ -356,6 +356,8 @@ def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path,
 
 def test_generate_budget_enforces_floor_and_never_truncates_locks(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    # Provider descriptor can raise prompt_char_limit (e.g. 6000) and skip truncation this test asserts.
+    monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_budget_enforce"
     image_id = _upload(client, project_id, "char-node")

@@ -20,6 +20,7 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_multi_character_keyframe_bridge"
     client.post("/projects", json={"project_id": project_id, "goal": "Multi-character bridge baseline"}).raise_for_status()

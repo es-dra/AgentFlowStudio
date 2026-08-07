@@ -49,6 +49,13 @@ EXPLICIT_NAME_BRIEF = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _clear_ambient_remote_llm_gate(monkeypatch) -> None:
+    # Ambient AFS_ALLOW_REMOTE_LLM routes preview onto server_codex; local confirm/graph
+    # tests expect deterministic planning and will fail or hang without a mocked dispatch.
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [

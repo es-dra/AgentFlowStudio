@@ -27,6 +27,13 @@ from tests.test_runtime_m6_script_plan_asset_bible import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _clear_ambient_remote_llm_gate(monkeypatch) -> None:
+    # AFS_ALLOW_REMOTE_LLM in the developer shell flips local preview onto server_codex
+    # and can leave durable waits stuck in phase=running without a mocked dispatch.
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+
+
 @pytest.mark.parametrize("source_text", ["灯亮", "第一行。\n第二行？", "🌧️ 雨夜，纸船逆流。"])
 def test_short_unicode_ideas_enter_durable_planning_without_schema_rejection_or_graph_mutation(
     tmp_path,
