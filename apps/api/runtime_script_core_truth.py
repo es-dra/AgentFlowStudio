@@ -27,6 +27,11 @@ from apps.api.runtime_script_candidate_extraction import (
     build_deterministic_analysis_candidate,
     scene_name_normalization_proposals_enabled,
 )
+from apps.api.runtime_script_scene_block_match import (
+    member_spans_in_scene_block as _member_spans_in_scene_block,
+    scene_content_start as _scene_content_start,
+    scene_evidence_start as _scene_start,
+)
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -2233,60 +2238,6 @@ def _extract_scene_ownership(
     return relationships, _unique(affected), _unique(preserved)
 
 
-def _scene_start(scene: dict[str, Any]) -> int:
-    starts = [
-        int(span.get("start"))
-        for span in (scene.get("evidence_spans") or [])
-        if isinstance(span, dict) and isinstance(span.get("start"), int)
-    ]
-    return min(starts) if starts else -1
-
-
-def _scene_content_start(source_text: str, scene: dict[str, Any], scene_end: int) -> int:
-    evidence_ends = [
-        int(span.get("end"))
-        for span in (scene.get("evidence_spans") or [])
-        if isinstance(span, dict) and isinstance(span.get("end"), int)
-    ]
-    if not evidence_ends:
-        return scene_end
-    heading_evidence_end = max(evidence_ends)
-    line_end = source_text.find("\n", heading_evidence_end, scene_end)
-    return scene_end if line_end < 0 else line_end + 1
-
-
-def _member_spans_in_scene_block(
-    source_text: str,
-    start: int,
-    end: int,
-    member: dict[str, Any],
-) -> list[dict[str, Any]]:
-    labels = _clean_text_list(
-        [
-            str(member.get("display_name") or member.get("name") or ""),
-            *[str(item) for item in (member.get("aliases") or [])],
-        ]
-    )
-    spans: list[dict[str, Any]] = []
-    block = source_text[start:end]
-    seen: set[tuple[int, int]] = set()
-    for label in labels:
-        pattern = re.compile(rf"(?<!\w){re.escape(label)}(?!\w)", re.IGNORECASE)
-        for match in pattern.finditer(block):
-            absolute_start = start + match.start()
-            absolute_end = start + match.end()
-            identity = (absolute_start, absolute_end)
-            if identity in seen:
-                continue
-            seen.add(identity)
-            spans.append(
-                {
-                    "start": absolute_start,
-                    "end": absolute_end,
-                    "quote": source_text[absolute_start:absolute_end],
-                }
-            )
-    return sorted(spans, key=lambda item: (item["start"], item["end"]))[:12]
 
 
 def _relationship_extraction_content(relationship: dict[str, Any]) -> dict[str, Any]:
