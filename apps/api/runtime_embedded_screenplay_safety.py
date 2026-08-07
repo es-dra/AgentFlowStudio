@@ -569,4 +569,3 @@ def _contains_unsafe_fragment(value: str) -> bool:
 def _contains_prompt_leak_fragment(value: str) -> bool:
     lowered = str(value or "").lower()
     return any(fragment in lowered for fragment in PROMPT_LEAK_FRAGMENTS)
-
