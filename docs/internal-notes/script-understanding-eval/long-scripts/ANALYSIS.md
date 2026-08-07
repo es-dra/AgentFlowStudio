@@ -5,16 +5,16 @@
 Deliberately **not** precision/recall. Understanding accuracy on long text is
 already covered by aliases + indirect-mentions. This dimension is a checklist:
 
-1. free-path bit-determinism  
-2. discovery volume ceilings  
-3. paid budget truncation (mock judge)  
-4. crash-free  
+1. free-path bit-determinism
+2. discovery volume ceilings
+3. paid budget truncation (mock judge)
+4. crash-free
 
 ## 2026-08-06 real run
 
-- Corpus: 2 long + 3 generalization scripts  
-- Remote LLM calls: **0** (mock judge)  
-- Wall time: ~0.05s  
+- Corpus: 2 long + 3 generalization scripts
+- Remote LLM calls: **0** (mock judge)
+- Wall time: ~0.05s
 - Checklist: **25/25 probes passed**
 
 | Script | chars | discovery | /1k chars | notes |
@@ -37,6 +37,6 @@ known-identity suppression. First probe draft wrongly expected
 
 ## Limits
 
-- Does not claim remote LLM judgment repeatability.  
-- Does not re-score alias/indirect accuracy on long text.  
+- Does not claim remote LLM judgment repeatability.
+- Does not re-score alias/indirect accuracy on long text.
 - Ceilings are corpus-informed heuristics; open NER would break them by design.
