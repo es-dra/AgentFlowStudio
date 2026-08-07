@@ -18,24 +18,24 @@ Today's conclusion stands: long scripts amplify alias / indirect-mention *correc
 
 ## Checklist probes
 
-1. **Deterministic free-path bit-stability**  
+1. **Deterministic free-path bit-stability**
    Same script twice → identical digests for:
    - indirect-mention *discovery* (free)
    - character + scene extraction
    - alias link proposals
-   - scene-name normalization proposals  
+   - scene-name normalization proposals
 
-2. **Discovery volume bounded**  
-   Per-script discovery count ≤ soft ceiling (warn/fail checklist) and hard ceiling (hard fail).  
+2. **Discovery volume bounded**
+   Per-script discovery count ≤ soft ceiling (warn/fail checklist) and hard ceiling (hard fail).
    Also report `discovery_per_1k_chars` so growth vs length is visible without inventing a fake regression R².
 
-3. **Paid budget truncation**  
+3. **Paid budget truncation**
    `build_indirect_mention_proposals(..., max_calls=N)` with a **mock judge**:
    - `judged_count == min(discovered, N)`
    - `len(budget_skipped) == max(0, discovered - N)`
    - never silently drops over-budget mentions
 
-4. **Crash-free**  
+4. **Crash-free**
    No uncaught exception on the above paths.
 
 ## Explicitly out of scope
@@ -48,9 +48,9 @@ Today's conclusion stands: long scripts amplify alias / indirect-mention *correc
 
 Hand-written observation payloads:
 
-- `perfect` → all probes pass  
-- `nondeterministic` → free-path digest mismatch fails  
-- `budget_bypass` → judged_count > max_calls fails  
+- `perfect` → all probes pass
+- `nondeterministic` → free-path digest mismatch fails
+- `budget_bypass` → judged_count > max_calls fails
 
 ## Cost
 
